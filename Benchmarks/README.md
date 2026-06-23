@@ -4,7 +4,7 @@ This directory contains a set of benchmarks that can be used to compare the perf
 
 The benchmarks are divided in two types:
 
-* Bencmarking WasmKit library via [`package-benchmark`](https://github.com/ordo-one/package-benchmark) harness;
+* Bencmarking WasmKit library via [`ordo-one/benchmark`](https://github.com/ordo-one/benchmark) harness;
 * Benchmarking Wasm runtime executables end-to-end, implemented with a `bench.py` script.
 
 Setup and running instructions depend on the type of benchmarking you're interested.

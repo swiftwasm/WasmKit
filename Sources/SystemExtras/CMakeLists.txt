@@ -7,6 +7,7 @@ add_wasmkit_library(SystemExtras
   FileAtOperations.swift
   FileOperations.swift
   Syscalls.swift
+  ThrowingDefer.swift
 )
 
 set(SWIFT_SYSTEM_APPLE_PLATFORMS "Darwin" "iOS" "watchOS" "tvOS" "visionOS")

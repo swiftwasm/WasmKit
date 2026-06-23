@@ -5,7 +5,7 @@ import SwiftShims  // For swift_stdlib_random
 /// This type is similar to `RandomNumberGenerator` in Swift standard library,
 /// but it provides a way to fill a buffer with random bytes instead of a single
 /// random number.
-public protocol RandomBufferGenerator {
+public protocol RandomBufferGenerator: Sendable {
 
     /// Fills the buffer with random bytes.
     ///

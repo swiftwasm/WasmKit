@@ -196,8 +196,8 @@
             let ft = typeDecls[0]
             #expect(ft.params.count == 1)
             #expect(ft.params[0].name == "name")
-            #expect(ft.params[0].type == .string)
-            #expect(ft.result == .string)
+            #expect(ft.params[0].type == .primitive(.string))
+            #expect(ft.result == .primitive(.string))
 
             // Decl 1: export → "do-stuff" → function(0)
             let exportDecls = iDecls.compactMap { d -> ComponentExportDecl? in
@@ -296,8 +296,8 @@
             if case .type(.function(let ft)) = it.declarations[0] {
                 #expect(ft.params.count == 1)
                 #expect(ft.params[0].name == "x")
-                #expect(ft.params[0].type == .u32)
-                #expect(ft.result == .u32)
+                #expect(ft.params[0].type == .primitive(.u32))
+                #expect(ft.result == .primitive(.u32))
             } else {
                 Issue.record("Expected functype in instance decl[0]")
             }
@@ -402,7 +402,7 @@
             let it = try #require(instanceTypes.first)
 
             // Find record type def
-            var records: [ComponentValueType] = []
+            var records: [ComponentDefValType] = []
             for d in it.declarations {
                 if case .type(.definedValue(let vt)) = d {
                     if case .record = vt { records.append(vt) }
@@ -418,8 +418,8 @@
             #expect(fields[1].name == "y")
             // Field types are read as type indices by the parser since they're
             // encoded as primitive opcodes (s32 = 0x7A = 122 as unsigned LEB128)
-            #expect(fields[0].type.rawValue == Int(0x7A))
-            #expect(fields[1].type.rawValue == Int(0x7A))
+            #expect(fields[0].type == .index(ComponentTypeIndex(rawValue: Int(0x7A))))
+            #expect(fields[1].type == .index(ComponentTypeIndex(rawValue: Int(0x7A))))
         }
 
         @Test func interfaceWithEnumType() throws {
@@ -721,9 +721,9 @@
             #expect(funcTypes.count == 13)
 
             // Each function has 1 param and 1 result, both the same primitive type
-            let expectedTypes: [ComponentValueType] = [
-                .bool, .u8, .u16, .u32, .u64, .s8, .s16, .s32, .s64,
-                .float32, .float64, .char, .string,
+            let expectedTypes: [ComponentDefValType] = [
+                .primitive(.bool), .primitive(.u8), .primitive(.u16), .primitive(.u32), .primitive(.u64), .primitive(.s8), .primitive(.s16), .primitive(.s32), .primitive(.s64),
+                .primitive(.float32), .primitive(.float64), .primitive(.char), .primitive(.string),
             ]
             for (i, expected) in expectedTypes.enumerated() {
                 #expect(funcTypes[i].params.count == 1)
@@ -769,7 +769,7 @@
             let it = try #require(instanceTypes.first)
 
             // Collect type defs in order
-            var typeDefs: [ComponentValueType] = []
+            var typeDefs: [ComponentDefValType] = []
             for d in it.declarations {
                 if case .type(.definedValue(let vt)) = d { typeDefs.append(vt) }
             }
@@ -791,8 +791,8 @@
             #expect(lineFields[0].name == "start")
             #expect(lineFields[1].name == "end")
             // point is type index 0 in this instancetype
-            #expect(lineFields[0].type.rawValue == 0)
-            #expect(lineFields[1].type.rawValue == 0)
+            #expect(lineFields[0].type == .index(ComponentTypeIndex(rawValue: 0)))
+            #expect(lineFields[1].type == .index(ComponentTypeIndex(rawValue: 0)))
         }
 
         // MARK: - Error path tests
@@ -981,7 +981,7 @@
             if let ft = funcTypesByIndex[3] {
                 // The result references point which is type 0; but since point is a
                 // named type, the serializer writes its index (0) as a type reference
-                if case .indexed(let idx) = ft.result {
+                if case .inlined(.index(let idx)) = ft.result {
                     #expect(idx.rawValue == 0, "get-point should return type 0 (point)")
                 } else {
                     Issue.record("Expected indexed result for get-point, got \(String(describing: ft.result))")
@@ -990,7 +990,7 @@
 
             // Verify get-color returns type index 1 (color)
             if let ft = funcTypesByIndex[4] {
-                if case .indexed(let idx) = ft.result {
+                if case .inlined(.index(let idx)) = ft.result {
                     #expect(idx.rawValue == 1, "get-color should return type 1 (color)")
                 } else {
                     Issue.record("Expected indexed result for get-color, got \(String(describing: ft.result))")
@@ -1017,7 +1017,7 @@
 
             // First should be a type def (the alias u32 → just writes u32 primitive)
             if case .type(.definedValue(let vt)) = iDecls[0] {
-                #expect(vt == .u32, "type my-id = u32 should produce u32 defined value")
+                #expect(vt == .primitive(.u32), "type my-id = u32 should produce u32 defined value")
             } else {
                 Issue.record("Expected defined value type for my-id, got \(iDecls[0])")
             }
@@ -1172,12 +1172,12 @@
             let ft = funcTypes[0]
             #expect(ft.params.count == 3)
             #expect(ft.params[0].name == "a")
-            #expect(ft.params[0].type == .u32)
+            #expect(ft.params[0].type == .primitive(.u32))
             #expect(ft.params[1].name == "b")
-            #expect(ft.params[1].type == .string)
+            #expect(ft.params[1].type == .primitive(.string))
             #expect(ft.params[2].name == "c")
-            #expect(ft.params[2].type == .bool)
-            #expect(ft.result == .u64)
+            #expect(ft.params[2].type == .primitive(.bool))
+            #expect(ft.result == .primitive(.u64))
         }
     }
 

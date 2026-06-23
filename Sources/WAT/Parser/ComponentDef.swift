@@ -242,7 +242,7 @@
         struct ComponentTypeDef: NamedFieldDecl {
             enum Kind: Hashable {
                 case function(ComponentFuncType)
-                case value(ComponentValueType)
+                case value(ComponentDefValType)
                 case instance(InstanceTypeDef)
                 case component(ComponentInnerTypeDef)
             }
@@ -253,7 +253,7 @@
         struct InstanceTypeDef: Hashable {
             struct TypeDecl: Hashable {
                 let id: Name?
-                let valueType: ComponentValueType
+                let valueType: ComponentDefValType
             }
             struct ExportDecl: Hashable {
                 let name: String
@@ -266,7 +266,7 @@
         struct ComponentInnerTypeDef: Hashable {
             struct TypeDecl: Hashable {
                 let id: Name?
-                let valueType: ComponentValueType
+                let valueType: ComponentDefValType
             }
             struct ImportDecl: Hashable {
                 let name: String

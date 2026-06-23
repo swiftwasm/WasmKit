@@ -26,22 +26,10 @@
         }
 
         /// Parse a value given its expected type
-        public mutating func parse(type: ComponentValueType) throws(WAVEParserError) -> ComponentValue {
+        public mutating func parse(type: ComponentDefValType) throws(WAVEParserError) -> ComponentValue {
             switch type {
-            case .bool:
-                return try parseBool()
-            case .u8, .u16, .u32, .u64:
-                return try parseUnsignedInt(type: type)
-            case .s8, .s16, .s32, .s64:
-                return try parseSignedInt(type: type)
-            case .float32:
-                return try parseFloat32()
-            case .float64:
-                return try parseFloat64()
-            case .char:
-                return try parseChar()
-            case .string:
-                return try parseString()
+            case .inlined(.primitive(let prim)):
+                return try parsePrimitive(prim)
             case .list(_):
                 // For now, we need a type context to resolve the element type
                 // This will be provided by the caller
@@ -67,31 +55,19 @@
 
         /// Parse a value with a type resolver for composite types
         public mutating func parse(
-            type: ComponentValueType,
-            resolver: (ComponentTypeIndex) throws -> ComponentValueType
+            type: ComponentDefValType,
+            resolver: (ComponentTypeIndex) throws -> ComponentDefValType
         ) throws -> ComponentValue {
             switch type {
-            case .bool:
-                return try parseBool()
-            case .u8, .u16, .u32, .u64:
-                return try parseUnsignedInt(type: type)
-            case .s8, .s16, .s32, .s64:
-                return try parseSignedInt(type: type)
-            case .float32:
-                return try parseFloat32()
-            case .float64:
-                return try parseFloat64()
-            case .char:
-                return try parseChar()
-            case .string:
-                return try parseString()
-            case .list(let elementTypeIdx):
-                let elementType = try resolver(elementTypeIdx)
+            case .inlined(.primitive(let prim)):
+                return try parsePrimitive(prim)
+            case .list(let element):
+                let elementType = try element.resolve(resolver)
                 return try parseList(elementType: elementType, resolver: resolver)
-            case .tuple(let typeIndices):
-                var types: [ComponentValueType] = []
-                for idx in typeIndices {
-                    types.append(try resolver(idx))
+            case .tuple(let elements):
+                var types: [ComponentDefValType] = []
+                for elem in elements {
+                    types.append(try elem.resolve(resolver))
                 }
                 return try parseTuple(types: types, resolver: resolver)
             case .record(let fields):
@@ -102,23 +78,39 @@
                 return try parseEnum(cases: cases)
             case .flags(let flagNames):
                 return try parseFlags(flagNames: flagNames)
-            case .option(let innerTypeIdx):
-                let innerType = try resolver(innerTypeIdx)
+            case .option(let inner):
+                let innerType = try inner.resolve(resolver)
                 return try parseOption(innerType: innerType, resolver: resolver)
-            case .result(let okTypeIdx, let errTypeIdx):
-                var okType: ComponentValueType?
-                var errType: ComponentValueType?
-                if let idx = okTypeIdx {
-                    okType = try resolver(idx)
-                }
-                if let idx = errTypeIdx {
-                    errType = try resolver(idx)
-                }
+            case .result(let okTypeRef, let errTypeRef):
+                let okType = try okTypeRef.map { try $0.resolve(resolver) }
+                let errType = try errTypeRef.map { try $0.resolve(resolver) }
                 return try parseResult(okType: okType, errType: errType, resolver: resolver)
-            case .indexed(let idx):
+            case .inlined(.index(let idx)):
                 return try parse(type: try resolver(idx), resolver: resolver)
             default:
                 throw WAVEParserError("unsupported type", span: try lexer.peek().span)
+            }
+        }
+
+        /// Parse a primitive value given its primitive type.
+        private mutating func parsePrimitive(_ prim: ComponentPrimValType) throws(WAVEParserError) -> ComponentValue {
+            switch prim {
+            case .bool:
+                return try parseBool()
+            case .u8, .u16, .u32, .u64:
+                return try parseUnsignedInt(prim)
+            case .s8, .s16, .s32, .s64:
+                return try parseSignedInt(prim)
+            case .float32:
+                return try parseFloat32()
+            case .float64:
+                return try parseFloat64()
+            case .char:
+                return try parseChar()
+            case .string:
+                return try parseString()
+            case .errorContext:
+                throw WAVEParserError("error-context values are not supported in WAVE", span: try lexer.peek().span)
             }
         }
 
@@ -136,7 +128,7 @@
             }
         }
 
-        private mutating func parseUnsignedInt(type: ComponentValueType) throws(WAVEParserError) -> ComponentValue {
+        private mutating func parseUnsignedInt(_ prim: ComponentPrimValType) throws(WAVEParserError) -> ComponentValue {
             let token = try lexer.next()
             guard case .number(let str, let span) = token else {
                 throw WAVEParserError("expected number", span: token.span)
@@ -146,7 +138,7 @@
                 throw WAVEParserError("invalid integer", span: span)
             }
 
-            switch type {
+            switch prim {
             case .u8:
                 guard value <= UInt64(UInt8.max) else {
                     throw WAVEParserError("value out of range for u8", span: span)
@@ -169,7 +161,7 @@
             }
         }
 
-        private mutating func parseSignedInt(type: ComponentValueType) throws(WAVEParserError) -> ComponentValue {
+        private mutating func parseSignedInt(_ prim: ComponentPrimValType) throws(WAVEParserError) -> ComponentValue {
             let token = try lexer.next()
             guard case .number(let str, let span) = token else {
                 throw WAVEParserError("expected number", span: token.span)
@@ -179,7 +171,7 @@
                 throw WAVEParserError("invalid integer", span: span)
             }
 
-            switch type {
+            switch prim {
             case .s8:
                 guard value >= Int64(Int8.min) && value <= Int64(Int8.max) else {
                     throw WAVEParserError("value out of range for s8", span: span)
@@ -259,8 +251,8 @@
         // MARK: - Composite Parsing
 
         private mutating func parseList(
-            elementType: ComponentValueType,
-            resolver: (ComponentTypeIndex) throws -> ComponentValueType
+            elementType: ComponentDefValType,
+            resolver: (ComponentTypeIndex) throws -> ComponentDefValType
         ) throws -> ComponentValue {
             let open = try lexer.next()
             guard case .leftBracket = open else {
@@ -299,8 +291,8 @@
         }
 
         private mutating func parseTuple(
-            types: [ComponentValueType],
-            resolver: (ComponentTypeIndex) throws -> ComponentValueType
+            types: [ComponentDefValType],
+            resolver: (ComponentTypeIndex) throws -> ComponentDefValType
         ) throws -> ComponentValue {
             let open = try lexer.next()
             guard case .leftParen = open else {
@@ -336,7 +328,7 @@
 
         private mutating func parseRecord(
             fields: [ComponentRecordField],
-            resolver: (ComponentTypeIndex) throws -> ComponentValueType
+            resolver: (ComponentTypeIndex) throws -> ComponentDefValType
         ) throws -> ComponentValue {
             let open = try lexer.next()
             guard case .leftBrace = open else {
@@ -353,7 +345,7 @@
                 // All fields must be optional and set to none
                 var result: [(name: String, value: ComponentValue)] = []
                 for field in fields {
-                    let fieldType = try resolver(field.type)
+                    let fieldType = try field.type.resolve(resolver)
                     if case .option = fieldType {
                         result.append((field.name, .option(nil)))
                     } else {
@@ -411,7 +403,7 @@
                     throw WAVEParserError("unknown field '\(fieldName)'", span: labelToken.span)
                 }
 
-                let fieldType = try resolver(fieldDef.type)
+                let fieldType = try fieldDef.type.resolve(resolver)
                 let value = try parse(type: fieldType, resolver: resolver)
                 parsedFields[fieldName] = value
 
@@ -440,7 +432,7 @@
                 if let value = parsedFields[field.name] {
                     result.append((field.name, value))
                 } else {
-                    let fieldType = try resolver(field.type)
+                    let fieldType = try field.type.resolve(resolver)
                     if case .option = fieldType {
                         result.append((field.name, .option(nil)))
                     } else {
@@ -454,7 +446,7 @@
 
         private mutating func parseVariant(
             cases: [ComponentCaseField],
-            resolver: (ComponentTypeIndex) throws -> ComponentValueType
+            resolver: (ComponentTypeIndex) throws -> ComponentDefValType
         ) throws -> ComponentValue {
             let labelToken = try lexer.next()
             let caseName: String
@@ -493,7 +485,7 @@
                     throw WAVEParserError("expected '(' for variant payload", span: open.span)
                 }
 
-                let payloadType = try resolver(payloadTypeIdx)
+                let payloadType = try payloadTypeIdx.resolve(resolver)
                 let payload = try parse(type: payloadType, resolver: resolver)
 
                 let close = try lexer.next()
@@ -582,8 +574,8 @@
         }
 
         private mutating func parseOption(
-            innerType: ComponentValueType,
-            resolver: (ComponentTypeIndex) throws -> ComponentValueType
+            innerType: ComponentDefValType,
+            resolver: (ComponentTypeIndex) throws -> ComponentDefValType
         ) throws -> ComponentValue {
             let token = try lexer.peek()
 
@@ -617,9 +609,9 @@
         }
 
         private mutating func parseResult(
-            okType: ComponentValueType?,
-            errType: ComponentValueType?,
-            resolver: (ComponentTypeIndex) throws -> ComponentValueType
+            okType: ComponentDefValType?,
+            errType: ComponentDefValType?,
+            resolver: (ComponentTypeIndex) throws -> ComponentDefValType
         ) throws -> ComponentValue {
             let token = try lexer.peek()
 
@@ -775,8 +767,8 @@
         ///   - resolver: A function to resolve type indices to concrete types
         /// - Returns: The parsed argument values
         public mutating func parseArguments(
-            params: [ComponentValueType],
-            resolver: @escaping (ComponentTypeIndex) throws -> ComponentValueType
+            params: [ComponentDefValType],
+            resolver: @escaping (ComponentTypeIndex) throws -> ComponentDefValType
         ) throws -> [ComponentValue] {
             var parsedArgs: [ComponentValue] = []
 

@@ -7,7 +7,7 @@ struct FileAccessMode: OptionSet {
     static let write = FileAccessMode(rawValue: 1 << 1)
 }
 
-protocol WASIEntry {
+protocol WASIEntry: Sendable {
     /// Whether this entry wraps a borrowed file descriptor that should not be
     /// closed when the WASI instance is torn down (e.g. process stdio).
     var isBorrowed: Bool { get }
@@ -119,9 +119,14 @@ struct FdTable {
         set { self.map[fd] = newValue }
     }
 
+    /// Whether another descriptor can be installed, i.e. the table is below capacity.
+    var hasCapacity: Bool {
+        map.count < WASIAbi.Fd.max
+    }
+
     /// Inserts an entry and returns the corresponding file descriptor
     mutating func push(_ entry: FdEntry) throws -> WASIAbi.Fd {
-        guard map.count < WASIAbi.Fd.max else {
+        guard hasCapacity else {
             throw WASIAbi.Errno.ENFILE
         }
         // Find a free fd
@@ -155,7 +160,7 @@ struct FdTable {
 }
 
 /// Content of a file that can be retrieved from the file system.
-public enum FileContent {
+public enum FileContent: Sendable {
     case bytes([UInt8])
     case handle(FileDescriptor)
 }
@@ -163,7 +168,7 @@ public enum FileContent {
 /// Protocol for file system implementations used by WASI.
 ///
 /// This protocol contains WASI-specific implementation details.
-protocol FileSystemImplementation: ~Copyable {
+protocol FileSystemImplementation: ~Copyable, Sendable {
     /// Preopens a directory and returns a WASIDir implementation.
     func preopenDirectory(guestPath: String, hostPath: String) throws -> any WASIDir
 

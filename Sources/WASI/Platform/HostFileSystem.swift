@@ -19,7 +19,7 @@ import SystemPackage
 /// A file system implementation that directly accesses the host operating system's file system.
 ///
 /// This implementation provides access to actual files and directories on the host system.
-final class HostFileSystem: FileSystemImplementation {
+final class HostFileSystem: FileSystemImplementation, Sendable {
 
     /// Creates a new host file system.
     init() {

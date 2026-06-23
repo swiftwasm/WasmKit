@@ -85,7 +85,7 @@ jobs:
           sudo installer -pkg $pkg -target /
           echo "toolchain-path=$toolchain_path" >> $GITHUB_OUTPUT
           "$toolchain_path/usr/bin/swift" sdk install "https://download.swift.org/development/wasm-sdk/$DEV_SNAPSHOT/${DEV_SNAPSHOT}_wasm.artifactbundle.tar.gz" --checksum "$WASI_SDK_CHECKSUM"
-          wasi_sdk_path=$("$toolchain_path/usr/bin/swift" sdk configure --show-configuration "${DEV_SNAPSHOT}_wasm" wasm32-unknown-wasi | grep sdkRootPath: | cut -d: -f2)
+          wasi_sdk_path=$("$toolchain_path/usr/bin/swift" sdk configure --show-configuration "${DEV_SNAPSHOT}_wasm" wasm32-unknown-wasip1 | grep sdkRootPath: | cut -d: -f2)
           echo "wasi-swift-sdk-path=$(dirname $wasi_sdk_path)" >> $GITHUB_OUTPUT
 
       - name: Select Xcode version
@@ -160,7 +160,7 @@ jobs:
           curl -L "https://download.swift.org/development/ubuntu2404/$DEV_SNAPSHOT/$DEV_SNAPSHOT-ubuntu24.04.tar.gz" | ./build-exec tar xz --strip-component 1 -C "$toolchain_path"
           echo "toolchain-path=$toolchain_path" >> $GITHUB_OUTPUT
           ./build-exec "$toolchain_path/usr/bin/swift" sdk install "https://download.swift.org/development/wasm-sdk/$DEV_SNAPSHOT/${DEV_SNAPSHOT}_wasm.artifactbundle.tar.gz" --checksum "$WASI_SDK_CHECKSUM"
-          wasi_sdk_path=$(./build-exec "$toolchain_path/usr/bin/swift" sdk configure --show-configuration "${DEV_SNAPSHOT}_wasm" wasm32-unknown-wasi | grep sdkRootPath: | cut -d: -f2)
+          wasi_sdk_path=$(./build-exec "$toolchain_path/usr/bin/swift" sdk configure --show-configuration "${DEV_SNAPSHOT}_wasm" wasm32-unknown-wasip1 | grep sdkRootPath: | cut -d: -f2)
           echo "wasi-swift-sdk-path=$(dirname $wasi_sdk_path)" >> $GITHUB_OUTPUT
 
       - name: Configure Tests/default.json

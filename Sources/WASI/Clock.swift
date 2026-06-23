@@ -3,7 +3,7 @@ import SystemExtras
 /// WASI wall clock interface based on WASI Preview 2 `wall-clock` interface.
 ///
 /// See also https://github.com/WebAssembly/wasi-clocks/blob/v0.2.0/wit/wall-clock.wit
-public protocol WallClock {
+public protocol WallClock: Sendable {
     /// An instant in time, in seconds and nanoseconds.
     typealias Duration = (
         seconds: UInt64,
@@ -22,7 +22,7 @@ public protocol WallClock {
 /// WASI monotonic clock interface based on WASI Preview 2 `monotonic-clock` interface.
 ///
 /// See also https://github.com/WebAssembly/wasi-clocks/blob/v0.2.0/wit/monotonic-clock.wit
-public protocol MonotonicClock {
+public protocol MonotonicClock: Sendable {
     /// An instant in time, in nanoseconds.
     typealias Instant = UInt64
     /// A duration of time, in nanoseconds.

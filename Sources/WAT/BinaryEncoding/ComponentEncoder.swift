@@ -356,24 +356,28 @@
         }
 
         // Collect all type indices that a value type depends on
-        private func collectDependentTypeIndices(from valueType: ComponentValueType) -> [Int] {
+        private func collectDependentTypeIndices(from valueType: ComponentDefValType) -> [Int] {
+            func indexOf(_ ref: ComponentValType) -> Int? {
+                if case .index(let idx) = ref { return Int(idx.rawValue) }
+                return nil
+            }
             switch valueType {
-            case .indexed(let typeIndex):
+            case .inlined(.index(let typeIndex)):
                 return [Int(typeIndex.rawValue)]
-            case .list(let typeIndex), .option(let typeIndex):
-                return [Int(typeIndex.rawValue)]
-            case .tuple(let typeIndices):
-                return typeIndices.map { Int($0.rawValue) }
-            case .result(let okType, let errorType):
+            case .list(let ref), .option(let ref):
+                return indexOf(ref).map { [$0] } ?? []
+            case .tuple(let refs):
+                return refs.compactMap(indexOf)
+            case .result(let okRef, let errorRef):
                 var indices: [Int] = []
-                if let okType { indices.append(Int(okType.rawValue)) }
-                if let errorType { indices.append(Int(errorType.rawValue)) }
+                if let okRef, let i = indexOf(okRef) { indices.append(i) }
+                if let errorRef, let i = indexOf(errorRef) { indices.append(i) }
                 return indices
             case .record(let fields):
-                return fields.map { Int($0.type.rawValue) }
+                return fields.compactMap { indexOf($0.type) }
             case .variant(let cases):
-                return cases.compactMap { $0.type.map { Int($0.rawValue) } }
-            case .bool, .u8, .u16, .u32, .u64, .s8, .s16, .s32, .s64, .float32, .float64, .char, .string, .errorContext, .flags, .enum:
+                return cases.compactMap { $0.type.flatMap(indexOf) }
+            case .inlined(.primitive), .flags, .enum:
                 return []
             case .future, .stream, .resource:
                 return []
@@ -451,7 +455,7 @@
                 encoder.writeUnsignedLEB128(UInt32(funcType.params.count))
                 for param in funcType.params {
                     encoder.encode(param.name)
-                    try Self.encodeComponentValueType(
+                    try Self.encodeComponentDefValType(
                         param.type,
                         types: types,
                         indexMapping: typeIndexMapping,
@@ -461,7 +465,7 @@
 
                 if let result = funcType.result {
                     encoder.output.append(0x00)  // has result
-                    try Self.encodeComponentValueType(
+                    try Self.encodeComponentDefValType(
                         result,
                         types: types,
                         indexMapping: typeIndexMapping,
@@ -473,7 +477,7 @@
                 }
 
             case .value(let valueType):
-                try Self.encodeComponentValueType(
+                try Self.encodeComponentDefValType(
                     valueType,
                     types: types,
                     indexMapping: typeIndexMapping,
@@ -487,7 +491,7 @@
 
                 for typeDecl in instanceType.typeDecls {
                     encoder.output.append(0x01)  // type declaration tag
-                    try Self.encodeComponentValueType(
+                    try Self.encodeComponentDefValType(
                         typeDecl.valueType,
                         types: types,
                         indexMapping: typeIndexMapping,
@@ -495,7 +499,7 @@
                     )
                 }
 
-                #warning("Instance types not fully supported in component binary encoder")
+                // TODO: Instance types not fully supported in component binary encoder
                 for export in instanceType.exports {
                     encoder.output.append(0x04)  // export declaration tag
                     encoder.output.append(0x00)  // outer count (simplified)
@@ -512,7 +516,7 @@
 
                 for typeDecl in componentType.typeDecls {
                     encoder.output.append(0x01)  // type declaration tag
-                    try Self.encodeComponentValueType(
+                    try Self.encodeComponentDefValType(
                         typeDecl.valueType,
                         types: types,
                         indexMapping: typeIndexMapping,
@@ -520,7 +524,7 @@
                     )
                 }
 
-                #warning("Imports and exports not fully supported in component binary encoder")
+                // TODO: Imports and exports not fully supported in component binary encoder
                 for importDecl in componentType.imports {
                     encoder.output.append(0x03)  // import declaration tag
                     encoder.output.append(0x00)  // outer count (simplified)
@@ -772,7 +776,7 @@
                         encoder.output.append(0x00)  // sort: core
                         encoder.output.append(coreSort.binaryEncoding)
                     case .func, .value, .type, .component, .instance:
-                        #warning("Unhandled cases for core aliases in `encodeBatchedAliases`")
+                        // TODO: Unhandled cases for core aliases in `encodeBatchedAliases`
                         // Non-core sorts not yet supported in batched aliases
                         break
                     }
@@ -805,11 +809,11 @@
                             coreFunctionCount += 1
                         case .table, .global, .type, .module, .instance:
                             // TODO: Track table and global counts
-                            #warning("Table and global counts not tracked in `encodeBatchedAlises`")
+                            // TODO: Table and global counts not tracked in `encodeBatchedAlises`
                             break
                         }
                     case .func, .value, .type, .component, .instance:
-                        #warning("Component-level alias counts not tracked in `encodeBatchedAlises`")
+                        // TODO: Component-level alias counts not tracked in `encodeBatchedAlises`
                         break
                     }
                 }
@@ -878,7 +882,7 @@
                             idx += 1
                         }
                     }
-                    #warning("Non-core func aliases not fully supported in component binary encoder")
+                    // TODO: Non-core func aliases not fully supported in component binary encoder
                     coreFuncIndex = coreFunctionCount - (emittedCoreFuncAliases.count - idx)
                 }
 
@@ -1071,12 +1075,12 @@
                     encoder.output.append(0x01)  // canon.lower
                     encoder.output.append(0x00)  // sub-opcode
 
-                    #warning("No function imports in enabled test cases yet to exercise this code path fully")
+                    // TODO: No function imports in enabled test cases yet to exercise this code path fully
                     // Reference the component function by its aliased index
                     encoder.writeUnsignedLEB128(UInt32(componentFuncIndex))
 
                     // No options for now
-                    #warning("canon.lower options not emitted yet in `encodeSingleCanon`")
+                    // TODO: canon.lower options not emitted yet in `encodeSingleCanon`
                     encoder.writeUnsignedLEB128(UInt32(0))  // 0 options
                 }
                 coreFunctionCount += 1  // canon.lower creates a core function
@@ -1387,11 +1391,19 @@
 
         /// Encode a component value type as valtype (either index or inline primitive)
         private static func encodeValType(
-            _ typeIndex: ComponentTypeIndex,
+            _ ref: ComponentValType,
             types: NameMapping<ComponentWatParser.ComponentTypeDef>,
             indexMapping: [Int: Int],
             encoder: inout Encoder
         ) throws(WatParserError) {
+            let typeIndex: ComponentTypeIndex
+            switch ref {
+            case .primitive(let prim):
+                try encodeComponentDefValType(.inlined(.primitive(prim)), types: types, indexMapping: indexMapping, encoder: &encoder)
+                return
+            case .index(let idx):
+                typeIndex = idx
+            }
             // Look up the type to see if it's a primitive
             let typeDef = types[Int(typeIndex.rawValue)]
             // Only inline primitives if the type is anonymous (no ID)
@@ -1399,9 +1411,9 @@
             if typeDef.id == nil, case .value(let valueType) = typeDef.kind {
                 // Check if it's a primitive that can be inlined
                 switch valueType {
-                case .bool, .s8, .u8, .s16, .u16, .s32, .u32, .s64, .u64, .float32, .float64, .char, .string, .errorContext:
+                case .inlined(.primitive):
                     // Inline the primitive
-                    try encodeComponentValueType(valueType, types: types, indexMapping: indexMapping, encoder: &encoder)
+                    try encodeComponentDefValType(valueType, types: types, indexMapping: indexMapping, encoder: &encoder)
                     return
                 default:
                     break
@@ -1415,28 +1427,28 @@
         }
 
         /// Encode a component value type
-        private static func encodeComponentValueType(
-            _ valueType: ComponentValueType,
+        private static func encodeComponentDefValType(
+            _ valueType: ComponentDefValType,
             types: NameMapping<ComponentWatParser.ComponentTypeDef>,
             indexMapping: [Int: Int],
             encoder: inout Encoder
         ) throws(WatParserError) {
             switch valueType {
             // Primitive types
-            case .bool: encoder.output.append(0x7F)
-            case .s8: encoder.output.append(0x7E)
-            case .u8: encoder.output.append(0x7D)
-            case .s16: encoder.output.append(0x7C)
-            case .u16: encoder.output.append(0x7B)
-            case .s32: encoder.output.append(0x7A)
-            case .u32: encoder.output.append(0x79)
-            case .s64: encoder.output.append(0x78)
-            case .u64: encoder.output.append(0x77)
-            case .float32: encoder.output.append(0x76)
-            case .float64: encoder.output.append(0x75)
-            case .char: encoder.output.append(0x74)
-            case .string: encoder.output.append(0x73)
-            case .errorContext: encoder.output.append(0x64)
+            case .inlined(.primitive(.bool)): encoder.output.append(0x7F)
+            case .inlined(.primitive(.s8)): encoder.output.append(0x7E)
+            case .inlined(.primitive(.u8)): encoder.output.append(0x7D)
+            case .inlined(.primitive(.s16)): encoder.output.append(0x7C)
+            case .inlined(.primitive(.u16)): encoder.output.append(0x7B)
+            case .inlined(.primitive(.s32)): encoder.output.append(0x7A)
+            case .inlined(.primitive(.u32)): encoder.output.append(0x79)
+            case .inlined(.primitive(.s64)): encoder.output.append(0x78)
+            case .inlined(.primitive(.u64)): encoder.output.append(0x77)
+            case .inlined(.primitive(.float32)): encoder.output.append(0x76)
+            case .inlined(.primitive(.float64)): encoder.output.append(0x75)
+            case .inlined(.primitive(.char)): encoder.output.append(0x74)
+            case .inlined(.primitive(.string)): encoder.output.append(0x73)
+            case .inlined(.primitive(.errorContext)): encoder.output.append(0x64)
 
             // Composite types
             case .list(let typeIndex):
@@ -1508,7 +1520,7 @@
             case .future, .stream, .resource:
                 throw WatParserError("Component value type not yet supported: \(valueType)", location: nil)
 
-            case .indexed(let typeIndex):
+            case .inlined(.index(let typeIndex)):
                 // This is already a type reference, encode as index with remapping
                 guard let mappedIndex = indexMapping[Int(typeIndex.rawValue)] else {
                     throw WatParserError("Type index \(typeIndex.rawValue) not found in index mapping", location: nil)

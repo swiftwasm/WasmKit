@@ -25,7 +25,6 @@ struct ParseOnlyTests {
             case .module(let module):
                 try parseModuleSource(module.source, features: features)
             case .assertUnlinkable(let wat, _):
-                var wat = wat
                 let bytes = try wat.encode(options: .default)
                 try parseWasmBytes(bytes, features: features)
             default:
@@ -41,7 +40,7 @@ struct ParseOnlyTests {
             bytes = b
         case .quote(let text):
             bytes = try wat2wasm(String(decoding: text, as: UTF8.self), features: features)
-        case .text(var wat):
+        case .text(let wat):
             bytes = try wat.encode(options: .default)
         }
         try parseWasmBytes(bytes, features: features)

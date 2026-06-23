@@ -124,7 +124,7 @@
     /// A component type definition (from binary section 7).
     public enum ComponentTypeDef {
         /// A defined value type
-        case definedValue(ComponentValueType)
+        case definedValue(ComponentDefValType)
         /// A function type
         case function(ComponentFuncType)
         /// A component type
@@ -264,7 +264,7 @@
         }
 
         /// Parse a value type (primitive or type index).
-        func parseValType() throws(WasmParserError) -> ComponentValueType {
+        func parseValType() throws(WasmParserError) -> ComponentDefValType {
             let byte = try stream.peek() ?? 0
             // Check if it's a type index (non-negative SLEB128)
             if byte < 0x64 {
@@ -277,18 +277,18 @@
         }
 
         /// Parse an optional value type.
-        func parseOptionalValType() throws(WasmParserError) -> ComponentTypeIndex? {
+        func parseOptionalValType() throws(WasmParserError) -> ComponentValType? {
             let present = try stream.consumeAny()
             if present == 0x00 {
                 return nil
             } else {
                 let idx: UInt32 = try parseUnsigned()
-                return ComponentTypeIndex(rawValue: Int(idx))
+                return .index(ComponentTypeIndex(rawValue: Int(idx)))
             }
         }
 
         /// Parse a defined value type.
-        func parseDefValType() throws(WasmParserError) -> ComponentValueType {
+        func parseDefValType() throws(WasmParserError) -> ComponentDefValType {
             let byte = try stream.peek() ?? 0
 
             // Check for type index first
@@ -312,7 +312,7 @@
                 let fields = try parseVector { () throws(WasmParserError) -> ComponentRecordField in
                     let name = try stream.parseName()
                     let typeIdx: UInt32 = try parseUnsigned()
-                    return ComponentRecordField(name: name, type: ComponentTypeIndex(rawValue: Int(typeIdx)))
+                    return ComponentRecordField(name: name, type: .index(ComponentTypeIndex(rawValue: Int(typeIdx))))
                 }
                 return .record(fields)
 
@@ -327,11 +327,11 @@
 
             case .list:
                 let elemIdx: UInt32 = try parseUnsigned()
-                return .list(ComponentTypeIndex(rawValue: Int(elemIdx)))
+                return .list(.index(ComponentTypeIndex(rawValue: Int(elemIdx))))
 
             case .tuple:
                 let typeIndices: [UInt32] = try parseVector { () throws(WasmParserError) -> UInt32 in try parseUnsigned() }
-                return .tuple(typeIndices.map { ComponentTypeIndex(rawValue: Int($0)) })
+                return .tuple(typeIndices.map { .index(ComponentTypeIndex(rawValue: Int($0))) })
 
             case .flags:
                 let labels = try parseVector { () throws(WasmParserError) -> String in try stream.parseName() }
@@ -343,7 +343,7 @@
 
             case .option:
                 let someIdx: UInt32 = try parseUnsigned()
-                return .option(ComponentTypeIndex(rawValue: Int(someIdx)))
+                return .option(.index(ComponentTypeIndex(rawValue: Int(someIdx))))
 
             case .result:
                 let okIdx = try parseOptionalValType()
@@ -364,26 +364,26 @@
         }
 
         /// Parse a primitive value type from an already-consumed opcode.
-        func parsePrimValTypeFromOpcode(_ opcode: UInt8) throws(WasmParserError) -> ComponentValueType {
+        func parsePrimValTypeFromOpcode(_ opcode: UInt8) throws(WasmParserError) -> ComponentDefValType {
             guard let type = PrimitiveValTypeOpcode(rawValue: opcode) else {
                 throw makeError(.malformedValueType(opcode))
             }
 
             switch type {
-            case .bool: return .bool
-            case .s8: return .s8
-            case .u8: return .u8
-            case .s16: return .s16
-            case .u16: return .u16
-            case .s32: return .s32
-            case .u32: return .u32
-            case .s64: return .s64
-            case .u64: return .u64
-            case .float32: return .float32
-            case .float64: return .float64
-            case .char: return .char
-            case .string: return .string
-            case .errorContext: return .errorContext
+            case .bool: return .primitive(.bool)
+            case .s8: return .primitive(.s8)
+            case .u8: return .primitive(.u8)
+            case .s16: return .primitive(.s16)
+            case .u16: return .primitive(.u16)
+            case .s32: return .primitive(.s32)
+            case .u32: return .primitive(.u32)
+            case .s64: return .primitive(.s64)
+            case .u64: return .primitive(.u64)
+            case .float32: return .primitive(.float32)
+            case .float64: return .primitive(.float64)
+            case .char: return .primitive(.char)
+            case .string: return .primitive(.string)
+            case .errorContext: return .primitive(.errorContext)
             }
         }
 
@@ -467,7 +467,7 @@
             // Handle version suffix if present
             if prefix == 0x01 {
                 let suffixLen: UInt32 = try parseUnsigned()
-                #warning("Version suffix skipped in `parseImportExportName` as not implemented yet")
+                // TODO: Version suffix skipped in `parseImportExportName` as not implemented yet
                 _ = try stream.consume(count: Int(suffixLen))  // Skip version suffix for now
             }
 
@@ -602,7 +602,7 @@
                     return ComponentFuncType.Param(name: name, type: valType)
                 }
                 let resultKind = try stream.consumeAny()
-                let result: ComponentValueType?
+                let result: ComponentDefValType?
                 if resultKind == 0x00 {
                     result = try parseValType()
                 } else {

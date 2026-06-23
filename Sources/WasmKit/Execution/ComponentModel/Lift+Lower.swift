@@ -9,77 +9,77 @@
         /// Handles both flat primitives and heap-based types (strings).
         static func lift(
             from iterator: inout some IteratorProtocol<Value>,
-            to type: ComponentValueType,
-            resolveType: (ComponentTypeIndex) throws -> ComponentValueType,
+            to type: ComponentDefValType,
+            resolveType: (ComponentTypeIndex) throws -> ComponentDefValType,
             options: CanonOptions,
             store: Store
         ) throws -> ComponentValue {
             // First, resolve indexed types to their actual type
-            let resolvedType: ComponentValueType
-            if case .indexed(let typeIndex) = type {
-                resolvedType = try resolveType(typeIndex)
+            let resolvedType: ComponentDefValType
+            if case .inlined(.index(let typeIdx)) = type {
+                resolvedType = try resolveType(typeIdx)
             } else {
                 resolvedType = type
             }
 
             switch resolvedType {
             // Flat primitives
-            case .bool:
+            case .inlined(.primitive(.bool)):
                 guard case .i32(let v) = iterator.next() else {
                     throw CanonicalABIError(description: "Expected i32 for bool")
                 }
                 return .bool(v != 0)
-            case .u8:
+            case .inlined(.primitive(.u8)):
                 guard case .i32(let v) = iterator.next() else {
                     throw CanonicalABIError(description: "Expected i32 for u8")
                 }
                 return .u8(UInt8(truncatingIfNeeded: v))
-            case .u16:
+            case .inlined(.primitive(.u16)):
                 guard case .i32(let v) = iterator.next() else {
                     throw CanonicalABIError(description: "Expected i32 for u16")
                 }
                 return .u16(UInt16(truncatingIfNeeded: v))
-            case .u32:
+            case .inlined(.primitive(.u32)):
                 guard case .i32(let v) = iterator.next() else {
                     throw CanonicalABIError(description: "Expected i32 for u32")
                 }
                 return .u32(v)
-            case .u64:
+            case .inlined(.primitive(.u64)):
                 guard case .i64(let v) = iterator.next() else {
                     throw CanonicalABIError(description: "Expected i64 for u64")
                 }
                 return .u64(v)
-            case .s8:
+            case .inlined(.primitive(.s8)):
                 guard case .i32(let v) = iterator.next() else {
                     throw CanonicalABIError(description: "Expected i32 for s8")
                 }
                 return .s8(Int8(truncatingIfNeeded: Int32(bitPattern: v)))
-            case .s16:
+            case .inlined(.primitive(.s16)):
                 guard case .i32(let v) = iterator.next() else {
                     throw CanonicalABIError(description: "Expected i32 for s16")
                 }
                 return .s16(Int16(truncatingIfNeeded: Int32(bitPattern: v)))
-            case .s32:
+            case .inlined(.primitive(.s32)):
                 guard case .i32(let v) = iterator.next() else {
                     throw CanonicalABIError(description: "Expected i32 for s32")
                 }
                 return .s32(Int32(bitPattern: v))
-            case .s64:
+            case .inlined(.primitive(.s64)):
                 guard case .i64(let v) = iterator.next() else {
                     throw CanonicalABIError(description: "Expected i64 for s64")
                 }
                 return .s64(Int64(bitPattern: v))
-            case .float32:
+            case .inlined(.primitive(.float32)):
                 guard case .f32(let bits) = iterator.next() else {
                     throw CanonicalABIError(description: "Expected f32 for float32")
                 }
                 return .float32(Float(bitPattern: bits))
-            case .float64:
+            case .inlined(.primitive(.float64)):
                 guard case .f64(let bits) = iterator.next() else {
                     throw CanonicalABIError(description: "Expected f64 for float64")
                 }
                 return .float64(Double(bitPattern: bits))
-            case .char:
+            case .inlined(.primitive(.char)):
                 guard case .i32(let v) = iterator.next() else {
                     throw CanonicalABIError(description: "Expected i32 for char")
                 }
@@ -89,7 +89,7 @@
                 return .char(scalar)
 
             // String - requires memory
-            case .string:
+            case .inlined(.primitive(.string)):
                 guard case .i32(let pointer) = iterator.next() else {
                     throw CanonicalABIError(description: "Expected i32 pointer for string")
                 }
@@ -130,21 +130,21 @@
                 return .flags(flagSet)
 
             // Tuple - lift each element recursively
-            case .tuple(let typeIndices):
+            case .tuple(let elementValTypes):
                 var elements: [ComponentValue] = []
-                for typeIndex in typeIndices {
-                    let elementType = try resolveType(typeIndex)
+                for valType in elementValTypes {
+                    let elementType = try valType.resolve(resolveType)
                     let element = try Self.lift(from: &iterator, to: elementType, resolveType: resolveType, options: options, store: store)
                     elements.append(element)
                 }
                 return .tuple(elements)
 
             // Option - lift discriminant and optional payload
-            case .option(let someTypeIndex):
+            case .option(let someValType):
                 guard case .i32(let discriminant) = iterator.next() else {
                     throw CanonicalABIError(description: "Expected i32 discriminant for option")
                 }
-                let someType = try resolveType(someTypeIndex)
+                let someType = try someValType.resolve(resolveType)
                 if discriminant == 0 {
                     // none: consume payload space (zeros)
                     let flatCount = someType.flattenedCount
@@ -162,20 +162,20 @@
             case .record(let fieldDefs):
                 var fields: [(name: String, value: ComponentValue)] = []
                 for fieldDef in fieldDefs {
-                    let fieldType = try resolveType(fieldDef.type)
+                    let fieldType = try fieldDef.type.resolve(resolveType)
                     let value = try Self.lift(from: &iterator, to: fieldType, resolveType: resolveType, options: options, store: store)
                     fields.append((fieldDef.name, value))
                 }
                 return .record(fields)
 
             // Result - lift discriminant and payload
-            case .result(let okTypeIndex, let errorTypeIndex):
+            case .result(let okValType, let errorValType):
                 guard case .i32(let discriminant) = iterator.next() else {
                     throw CanonicalABIError(description: "Expected i32 discriminant for result")
                 }
 
-                let okType = try okTypeIndex.map(resolveType)
-                let errorType = try errorTypeIndex.map(resolveType)
+                let okType = try okValType.map { try $0.resolve(resolveType) }
+                let errorType = try errorValType.map { try $0.resolve(resolveType) }
 
                 // Calculate max payload size
                 let okFlatCount = okType.map { $0.flattenedCount } ?? 0
@@ -232,16 +232,16 @@
                 // Calculate max payload size
                 let maxPayloadCount =
                     try cases.map { variantCase -> Int in
-                        if let typeIndex = variantCase.type {
-                            return try resolveType(typeIndex).flattenedCount
+                        if let valType = variantCase.type {
+                            return try valType.resolve(resolveType).flattenedCount
                         }
                         return 0
                     }.max() ?? 0
 
                 let variantCase = cases[caseIndex]
-                if let typeIndex = variantCase.type {
+                if let valType = variantCase.type {
                     // Case with payload
-                    let caseType = try resolveType(typeIndex)
+                    let caseType = try valType.resolve(resolveType)
                     let value = try Self.lift(from: &iterator, to: caseType, resolveType: resolveType, options: options, store: store)
                     // Consume padding
                     let consumed = caseType.flattenedCount
@@ -258,7 +258,7 @@
                 }
 
             // List - lift pointer and length, then load elements from memory
-            case .list(let elementTypeIndex):
+            case .list(let elementValType):
                 guard case .i32(let pointer) = iterator.next() else {
                     throw CanonicalABIError(description: "Expected i32 pointer for list")
                 }
@@ -268,7 +268,7 @@
                 return try liftList(
                     pointer: pointer,
                     length: length,
-                    elementTypeIndex: elementTypeIndex,
+                    elementValType: elementValType,
                     resolveType: resolveType,
                     options: options,
                     store: store
@@ -282,48 +282,48 @@
         /// Lower a component value to core wasm values.
         /// Handles both flat primitives and heap-based types (strings).
         func lower(
-            to type: ComponentValueType,
-            resolveType: (ComponentTypeIndex) throws -> ComponentValueType,
+            to type: ComponentDefValType,
+            resolveType: (ComponentTypeIndex) throws -> ComponentDefValType,
             options: CanonOptions,
             store: Store
         ) throws -> [Value] {
             // First, resolve indexed types to their actual type
-            let resolvedType: ComponentValueType
-            if case .indexed(let typeIndex) = type {
-                resolvedType = try resolveType(typeIndex)
+            let resolvedType: ComponentDefValType
+            if case .inlined(.index(let typeIdx)) = type {
+                resolvedType = try resolveType(typeIdx)
             } else {
                 resolvedType = type
             }
 
             switch (self, resolvedType) {
             // Flat primitives - no memory needed
-            case (.bool(let b), .bool):
+            case (.bool(let b), .inlined(.primitive(.bool))):
                 return [.i32(b ? 1 : 0)]
-            case (.u8(let v), .u8):
+            case (.u8(let v), .inlined(.primitive(.u8))):
                 return [.i32(UInt32(v))]
-            case (.u16(let v), .u16):
+            case (.u16(let v), .inlined(.primitive(.u16))):
                 return [.i32(UInt32(v))]
-            case (.u32(let v), .u32):
+            case (.u32(let v), .inlined(.primitive(.u32))):
                 return [.i32(v)]
-            case (.u64(let v), .u64):
+            case (.u64(let v), .inlined(.primitive(.u64))):
                 return [.i64(v)]
-            case (.s8(let v), .s8):
+            case (.s8(let v), .inlined(.primitive(.s8))):
                 return [.i32(UInt32(bitPattern: Int32(v)))]
-            case (.s16(let v), .s16):
+            case (.s16(let v), .inlined(.primitive(.s16))):
                 return [.i32(UInt32(bitPattern: Int32(v)))]
-            case (.s32(let v), .s32):
+            case (.s32(let v), .inlined(.primitive(.s32))):
                 return [.i32(UInt32(bitPattern: v))]
-            case (.s64(let v), .s64):
+            case (.s64(let v), .inlined(.primitive(.s64))):
                 return [.i64(UInt64(bitPattern: v))]
-            case (.float32(let v), .float32):
+            case (.float32(let v), .inlined(.primitive(.float32))):
                 return [.f32(v.bitPattern)]
-            case (.float64(let v), .float64):
+            case (.float64(let v), .inlined(.primitive(.float64))):
                 return [.f64(v.bitPattern)]
-            case (.char(let scalar), .char):
+            case (.char(let scalar), .inlined(.primitive(.char))):
                 return [.i32(scalar.value)]
 
             // String - requires memory and realloc
-            case (.string(let s), .string):
+            case (.string(let s), .inlined(.primitive(.string))):
                 return try lowerString(s, options: options, store: store)
 
             // Enum - lower to discriminant value (u8, u16, or u32 based on case count)
@@ -355,21 +355,21 @@
                 return results
 
             // Tuple - lower each element recursively
-            case (.tuple(let elements), .tuple(let typeIndices)):
-                guard elements.count == typeIndices.count else {
-                    throw CanonicalABIError(description: "Tuple element count mismatch: expected \(typeIndices.count), got \(elements.count)")
+            case (.tuple(let elements), .tuple(let elementValTypes)):
+                guard elements.count == elementValTypes.count else {
+                    throw CanonicalABIError(description: "Tuple element count mismatch: expected \(elementValTypes.count), got \(elements.count)")
                 }
                 var results: [Value] = []
-                for (element, typeIndex) in zip(elements, typeIndices) {
-                    let elementType = try resolveType(typeIndex)
+                for (element, valType) in zip(elements, elementValTypes) {
+                    let elementType = try valType.resolve(resolveType)
                     let lowered = try element.lower(to: elementType, resolveType: resolveType, options: options, store: store)
                     results.append(contentsOf: lowered)
                 }
                 return results
 
             // Option - discriminant (0=none, 1=some) + optional payload
-            case (.option(let maybeValue), .option(let someTypeIndex)):
-                let someType = try resolveType(someTypeIndex)
+            case (.option(let maybeValue), .option(let someValType)):
+                let someType = try someValType.resolve(resolveType)
                 if let value = maybeValue {
                     // some: discriminant=1, followed by flattened value
                     var results: [Value] = [.i32(1)]
@@ -391,16 +391,16 @@
                     guard let fieldValue = fields.first(where: { $0.name == fieldDef.name })?.value else {
                         throw CanonicalABIError(description: "Missing record field: \(fieldDef.name)")
                     }
-                    let fieldType = try resolveType(fieldDef.type)
+                    let fieldType = try fieldDef.type.resolve(resolveType)
                     let lowered = try fieldValue.lower(to: fieldType, resolveType: resolveType, options: options, store: store)
                     results.append(contentsOf: lowered)
                 }
                 return results
 
             // Result - discriminant (0=ok, 1=err) + payload with variant flattening
-            case (.result(let ok, let error), .result(let okTypeIndex, let errorTypeIndex)):
-                let okType = try okTypeIndex.map(resolveType)
-                let errorType = try errorTypeIndex.map(resolveType)
+            case (.result(let ok, let error), .result(let okValType, let errorValType)):
+                let okType = try okValType.map { try $0.resolve(resolveType) }
+                let errorType = try errorValType.map { try $0.resolve(resolveType) }
 
                 // Calculate max payload size for variant union
                 let okFlatCount = okType.map { $0.flattenedCount } ?? 0
@@ -446,17 +446,17 @@
                 // Calculate max payload size across all cases
                 let maxPayloadCount =
                     try cases.map { variantCase -> Int in
-                        if let typeIndex = variantCase.type {
-                            return try resolveType(typeIndex).flattenedCount
+                        if let valType = variantCase.type {
+                            return try valType.resolve(resolveType).flattenedCount
                         }
                         return 0
                     }.max() ?? 0
 
                 var lowered: [Value] = [.i32(UInt32(caseIndex))]
 
-                if let typeIndex = cases[caseIndex].type, let payloadValue = payload {
+                if let valType = cases[caseIndex].type, let payloadValue = payload {
                     // Case with payload
-                    let caseType = try resolveType(typeIndex)
+                    let caseType = try valType.resolve(resolveType)
                     let caseLowered = try payloadValue.lower(to: caseType, resolveType: resolveType, options: options, store: store)
                     lowered.append(contentsOf: caseLowered)
                     // Pad to max payload size
@@ -469,8 +469,8 @@
                 return lowered
 
             // List - allocate memory and write elements (requires memory + realloc)
-            case (.list(let elements), .list(let elementTypeIndex)):
-                return try lowerList(elements, elementTypeIndex: elementTypeIndex, resolveType: resolveType, options: options, store: store)
+            case (.list(let elements), .list(let elementValType)):
+                return try lowerList(elements, elementValType: elementValType, resolveType: resolveType, options: options, store: store)
 
             default:
                 throw CanonicalABIError(
@@ -593,8 +593,8 @@
     /// Allocates memory using realloc and writes elements.
     private func lowerList(
         _ elements: [ComponentValue],
-        elementTypeIndex: ComponentTypeIndex,
-        resolveType: (ComponentTypeIndex) throws -> ComponentValueType,
+        elementValType: ComponentValType,
+        resolveType: (ComponentTypeIndex) throws -> ComponentDefValType,
         options: CanonOptions,
         store: Store
     ) throws -> [Value] {
@@ -605,7 +605,7 @@
             throw CanonicalABIError(description: "List lowering requires realloc option")
         }
 
-        let elementType = try resolveType(elementTypeIndex)
+        let elementType = try elementValType.resolve(resolveType)
         let elementCount = UInt32(elements.count)
 
         // Calculate element size in bytes based on type
@@ -644,34 +644,40 @@
 
     /// Calculate the byte size of a component value type.
     private func sizeOf(
-        _ type: ComponentValueType,
-        resolveType: (ComponentTypeIndex) throws -> ComponentValueType
+        _ type: ComponentDefValType,
+        resolveType: (ComponentTypeIndex) throws -> ComponentDefValType
     ) throws -> Int {
         switch type {
-        case .bool, .s8, .u8: return 1
-        case .s16, .u16: return 2
-        case .s32, .u32, .float32, .char: return 4
-        case .s64, .u64, .float64: return 8
-        case .string, .list: return 8  // pointer + length
-        case .tuple(let typeIndices):
-            return try typeIndices.reduce(0) { sum, typeIndex in
-                try sum + sizeOf(try resolveType(typeIndex), resolveType: resolveType)
+        case .inlined(.primitive(let prim)):
+            switch prim {
+            case .bool, .s8, .u8: return 1
+            case .s16, .u16: return 2
+            case .s32, .u32, .float32, .char: return 4
+            case .s64, .u64, .float64: return 8
+            case .string: return 8  // pointer + length
+            case .errorContext:
+                throw CanonicalABIError(description: "sizeOf for \(type) not yet implemented")
+            }
+        case .list: return 8  // pointer + length
+        case .tuple(let elementValTypes):
+            return try elementValTypes.reduce(0) { sum, valType in
+                try sum + sizeOf(valType.resolve(resolveType), resolveType: resolveType)
             }
         case .record(let fields):
             return try fields.reduce(0) { sum, field in
-                try sum + sizeOf(try resolveType(field.type), resolveType: resolveType)
+                try sum + sizeOf(field.type.resolve(resolveType), resolveType: resolveType)
             }
-        case .option(let someTypeIndex):
-            return try 4 + sizeOf(try resolveType(someTypeIndex), resolveType: resolveType)  // discriminant + payload
-        case .result(let okTypeIndex, let errorTypeIndex):
-            let okSize = try okTypeIndex.map { try sizeOf(resolveType($0), resolveType: resolveType) } ?? 0
-            let errSize = try errorTypeIndex.map { try sizeOf(resolveType($0), resolveType: resolveType) } ?? 0
+        case .option(let someValType):
+            return try 4 + sizeOf(someValType.resolve(resolveType), resolveType: resolveType)  // discriminant + payload
+        case .result(let okValType, let errorValType):
+            let okSize = try okValType.map { try sizeOf($0.resolve(resolveType), resolveType: resolveType) } ?? 0
+            let errSize = try errorValType.map { try sizeOf($0.resolve(resolveType), resolveType: resolveType) } ?? 0
             return 4 + max(okSize, errSize)  // discriminant + max payload
         case .variant(let cases):
             let maxPayloadSize =
                 try cases.map { variantCase -> Int in
-                    if let typeIndex = variantCase.type {
-                        return try sizeOf(try resolveType(typeIndex), resolveType: resolveType)
+                    if let valType = variantCase.type {
+                        return try sizeOf(valType.resolve(resolveType), resolveType: resolveType)
                     }
                     return 0
                 }.max() ?? 0
@@ -689,41 +695,48 @@
         case .enum: return 4  // u32 discriminant
         case .flags(let flagNames):
             return numberOfFlagsInt32(flagsCount: flagNames.count) * 4
-        case .errorContext, .future, .stream, .resource, .indexed:
+        case .future, .stream, .resource, .inlined(.index):
             throw CanonicalABIError(description: "sizeOf for \(type) not yet implemented")
         }
     }
 
     /// Calculate the alignment requirement of a component value type.
     private func alignmentOf(
-        _ type: ComponentValueType,
-        resolveType: (ComponentTypeIndex) throws -> ComponentValueType
+        _ type: ComponentDefValType,
+        resolveType: (ComponentTypeIndex) throws -> ComponentDefValType
     ) throws -> Int {
         switch type {
-        case .bool, .s8, .u8: return 1
-        case .s16, .u16: return 2
-        case .s32, .u32, .float32, .char, .enum: return 4
-        case .s64, .u64, .float64: return 8
-        case .string, .list: return 4  // pointer/length use i32 alignment
-        case .tuple(let typeIndices):
-            return try typeIndices.map { try alignmentOf(resolveType($0), resolveType: resolveType) }.max() ?? 1
+        case .inlined(.primitive(let prim)):
+            switch prim {
+            case .bool, .s8, .u8: return 1
+            case .s16, .u16: return 2
+            case .s32, .u32, .float32, .char: return 4
+            case .s64, .u64, .float64: return 8
+            case .string: return 4  // pointer/length use i32 alignment
+            case .errorContext:
+                throw CanonicalABIError(description: "alignmentOf for \(type) not yet implemented")
+            }
+        case .enum: return 4
+        case .list: return 4  // pointer/length use i32 alignment
+        case .tuple(let elementValTypes):
+            return try elementValTypes.map { try alignmentOf($0.resolve(resolveType), resolveType: resolveType) }.max() ?? 1
         case .record(let fields):
-            return try fields.map { try alignmentOf(resolveType($0.type), resolveType: resolveType) }.max() ?? 1
-        case .option(let someTypeIndex):
-            return max(4, try alignmentOf(resolveType(someTypeIndex), resolveType: resolveType))
-        case .result(let okTypeIndex, let errorTypeIndex):
-            let okAlign = try okTypeIndex.map { try alignmentOf(resolveType($0), resolveType: resolveType) } ?? 1
-            let errAlign = try errorTypeIndex.map { try alignmentOf(resolveType($0), resolveType: resolveType) } ?? 1
+            return try fields.map { try alignmentOf($0.type.resolve(resolveType), resolveType: resolveType) }.max() ?? 1
+        case .option(let someValType):
+            return max(4, try alignmentOf(someValType.resolve(resolveType), resolveType: resolveType))
+        case .result(let okValType, let errorValType):
+            let okAlign = try okValType.map { try alignmentOf($0.resolve(resolveType), resolveType: resolveType) } ?? 1
+            let errAlign = try errorValType.map { try alignmentOf($0.resolve(resolveType), resolveType: resolveType) } ?? 1
             return max(4, max(okAlign, errAlign))
         case .variant(let cases):
             let maxPayloadAlign =
                 try cases.compactMap { variantCase -> Int? in
-                    guard let typeIndex = variantCase.type else { return nil }
-                    return try alignmentOf(try resolveType(typeIndex), resolveType: resolveType)
+                    guard let valType = variantCase.type else { return nil }
+                    return try alignmentOf(valType.resolve(resolveType), resolveType: resolveType)
                 }.max() ?? 1
             return max(4, maxPayloadAlign)
         case .flags: return 4  // i32 chunks
-        case .errorContext, .future, .stream, .resource, .indexed:
+        case .future, .stream, .resource, .inlined(.index):
             throw CanonicalABIError(description: "alignmentOf for \(type) not yet implemented")
         }
     }
@@ -731,71 +744,71 @@
     /// Store a component value to memory at a given offset.
     private func storeValue(
         _ value: ComponentValue,
-        type: ComponentValueType,
+        type: ComponentDefValType,
         at offset: Int,
         memory: Memory,
-        resolveType: (ComponentTypeIndex) throws -> ComponentValueType,
+        resolveType: (ComponentTypeIndex) throws -> ComponentDefValType,
         options: CanonOptions,
         store: Store
     ) throws {
         // First, resolve indexed types to their actual type
-        let resolvedType: ComponentValueType
-        if case .indexed(let typeIndex) = type {
-            resolvedType = try resolveType(typeIndex)
+        let resolvedType: ComponentDefValType
+        if case .inlined(.index(let typeIdx)) = type {
+            resolvedType = try resolveType(typeIdx)
         } else {
             resolvedType = type
         }
 
         switch (value, resolvedType) {
-        case (.bool(let b), .bool):
+        case (.bool(let b), .inlined(.primitive(.bool))):
             memory.withUnsafeMutableBufferPointer(offset: UInt(offset), count: 1) { buffer in
                 buffer.storeBytes(of: UInt8(b ? 1 : 0), as: UInt8.self)
             }
-        case (.u8(let v), .u8):
+        case (.u8(let v), .inlined(.primitive(.u8))):
             memory.withUnsafeMutableBufferPointer(offset: UInt(offset), count: 1) { buffer in
                 buffer.storeBytes(of: v, as: UInt8.self)
             }
-        case (.u16(let v), .u16):
+        case (.u16(let v), .inlined(.primitive(.u16))):
             memory.withUnsafeMutableBufferPointer(offset: UInt(offset), count: 2) { buffer in
                 buffer.storeBytes(of: v, as: UInt16.self)
             }
-        case (.u32(let v), .u32):
+        case (.u32(let v), .inlined(.primitive(.u32))):
             memory.withUnsafeMutableBufferPointer(offset: UInt(offset), count: 4) { buffer in
                 buffer.storeBytes(of: v, as: UInt32.self)
             }
-        case (.u64(let v), .u64):
+        case (.u64(let v), .inlined(.primitive(.u64))):
             memory.withUnsafeMutableBufferPointer(offset: UInt(offset), count: 8) { buffer in
                 buffer.storeBytes(of: v, as: UInt64.self)
             }
-        case (.s8(let v), .s8):
+        case (.s8(let v), .inlined(.primitive(.s8))):
             memory.withUnsafeMutableBufferPointer(offset: UInt(offset), count: 1) { buffer in
                 buffer.storeBytes(of: v, as: Int8.self)
             }
-        case (.s16(let v), .s16):
+        case (.s16(let v), .inlined(.primitive(.s16))):
             memory.withUnsafeMutableBufferPointer(offset: UInt(offset), count: 2) { buffer in
                 buffer.storeBytes(of: v, as: Int16.self)
             }
-        case (.s32(let v), .s32):
+        case (.s32(let v), .inlined(.primitive(.s32))):
             memory.withUnsafeMutableBufferPointer(offset: UInt(offset), count: 4) { buffer in
                 buffer.storeBytes(of: v, as: Int32.self)
             }
-        case (.s64(let v), .s64):
+        case (.s64(let v), .inlined(.primitive(.s64))):
             memory.withUnsafeMutableBufferPointer(offset: UInt(offset), count: 8) { buffer in
                 buffer.storeBytes(of: v, as: Int64.self)
             }
-        case (.float32(let v), .float32):
+        case (.float32(let v), .inlined(.primitive(.float32))):
             memory.withUnsafeMutableBufferPointer(offset: UInt(offset), count: 4) { buffer in
                 buffer.storeBytes(of: v.bitPattern, as: UInt32.self)
             }
-        case (.float64(let v), .float64):
+        case (.float64(let v), .inlined(.primitive(.float64))):
             memory.withUnsafeMutableBufferPointer(offset: UInt(offset), count: 8) { buffer in
                 buffer.storeBytes(of: v.bitPattern, as: UInt64.self)
             }
-        case (.char(let scalar), .char):
+        case (.char(let scalar), .inlined(.primitive(.char))):
             memory.withUnsafeMutableBufferPointer(offset: UInt(offset), count: 4) { buffer in
                 buffer.storeBytes(of: scalar.value, as: UInt32.self)
             }
-        case (.string(let s), .string):
+        case (.string(let s), .inlined(.primitive(.string))):
             // For strings in lists, we need to lower the string (allocate + write) and store the pointer/length
             let lowered = try lowerString(s, options: options, store: store)
             guard case .i32(let ptr) = lowered[0], case .i32(let len) = lowered[1] else {
@@ -838,8 +851,8 @@
             }
 
             // Write payload if present
-            if let typeIndex = cases[caseIndex].type, let payloadValue = payload {
-                let caseType = try resolveType(typeIndex)
+            if let valType = cases[caseIndex].type, let payloadValue = payload {
+                let caseType = try valType.resolve(resolveType)
                 let payloadOffset = offset + max(4, try alignmentOf(caseType, resolveType: resolveType))
                 try storeValue(
                     payloadValue,
@@ -994,8 +1007,8 @@
     private func liftList(
         pointer: UInt32,
         length: UInt32,
-        elementTypeIndex: ComponentTypeIndex,
-        resolveType: (ComponentTypeIndex) throws -> ComponentValueType,
+        elementValType: ComponentValType,
+        resolveType: (ComponentTypeIndex) throws -> ComponentDefValType,
         options: CanonOptions,
         store: Store
     ) throws -> ComponentValue {
@@ -1003,7 +1016,7 @@
             throw CanonicalABIError(description: "List lifting requires memory option")
         }
 
-        let elementType = try resolveType(elementTypeIndex)
+        let elementType = try elementValType.resolve(resolveType)
         let elementSize = try sizeOf(elementType, resolveType: resolveType)
         let memoryInstance = Memory(handle: memory, allocator: store.allocator)
         let memorySize = memoryInstance.byteCount
@@ -1037,10 +1050,10 @@
     /// Load a component value from memory at a given offset.
     /// Used for loading list elements from memory.
     private func loadValue(
-        type: ComponentValueType,
+        type: ComponentDefValType,
         at offset: Int,
         memory: Memory,
-        resolveType: (ComponentTypeIndex) throws -> ComponentValueType,
+        resolveType: (ComponentTypeIndex) throws -> ComponentDefValType,
         options: CanonOptions,
         store: Store
     ) throws -> ComponentValue {
@@ -1055,73 +1068,73 @@
 
         switch type {
         // Primitives
-        case .bool:
+        case .inlined(.primitive(.bool)):
             try checkBounds(count: 1)
             let v: UInt8 = memory.withUnsafeBufferPointer(offset: UInt(offset), count: 1) { buffer in
                 buffer.load(as: UInt8.self)
             }
             return .bool(v != 0)
-        case .u8:
+        case .inlined(.primitive(.u8)):
             try checkBounds(count: 1)
             let v: UInt8 = memory.withUnsafeBufferPointer(offset: UInt(offset), count: 1) { buffer in
                 buffer.load(as: UInt8.self)
             }
             return .u8(v)
-        case .u16:
+        case .inlined(.primitive(.u16)):
             try checkBounds(count: 2)
             let v: UInt16 = memory.withUnsafeBufferPointer(offset: UInt(offset), count: 2) { buffer in
                 buffer.load(as: UInt16.self)
             }
             return .u16(v)
-        case .u32:
+        case .inlined(.primitive(.u32)):
             try checkBounds(count: 4)
             let v: UInt32 = memory.withUnsafeBufferPointer(offset: UInt(offset), count: 4) { buffer in
                 buffer.load(as: UInt32.self)
             }
             return .u32(v)
-        case .u64:
+        case .inlined(.primitive(.u64)):
             try checkBounds(count: 8)
             let v: UInt64 = memory.withUnsafeBufferPointer(offset: UInt(offset), count: 8) { buffer in
                 buffer.load(as: UInt64.self)
             }
             return .u64(v)
-        case .s8:
+        case .inlined(.primitive(.s8)):
             try checkBounds(count: 1)
             let v: Int8 = memory.withUnsafeBufferPointer(offset: UInt(offset), count: 1) { buffer in
                 buffer.load(as: Int8.self)
             }
             return .s8(v)
-        case .s16:
+        case .inlined(.primitive(.s16)):
             try checkBounds(count: 2)
             let v: Int16 = memory.withUnsafeBufferPointer(offset: UInt(offset), count: 2) { buffer in
                 buffer.load(as: Int16.self)
             }
             return .s16(v)
-        case .s32:
+        case .inlined(.primitive(.s32)):
             try checkBounds(count: 4)
             let v: Int32 = memory.withUnsafeBufferPointer(offset: UInt(offset), count: 4) { buffer in
                 buffer.load(as: Int32.self)
             }
             return .s32(v)
-        case .s64:
+        case .inlined(.primitive(.s64)):
             try checkBounds(count: 8)
             let v: Int64 = memory.withUnsafeBufferPointer(offset: UInt(offset), count: 8) { buffer in
                 buffer.load(as: Int64.self)
             }
             return .s64(v)
-        case .float32:
+        case .inlined(.primitive(.float32)):
             try checkBounds(count: 4)
             let bits: UInt32 = memory.withUnsafeBufferPointer(offset: UInt(offset), count: 4) { buffer in
                 buffer.load(as: UInt32.self)
             }
             return .float32(Float(bitPattern: bits))
-        case .float64:
+        case .inlined(.primitive(.float64)):
             try checkBounds(count: 8)
             let bits: UInt64 = memory.withUnsafeBufferPointer(offset: UInt(offset), count: 8) { buffer in
                 buffer.load(as: UInt64.self)
             }
             return .float64(Double(bitPattern: bits))
-        case .char:
+        case .inlined(.primitive(.char)):
             try checkBounds(count: 4)
             let v: UInt32 = memory.withUnsafeBufferPointer(offset: UInt(offset), count: 4) { buffer in
                 buffer.load(as: UInt32.self)
@@ -1130,7 +1143,7 @@
                 throw CanonicalABIError(description: "invalid `char` bit pattern: \(v)")
             }
             return .char(scalar)
-        case .string:
+        case .inlined(.primitive(.string)):
             // String is stored as (pointer, length) pair
             try checkBounds(count: 8)
             let (ptr, len): (UInt32, UInt32) = memory.withUnsafeBufferPointer(offset: UInt(offset), count: 8) { buffer in
@@ -1144,12 +1157,12 @@
         }
     }
 
-    extension ComponentValueType {
+    extension ComponentDefValType {
         /// Lift a component value from memory at a given offset.
         /// Used for indirect results when flattened count > MAX_FLAT_RESULTS.
         func liftValueFromMemory(
             at offset: UInt32,
-            resolveType: (ComponentTypeIndex) throws -> ComponentValueType,
+            resolveType: (ComponentTypeIndex) throws -> ComponentDefValType,
             options: CanonOptions,
             store: Store
         ) throws -> ComponentValue {
@@ -1169,73 +1182,73 @@
 
             switch self {
             // Primitives (single values stored in memory)
-            case .bool:
+            case .inlined(.primitive(.bool)):
                 try checkBounds(offset: UInt(offset), count: 1)
                 let v: UInt8 = memoryInstance.withUnsafeBufferPointer(offset: UInt(offset), count: 1) { buffer in
                     buffer.load(as: UInt8.self)
                 }
                 return .bool(v != 0)
-            case .u8:
+            case .inlined(.primitive(.u8)):
                 try checkBounds(offset: UInt(offset), count: 1)
                 let v: UInt8 = memoryInstance.withUnsafeBufferPointer(offset: UInt(offset), count: 1) { buffer in
                     buffer.load(as: UInt8.self)
                 }
                 return .u8(v)
-            case .s8:
+            case .inlined(.primitive(.s8)):
                 try checkBounds(offset: UInt(offset), count: 1)
                 let v: Int8 = memoryInstance.withUnsafeBufferPointer(offset: UInt(offset), count: 1) { buffer in
                     buffer.load(as: Int8.self)
                 }
                 return .s8(v)
-            case .u16:
+            case .inlined(.primitive(.u16)):
                 try checkBounds(offset: UInt(offset), count: 2)
                 let v: UInt16 = memoryInstance.withUnsafeBufferPointer(offset: UInt(offset), count: 2) { buffer in
                     buffer.load(as: UInt16.self)
                 }
                 return .u16(v)
-            case .s16:
+            case .inlined(.primitive(.s16)):
                 try checkBounds(offset: UInt(offset), count: 2)
                 let v: Int16 = memoryInstance.withUnsafeBufferPointer(offset: UInt(offset), count: 2) { buffer in
                     buffer.load(as: Int16.self)
                 }
                 return .s16(v)
-            case .u32:
+            case .inlined(.primitive(.u32)):
                 try checkBounds(offset: UInt(offset), count: 4)
                 let v: UInt32 = memoryInstance.withUnsafeBufferPointer(offset: UInt(offset), count: 4) { buffer in
                     buffer.load(as: UInt32.self)
                 }
                 return .u32(v)
-            case .s32:
+            case .inlined(.primitive(.s32)):
                 try checkBounds(offset: UInt(offset), count: 4)
                 let v: Int32 = memoryInstance.withUnsafeBufferPointer(offset: UInt(offset), count: 4) { buffer in
                     buffer.load(as: Int32.self)
                 }
                 return .s32(v)
-            case .u64:
+            case .inlined(.primitive(.u64)):
                 try checkBounds(offset: UInt(offset), count: 8)
                 let v: UInt64 = memoryInstance.withUnsafeBufferPointer(offset: UInt(offset), count: 8) { buffer in
                     buffer.load(as: UInt64.self)
                 }
                 return .u64(v)
-            case .s64:
+            case .inlined(.primitive(.s64)):
                 try checkBounds(offset: UInt(offset), count: 8)
                 let v: Int64 = memoryInstance.withUnsafeBufferPointer(offset: UInt(offset), count: 8) { buffer in
                     buffer.load(as: Int64.self)
                 }
                 return .s64(v)
-            case .float32:
+            case .inlined(.primitive(.float32)):
                 try checkBounds(offset: UInt(offset), count: 4)
                 let bits: UInt32 = memoryInstance.withUnsafeBufferPointer(offset: UInt(offset), count: 4) { buffer in
                     buffer.load(as: UInt32.self)
                 }
                 return .float32(Float(bitPattern: bits))
-            case .float64:
+            case .inlined(.primitive(.float64)):
                 try checkBounds(offset: UInt(offset), count: 8)
                 let bits: UInt64 = memoryInstance.withUnsafeBufferPointer(offset: UInt(offset), count: 8) { buffer in
                     buffer.load(as: UInt64.self)
                 }
                 return .float64(Double(bitPattern: bits))
-            case .char:
+            case .inlined(.primitive(.char)):
                 try checkBounds(offset: UInt(offset), count: 4)
                 let v: UInt32 = memoryInstance.withUnsafeBufferPointer(offset: UInt(offset), count: 4) { buffer in
                     buffer.load(as: UInt32.self)
@@ -1246,7 +1259,7 @@
                 return .char(scalar)
 
             // String: (ptr, len) pair at the offset
-            case .string:
+            case .inlined(.primitive(.string)):
                 try checkBounds(offset: UInt(offset), count: 8)
                 let (ptr, len): (UInt32, UInt32) = memoryInstance.withUnsafeBufferPointer(offset: UInt(offset), count: 8) { buffer in
                     let ptr = buffer.load(fromByteOffset: 0, as: UInt32.self)
@@ -1263,40 +1276,40 @@
 
     /// Lower a component value to core wasm values (flat encoding only).
     /// This handles primitive types that map directly to core wasm types.
-    func lowerFlat(_ value: ComponentValue, paramType: ComponentValueType) throws -> [Value] {
+    func lowerFlat(_ value: ComponentValue, paramType: ComponentDefValType) throws -> [Value] {
         switch (value, paramType) {
         // Boolean -> i32
-        case (.bool(let b), .bool):
+        case (.bool(let b), .inlined(.primitive(.bool))):
             return [.i32(b ? 1 : 0)]
 
         // Unsigned integers
-        case (.u8(let v), .u8):
+        case (.u8(let v), .inlined(.primitive(.u8))):
             return [.i32(UInt32(v))]
-        case (.u16(let v), .u16):
+        case (.u16(let v), .inlined(.primitive(.u16))):
             return [.i32(UInt32(v))]
-        case (.u32(let v), .u32):
+        case (.u32(let v), .inlined(.primitive(.u32))):
             return [.i32(v)]
-        case (.u64(let v), .u64):
+        case (.u64(let v), .inlined(.primitive(.u64))):
             return [.i64(v)]
 
         // Signed integers
-        case (.s8(let v), .s8):
+        case (.s8(let v), .inlined(.primitive(.s8))):
             return [.i32(UInt32(bitPattern: Int32(v)))]
-        case (.s16(let v), .s16):
+        case (.s16(let v), .inlined(.primitive(.s16))):
             return [.i32(UInt32(bitPattern: Int32(v)))]
-        case (.s32(let v), .s32):
+        case (.s32(let v), .inlined(.primitive(.s32))):
             return [.i32(UInt32(bitPattern: v))]
-        case (.s64(let v), .s64):
+        case (.s64(let v), .inlined(.primitive(.s64))):
             return [.i64(UInt64(bitPattern: v))]
 
         // Floating point
-        case (.float32(let v), .float32):
+        case (.float32(let v), .inlined(.primitive(.float32))):
             return [.f32(v.bitPattern)]
-        case (.float64(let v), .float64):
+        case (.float64(let v), .inlined(.primitive(.float64))):
             return [.f64(v.bitPattern)]
 
         // Character (Unicode scalar value as i32)
-        case (.char(let scalar), .char):
+        case (.char(let scalar), .inlined(.primitive(.char))):
             return [.i32(scalar.value)]
 
         default:
@@ -1308,7 +1321,7 @@
 
     /// Lift core wasm values to a component value (flat encoding only).
     /// This handles primitive types that map directly from core wasm types.
-    func liftFlat(_ values: [Value], to resultType: ComponentValueType) throws -> [ComponentValue] {
+    func liftFlat(_ values: [Value], to resultType: ComponentDefValType) throws -> [ComponentValue] {
         guard !values.isEmpty else {
             throw CanonicalABIError(description: "No values to lift - expected at least 1")
         }
@@ -1317,37 +1330,37 @@
 
         switch (value, resultType) {
         // i32 -> Boolean (any non-zero is true)
-        case (.i32(let v), .bool):
+        case (.i32(let v), .inlined(.primitive(.bool))):
             return [.bool(v != 0)]
 
         // i32 -> Unsigned integers (with truncation/masking)
-        case (.i32(let v), .u8):
+        case (.i32(let v), .inlined(.primitive(.u8))):
             return [.u8(UInt8(truncatingIfNeeded: v))]
-        case (.i32(let v), .u16):
+        case (.i32(let v), .inlined(.primitive(.u16))):
             return [.u16(UInt16(truncatingIfNeeded: v))]
-        case (.i32(let v), .u32):
+        case (.i32(let v), .inlined(.primitive(.u32))):
             return [.u32(v)]
-        case (.i64(let v), .u64):
+        case (.i64(let v), .inlined(.primitive(.u64))):
             return [.u64(v)]
 
         // i32 -> Signed integers (with sign extension)
-        case (.i32(let v), .s8):
+        case (.i32(let v), .inlined(.primitive(.s8))):
             return [.s8(Int8(truncatingIfNeeded: Int32(bitPattern: v)))]
-        case (.i32(let v), .s16):
+        case (.i32(let v), .inlined(.primitive(.s16))):
             return [.s16(Int16(truncatingIfNeeded: Int32(bitPattern: v)))]
-        case (.i32(let v), .s32):
+        case (.i32(let v), .inlined(.primitive(.s32))):
             return [.s32(Int32(bitPattern: v))]
-        case (.i64(let v), .s64):
+        case (.i64(let v), .inlined(.primitive(.s64))):
             return [.s64(Int64(bitPattern: v))]
 
         // Floating point
-        case (.f32(let bits), .float32):
+        case (.f32(let bits), .inlined(.primitive(.float32))):
             return [.float32(Float(bitPattern: bits))]
-        case (.f64(let bits), .float64):
+        case (.f64(let bits), .inlined(.primitive(.float64))):
             return [.float64(Double(bitPattern: bits))]
 
         // i32 -> Character
-        case (.i32(let v), .char):
+        case (.i32(let v), .inlined(.primitive(.char))):
             guard let scalar = Unicode.Scalar(v) else {
                 throw CanonicalABIError(
                     description: "invalid `char` bit pattern: \(v)"
@@ -1372,45 +1385,47 @@
     func flattenComponentFuncType(_ funcType: ComponentFuncType) -> FunctionType {
         var coreParams: [ValueType] = []
         for param in funcType.params {
-            let coreTypes = param.type.flattenedComponentValueType
+            let coreTypes = param.type.flattenedComponentDefValType
             coreParams.append(contentsOf: coreTypes)
         }
 
         var coreResults: [ValueType] = []
         if let resultType = funcType.result {
-            let flatResults = resultType.flattenedComponentValueType
+            let flatResults = resultType.flattenedComponentDefValType
             coreResults.append(contentsOf: flatResults)
         }
 
         return FunctionType(parameters: coreParams, results: coreResults)
     }
 
-    extension ComponentValueType {
+    extension ComponentDefValType {
         /// Returns the number of flat core values for a component value type.
         var flattenedCount: Int {
-            return self.flattenedComponentValueType.count
+            return self.flattenedComponentDefValType.count
         }
 
         /// Flatten a component value type to core wasm value types.
         /// For primitive types, this returns a single core type.
-        var flattenedComponentValueType: [ValueType] {
+        var flattenedComponentDefValType: [ValueType] {
             switch self {
-            case .bool, .s8, .u8, .s16, .u16, .s32, .u32:
+            case .inlined(.primitive(.bool)), .inlined(.primitive(.s8)), .inlined(.primitive(.u8)),
+                .inlined(.primitive(.s16)), .inlined(.primitive(.u16)), .inlined(.primitive(.s32)),
+                .inlined(.primitive(.u32)):
                 return [.i32]
-            case .s64, .u64:
+            case .inlined(.primitive(.s64)), .inlined(.primitive(.u64)):
                 return [.i64]
-            case .float32:
+            case .inlined(.primitive(.float32)):
                 return [.f32]
-            case .float64:
+            case .inlined(.primitive(.float64)):
                 return [.f64]
-            case .char:
+            case .inlined(.primitive(.char)):
                 return [.i32]  // Unicode scalar as i32
-            case .string:
+            case .inlined(.primitive(.string)):
                 return [.i32, .i32]  // (pointer, length)
             default:
                 // For complex types, we'll need heap-based ABI
                 // For now, return empty to avoid crashes - these will fail at runtime
-                #warning("Complex types not supported in `flattenComponentValueType`")
+                // TODO: Complex types not supported in `flattenedComponentDefValType`
                 return []
             }
         }

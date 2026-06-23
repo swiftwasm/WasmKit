@@ -18,9 +18,7 @@ struct MemoryDirEntry: WASIDir {
         return WASIAbi.Filestat(
             dev: 0, ino: 0, filetype: .DIRECTORY,
             nlink: 1, size: 0,
-            atim: timestamps.atim,
-            mtim: timestamps.mtim,
-            ctim: timestamps.ctim
+            atim: timestamps.atim, mtim: timestamps.mtim, ctim: timestamps.ctim
         )
     }
 
@@ -75,22 +73,21 @@ struct MemoryDirEntry: WASIDir {
         accessMode: FileAccessMode,
         fdflags: WASIAbi.Fdflags
     ) throws -> FileDescriptor {
-        // Memory filesystem doesn't return real file descriptors for this method
-        // File opening is handled through the WASI bridge's path_open implementation
+        // Memory filesystem doesn't return real file descriptors for this method.
+        // File opening is handled through the WASI bridge's path_open implementation.
         throw WASIAbi.Errno.ENOTSUP
     }
 
     func createDirectory(atPath path: String) throws {
-        let fullPath = self.path.hasSuffix("/") ? self.path + path : self.path + "/" + path
-        try fileSystem.ensureDirectory(at: fullPath)
+        try fileSystem.ensureDirectory(at: MemoryFileSystem.joinGuestPath(self.path, path))
     }
 
     func removeDirectory(atPath path: String) throws {
-        try fileSystem.removeNode(in: dirNode, at: path, mustBeDirectory: true)
+        try fileSystem.removeNode(at: self.path, relativePath: path, mustBeDirectory: true)
     }
 
     func removeFile(atPath path: String) throws {
-        try fileSystem.removeNode(in: dirNode, at: path, mustBeDirectory: false)
+        try fileSystem.removeNode(at: self.path, relativePath: path, mustBeDirectory: false)
     }
 
     func symlink(from sourcePath: String, to destPath: String) throws {
@@ -104,20 +101,23 @@ struct MemoryDirEntry: WASIDir {
         }
 
         try fileSystem.rename(
-            from: sourcePath, in: dirNode,
-            to: destPath, in: newMemoryDir.dirNode
+            from: sourcePath, at: self.path,
+            to: destPath, at: newMemoryDir.path
         )
     }
 
     func readEntries(cookie: WASIAbi.DirCookie) throws -> AnyIterator<Result<ReaddirElement, any Error>> {
         let children = dirNode.listChildren()
 
+        let fs = self.fileSystem
+        let basePath = self.path
+
         let iterator = children.enumerated()
             .dropFirst(Int(cookie))
             .map { (index, name) -> Result<ReaddirElement, any Error> in
                 return Result(catching: {
-                    let childPath = self.path.hasSuffix("/") ? self.path + name : self.path + "/" + name
-                    guard let childNode = fileSystem.lookup(at: childPath) else {
+                    let childPath = MemoryFileSystem.joinGuestPath(basePath, name)
+                    guard let childNode = fs.lookup(at: childPath) else {
                         throw WASIAbi.Errno.ENOENT
                     }
 
@@ -144,8 +144,7 @@ struct MemoryDirEntry: WASIDir {
     }
 
     func attributes(path: String, symlinkFollow: Bool) throws -> WASIAbi.Filestat {
-        let fullPath = self.path.hasSuffix("/") ? self.path + path : self.path + "/" + path
-        guard let node = fileSystem.lookup(at: fullPath) else {
+        guard let node = fileSystem.lookup(at: MemoryFileSystem.joinGuestPath(self.path, path)) else {
             throw WASIAbi.Errno.ENOENT
         }
 
@@ -167,8 +166,8 @@ struct MemoryDirEntry: WASIDir {
         case .file:
             fileType = .REGULAR_FILE
             if let fileNode = node as? MemoryFileNode {
-                size = WASIAbi.FileSize(fileNode.size)
-                let timestamps = fileNode.timestamps
+                size = WASIAbi.FileSize(try fileNode.size)
+                let timestamps = try fileNode.timestamps
                 atim = timestamps.atim
                 mtim = timestamps.mtim
                 ctim = timestamps.ctim
@@ -189,8 +188,7 @@ struct MemoryDirEntry: WASIDir {
         atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags, symlinkFollow: Bool
     ) throws {
-        let fullPath = self.path.hasSuffix("/") ? self.path + path : self.path + "/" + path
-        guard let node = fileSystem.lookup(at: fullPath) else {
+        guard let node = fileSystem.lookup(at: MemoryFileSystem.joinGuestPath(self.path, path)) else {
             throw WASIAbi.Errno.ENOENT
         }
 
@@ -222,36 +220,30 @@ struct MemoryDirEntry: WASIDir {
             return
         }
 
-        switch fileNode.content {
-        case .bytes:
-            fileNode.setTimes(atim: newAtim, mtim: newMtim)
-
-        case .handle(let handle):
-            let accessTime: FileTime
-            if fstFlags.contains(.ATIM) {
-                accessTime = FileTime(
-                    seconds: Int(atim / 1_000_000_000),
-                    nanoseconds: Int(atim % 1_000_000_000)
-                )
-            } else if fstFlags.contains(.ATIM_NOW) {
-                accessTime = .now
-            } else {
-                accessTime = .omit
-            }
-
-            let modTime: FileTime
-            if fstFlags.contains(.MTIM) {
-                modTime = FileTime(
-                    seconds: Int(mtim / 1_000_000_000),
-                    nanoseconds: Int(mtim % 1_000_000_000)
-                )
-            } else if fstFlags.contains(.MTIM_NOW) {
-                modTime = .now
-            } else {
-                modTime = .omit
-            }
-
-            try handle.setTimes(access: accessTime, modification: modTime)
+        // nil means the times were applied in memory; a non-nil handle is a host
+        // fd whose times we set below.
+        guard let handle = fileNode.setTimesInMemory(atim: newAtim, mtim: newMtim) else {
+            return
         }
+
+        let accessTime: FileTime
+        if fstFlags.contains(.ATIM) {
+            accessTime = FileTime(seconds: Int(atim / 1_000_000_000), nanoseconds: Int(atim % 1_000_000_000))
+        } else if fstFlags.contains(.ATIM_NOW) {
+            accessTime = .now
+        } else {
+            accessTime = .omit
+        }
+
+        let modTime: FileTime
+        if fstFlags.contains(.MTIM) {
+            modTime = FileTime(seconds: Int(mtim / 1_000_000_000), nanoseconds: Int(mtim % 1_000_000_000))
+        } else if fstFlags.contains(.MTIM_NOW) {
+            modTime = .now
+        } else {
+            modTime = .omit
+        }
+
+        try handle.setTimes(access: accessTime, modification: modTime)
     }
 }

@@ -202,7 +202,7 @@
             case "func":
                 // Handle function imports
                 let funcId = try parser.takeId()
-                #warning("Skipping the type constraint as unimplemented")
+                // TODO: Skipping the type constraint as unimplemented
                 var depth = 1
                 while depth > 0 {
                     if try parser.take(.leftParen) {
@@ -323,7 +323,7 @@
                 _ = try currentComponent.coreMemoriesMap.add(memDef)
             case .table, .global, .type, .module, .instance:
                 // TODO: Add support for table and global aliases
-                #warning("Not all core alias sorts supported yet")
+                // TODO: Not all core alias sorts supported yet
                 break
             }
 
@@ -392,9 +392,9 @@
                 switch typeKeyword {
                 case "func":
                     let params = try parseFuncParams(&parser)
-                    var resultType: ComponentValueType?
+                    var resultType: ComponentDefValType?
                     if try parser.takeParenBlockStart("result") {
-                        resultType = try parseComponentValueType(&parser)
+                        resultType = try parseComponentDefValType(&parser)
                         try parser.expect(.rightParen)
                     }
                     kind = .function(ComponentFuncType(params: params, result: resultType))
@@ -414,18 +414,18 @@
                     var fields: [ComponentRecordField] = []
                     while try parser.takeParenBlockStart("field") {
                         let fieldName = try parser.expectString()
-                        let fieldType = try parseComponentValueType(&parser)
+                        let fieldType = try parseComponentDefValType(&parser)
                         let fieldTypeIndex: ComponentTypeIndex
-                        if case .indexed(let idx) = fieldType {
+                        if case .inlined(.index(let idx)) = fieldType {
                             fieldTypeIndex = idx
                         } else {
                             let idx = try addAnonymousComponentType(fieldType)
                             fieldTypeIndex = ComponentTypeIndex(rawValue: idx)
                         }
-                        fields.append(ComponentRecordField(name: fieldName, type: fieldTypeIndex))
+                        fields.append(ComponentRecordField(name: fieldName, type: .index(fieldTypeIndex)))
                         try parser.expect(.rightParen)
                     }
-                    let recordType = ComponentValueType.record(fields)
+                    let recordType = ComponentDefValType.record(fields)
                     kind = .value(recordType)
                     try parser.expect(.rightParen)
 
@@ -436,8 +436,8 @@
                         let caseName = try parser.expectString()
                         var caseType: ComponentTypeIndex? = nil
                         if try !parser.take(.rightParen) {
-                            let valueType = try parseComponentValueType(&parser)
-                            if case .indexed(let idx) = valueType {
+                            let valueType = try parseComponentDefValType(&parser)
+                            if case .inlined(.index(let idx)) = valueType {
                                 caseType = idx
                             } else {
                                 let idx = try addAnonymousComponentType(valueType)
@@ -445,9 +445,9 @@
                             }
                             try parser.expect(.rightParen)
                         }
-                        cases.append(ComponentCaseField(name: caseName, type: caseType))
+                        cases.append(ComponentCaseField(name: caseName, type: caseType.map { .index($0) }))
                     }
-                    let variantType = ComponentValueType.variant(cases)
+                    let variantType = ComponentDefValType.variant(cases)
                     kind = .value(variantType)
                     try parser.expect(.rightParen)
 
@@ -456,7 +456,7 @@
                     while let flagName = try parser.takeString() {
                         flagNames.append(flagName)
                     }
-                    let flagsType = ComponentValueType.flags(flagNames)
+                    let flagsType = ComponentDefValType.flags(flagNames)
                     kind = .value(flagsType)
                     try parser.expect(.rightParen)
 
@@ -465,47 +465,47 @@
                     while let caseName = try parser.takeString() {
                         enumCases.append(caseName)
                     }
-                    let enumType = ComponentValueType.enum(enumCases)
+                    let enumType = ComponentDefValType.enum(enumCases)
                     kind = .value(enumType)
                     try parser.expect(.rightParen)
 
                 case "list":
-                    let elementType = try parseComponentValueType(&parser)
+                    let elementType = try parseComponentDefValType(&parser)
                     let elementIndex: ComponentTypeIndex
-                    if case .indexed(let idx) = elementType {
+                    if case .inlined(.index(let idx)) = elementType {
                         elementIndex = idx
                     } else {
                         let elemIdx = try addAnonymousComponentType(elementType)
                         elementIndex = ComponentTypeIndex(rawValue: elemIdx)
                     }
-                    let listType = ComponentValueType.list(elementIndex)
+                    let listType = ComponentDefValType.list(.index(elementIndex))
                     kind = .value(listType)
                     try parser.expect(.rightParen)
 
                 case "tuple":
                     var typeIndices: [ComponentTypeIndex] = []
                     while try !parser.take(.rightParen) {
-                        let valueType = try parseComponentValueType(&parser)
-                        if case .indexed(let idx) = valueType {
+                        let valueType = try parseComponentDefValType(&parser)
+                        if case .inlined(.index(let idx)) = valueType {
                             typeIndices.append(idx)
                         } else {
                             let elemIdx = try addAnonymousComponentType(valueType)
                             typeIndices.append(ComponentTypeIndex(rawValue: elemIdx))
                         }
                     }
-                    let tupleType = ComponentValueType.tuple(typeIndices)
+                    let tupleType = ComponentDefValType.tuple(typeIndices.map { .index($0) })
                     kind = .value(tupleType)
 
                 case "option":
-                    let someType = try parseComponentValueType(&parser)
+                    let someType = try parseComponentDefValType(&parser)
                     let elementIndex: ComponentTypeIndex
-                    if case .indexed(let idx) = someType {
+                    if case .inlined(.index(let idx)) = someType {
                         elementIndex = idx
                     } else {
                         let elemIdx = try addAnonymousComponentType(someType)
                         elementIndex = ComponentTypeIndex(rawValue: elemIdx)
                     }
-                    let optionType = ComponentValueType.option(elementIndex)
+                    let optionType = ComponentDefValType.option(.index(elementIndex))
                     kind = .value(optionType)
                     try parser.expect(.rightParen)
 
@@ -517,8 +517,8 @@
                     if try !parser.take(.rightParen) {
                         // Check for (error ...) first (error-only result)
                         if try parser.takeParenBlockStart("error") {
-                            let valueType = try parseComponentValueType(&parser)
-                            if case .indexed(let idx) = valueType {
+                            let valueType = try parseComponentDefValType(&parser)
+                            if case .inlined(.index(let idx)) = valueType {
                                 errorType = idx
                             } else {
                                 errorType = ComponentTypeIndex(rawValue: try addAnonymousComponentType(valueType))
@@ -527,8 +527,8 @@
                             try parser.expect(.rightParen)
                         } else if try parser.takeParenBlockStart("ok") {
                             // Explicit (ok TYPE)
-                            let valueType = try parseComponentValueType(&parser)
-                            if case .indexed(let idx) = valueType {
+                            let valueType = try parseComponentDefValType(&parser)
+                            if case .inlined(.index(let idx)) = valueType {
                                 okType = idx
                             } else {
                                 okType = ComponentTypeIndex(rawValue: try addAnonymousComponentType(valueType))
@@ -536,8 +536,8 @@
                             try parser.expect(.rightParen)
                             // Check for optional (error TYPE)
                             if try parser.takeParenBlockStart("error") {
-                                let errType = try parseComponentValueType(&parser)
-                                if case .indexed(let idx) = errType {
+                                let errType = try parseComponentDefValType(&parser)
+                                if case .inlined(.index(let idx)) = errType {
                                     errorType = idx
                                 } else {
                                     errorType = ComponentTypeIndex(rawValue: try addAnonymousComponentType(errType))
@@ -547,16 +547,16 @@
                             try parser.expect(.rightParen)
                         } else {
                             // Shorthand: TYPE is the ok type
-                            let valueType = try parseComponentValueType(&parser)
-                            if case .indexed(let idx) = valueType {
+                            let valueType = try parseComponentDefValType(&parser)
+                            if case .inlined(.index(let idx)) = valueType {
                                 okType = idx
                             } else {
                                 okType = ComponentTypeIndex(rawValue: try addAnonymousComponentType(valueType))
                             }
                             // Check for optional (error TYPE)
                             if try parser.takeParenBlockStart("error") {
-                                let errType = try parseComponentValueType(&parser)
-                                if case .indexed(let idx) = errType {
+                                let errType = try parseComponentDefValType(&parser)
+                                if case .inlined(.index(let idx)) = errType {
                                     errorType = idx
                                 } else {
                                     errorType = ComponentTypeIndex(rawValue: try addAnonymousComponentType(errType))
@@ -566,7 +566,7 @@
                             try parser.expect(.rightParen)
                         }
                     }
-                    let resultType = ComponentValueType.result(ok: okType, error: errorType)
+                    let resultType = ComponentDefValType.result(ok: okType.map { .index($0) }, error: errorType.map { .index($0) })
                     kind = .value(resultType)
 
                 default:
@@ -577,7 +577,7 @@
                 }
             } else {
                 // Shorthand: primitive value type keyword directly (e.g., `bool`, `u8`, etc.)
-                let primitiveType = try parseComponentValueType(&parser)
+                let primitiveType = try parseComponentDefValType(&parser)
                 kind = .value(primitiveType)
             }
 
@@ -887,11 +887,11 @@
                 switch declKeyword {
                 case "type":
                     let typeId = try parser.takeId()
-                    let valueType = try parseComponentValueType(&parser)
+                    let valueType = try parseComponentDefValType(&parser)
                     typeDecls.append(InstanceTypeDef.TypeDecl(id: typeId, valueType: valueType))
                 case "export":
                     let exportName = try parser.expectString()
-                    #warning("Skipping the type constraint as unimplemented")
+                    // TODO: Skipping the type constraint as unimplemented
                     var depth = 1
                     while depth > 0 {
                         if try parser.take(.leftParen) {
@@ -924,11 +924,11 @@
                 switch declKeyword {
                 case "type":
                     let typeId = try parser.takeId()
-                    let valueType = try parseComponentValueType(&parser)
+                    let valueType = try parseComponentDefValType(&parser)
                     typeDecls.append(ComponentInnerTypeDef.TypeDecl(id: typeId, valueType: valueType))
                 case "import":
                     let importName = try parser.expectString()
-                    #warning("Skipping the type constraint as unimplemented")
+                    // TODO: Skipping the type constraint as unimplemented
                     var depth = 1
                     while depth > 0 {
                         if try parser.take(.leftParen) {
@@ -944,7 +944,7 @@
                 case "export":
                     let exportName = try parser.expectString()
 
-                    #warning("Skipping the type constraint as unimplemented")
+                    // TODO: Skipping the type constraint as unimplemented
                     var depth = 1
                     while depth > 0 {
                         if try parser.take(.leftParen) {
@@ -966,7 +966,7 @@
             return ComponentInnerTypeDef(typeDecls: typeDecls, imports: imports, exports: exports)
         }
 
-        private mutating func parseComponentValueType(_ parser: inout Parser) throws(WatParserError) -> ComponentValueType {
+        private mutating func parseComponentDefValType(_ parser: inout Parser) throws(WatParserError) -> ComponentDefValType {
             // First check for type reference (identifier like $A1)
             if let typeRef = try parser.takeId() {
                 // Resolve the type reference to an index
@@ -979,22 +979,22 @@
             let primitiveTypeKeyword = try parser.peekKeyword()
 
             if let primitiveTypeKeyword {
-                let primitiveType: ComponentValueType
+                let primitiveType: ComponentDefValType
                 switch primitiveTypeKeyword {
-                case "bool": primitiveType = .bool
-                case "u8": primitiveType = .u8
-                case "u16": primitiveType = .u16
-                case "u32": primitiveType = .u32
-                case "u64": primitiveType = .u64
-                case "s8": primitiveType = .s8
-                case "s16": primitiveType = .s16
-                case "s32": primitiveType = .s32
-                case "s64": primitiveType = .s64
-                case "float32", "f32": primitiveType = .float32
-                case "float64", "f64": primitiveType = .float64
-                case "char": primitiveType = .char
-                case "string": primitiveType = .string
-                case "error-context": primitiveType = .errorContext
+                case "bool": primitiveType = .primitive(.bool)
+                case "u8": primitiveType = .primitive(.u8)
+                case "u16": primitiveType = .primitive(.u16)
+                case "u32": primitiveType = .primitive(.u32)
+                case "u64": primitiveType = .primitive(.u64)
+                case "s8": primitiveType = .primitive(.s8)
+                case "s16": primitiveType = .primitive(.s16)
+                case "s32": primitiveType = .primitive(.s32)
+                case "s64": primitiveType = .primitive(.s64)
+                case "float32", "f32": primitiveType = .primitive(.float32)
+                case "float64", "f64": primitiveType = .primitive(.float64)
+                case "char": primitiveType = .primitive(.char)
+                case "string": primitiveType = .primitive(.string)
+                case "error-context": primitiveType = .primitive(.errorContext)
                 default:
                     throw WatParserError(
                         "Unexpected primitive component type keyword `\(primitiveTypeKeyword)`",
@@ -1008,26 +1008,26 @@
                 let compositeTypeKeyword = try parser.expectKeyword()
                 switch compositeTypeKeyword {
                 case "list":
-                    let elementType = try parseComponentValueType(&parser)
+                    let elementType = try parseComponentDefValType(&parser)
                     try parser.expect(.rightParen)
                     // Get or create type index for element
                     let elementIndex: ComponentTypeIndex
-                    if case .indexed(let idx) = elementType {
+                    if case .inlined(.index(let idx)) = elementType {
                         elementIndex = idx
                     } else {
                         // Primitive - create a "pseudo-type" entry that encoder will inline
                         let elemIdx = try addAnonymousComponentType(elementType)
                         elementIndex = ComponentTypeIndex(rawValue: elemIdx)
                     }
-                    let listValueType: ComponentValueType = .list(elementIndex)
+                    let listValueType: ComponentDefValType = .list(.index(elementIndex))
                     let typeIndex = try addAnonymousComponentType(listValueType)
                     return .indexed(ComponentTypeIndex(rawValue: typeIndex))
 
                 case "tuple":
                     var typeIndices: [ComponentTypeIndex] = []
                     while try !parser.take(.rightParen) {
-                        let valueType = try parseComponentValueType(&parser)
-                        if case .indexed(let idx) = valueType {
+                        let valueType = try parseComponentDefValType(&parser)
+                        if case .inlined(.index(let idx)) = valueType {
                             typeIndices.append(idx)
                         } else {
                             // Primitive - create pseudo-type entry
@@ -1035,21 +1035,21 @@
                             typeIndices.append(ComponentTypeIndex(rawValue: elemIdx))
                         }
                     }
-                    let tupleValueType: ComponentValueType = .tuple(typeIndices)
+                    let tupleValueType: ComponentDefValType = .tuple(typeIndices.map { .index($0) })
                     let typeIndex = try addAnonymousComponentType(tupleValueType)
                     return .indexed(ComponentTypeIndex(rawValue: typeIndex))
 
                 case "option":
-                    let someType = try parseComponentValueType(&parser)
+                    let someType = try parseComponentDefValType(&parser)
                     try parser.expect(.rightParen)
                     let elementIndex: ComponentTypeIndex
-                    if case .indexed(let idx) = someType {
+                    if case .inlined(.index(let idx)) = someType {
                         elementIndex = idx
                     } else {
                         let elemIdx = try addAnonymousComponentType(someType)
                         elementIndex = ComponentTypeIndex(rawValue: elemIdx)
                     }
-                    let optionValueType: ComponentValueType = .option(elementIndex)
+                    let optionValueType: ComponentDefValType = .option(.index(elementIndex))
                     let typeIndex = try addAnonymousComponentType(optionValueType)
                     return .indexed(ComponentTypeIndex(rawValue: typeIndex))
 
@@ -1061,8 +1061,8 @@
                     if try !parser.take(.rightParen) {
                         // Check for (error ...) first (error-only result)
                         if try parser.takeParenBlockStart("error") {
-                            let valueType = try parseComponentValueType(&parser)
-                            if case .indexed(let idx) = valueType {
+                            let valueType = try parseComponentDefValType(&parser)
+                            if case .inlined(.index(let idx)) = valueType {
                                 errorType = idx
                             } else {
                                 errorType = ComponentTypeIndex(rawValue: try addAnonymousComponentType(valueType))
@@ -1071,8 +1071,8 @@
                             try parser.expect(.rightParen)
                         } else if try parser.takeParenBlockStart("ok") {
                             // Explicit (ok TYPE)
-                            let valueType = try parseComponentValueType(&parser)
-                            if case .indexed(let idx) = valueType {
+                            let valueType = try parseComponentDefValType(&parser)
+                            if case .inlined(.index(let idx)) = valueType {
                                 okType = idx
                             } else {
                                 okType = ComponentTypeIndex(rawValue: try addAnonymousComponentType(valueType))
@@ -1080,8 +1080,8 @@
                             try parser.expect(.rightParen)
                             // Check for optional (error TYPE)
                             if try parser.takeParenBlockStart("error") {
-                                let errType = try parseComponentValueType(&parser)
-                                if case .indexed(let idx) = errType {
+                                let errType = try parseComponentDefValType(&parser)
+                                if case .inlined(.index(let idx)) = errType {
                                     errorType = idx
                                 } else {
                                     errorType = ComponentTypeIndex(rawValue: try addAnonymousComponentType(errType))
@@ -1091,16 +1091,16 @@
                             try parser.expect(.rightParen)
                         } else {
                             // Shorthand: TYPE is the ok type
-                            let valueType = try parseComponentValueType(&parser)
-                            if case .indexed(let idx) = valueType {
+                            let valueType = try parseComponentDefValType(&parser)
+                            if case .inlined(.index(let idx)) = valueType {
                                 okType = idx
                             } else {
                                 okType = ComponentTypeIndex(rawValue: try addAnonymousComponentType(valueType))
                             }
                             // Check for optional (error TYPE)
                             if try parser.takeParenBlockStart("error") {
-                                let errType = try parseComponentValueType(&parser)
-                                if case .indexed(let idx) = errType {
+                                let errType = try parseComponentDefValType(&parser)
+                                if case .inlined(.index(let idx)) = errType {
                                     errorType = idx
                                 } else {
                                     errorType = ComponentTypeIndex(rawValue: try addAnonymousComponentType(errType))
@@ -1110,24 +1110,24 @@
                             try parser.expect(.rightParen)
                         }
                     }
-                    return .result(ok: okType, error: errorType)
+                    return .result(ok: okType.map { .index($0) }, error: errorType.map { .index($0) })
 
                 case "record":
                     var fields: [ComponentRecordField] = []
                     while try parser.takeParenBlockStart("field") {
                         let fieldName = try parser.expectString()
-                        let fieldType = try parseComponentValueType(&parser)
+                        let fieldType = try parseComponentDefValType(&parser)
                         let fieldTypeIndex: ComponentTypeIndex
-                        if case .indexed(let idx) = fieldType {
+                        if case .inlined(.index(let idx)) = fieldType {
                             fieldTypeIndex = idx
                         } else {
                             let idx = try addAnonymousComponentType(fieldType)
                             fieldTypeIndex = ComponentTypeIndex(rawValue: idx)
                         }
-                        fields.append(ComponentRecordField(name: fieldName, type: fieldTypeIndex))
+                        fields.append(ComponentRecordField(name: fieldName, type: .index(fieldTypeIndex)))
                         try parser.expect(.rightParen)
                     }
-                    let recordValueType: ComponentValueType = .record(fields)
+                    let recordValueType: ComponentDefValType = .record(fields)
                     let typeIndex = try addAnonymousComponentType(recordValueType)
                     return .indexed(ComponentTypeIndex(rawValue: typeIndex))
 
@@ -1138,8 +1138,8 @@
                         var caseType: ComponentTypeIndex? = nil
                         // Check if there's a type after the case name
                         if try !parser.take(.rightParen) {
-                            let valueType = try parseComponentValueType(&parser)
-                            if case .indexed(let idx) = valueType {
+                            let valueType = try parseComponentDefValType(&parser)
+                            if case .inlined(.index(let idx)) = valueType {
                                 caseType = idx
                             } else {
                                 let idx = try addAnonymousComponentType(valueType)
@@ -1147,9 +1147,9 @@
                             }
                             try parser.expect(.rightParen)
                         }
-                        cases.append(ComponentCaseField(name: caseName, type: caseType))
+                        cases.append(ComponentCaseField(name: caseName, type: caseType.map { .index($0) }))
                     }
-                    let variantValueType: ComponentValueType = .variant(cases)
+                    let variantValueType: ComponentDefValType = .variant(cases)
                     let typeIndex = try addAnonymousComponentType(variantValueType)
                     return .indexed(ComponentTypeIndex(rawValue: typeIndex))
 
@@ -1158,7 +1158,7 @@
                     while let flagName = try parser.takeString() {
                         flagNames.append(flagName)
                     }
-                    let flagsValueType: ComponentValueType = .flags(flagNames)
+                    let flagsValueType: ComponentDefValType = .flags(flagNames)
                     let typeIndex = try addAnonymousComponentType(flagsValueType)
                     return .indexed(ComponentTypeIndex(rawValue: typeIndex))
 
@@ -1167,7 +1167,7 @@
                     while let caseName = try parser.takeString() {
                         enumCases.append(caseName)
                     }
-                    let enumValueType: ComponentValueType = .enum(enumCases)
+                    let enumValueType: ComponentDefValType = .enum(enumCases)
                     let typeIndex = try addAnonymousComponentType(enumValueType)
                     return .indexed(ComponentTypeIndex(rawValue: typeIndex))
 
@@ -1186,7 +1186,7 @@
         }
 
         /// Add an anonymous component type for inline type references
-        private mutating func addAnonymousComponentType(_ valueType: ComponentValueType) throws(WatParserError) -> Int {
+        private mutating func addAnonymousComponentType(_ valueType: ComponentDefValType) throws(WatParserError) -> Int {
             let typeDef = ComponentTypeDef(id: nil, kind: .value(valueType))
 
             // Check if this type already exists as an anonymous type (deduplication)
@@ -1207,7 +1207,7 @@
         }
 
         private mutating func parseComponentFuncParam(_ parser: inout Parser) throws(WatParserError) -> ComponentFuncType.Param {
-            try .init(name: parser.expectString(), type: try parseComponentValueType(&parser))
+            try .init(name: parser.expectString(), type: try parseComponentDefValType(&parser))
         }
 
         /// Parse function parameters for component function types
@@ -1215,7 +1215,7 @@
             var params: [ComponentFuncType.Param] = []
             while try parser.takeParenBlockStart("param") {
                 let name = try parser.expectString()
-                let type = try parseComponentValueType(&parser)
+                let type = try parseComponentDefValType(&parser)
                 params.append(ComponentFuncType.Param(name: name, type: type))
                 try parser.expect(.rightParen)
             }
@@ -1226,7 +1226,7 @@
             _ = parser.lexer.location()
             _ = try parser.takeId()
             var parameters = [ComponentFuncType.Param]()
-            var resultType: ComponentValueType?
+            var resultType: ComponentDefValType?
             var exportDef: (location: Location, exportName: String)?
             var importDef: (location: Location, importModule: String, importName: String)?
 
@@ -1249,7 +1249,7 @@
                     parameters.append(try self.parseComponentFuncParam(&parser))
 
                 case "result":
-                    resultType = try parseComponentValueType(&parser)
+                    resultType = try parseComponentDefValType(&parser)
 
                 case "export":
                     exportDef = (parser.lexer.location(), try parser.expectString())

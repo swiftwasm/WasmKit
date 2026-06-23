@@ -1,5 +1,5 @@
 /// A protocol for limiting resource allocation.
-public protocol ResourceLimiter {
+public protocol ResourceLimiter: Sendable {
     /// Limit the memory growth of the process to the specified number of bytes.
     ///
     /// - Parameter desired: The desired size of the memory in bytes.

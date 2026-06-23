@@ -4,7 +4,7 @@
     /// Converts WIT type representations to ComponentModel types.
     ///
     /// This converter bridges WIT (WebAssembly Interface Types) definitions
-    /// to the ComponentValueType system used for runtime values.
+    /// to the ComponentDefValType system used for runtime values.
     ///
     /// Example usage:
     /// ```swift
@@ -21,41 +21,41 @@
     /// ```
     public struct WITTypeConverter {
         /// Type table for resolving indexed types
-        public private(set) var typeTable: [ComponentValueType] = []
+        public private(set) var typeTable: [ComponentDefValType] = []
 
         /// Named type definitions
-        public private(set) var namedTypes: [String: ComponentValueType] = [:]
+        public private(set) var namedTypes: [String: ComponentDefValType] = [:]
 
         public init() {}
 
         /// Add a type to the table and return its index
-        public mutating func addType(_ type: ComponentValueType) -> ComponentTypeIndex {
+        public mutating func addType(_ type: ComponentDefValType) -> ComponentTypeIndex {
             let idx = typeTable.count
             typeTable.append(type)
             return ComponentTypeIndex(rawValue: idx)
         }
 
-        /// Convert a WIT type representation to a ComponentValueType
-        public mutating func convert(_ typeRepr: TypeReprSyntax) -> ComponentValueType {
+        /// Convert a WIT type representation to a ComponentDefValType
+        public mutating func convert(_ typeRepr: TypeReprSyntax) -> ComponentDefValType {
             switch typeRepr {
-            case .bool: return .bool
-            case .u8: return .u8
-            case .u16: return .u16
-            case .u32: return .u32
-            case .u64: return .u64
-            case .s8: return .s8
-            case .s16: return .s16
-            case .s32: return .s32
-            case .s64: return .s64
-            case .float32: return .float32
-            case .float64: return .float64
-            case .char: return .char
-            case .string: return .string
+            case .bool: return .primitive(.bool)
+            case .u8: return .primitive(.u8)
+            case .u16: return .primitive(.u16)
+            case .u32: return .primitive(.u32)
+            case .u64: return .primitive(.u64)
+            case .s8: return .primitive(.s8)
+            case .s16: return .primitive(.s16)
+            case .s32: return .primitive(.s32)
+            case .s64: return .primitive(.s64)
+            case .float32: return .primitive(.float32)
+            case .float64: return .primitive(.float64)
+            case .char: return .primitive(.char)
+            case .string: return .primitive(.string)
             case .name(let id):
                 // Handle f32/f64 as aliases for float32/float64 (WIT spec uses f32/f64)
                 switch id.text {
-                case "f32": return .float32
-                case "f64": return .float64
+                case "f32": return .primitive(.float32)
+                case "f64": return .primitive(.float64)
                 default:
                     // Look up named type
                     if let type = namedTypes[id.text] {
@@ -66,11 +66,11 @@
             case .list(let element):
                 let elementType = convert(element)
                 let idx = addType(elementType)
-                return .list(idx)
+                return .list(.index(idx))
             case .option(let inner):
                 let innerType = convert(inner)
                 let idx = addType(innerType)
-                return .option(idx)
+                return .option(.index(idx))
             case .result(let resultSyntax):
                 let okIdx = resultSyntax.ok.map { ok -> ComponentTypeIndex in
                     let okType = convert(ok)
@@ -80,11 +80,11 @@
                     let errType = convert(err)
                     return addType(errType)
                 }
-                return .result(ok: okIdx, error: errIdx)
+                return .result(ok: okIdx.map { .index($0) }, error: errIdx.map { .index($0) })
             case .tuple(let elements):
-                let indices = elements.map { elem -> ComponentTypeIndex in
+                let indices = elements.map { elem -> ComponentValType in
                     let elemType = convert(elem)
-                    return addType(elemType)
+                    return .index(addType(elemType))
                 }
                 return .tuple(indices)
             case .handle, .future, .stream:
@@ -95,14 +95,14 @@
         /// Register a type definition, making it available for lookup by name
         public mutating func registerTypeDef(_ typeDef: TypeDefSyntax) {
             let typeName = typeDef.name.text
-            let componentType: ComponentValueType
+            let componentType: ComponentDefValType
 
             switch typeDef.body {
             case .record(let recordSyntax):
                 let fields = recordSyntax.fields.map { field -> ComponentRecordField in
                     let fieldType = convert(field.type)
                     let fieldIdx = addType(fieldType)
-                    return ComponentRecordField(name: field.name.text, type: fieldIdx)
+                    return ComponentRecordField(name: field.name.text, type: .index(fieldIdx))
                 }
                 componentType = .record(fields)
             case .enum(let enumSyntax):
@@ -113,9 +113,9 @@
                 componentType = .flags(flags)
             case .variant(let variantSyntax):
                 let cases = variantSyntax.cases.map { caseItem -> ComponentCaseField in
-                    let caseType = caseItem.type.map { type -> ComponentTypeIndex in
+                    let caseType = caseItem.type.map { type -> ComponentValType in
                         let converted = convert(type)
-                        return addType(converted)
+                        return .index(addType(converted))
                     }
                     return ComponentCaseField(name: caseItem.name.text, type: caseType)
                 }
@@ -129,8 +129,8 @@
             namedTypes[typeName] = componentType
         }
 
-        /// Resolve a type index to its ComponentValueType
-        public func resolve(_ idx: ComponentTypeIndex) -> ComponentValueType {
+        /// Resolve a type index to its ComponentDefValType
+        public func resolve(_ idx: ComponentTypeIndex) -> ComponentDefValType {
             return typeTable[Int(idx.rawValue)]
         }
     }
@@ -138,7 +138,7 @@
     /// Helper for extracting interface information from parsed WIT
     public struct WITInterfaceExtractor {
         /// Extracted function signatures
-        public private(set) var functions: [String: [(name: String, type: ComponentValueType)]] = [:]
+        public private(set) var functions: [String: [(name: String, type: ComponentDefValType)]] = [:]
 
         /// The type converter used during extraction
         public private(set) var converter: WITTypeConverter
@@ -161,7 +161,7 @@
                 if case .function(let funcNode) = item {
                     let funcSyntax = funcNode.syntax
                     let funcName = funcSyntax.name.text
-                    let params = funcSyntax.function.parameters.map { param -> (String, ComponentValueType) in
+                    let params = funcSyntax.function.parameters.map { param -> (String, ComponentDefValType) in
                         let paramType = converter.convert(param.type)
                         return (param.name.text, paramType)
                     }
