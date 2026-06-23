@@ -1860,18 +1860,10 @@ final class WASIImplementation: Sendable {
 
     /// Open a file or directory.
     ///
-    /// The lookup, open, and push are done in a single lock scope so that the
-    /// new entry (which contains non-Sendable existentials) is created inside
-    /// the closure, satisfying Mutex's `sending` contract. The openAt call is
-    /// non-blocking (opens a host fd or traverses an in-memory tree).
-    ///
-    /// - Note: This holds the fdTable lock during `fileSystem.openAt()`, which
-    ///   performs `openat(2)` + `fstat(2)` for `HostFileSystem`. These are
-    ///   normally sub-millisecond on local filesystems but can block on network
-    ///   mounts (NFS, FUSE). In a multi-threaded WASI context, this means all
-    ///   fd operations on all threads stall during any single `path_open`. A
-    ///   two-phase approach (reserve fd slot under lock, fill entry separately)
-    ///   would reduce contention but requires FdTable to support reserved slots.
+    /// Lookup, open, and push share one `fdTable` lock scope: the new entry holds
+    /// non-Sendable existentials, so it must be built inside the closure to satisfy
+    /// the lock's `sending` requirement. A full table is rejected before the open,
+    /// so a successful open is never orphaned by a failing install.
     func path_open(
         dirFd: WASIAbi.Fd,
         dirFlags: WASIAbi.LookupFlags,
@@ -1884,6 +1876,9 @@ final class WASIImplementation: Sendable {
         try fdTable.withLock { table in
             guard case .directory(let dirEntry) = table[dirFd] else {
                 throw WASIAbi.Errno.ENOTDIR
+            }
+            guard table.hasCapacity else {
+                throw WASIAbi.Errno.ENFILE
             }
             let newEntry = try fileSystem.openAt(
                 dirFd: dirEntry,
