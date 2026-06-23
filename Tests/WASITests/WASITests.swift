@@ -147,32 +147,25 @@ struct WASITests {
         _ = try fs.ensureDirectory(at: "/")
 
         try fs.addFile(at: "/hello.txt", content: Array("Hello, World!".utf8))
-        let node = fs.lookup(at: "/hello.txt")
-        #expect(node != nil)
-        #expect(node?.type == .file)
+        #expect(fs.nodeType(at: "/hello.txt") == .file)
 
-        guard let fileNode = node as? MemoryFileNode else {
-            #expect(Bool(false), "Expected FileNode")
-            return
-        }
-
-        guard case .bytes(let content) = fileNode.content else {
+        guard case .bytes(let content) = try fs.getFile(at: "/hello.txt") else {
             #expect(Bool(false), "Expected bytes content")
             return
         }
 
         #expect(content == Array("Hello, World!".utf8))
-        #expect(fileNode.size == 13)
+        #expect(content.count == 13)
 
         try fs.ensureDirectory(at: "/dir/subdir")
-        #expect(fs.lookup(at: "/dir") != nil)
-        #expect(fs.lookup(at: "/dir/subdir") != nil)
+        #expect(fs.nodeType(at: "/dir") != nil)
+        #expect(fs.nodeType(at: "/dir/subdir") != nil)
 
         try fs.addFile(at: "/dir/file.txt", content: Array("test".utf8))
-        #expect(fs.lookup(at: "/dir/file.txt") != nil)
+        #expect(fs.nodeType(at: "/dir/file.txt") != nil)
 
         try fs.removeFile(at: "/dir/file.txt")
-        #expect(fs.lookup(at: "/dir/file.txt") == nil)
+        #expect(fs.nodeType(at: "/dir/file.txt") == nil)
     }
 
     @Test
@@ -260,7 +253,7 @@ struct WASITests {
             let rootFd: WASIAbi.Fd = 3
 
             try wasi.path_create_directory(dirFd: rootFd, path: "newdir")
-            #expect(fs.lookup(at: "/newdir") != nil)
+            #expect(fs.nodeType(at: "/newdir") != nil)
 
             let dirStat = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "newdir")
             #expect(dirStat.filetype == .DIRECTORY)
@@ -281,8 +274,8 @@ struct WASITests {
             try wasi.fd_close(fd: dirFd)
 
             try wasi.path_unlink_file(dirFd: rootFd, path: "newdir/file1.txt")
-            #expect(fs.lookup(at: "/newdir/file1.txt") == nil)
-            #expect(fs.lookup(at: "/newdir/file2.txt") != nil)
+            #expect(fs.nodeType(at: "/newdir/file1.txt") == nil)
+            #expect(fs.nodeType(at: "/newdir/file2.txt") != nil)
         }
     }
 
@@ -311,7 +304,7 @@ struct WASITests {
             )
             try wasi.fd_close(fd: fd1)
 
-            #expect(fs.lookup(at: "/created.txt") != nil)
+            #expect(fs.nodeType(at: "/created.txt") != nil)
 
             try fs.addFile(at: "/truncate.txt", content: Array("Long content here".utf8))
 
@@ -428,8 +421,8 @@ struct WASITests {
         }
         let wasi = try WASIBridgeToHost(fileSystem: .memory(fs).withPreopens(preopens))
         try wasi.runAndClose { _ in
-            #expect(fs.lookup(at: "/tmp") != nil)
-            #expect(fs.lookup(at: "/data") != nil)
+            #expect(fs.nodeType(at: "/tmp") != nil)
+            #expect(fs.nodeType(at: "/data") != nil)
         }
     }
 
@@ -489,14 +482,14 @@ struct WASITests {
 
         try fs.addFile(at: "/test.txt", content: [1, 2, 3])
 
-        #expect(fs.lookup(at: "/test.txt") != nil)
-        #expect(fs.lookup(at: "//test.txt") != nil)
-        #expect(fs.lookup(at: "/./test.txt") == nil)
+        #expect(fs.nodeType(at: "/test.txt") != nil)
+        #expect(fs.nodeType(at: "//test.txt") != nil)
+        #expect(fs.nodeType(at: "/./test.txt") == nil)
 
         try fs.ensureDirectory(at: "/a/b/c")
-        #expect(fs.lookup(at: "/a/b/c") != nil)
-        #expect(fs.lookup(at: "/a/b") != nil)
-        #expect(fs.lookup(at: "/a") != nil)
+        #expect(fs.nodeType(at: "/a/b/c") != nil)
+        #expect(fs.nodeType(at: "/a/b") != nil)
+        #expect(fs.nodeType(at: "/a") != nil)
     }
 
     @Test
@@ -505,16 +498,14 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.ensureDirectory(at: "/dir")
         try fs.addFile(at: "/dir/file.txt", content: [])
-        let resolved = fs.resolve(at: "/dir", path: "file.txt")
-        #expect(resolved != nil)
-        #expect(resolved?.type == .file)
+        let resolved = fs.resolveType(at: "/dir", path: "file.txt")
+        #expect(resolved == .file)
 
-        let dotResolved = fs.resolve(at: "/dir", path: ".")
+        let dotResolved = fs.resolveType(at: "/dir", path: ".")
         #expect(dotResolved != nil)
 
-        let parentResolved = fs.resolve(at: "/dir", path: "..")
-        #expect(parentResolved != nil)
-        #expect(parentResolved?.type == .directory)
+        let parentResolved = fs.resolveType(at: "/dir", path: "..")
+        #expect(parentResolved == .directory)
     }
 
     @Test
@@ -881,8 +872,8 @@ struct WASITests {
                 newPath: "new.txt"
             )
 
-            #expect(fs.lookup(at: "/old.txt") == nil)
-            #expect(fs.lookup(at: "/new.txt") != nil)
+            #expect(fs.nodeType(at: "/old.txt") == nil)
+            #expect(fs.nodeType(at: "/new.txt") != nil)
 
             let content = try fs.getFile(at: "/new.txt")
             guard case .bytes(let bytes) = content else {
@@ -916,8 +907,8 @@ struct WASITests {
                 newPath: "subdir/moved.txt"
             )
 
-            #expect(fs.lookup(at: "/file.txt") == nil)
-            #expect(fs.lookup(at: "/subdir/moved.txt") != nil)
+            #expect(fs.nodeType(at: "/file.txt") == nil)
+            #expect(fs.nodeType(at: "/subdir/moved.txt") != nil)
         }
     }
 
@@ -937,7 +928,7 @@ struct WASITests {
             let rootFd: WASIAbi.Fd = 3
 
             try wasi.path_remove_directory(dirFd: rootFd, path: "emptydir")
-            #expect(fs.lookup(at: "/emptydir") == nil)
+            #expect(fs.nodeType(at: "/emptydir") == nil)
         }
     }
 
@@ -964,7 +955,7 @@ struct WASITests {
                 #expect(error == .ENOTEMPTY)
             }
 
-            #expect(fs.lookup(at: "/nonempty") != nil)
+            #expect(fs.nodeType(at: "/nonempty") != nil)
         }
     }
 
