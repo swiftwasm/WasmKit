@@ -162,7 +162,10 @@ final class MemoryFileNode: MemFSNode {
 
     /// The host descriptor for a `.handle`-backed file, or nil for an in-memory file.
     var handle: FileDescriptor? {
-        state.withLock { if case .handle(let fd) = $0.content { return fd }; return nil }
+        state.withLock {
+            if case .handle(let fd) = $0.content { return fd }
+            return nil
+        }
     }
 
     var size: Int {

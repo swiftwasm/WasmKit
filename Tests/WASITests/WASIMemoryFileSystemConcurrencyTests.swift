@@ -1,6 +1,5 @@
-import Testing
-
 import SystemExtras
+import Testing
 
 @testable import WASI
 

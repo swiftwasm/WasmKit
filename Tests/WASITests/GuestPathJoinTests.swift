@@ -1,5 +1,4 @@
 import Testing
-
 import WASI
 
 @Test func joinGuestPathContract() {
