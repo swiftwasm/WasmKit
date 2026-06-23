@@ -39,6 +39,7 @@ add_wasmkit_library(WasmKit
   Execution/NameRegistry.swift
   Execution/Profiler.swift
   Execution/Runtime.swift
+  Execution/SharedMemoryStorage.swift
   Execution/SignpostTracer.swift
   Execution/Store.swift
   Execution/StoreAllocator.swift

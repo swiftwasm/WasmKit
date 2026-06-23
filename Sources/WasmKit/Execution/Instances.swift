@@ -66,6 +66,30 @@ package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
     }
 }
 
+/// A `Sendable` reference to a `SharedMemoryStorage` allocation.
+///
+/// `EntityHandle<T>` wraps `UnsafeMutablePointer<T>`, which is not `Sendable` in
+/// Swift 6. Shared memory is the only entity that must cross thread boundaries
+/// (via `ThreadGroup`), so this purpose-built type stores the pointer as a `UInt`
+/// bit pattern that the compiler can verify as `Sendable`.
+///
+/// The underlying `SharedMemoryStorage` must outlive all threads holding a
+/// `SharedMemoryEntity`. This is guaranteed by the `StoreAllocator`'s
+/// `BumpAllocator<SharedMemoryStorage>`, which lives as long as the parent `Store`.
+package struct SharedMemoryEntity: Sendable, Equatable, Hashable {
+    private let bits: UInt
+
+    init(unsafe pointer: UnsafeMutablePointer<SharedMemoryStorage>) {
+        self.bits = UInt(bitPattern: pointer)
+    }
+
+    @inline(__always)
+    func withValue<R>(_ body: (inout SharedMemoryStorage) throws -> R) rethrows -> R {
+        let pointer = UnsafeMutablePointer<SharedMemoryStorage>(bitPattern: bits)!
+        return try body(&pointer.pointee)
+    }
+}
+
 extension EntityHandle: ValidatableEntity where T: ValidatableEntity, T: ~Copyable {
     static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
         T.createOutOfBoundsError(index: index, count: count)
@@ -589,7 +613,10 @@ struct MemoryEntity: ~Copyable {
     private var storage: Storage
     let maxPageCount: UInt64
     let limit: Limits
-    let sharedMutex: Mutex<Void>?
+
+    /// If this memory is shared, the mmap-backed storage is held here.
+    /// Multiple `MemoryEntity` instances (across threads) may reference the same `SharedMemoryStorage`.
+    let sharedStorage: SharedMemoryEntity?
 
     init(_ memoryType: MemoryType, engineConfiguration: EngineConfiguration, resourceLimiter: any ResourceLimiter) throws {
         let byteSize = Int(memoryType.min) * Self.pageSize
@@ -600,26 +627,80 @@ struct MemoryEntity: ~Copyable {
         let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
         maxPageCount = memoryType.max ?? defaultMaxPageCount
         limit = memoryType
-        sharedMutex = memoryType.shared ? Mutex<Void>(()) : nil
+        sharedStorage = nil
+    }
+
+    /// Creates a memory entity for a shared memory backed by pre-allocated `SharedMemoryStorage`.
+    ///
+    /// The inline `storage` is an empty placeholder; every accessor routes through
+    /// `sharedStorage` first.
+    init(_ memoryType: MemoryType, sharedStorage: SharedMemoryEntity) {
+        precondition(memoryType.shared)
+        // The inline storage is never accessed for shared memories (all accessors
+        // route through `sharedStorage`), so allocate an empty software-backed
+        // placeholder to avoid reserving any mprotect address space.
+        var placeholderConfiguration = EngineConfiguration()
+        placeholderConfiguration.memoryBoundsChecking = .software
+        self.storage = Storage(byteSize: 0, isMemory64: memoryType.isMemory64, engineConfiguration: placeholderConfiguration)
+        self.maxPageCount = memoryType.max ?? Self.maxPageCount(isMemory64: memoryType.isMemory64)
+        self.limit = memoryType
+        self.sharedStorage = sharedStorage
     }
 
     deinit {
+        // Only deallocate inline storage for non-shared memories.
+        // `SharedMemoryStorage` cleanup is managed by its own `BumpAllocator`.
+        guard sharedStorage == nil else { return }
         storage.deallocate()
     }
 
-    var data: UnsafeBufferPointer<UInt8> { storage.data }
+    var data: UnsafeBufferPointer<UInt8> {
+        if let sharedStorage {
+            return sharedStorage.withValue { shared in
+                let count = shared.currentByteCount.load(ordering: .acquiring)
+                return UnsafeBufferPointer(
+                    start: shared.basePointer.assumingMemoryBound(to: UInt8.self),
+                    count: count
+                )
+            }
+        }
+        return storage.data
+    }
 
-    var baseAddress: UnsafeMutableRawPointer? { storage.baseAddress }
+    var baseAddress: UnsafeMutableRawPointer? {
+        if let sharedStorage {
+            return sharedStorage.withValue { $0.basePointer }
+        }
+        return storage.baseAddress
+    }
 
-    var byteCount: Int { storage.byteCount }
+    var byteCount: Int {
+        if let sharedStorage {
+            return sharedStorage.withValue { $0.currentByteCount.load(ordering: .acquiring) }
+        }
+        return storage.byteCount
+    }
 
     var trapGuardReservationSize: Int {
-        storage.trapGuardReservationSize
+        if let sharedStorage {
+            return sharedStorage.withValue { $0.reservationSize }
+        }
+        return storage.trapGuardReservationSize
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#grow-mem>
     mutating func grow(by pageCount: Int, resourceLimiter: any ResourceLimiter) throws -> Value {
+        if let sharedStorage {
+            let oldPages = try sharedStorage.withValue { shared in
+                try shared.grow(by: pageCount, resourceLimiter: resourceLimiter)
+            }
+            if oldPages < 0 {
+                return limit.isMemory64 ? .i64((-1 as Int64).unsigned) : .i32((-1 as Int32).unsigned)
+            }
+            return limit.isMemory64 ? .i64(UInt64(oldPages)) : .i32(UInt32(oldPages))
+        }
+
         let currentByteCount = byteCount
         let newPageCount = currentByteCount / Self.pageSize + pageCount
 
@@ -753,6 +834,22 @@ public struct Memory: Equatable {
 
         self.init(
             handle: try store.allocator.allocate(memoryType: type, engineConfiguration: store.engine.configuration, resourceLimiter: store.resourceLimiter),
+            allocator: store.allocator
+        )
+    }
+
+    /// The shared memory entity backing this memory, if shared.
+    package var sharedStorage: SharedMemoryEntity? {
+        handle.withValue { $0.sharedStorage }
+    }
+
+    /// Create a `Memory` in `store` that wraps an existing `SharedMemoryEntity`.
+    ///
+    /// Used by `wasi_thread_spawn` to provide the same shared memory as an
+    /// import to child `Store` instances.
+    package init(store: Store, type: MemoryType, sharedStorage: SharedMemoryEntity) {
+        self.init(
+            handle: store.allocator.allocate(memoryType: type, sharedStorage: sharedStorage),
             allocator: store.allocator
         )
     }

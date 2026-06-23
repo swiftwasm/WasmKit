@@ -85,6 +85,17 @@ enum VMGen {
             """
         }
 
+        for op in memoryLoadOps {
+            inlineImpls[op.sharedInstruction.name] = """
+            try memoryLoadShared(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) })
+            """
+        }
+        for op in memoryStoreOps {
+            inlineImpls[op.sharedInstruction.name] = """
+            try memoryStoreShared(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { \(op.castFromValue) })
+            """
+        }
+
         for op in memoryAtomicLoadOps {
             inlineImpls[op.atomicInstruction.name] = """
             try atomicLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) })

@@ -10,6 +10,70 @@ extension Execution {
     @inline(never) func throwUnalignedAtomicAccess() throws -> Never {
         throw Trap(.unalignedAtomic)
     }
+
+    /// Reload the current shared memory size atomically (slow path for stale Ms).
+    /// Returns `nil` if the default memory is not shared. `@inline(never)`: this is a
+    /// cold-path helper (failed fast bounds check); keeping it out of line avoids
+    /// bloating the inlined bounds checks in the scalar shared and SIMD handlers.
+    @inline(never)
+    func reloadSharedMemorySize(sp: Sp) -> Int? {
+        guard let memory = currentInstance(sp: sp).memories.first else { return nil }
+        return memory.withValue { entity -> Int? in
+            guard let sharedStorage = entity.sharedStorage else { return nil }
+            return sharedStorage.withValue { $0.currentByteCount.load(ordering: .acquiring) }
+        }
+    }
+
+    /// Shared-memory load: a concurrent grow can leave the cached `Ms` stale, so on a
+    /// failed fast bounds check reload the authoritative committed size before trapping.
+    /// Emitted by the translator only for shared memories, so the plain `memoryLoad`
+    /// keeps `origin/main`'s leaf codegen for the common single-threaded case.
+    mutating func memoryLoadShared<T: FixedWidthInteger>(
+        sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
+    ) throws {
+        let length = UInt64(T.bitWidth) / 8
+        let i = sp[loadOperand.pointer].asAddressOffset()
+        let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ loadOperand.offset)
+        let boundsOk: Bool
+        if _fastPath(!isEndOverflow && endAddress <= ms) {
+            boundsOk = true
+        } else if !isEndOverflow, let freshMs = reloadSharedMemorySize(sp: sp), endAddress <= UInt64(freshMs) {
+            boundsOk = true
+        } else {
+            boundsOk = false
+        }
+        if boundsOk {
+            let address = loadOperand.offset + i
+            let loaded = md.unsafelyUnwrapped.loadUnaligned(fromByteOffset: Int(address), as: T.self)
+            sp[loadOperand.result] = castToValue(loaded)
+        } else {
+            try throwOutOfBoundsMemoryAccess()
+        }
+    }
+
+    /// Shared-memory store. See `memoryLoadShared`.
+    mutating func memoryStoreShared<T: FixedWidthInteger>(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand, castFromValue: (UntypedValue) -> T) throws {
+        let value = sp[storeOperand.value]
+        let length = UInt64(T.bitWidth) / 8
+        let i = sp[storeOperand.pointer].asAddressOffset()
+        let address = storeOperand.offset + i
+        let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ storeOperand.offset)
+        let boundsOk: Bool
+        if _fastPath(!isEndOverflow && endAddress <= ms) {
+            boundsOk = true
+        } else if !isEndOverflow, let freshMs = reloadSharedMemorySize(sp: sp), endAddress <= UInt64(freshMs) {
+            boundsOk = true
+        } else {
+            boundsOk = false
+        }
+        if boundsOk {
+            let toStore = castFromValue(value)
+            md.unsafelyUnwrapped.advanced(by: Int(address))
+                .bindMemory(to: T.self, capacity: 1).pointee = toStore.littleEndian
+        } else {
+            try throwOutOfBoundsMemoryAccess()
+        }
+    }
     mutating func memoryLoad<T: FixedWidthInteger>(
         sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
     ) throws {
@@ -118,7 +182,17 @@ extension Execution {
             try throwUnalignedAtomicAccess()
         }
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ loadOperand.offset)
+        let boundsOk: Bool
         if _fastPath(!isEndOverflow && endAddress <= ms) {
+            boundsOk = true
+        } else if !isEndOverflow, let freshMs = reloadSharedMemorySize(sp: sp),
+            endAddress <= UInt64(freshMs)
+        {
+            boundsOk = true
+        } else {
+            boundsOk = false
+        }
+        if boundsOk {
             let rawPtr = md.unsafelyUnwrapped.advanced(by: Int(address))
             let loaded: T
             switch T.bitWidth {
@@ -147,7 +221,17 @@ extension Execution {
             try throwUnalignedAtomicAccess()
         }
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ storeOperand.offset)
+        let boundsOk: Bool
         if _fastPath(!isEndOverflow && endAddress <= ms) {
+            boundsOk = true
+        } else if !isEndOverflow, let freshMs = reloadSharedMemorySize(sp: sp),
+            endAddress <= UInt64(freshMs)
+        {
+            boundsOk = true
+        } else {
+            boundsOk = false
+        }
+        if boundsOk {
             let toStore = castFromValue(value)
             let rawPtr = md.unsafelyUnwrapped.advanced(by: Int(address))
             switch T.bitWidth {
@@ -180,7 +264,17 @@ extension Execution {
             try throwUnalignedAtomicAccess()
         }
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ rmwOperand.offset)
+        let boundsOk: Bool
         if _fastPath(!isEndOverflow && endAddress <= ms) {
+            boundsOk = true
+        } else if !isEndOverflow, let freshMs = reloadSharedMemorySize(sp: sp),
+            endAddress <= UInt64(freshMs)
+        {
+            boundsOk = true
+        } else {
+            boundsOk = false
+        }
+        if boundsOk {
             let rawPtr = md.unsafelyUnwrapped.advanced(by: Int(address))
             let value = castFromValue(sp[rmwOperand.value])
             let oldValue = atomicOp(rawPtr, value)
@@ -206,7 +300,17 @@ extension Execution {
             try throwUnalignedAtomicAccess()
         }
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ cmpxchgOperand.offset)
+        let boundsOk: Bool
         if _fastPath(!isEndOverflow && endAddress <= ms) {
+            boundsOk = true
+        } else if !isEndOverflow, let freshMs = reloadSharedMemorySize(sp: sp),
+            endAddress <= UInt64(freshMs)
+        {
+            boundsOk = true
+        } else {
+            boundsOk = false
+        }
+        if boundsOk {
             let rawPtr = md.unsafelyUnwrapped.advanced(by: Int(address))
             let expectedValue = castFromValue(sp[cmpxchgOperand.expected])
             let replacementValue = castFromValue(sp[cmpxchgOperand.replacement])
@@ -228,7 +332,17 @@ extension Execution {
             try throwUnalignedAtomicAccess()
         }
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(4 &+ waitOperand.offset)
+        let boundsOk: Bool
         if _fastPath(!isEndOverflow && endAddress <= ms) {
+            boundsOk = true
+        } else if !isEndOverflow, let freshMs = reloadSharedMemorySize(sp: sp),
+            endAddress <= UInt64(freshMs)
+        {
+            boundsOk = true
+        } else {
+            boundsOk = false
+        }
+        if boundsOk {
             let rawPtr = md.unsafelyUnwrapped.advanced(by: Int(address))
             let currentValue = wasmkit_atomic_load_32(rawPtr)
             let expectedValue = sp[waitOperand.expected].i32
@@ -241,20 +355,21 @@ extension Execution {
                 return
             }
 
-            // Value matches - wait for notification or timeout
+            // Value matches - wait for notification or timeout.
+            // Per the threads spec: timeout is a signed i64 in nanoseconds.
+            //   timeout < 0 → never expires (wait indefinitely)
+            //   timeout >= 0 → expires after `timeout` nanoseconds
             let parkingLot = store.value.atomicParkingLot
+            let timeoutSigned = Int64(bitPattern: timeout)
             let deadline: (() -> ContinuousClock.Instant)?
-            if timeout == 0 {
-                // Timeout of 0 means wait indefinitely
+            if timeoutSigned < 0 {
                 deadline = nil
             } else {
-                // Convert nanoseconds to Duration and calculate deadline
-                let timeoutDuration = Duration.nanoseconds(Int64(timeout))
+                let timeoutDuration = Duration.nanoseconds(timeoutSigned)
                 let deadlineInstant = ContinuousClock.now.advanced(by: timeoutDuration)
                 deadline = { deadlineInstant }
             }
 
-            var threadState = ThreadWaitState()
             let result = parkingLot.parkConditionally(
                 address: UInt64(address),
                 validate: {
@@ -262,8 +377,7 @@ extension Execution {
                     let currentValue = wasmkit_atomic_load_32(rawPtr)
                     return currentValue == expectedValue
                 },
-                deadline: deadline,
-                threadState: &threadState
+                deadline: deadline
             )
 
             let resultValue: Int32
@@ -287,7 +401,17 @@ extension Execution {
             try throwUnalignedAtomicAccess()
         }
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(8 &+ waitOperand.offset)
+        let boundsOk: Bool
         if _fastPath(!isEndOverflow && endAddress <= ms) {
+            boundsOk = true
+        } else if !isEndOverflow, let freshMs = reloadSharedMemorySize(sp: sp),
+            endAddress <= UInt64(freshMs)
+        {
+            boundsOk = true
+        } else {
+            boundsOk = false
+        }
+        if boundsOk {
             let rawPtr = md.unsafelyUnwrapped.advanced(by: Int(address))
             let currentValue = wasmkit_atomic_load_64(rawPtr)
             let expectedValue = sp[waitOperand.expected].i64
@@ -300,20 +424,21 @@ extension Execution {
                 return
             }
 
-            // Value matches - wait for notification or timeout
+            // Value matches - wait for notification or timeout.
+            // Per the threads spec: timeout is a signed i64 in nanoseconds.
+            //   timeout < 0 → never expires (wait indefinitely)
+            //   timeout >= 0 → expires after `timeout` nanoseconds
             let parkingLot = store.value.atomicParkingLot
+            let timeoutSigned = Int64(bitPattern: timeout)
             let deadline: (() -> ContinuousClock.Instant)?
-            if timeout == 0 {
-                // Timeout of 0 means wait indefinitely
+            if timeoutSigned < 0 {
                 deadline = nil
             } else {
-                // Convert nanoseconds to Duration and calculate deadline
-                let timeoutDuration = Duration.nanoseconds(Int64(timeout))
+                let timeoutDuration = Duration.nanoseconds(timeoutSigned)
                 let deadlineInstant = ContinuousClock.now.advanced(by: timeoutDuration)
                 deadline = { deadlineInstant }
             }
 
-            var threadState = ThreadWaitState()
             let result = parkingLot.parkConditionally(
                 address: UInt64(address),
                 validate: {
@@ -321,8 +446,7 @@ extension Execution {
                     let currentValue = wasmkit_atomic_load_64(rawPtr)
                     return currentValue == expectedValue
                 },
-                deadline: deadline,
-                threadState: &threadState
+                deadline: deadline
             )
 
             let resultValue: Int32
@@ -342,7 +466,17 @@ extension Execution {
         let i = sp[notifyOperand.pointer].asAddressOffset()
         let address = notifyOperand.offset + i
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(4 &+ notifyOperand.offset)
+        let boundsOk: Bool
         if _fastPath(!isEndOverflow && endAddress <= ms) {
+            boundsOk = true
+        } else if !isEndOverflow, let freshMs = reloadSharedMemorySize(sp: sp),
+            endAddress <= UInt64(freshMs)
+        {
+            boundsOk = true
+        } else {
+            boundsOk = false
+        }
+        if boundsOk {
             let count = sp[notifyOperand.count].i32
             let parkingLot = store.value.atomicParkingLot
             let wokenCount = parkingLot.unpark(address: UInt64(address), count: UInt32(bitPattern: Int32(truncatingIfNeeded: count)))

@@ -1,175 +1,258 @@
 /// Synchronization primitives for atomic memory wait and notify operations.
 ///
 /// Provides thread-safe waiting and notification mechanisms for shared memory
-/// operations. The current implementation uses a simple mutex-protected queue
-/// with busy-waiting, but the interface is designed to allow future
-/// optimizations with more efficient blocking mechanisms.
+/// operations. Uses pthread condition variables for OS-level blocking.
 ///
 /// API design inspired by WebKit's ParkingLot:
 /// https://github.com/WebKit/WebKit/blob/main/Source/WTF/wtf/ParkingLot.h
 
 import Synchronization
 
-/// Represents a thread waiting on a memory address
-final class WaitingThread: @unchecked Sendable {
-    let isWoken: Atomic<Bool>
+#if canImport(Darwin)
+    import Darwin
+#elseif canImport(Musl)
+    import Musl
+#elseif canImport(Glibc)
+    import Glibc
+#endif
+
+/// Per-wait blocking context wrapping a pthread condvar + mutex pair.
+///
+/// A class because the same slot is referenced simultaneously from the
+/// registry (where `unpark` finds it) and the parked thread (blocking in
+/// `wait()`). `woken` is only accessed under `pthread_mutex_lock(mutex)`.
+final class BlockingSlot: @unchecked Sendable {
+    private let mutex: UnsafeMutablePointer<pthread_mutex_t>
+    private let cond: UnsafeMutablePointer<pthread_cond_t>
+    private var woken: Bool
 
     init() {
-        self.isWoken = Atomic(false)
+        mutex = .allocate(capacity: 1)
+        mutex.initialize(to: pthread_mutex_t())
+        pthread_mutex_init(mutex, nil)
+
+        cond = .allocate(capacity: 1)
+        cond.initialize(to: pthread_cond_t())
+        #if canImport(Darwin)
+            pthread_cond_init(cond, nil)
+        #else
+            var attr = pthread_condattr_t()
+            pthread_condattr_init(&attr)
+            pthread_condattr_setclock(&attr, CLOCK_MONOTONIC)
+            pthread_cond_init(cond, &attr)
+            pthread_condattr_destroy(&attr)
+        #endif
+
+        woken = false
+    }
+
+    deinit {
+        pthread_cond_destroy(cond)
+        cond.deinitialize(count: 1)
+        cond.deallocate()
+
+        pthread_mutex_destroy(mutex)
+        mutex.deinitialize(count: 1)
+        mutex.deallocate()
+    }
+
+    /// Block until woken or timeout expires.
+    /// - Parameter timeoutNs: relative timeout in nanoseconds.
+    ///   `< 0` = wait indefinitely, `0` = return immediately, `> 0` = timed wait.
+    /// - Returns: `true` if woken by `wake()`, `false` if timed out.
+    func wait(timeoutNs: Int64) -> Bool {
+        pthread_mutex_lock(mutex)
+        defer { pthread_mutex_unlock(mutex) }
+
+        if timeoutNs == 0 {
+            return woken
+        }
+
+        if timeoutNs < 0 {
+            while !woken {
+                pthread_cond_wait(cond, mutex)
+            }
+            return true
+        }
+
+        var deadline = timespec()
+        #if canImport(Darwin)
+            clock_gettime(CLOCK_REALTIME, &deadline)
+        #else
+            clock_gettime(CLOCK_MONOTONIC, &deadline)
+        #endif
+        let extraSec = timeoutNs / 1_000_000_000
+        let extraNsec = timeoutNs % 1_000_000_000
+        deadline.tv_sec += Int(extraSec)
+        deadline.tv_nsec += Int(extraNsec)
+        if deadline.tv_nsec >= 1_000_000_000 {
+            deadline.tv_sec += 1
+            deadline.tv_nsec -= 1_000_000_000
+        }
+
+        while !woken {
+            let rc = pthread_cond_timedwait(cond, mutex, &deadline)
+            if rc == ETIMEDOUT { break }
+        }
+        return woken
+    }
+
+    /// Wake the thread blocked on this slot.
+    func wake() {
+        pthread_mutex_lock(mutex)
+        woken = true
+        pthread_cond_signal(cond)
+        pthread_mutex_unlock(mutex)
     }
 }
 
 /// Manages waiting threads for atomic memory operations.
-final class AtomicParkingLot {
-    /// Synchronized map from memory address to waiting threads
-    private let lock: Mutex<[UInt64: [WaitingThread]]>
+package final class AtomicParkingLot: Sendable {
+    private let registry: Mutex<[UInt64: [BlockingSlot]]>
+
+    #if DEBUG
+        /// Test-only hook fired inside `unpark` after the slots are removed and counted
+        /// (registry lock released) and before `wake()` runs, used to deterministically
+        /// exercise the timeout/notify race. Never set outside tests; compiled out of release.
+        let _afterDequeueBeforeWake = Mutex<(@Sendable () -> Void)?>(nil)
+    #endif
 
     init() {
-        self.lock = Mutex([:])
+        self.registry = Mutex([:])
     }
 
-    /// Parks the thread in a queue associated with the given address.
+    /// Parks the calling thread until woken, timed out, or validation fails.
     ///
-    /// The parking only succeeds if the validation function returns true while
-    /// the queue lock is held. If validation returns false, it will return
-    /// `.mismatch` without doing anything else.
-    ///
-    /// If validation returns true, it will enqueue the thread, unlock the
-    /// parking queue lock, and then sleep so long as the thread continues to be
-    /// on the queue and the timeout hasn't fired. Returns `.woken` if we
-    /// actually got unparked, `.timedOut` if the timeout was hit, or `.mismatch`
-    /// if validation failed.
-    ///
+    /// Validation runs twice: once before acquiring the registry lock (quick
+    /// path) and once while holding it (definitive check). If either returns
+    /// false, returns `.mismatch` without blocking.
     /// - Parameters:
-    ///   - address: Memory address to park on (cannot be null conceptually)
+    ///   - address: Memory address to park on
     ///   - validate: Closure that checks if the wait condition is still valid
     ///   - deadline: Optional deadline after which to timeout
-    ///   - threadState: Thread-local state for this wait operation
-    /// - Returns: Result indicating woken, mismatch, or timeout
+    ///   - beforeSleep: Optional callback invoked after the thread is queued
+    ///     in the registry but before it blocks. Callers can use this to
+    ///     signal readiness, knowing that a subsequent `unpark` on the same
+    ///     address will find this thread.
     func parkConditionally(
         address: UInt64,
         validate: () -> Bool,
         deadline: (() -> ContinuousClock.Instant)?,
-        threadState: inout ThreadWaitState
+        beforeSleep: (() -> Void)? = nil
     ) -> WaitOutcome {
-        // Quick check before acquiring lock
         if !validate() {
-            return WaitOutcome.mismatch
+            return .mismatch
         }
 
-        // Initialize thread state if needed
-        let thread = threadState.thread ?? WaitingThread()
-        threadState.thread = thread
-        thread.isWoken.store(false, ordering: .relaxed)
+        let slot = BlockingSlot()
 
-        // Register this thread as waiting
-        let shouldBlock = lock.withLock { registry -> Bool in
-            // Re-check condition while holding lock
+        let shouldBlock = registry.withLock { reg -> Bool in
             if !validate() {
-                thread.isWoken.store(true, ordering: .relaxed)
                 return false
             }
-
-            // Add to waiting list for this address
-            registry[address, default: []].append(thread)
+            reg[address, default: []].append(slot)
             return true
         }
 
-        // Exit early if condition no longer holds
-        if !shouldBlock || thread.isWoken.load(ordering: .acquiring) {
-            return WaitOutcome.mismatch
+        if !shouldBlock {
+            return .mismatch
         }
 
-        // Wait for wake signal with timeout handling
-        let deadlineTime = deadline?()
-        var expired = false
-        var spinCount = 1
+        beforeSleep?()
 
-        while !thread.isWoken.load(ordering: .acquiring) {
-            if let deadlineTime = deadlineTime {
-                let currentTime = ContinuousClock.now
-                if currentTime >= deadlineTime {
-                    expired = true
-                    break
+        let timeoutNs: Int64
+        if let deadline = deadline?() {
+            let remaining = deadline - ContinuousClock.now
+            let (seconds, attoseconds) = remaining.components
+            let ns = seconds * 1_000_000_000 + attoseconds / 1_000_000_000
+            timeoutNs = max(ns, 0)
+        } else {
+            timeoutNs = -1
+        }
+
+        let wasWoken = slot.wait(timeoutNs: timeoutNs)
+
+        if !wasWoken {
+            // `slot.wait` reported a timeout, but the pthread `woken` flag and registry
+            // membership are two views of one wakeup. The registry — mutated only under
+            // `registry`'s lock — is authoritative: `unpark` removes a slot from the
+            // registry (under the lock) before it calls `wake()` (outside the lock). So if
+            // our slot is still queued here we genuinely timed out; if it is already gone,
+            // a concurrent `unpark` claimed and counted us in the gap between our timeout
+            // and its `wake()`, and we report `.woken` to keep `unpark`'s returned count
+            // equal to the wakeups waiters observe. Each slot is appended exactly once, so
+            // `firstIndex` finds the unique entry. This relies on `unpark` being the only
+            // dequeuer; `unparkAll`, when wired for termination, must revisit it (see Risks).
+            let genuinelyTimedOut = registry.withLock { reg -> Bool in
+                guard var slots = reg[address],
+                    let index = slots.firstIndex(where: { $0 === slot })
+                else {
+                    return false
                 }
+                slots.remove(at: index)
+                setOrRemove(slots, for: address, in: &reg)
+                return true
             }
-
-            // Progressive backoff to reduce CPU spinning
-            for _ in 0..<spinCount {
-                _ = spinCount & 1
-            }
-            spinCount = min(spinCount * 2, 1024)
+            return genuinelyTimedOut ? .timedOut : .woken
         }
 
-        // Clean up if we timed out
-        if expired {
-            lock.withLock { registry in
-                if var threads = registry[address] {
-                    threads.removeAll { $0 === thread }
-                    if threads.isEmpty {
-                        registry.removeValue(forKey: address)
-                    } else {
-                        registry[address] = threads
-                    }
-                }
-            }
-            return WaitOutcome.timedOut
-        }
-
-        return WaitOutcome.woken
+        return .woken
     }
 
-    /// Unparks up to `count` threads from the queue associated with the given address.
-    ///
-    /// - Parameters:
-    ///   - address: Memory address to unpark threads for (cannot be null conceptually)
-    ///   - count: Maximum number of threads to unpark
-    /// - Returns: Number of threads actually unparked
+    /// Stores the waiter list for `address`, or removes the key entirely when the list
+    /// is empty so empty buckets do not accumulate.
+    private func setOrRemove(
+        _ slots: [BlockingSlot], for address: UInt64, in reg: inout [UInt64: [BlockingSlot]]
+    ) {
+        if slots.isEmpty {
+            reg.removeValue(forKey: address)
+        } else {
+            reg[address] = slots
+        }
+    }
+
+    /// Unparks up to `count` threads from the queue at `address`.
     func unpark(address: UInt64, count: UInt32) -> UInt32 {
-        if count == 0 {
-            return 0
+        if count == 0 { return 0 }
+
+        let toWake: [BlockingSlot] = registry.withLock { reg in
+            guard var slots = reg[address], !slots.isEmpty else {
+                return []
+            }
+            let wakeCount = min(Int(count), slots.count)
+            let result = Array(slots.prefix(wakeCount))
+            slots.removeFirst(wakeCount)
+            setOrRemove(slots, for: address, in: &reg)
+            return result
         }
 
-        var wokenCount: UInt32 = 0
+        #if DEBUG
+            _afterDequeueBeforeWake.withLock { $0 }?()
+        #endif
 
-        lock.withLock { registry in
-            guard var threads = registry[address], !threads.isEmpty else {
-                return
-            }
-
-            let wakeCount = min(Int(count), threads.count)
-            let toWake = Array(threads.prefix(wakeCount))
-            threads.removeFirst(wakeCount)
-
-            if threads.isEmpty {
-                registry.removeValue(forKey: address)
-            } else {
-                registry[address] = threads
-            }
-
-            // Signal waiting threads
-            for thread in toWake {
-                thread.isWoken.store(true, ordering: .releasing)
-            }
-
-            wokenCount = UInt32(wakeCount)
+        for slot in toWake {
+            slot.wake()
         }
-
-        return wokenCount
+        return UInt32(toWake.count)
     }
-}
 
-/// Per-thread state for wait operations
-struct ThreadWaitState {
-    var thread: WaitingThread?
-
-    init() {
-        self.thread = nil
+    /// Wake all parked threads across all addresses.
+    func unparkAll() {
+        let allSlots: [[BlockingSlot]] = registry.withLock { reg in
+            let result = Array(reg.values)
+            reg.removeAll()
+            return result
+        }
+        for slots in allSlots {
+            for slot in slots {
+                slot.wake()
+            }
+        }
     }
 }
 
 /// Result of a wait operation
-enum WaitOutcome {
+enum WaitOutcome: Equatable {
     case woken  // 0 - successfully woken by notify
     case mismatch  // 1 - value didn't match expected
     case timedOut  // 2 - deadline expired
