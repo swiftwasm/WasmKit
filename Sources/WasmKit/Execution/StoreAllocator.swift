@@ -365,6 +365,7 @@ extension StoreAllocator {
             module: module, engine: engine, resourceLimiter: resourceLimiter,
             importedFunctions: importedFunctions, importedTables: importedTables,
             importedMemories: importedMemories, importedGlobals: importedGlobals,
+            importedTags: importedTags,
             isDebuggable: isDebuggable
         )
     }
@@ -383,6 +384,7 @@ extension StoreAllocator {
         importedTables: [InternalTable],
         importedMemories: [InternalMemory],
         importedGlobals: [InternalGlobal],
+        importedTags: [InternalTag],
         isDebuggable: Bool,
         localMemoryResolver: ((_ memoryIndex: Int, _ memoryType: MemoryType) throws -> InternalMemory)? = nil
     ) throws -> InternalInstance {
