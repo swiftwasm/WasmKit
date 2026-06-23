@@ -3,6 +3,8 @@ import Foundation
 import Synchronization
 import Testing
 
+@testable import WasmKit
+
 #if canImport(Darwin)
     import Darwin
 #elseif canImport(Musl)
@@ -11,67 +13,73 @@ import Testing
     import Glibc
 #endif
 
-@testable import WasmKit
-
 @Suite struct AtomicParkingLotTests {
     #if DEBUG
-    /// Deterministic regression for the notify/timeout race: a waiter that `unpark`
-    /// dequeues and counts must report `.woken` (0), not `.timedOut` (2).
-    ///
-    /// Ordering is forced with no reliance on wall-clock timing:
-    ///   1. the waiter registers, then blocks in `beforeSleep`;
-    ///   2. the notifier `unpark`s — removing and counting the slot — then pauses in the
-    ///      seam, before `wake()`, so `woken` stays false and the slot is already absent;
-    ///   3. the waiter resumes with a zero timeout, reads `woken == false`, and runs its
-    ///      timeout-path registry check against the now-absent slot.
-    @Test func timedOutWaiterClaimedByNotifyReportsWoken() {
-        let lot = AtomicParkingLot()
-        let address: UInt64 = 0x2000
+        /// Deterministic regression for the notify/timeout race: a waiter that `unpark`
+        /// dequeues and counts must report `.woken` (0), not `.timedOut` (2).
+        ///
+        /// Ordering is forced with no reliance on wall-clock timing:
+        ///   1. the waiter registers, then blocks in `beforeSleep`;
+        ///   2. the notifier `unpark`s — removing and counting the slot — then pauses in the
+        ///      seam, before `wake()`, so `woken` stays false and the slot is already absent;
+        ///   3. the waiter resumes with a zero timeout, reads `woken == false`, and runs its
+        ///      timeout-path registry check against the now-absent slot.
+        @Test func timedOutWaiterClaimedByNotifyReportsWoken() {
+            let lot = AtomicParkingLot()
+            let address: UInt64 = 0x2000
 
-        let registered = DispatchSemaphore(value: 0)
-        let proceedWaiter = DispatchSemaphore(value: 0)
-        let dequeued = DispatchSemaphore(value: 0)
-        let release = DispatchSemaphore(value: 0)
+            let registered = DispatchSemaphore(value: 0)
+            let proceedWaiter = DispatchSemaphore(value: 0)
+            let dequeued = DispatchSemaphore(value: 0)
+            let release = DispatchSemaphore(value: 0)
 
-        lot._afterDequeueBeforeWake.withLock { $0 = { dequeued.signal(); release.wait() } }
+            lot._afterDequeueBeforeWake.withLock {
+                $0 = {
+                    dequeued.signal()
+                    release.wait()
+                }
+            }
 
-        let outcome = Mutex<WaitOutcome?>(nil)
-        let notifyCount = Mutex<UInt32>(0)
-        let waiterDone = DispatchGroup()
-        let notifierDone = DispatchGroup()
+            let outcome = Mutex<WaitOutcome?>(nil)
+            let notifyCount = Mutex<UInt32>(0)
+            let waiterDone = DispatchGroup()
+            let notifierDone = DispatchGroup()
 
-        waiterDone.enter()
-        Thread.detachNewThread {
-            let result = lot.parkConditionally(
-                address: address,
-                validate: { true },
-                deadline: { ContinuousClock.now },  // relative timeout 0: `wait` reads `woken` immediately
-                beforeSleep: { registered.signal(); proceedWaiter.wait() }
+            waiterDone.enter()
+            Thread.detachNewThread {
+                let result = lot.parkConditionally(
+                    address: address,
+                    validate: { true },
+                    deadline: { ContinuousClock.now },  // relative timeout 0: `wait` reads `woken` immediately
+                    beforeSleep: {
+                        registered.signal()
+                        proceedWaiter.wait()
+                    }
+                )
+                outcome.withLock { $0 = result }
+                waiterDone.leave()
+            }
+
+            notifierDone.enter()
+            Thread.detachNewThread {
+                registered.wait()  // slot is queued
+                let n = lot.unpark(address: address, count: .max)  // removes+counts, then pauses in the seam
+                notifyCount.withLock { $0 = n }
+                notifierDone.leave()
+            }
+
+            dequeued.wait()  // unpark removed+counted the slot; paused before wake()
+            proceedWaiter.signal()  // waiter resumes: reads woken==false, finds its slot absent
+            waiterDone.wait()  // waiter has returned its outcome
+            release.signal()  // unpark finishes (wake() is now a no-op on the discarded slot)
+            notifierDone.wait()
+
+            #expect(notifyCount.withLock { $0 } == 1, "unpark must count the single dequeued waiter")
+            #expect(
+                outcome.withLock { $0 } == .woken,
+                "a waiter that unpark dequeued and counted must report .woken (0), not .timedOut (2)"
             )
-            outcome.withLock { $0 = result }
-            waiterDone.leave()
         }
-
-        notifierDone.enter()
-        Thread.detachNewThread {
-            registered.wait()                                   // slot is queued
-            let n = lot.unpark(address: address, count: .max)   // removes+counts, then pauses in the seam
-            notifyCount.withLock { $0 = n }
-            notifierDone.leave()
-        }
-
-        dequeued.wait()         // unpark removed+counted the slot; paused before wake()
-        proceedWaiter.signal()  // waiter resumes: reads woken==false, finds its slot absent
-        waiterDone.wait()       // waiter has returned its outcome
-        release.signal()        // unpark finishes (wake() is now a no-op on the discarded slot)
-        notifierDone.wait()
-
-        #expect(notifyCount.withLock { $0 } == 1, "unpark must count the single dequeued waiter")
-        #expect(
-            outcome.withLock { $0 } == .woken,
-            "a waiter that unpark dequeued and counted must report .woken (0), not .timedOut (2)"
-        )
-    }
     #endif
 
     /// Contention breadth: across a run using only `unpark`, the sum of `unpark`
@@ -115,7 +123,10 @@ import Testing
                         continue
                     }
                 }
-                totals.withLock { $0.woken += woken; $0.timedOut += timedOut }
+                totals.withLock {
+                    $0.woken += woken
+                    $0.timedOut += timedOut
+                }
                 waiters.leave()
             }
         }
