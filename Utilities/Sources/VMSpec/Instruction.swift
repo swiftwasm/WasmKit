@@ -363,6 +363,10 @@ extension VMGen {
             Instruction(name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
                         mayThrow: true, useCurrentMemory: .read, immediateLayout: .load)
         }
+        var sharedInstruction: Instruction {
+            Instruction(name: "\(type)\(op)Shared", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))` on shared memory",
+                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .load)
+        }
     }
 
     static let memoryLoadOps: [LoadOpInfo] = [
@@ -399,6 +403,10 @@ extension VMGen {
             Instruction(name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
                         mayThrow: true, useCurrentMemory: .read, immediateLayout: .store)
         }
+        var sharedInstruction: Instruction {
+            Instruction(name: "\(type)\(op)Shared", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))` on shared memory",
+                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .store)
+        }
     }
     static let memoryStoreOps: [StoreOpInfo] = [
         ("i32", "Store", "$0.i32", false),
@@ -415,6 +423,7 @@ extension VMGen {
     }
     static let memoryAtomicStoreOps = memoryStoreOps.filter { !$0.isFloatingPoint }
     static let memoryLoadStoreInsts: [Instruction] = memoryLoadOps.map(\.instruction) + memoryStoreOps.map(\.instruction)
+    static let memorySharedLoadStoreInsts: [Instruction] = memoryLoadOps.map(\.sharedInstruction) + memoryStoreOps.map(\.sharedInstruction)
     static let memoryAtomicInsts: [Instruction] = memoryAtomicLoadOps.map(\.atomicInstruction) + memoryAtomicStoreOps.map(\.atomicInstruction)
 
     // MARK: - Atomic RMW Operations
@@ -775,6 +784,7 @@ extension VMGen {
         instructions += atomicWaitNotifyInsts
         // Exception handling
         instructions += exceptionHandlingInsts
+        instructions += memorySharedLoadStoreInsts
         return instructions
     }
 

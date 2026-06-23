@@ -193,7 +193,7 @@ public struct Global: Equatable, Sendable {
 /// Tag entry in a module
 /// > Note:
 /// <https://webassembly.github.io/exception-handling/core/syntax/modules.html#tags>
-public struct Tag: Equatable {
+public struct Tag: Equatable, Sendable {
     /// The type index of the tag's function type (parameters = exception payload, results must be empty).
     public let type: TypeIndex
 

@@ -565,6 +565,52 @@ enum Instruction: Equatable {
     case catchHandlers(Instruction.CatchHandlersOperand)
     /// Unregister exception handlers for a `try_table` block
     case catchHandlersEnd(Instruction.CatchHandlersEndOperand)
+    /// WebAssembly Core Instruction `i32.load` on shared memory
+    case i32LoadShared(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i64.load` on shared memory
+    case i64LoadShared(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `f32.load` on shared memory
+    case f32LoadShared(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `f64.load` on shared memory
+    case f64LoadShared(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i32.load8_s` on shared memory
+    case i32Load8SShared(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i32.load8_u` on shared memory
+    case i32Load8UShared(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i32.load16_s` on shared memory
+    case i32Load16SShared(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i32.load16_u` on shared memory
+    case i32Load16UShared(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i64.load8_s` on shared memory
+    case i64Load8SShared(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i64.load8_u` on shared memory
+    case i64Load8UShared(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i64.load16_s` on shared memory
+    case i64Load16SShared(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i64.load16_u` on shared memory
+    case i64Load16UShared(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i64.load32_s` on shared memory
+    case i64Load32SShared(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i64.load32_u` on shared memory
+    case i64Load32UShared(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i32.store` on shared memory
+    case i32StoreShared(Instruction.StoreOperand)
+    /// WebAssembly Core Instruction `i64.store` on shared memory
+    case i64StoreShared(Instruction.StoreOperand)
+    /// WebAssembly Core Instruction `f32.store` on shared memory
+    case f32StoreShared(Instruction.StoreOperand)
+    /// WebAssembly Core Instruction `f64.store` on shared memory
+    case f64StoreShared(Instruction.StoreOperand)
+    /// WebAssembly Core Instruction `i32.store8` on shared memory
+    case i32Store8Shared(Instruction.StoreOperand)
+    /// WebAssembly Core Instruction `i32.store16` on shared memory
+    case i32Store16Shared(Instruction.StoreOperand)
+    /// WebAssembly Core Instruction `i64.store8` on shared memory
+    case i64Store8Shared(Instruction.StoreOperand)
+    /// WebAssembly Core Instruction `i64.store16` on shared memory
+    case i64Store16Shared(Instruction.StoreOperand)
+    /// WebAssembly Core Instruction `i64.store32` on shared memory
+    case i64Store32Shared(Instruction.StoreOperand)
 }
 
 extension Instruction {
@@ -1473,6 +1519,29 @@ extension Instruction {
         case .throwRef(let immediate): return immediate
         case .catchHandlers(let immediate): return immediate
         case .catchHandlersEnd(let immediate): return immediate
+        case .i32LoadShared(let immediate): return immediate
+        case .i64LoadShared(let immediate): return immediate
+        case .f32LoadShared(let immediate): return immediate
+        case .f64LoadShared(let immediate): return immediate
+        case .i32Load8SShared(let immediate): return immediate
+        case .i32Load8UShared(let immediate): return immediate
+        case .i32Load16SShared(let immediate): return immediate
+        case .i32Load16UShared(let immediate): return immediate
+        case .i64Load8SShared(let immediate): return immediate
+        case .i64Load8UShared(let immediate): return immediate
+        case .i64Load16SShared(let immediate): return immediate
+        case .i64Load16UShared(let immediate): return immediate
+        case .i64Load32SShared(let immediate): return immediate
+        case .i64Load32UShared(let immediate): return immediate
+        case .i32StoreShared(let immediate): return immediate
+        case .i64StoreShared(let immediate): return immediate
+        case .f32StoreShared(let immediate): return immediate
+        case .f64StoreShared(let immediate): return immediate
+        case .i32Store8Shared(let immediate): return immediate
+        case .i32Store16Shared(let immediate): return immediate
+        case .i64Store8Shared(let immediate): return immediate
+        case .i64Store16Shared(let immediate): return immediate
+        case .i64Store32Shared(let immediate): return immediate
         default: return nil
         }
     }
@@ -1757,6 +1826,29 @@ extension Instruction {
         case .throwRef: return 271
         case .catchHandlers: return 272
         case .catchHandlersEnd: return 273
+        case .i32LoadShared: return 274
+        case .i64LoadShared: return 275
+        case .f32LoadShared: return 276
+        case .f64LoadShared: return 277
+        case .i32Load8SShared: return 278
+        case .i32Load8UShared: return 279
+        case .i32Load16SShared: return 280
+        case .i32Load16UShared: return 281
+        case .i64Load8SShared: return 282
+        case .i64Load8UShared: return 283
+        case .i64Load16SShared: return 284
+        case .i64Load16UShared: return 285
+        case .i64Load32SShared: return 286
+        case .i64Load32UShared: return 287
+        case .i32StoreShared: return 288
+        case .i64StoreShared: return 289
+        case .f32StoreShared: return 290
+        case .f64StoreShared: return 291
+        case .i32Store8Shared: return 292
+        case .i32Store16Shared: return 293
+        case .i64Store8Shared: return 294
+        case .i64Store16Shared: return 295
+        case .i64Store32Shared: return 296
         }
     }
 }
@@ -2042,6 +2134,29 @@ extension Instruction {
         case 271: return .throwRef(Instruction.ThrowRefOperand.load(from: &pc))
         case 272: return .catchHandlers(Instruction.CatchHandlersOperand.load(from: &pc))
         case 273: return .catchHandlersEnd(Instruction.CatchHandlersEndOperand.load(from: &pc))
+        case 274: return .i32LoadShared(Instruction.LoadOperand.load(from: &pc))
+        case 275: return .i64LoadShared(Instruction.LoadOperand.load(from: &pc))
+        case 276: return .f32LoadShared(Instruction.LoadOperand.load(from: &pc))
+        case 277: return .f64LoadShared(Instruction.LoadOperand.load(from: &pc))
+        case 278: return .i32Load8SShared(Instruction.LoadOperand.load(from: &pc))
+        case 279: return .i32Load8UShared(Instruction.LoadOperand.load(from: &pc))
+        case 280: return .i32Load16SShared(Instruction.LoadOperand.load(from: &pc))
+        case 281: return .i32Load16UShared(Instruction.LoadOperand.load(from: &pc))
+        case 282: return .i64Load8SShared(Instruction.LoadOperand.load(from: &pc))
+        case 283: return .i64Load8UShared(Instruction.LoadOperand.load(from: &pc))
+        case 284: return .i64Load16SShared(Instruction.LoadOperand.load(from: &pc))
+        case 285: return .i64Load16UShared(Instruction.LoadOperand.load(from: &pc))
+        case 286: return .i64Load32SShared(Instruction.LoadOperand.load(from: &pc))
+        case 287: return .i64Load32UShared(Instruction.LoadOperand.load(from: &pc))
+        case 288: return .i32StoreShared(Instruction.StoreOperand.load(from: &pc))
+        case 289: return .i64StoreShared(Instruction.StoreOperand.load(from: &pc))
+        case 290: return .f32StoreShared(Instruction.StoreOperand.load(from: &pc))
+        case 291: return .f64StoreShared(Instruction.StoreOperand.load(from: &pc))
+        case 292: return .i32Store8Shared(Instruction.StoreOperand.load(from: &pc))
+        case 293: return .i32Store16Shared(Instruction.StoreOperand.load(from: &pc))
+        case 294: return .i64Store8Shared(Instruction.StoreOperand.load(from: &pc))
+        case 295: return .i64Store16Shared(Instruction.StoreOperand.load(from: &pc))
+        case 296: return .i64Store32Shared(Instruction.StoreOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -2330,6 +2445,29 @@ extension Instruction {
         case 271: return "throwRef"
         case 272: return "catchHandlers"
         case 273: return "catchHandlersEnd"
+        case 274: return "i32LoadShared"
+        case 275: return "i64LoadShared"
+        case 276: return "f32LoadShared"
+        case 277: return "f64LoadShared"
+        case 278: return "i32Load8SShared"
+        case 279: return "i32Load8UShared"
+        case 280: return "i32Load16SShared"
+        case 281: return "i32Load16UShared"
+        case 282: return "i64Load8SShared"
+        case 283: return "i64Load8UShared"
+        case 284: return "i64Load16SShared"
+        case 285: return "i64Load16UShared"
+        case 286: return "i64Load32SShared"
+        case 287: return "i64Load32UShared"
+        case 288: return "i32StoreShared"
+        case 289: return "i64StoreShared"
+        case 290: return "f32StoreShared"
+        case 291: return "f64StoreShared"
+        case 292: return "i32Store8Shared"
+        case 293: return "i32Store16Shared"
+        case 294: return "i64Store8Shared"
+        case 295: return "i64Store16Shared"
+        case 296: return "i64Store32Shared"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
