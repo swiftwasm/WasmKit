@@ -14,7 +14,18 @@ import Synchronization
     import Musl
 #elseif canImport(Glibc)
     import Glibc
+#elseif canImport(Android)
+    import Android
+#elseif canImport(WASILibc)
+    import WASILibc
+    import wasi_pthread
 #endif
+
+// `memory.atomic.wait`/`notify` need an OS primitive to block and wake a thread.
+// pthread provides it on Darwin, Linux (Glibc/Musl), Android (Bionic), and WASI
+// (wasi-libc's `wasi_pthread`). Windows has no pthread here, so the parking lot is
+// excluded there; the wait/notify instructions handle its absence directly.
+#if !os(Windows)
 
 /// Per-wait blocking context wrapping a pthread condvar + mutex pair.
 ///
@@ -33,7 +44,10 @@ final class BlockingSlot: @unchecked Sendable {
 
         cond = .allocate(capacity: 1)
         cond.initialize(to: pthread_cond_t())
-        #if canImport(Darwin)
+        #if canImport(Darwin) || canImport(WASILibc)
+            // Darwin has no `pthread_condattr_setclock`; wasi-libc's `CLOCK_MONOTONIC`
+            // is a time64 clock object (not an importable constant). Both use the
+            // default clock, so the timed wait below reads `CLOCK_REALTIME` to match.
             pthread_cond_init(cond, nil)
         #else
             var attr = pthread_condattr_t()
@@ -78,12 +92,19 @@ final class BlockingSlot: @unchecked Sendable {
         var deadline = timespec()
         #if canImport(Darwin)
             clock_gettime(CLOCK_REALTIME, &deadline)
+        #elseif canImport(WASILibc)
+            // wasi-libc's `CLOCK_REALTIME` is a time64 clock object, not an importable
+            // constant, so seed the (default-clock) deadline from `gettimeofday`.
+            var now = timeval()
+            gettimeofday(&now, nil)
+            deadline.tv_sec = now.tv_sec
+            deadline.tv_nsec = Int(now.tv_usec) * 1000
         #else
             clock_gettime(CLOCK_MONOTONIC, &deadline)
         #endif
         let extraSec = timeoutNs / 1_000_000_000
         let extraNsec = timeoutNs % 1_000_000_000
-        deadline.tv_sec += Int(extraSec)
+        deadline.tv_sec += time_t(extraSec)
         deadline.tv_nsec += Int(extraNsec)
         if deadline.tv_nsec >= 1_000_000_000 {
             deadline.tv_sec += 1
@@ -250,6 +271,8 @@ package final class AtomicParkingLot: Sendable {
         }
     }
 }
+
+#endif
 
 /// Result of a wait operation
 enum WaitOutcome: Equatable {

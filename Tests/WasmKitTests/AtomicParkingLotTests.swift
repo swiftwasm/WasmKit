@@ -13,6 +13,11 @@ import Testing
     import Glibc
 #endif
 
+// These tests drive real cross-thread park/unpark blocking, so they only apply where
+// `AtomicParkingLot` has a pthread-backed implementation. On Windows/WASI it is a stub
+// (see AtomicParkingLot.swift), and `swift test` there must not compile this suite.
+#if canImport(Darwin) || canImport(Musl) || canImport(Glibc)
+
 @Suite struct AtomicParkingLotTests {
     #if DEBUG
         /// Deterministic regression for the notify/timeout race: a waiter that `unpark`
@@ -169,3 +174,5 @@ import Testing
         }
     }
 }
+
+#endif

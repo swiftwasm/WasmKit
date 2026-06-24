@@ -37,9 +37,16 @@ import WAT
             shared.withValue { storage in
                 #expect(storage.currentByteCount.load(ordering: .acquiring) == 2 * 65536)
                 #expect(storage.maxByteCount == 10 * 65536)
-                // On mprotect platforms, reservation covers full wasm32 range (4 GiB+)
+                // The full wasm32 reservation (4 GiB+) is only taken when the engine
+                // actually resolved to mprotect bounds checking. Under AddressSanitizer or
+                // token threading the engine downgrades to software checks (see Engine.init),
+                // where the reservation is just maxByteCount.
                 #if os(macOS) || os(Linux)
-                    #expect(storage.reservationSize >= (1 << 32))
+                    if engine.configuration.memoryBoundsChecking == .mprotect {
+                        #expect(storage.reservationSize >= (1 << 32))
+                    } else {
+                        #expect(storage.reservationSize == 10 * 65536)
+                    }
                 #else
                     #expect(storage.reservationSize == 10 * 65536)
                 #endif

@@ -164,6 +164,9 @@ extension TrapReason.Message {
     static var sharedMemoryGuardRegistryFull: Self {
         Self("shared memory guard registry is full (too many concurrent shared memories)")
     }
+    static var atomicWaitUnsupported: Self {
+        Self("memory.atomic.wait is not supported on this platform (no thread-blocking primitive)")
+    }
     static func noGlobalExportWithName(globalName: String, instance: Instance) -> Self {
         Self("no global export with name \(globalName) in a module instance \(instance)")
     }

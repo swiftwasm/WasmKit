@@ -140,10 +140,12 @@ struct SharedMemoryStorage: ~Copyable {
         }
 
         if deltaBytes > 0 {
-            #if os(Windows)
+            #if os(WASI)
+                // The whole max region is already allocated and zero-filled; nothing to commit.
+            #elseif os(Windows)
                 guard
                     VirtualAlloc(
-                        basePointer.advanced(by: oldBytes), deltaBytes,
+                        basePointer.advanced(by: oldBytes), SIZE_T(deltaBytes),
                         DWORD(MEM_COMMIT), DWORD(PAGE_READWRITE)
                     ) != nil
                 else { return -1 }
@@ -197,12 +199,20 @@ struct SharedMemoryStorage: ~Copyable {
             let ptr = UnsafeMutableRawPointer.allocate(byteCount: 1, alignment: 1)
             return ptr
         }
-        #if os(Windows)
-            guard let base = VirtualAlloc(nil, reserveBytes, DWORD(MEM_RESERVE), DWORD(PAGE_NOACCESS)) else {
+        #if os(WASI)
+            // Wasm always uses software bounds checking: no PROT_NONE reservation and no
+            // page-commit faults, so there is no mmap/mprotect dance. Allocate the whole
+            // (max-bounded) region up front, zero-filled. `reserveBytes == maxByteCount`
+            // here, and `grow` only bumps the size counters.
+            let base = UnsafeMutableRawPointer.allocate(byteCount: reserveBytes, alignment: 16)
+            base.initializeMemory(as: UInt8.self, repeating: 0, count: reserveBytes)
+            return base
+        #elseif os(Windows)
+            guard let base = VirtualAlloc(nil, SIZE_T(reserveBytes), DWORD(MEM_RESERVE), DWORD(PAGE_NOACCESS)) else {
                 throw Trap(.mmapFailed(reserveBytes: reserveBytes))
             }
             if commitBytes > 0 {
-                guard VirtualAlloc(base, commitBytes, DWORD(MEM_COMMIT), DWORD(PAGE_READWRITE)) != nil else {
+                guard VirtualAlloc(base, SIZE_T(commitBytes), DWORD(MEM_COMMIT), DWORD(PAGE_READWRITE)) != nil else {
                     VirtualFree(base, 0, DWORD(MEM_RELEASE))
                     throw Trap(.mmapFailed(reserveBytes: reserveBytes))
                 }
@@ -234,7 +244,9 @@ struct SharedMemoryStorage: ~Copyable {
             base.deallocate()
             return
         }
-        #if os(Windows)
+        #if os(WASI)
+            base.deallocate()
+        #elseif os(Windows)
             VirtualFree(base, 0, DWORD(MEM_RELEASE))
         #else
             munmap(base, byteCount)
