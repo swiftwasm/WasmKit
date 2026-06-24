@@ -228,7 +228,9 @@ struct SharedMemoryStorage: ~Copyable {
                 let mapAnon = MAP_ANON
             #endif
             let base = mmap(nil, reserveBytes, PROT_NONE, MAP_PRIVATE | mapAnon, -1, 0)
-            guard base != MAP_FAILED else {
+            // `MAP_FAILED` is `(void *)-1`; compare that sentinel directly rather than the
+            // macro, which Bionic defines as a C++ `reinterpret_cast` Swift cannot import.
+            guard base != UnsafeMutableRawPointer(bitPattern: -1) else {
                 throw Trap(.mmapFailed(reserveBytes: reserveBytes))
             }
             if commitBytes > 0 {
@@ -237,7 +239,12 @@ struct SharedMemoryStorage: ~Copyable {
                     throw Trap(.mmapFailed(reserveBytes: reserveBytes))
                 }
             }
-            return base!
+            #if canImport(Android)
+                // Bionic types `mmap` as returning a non-optional pointer.
+                return base
+            #else
+                return base!
+            #endif
         #endif
     }
 
