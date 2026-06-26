@@ -1,4 +1,4 @@
-<img alt="WasmKit Icon" src="https://raw.github.com/wiki/akkyie/wakit/images/wakit_icon.png" width="100px">
+<img width="100" height="100" alt="wasmkit" src="https://github.com/user-attachments/assets/7db95250-18cb-401c-9009-4477b5d61a0d" />
 
 # WasmKit
 
