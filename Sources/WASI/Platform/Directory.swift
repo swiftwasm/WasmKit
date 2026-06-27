@@ -178,22 +178,56 @@ extension DirEntry: WASIDir, FdWASIEntry {
         #endif
     }
 
-    func readEntries(
-        cookie: WASIAbi.DirCookie
-    ) throws -> AnyIterator<Result<ReaddirElement, any Error>> {
-        #if os(Windows)
-            throw WASIAbi.Errno.ENOSYS
-        #else
-            // Duplicate fd because readdir takes the ownership of
-            // the given fd and closedir also close the underlying fd
-            let newFd = try WASIAbi.Errno.translatingPlatformErrno {
-                try fd.open(at: ".", .readOnly, options: [])
+    #if os(Windows)
+        struct ReadEntriesResult: WASIReaddirIterator {
+            init(fd: FileDescriptor, cookie: WASIAbi.DirCookie) throws {
+                throw WASIAbi.Errno.ENOSYS
             }
-            let iterator = try WASIAbi.Errno.translatingPlatformErrno {
-                try newFd.contentsOfDirectory()
+
+            mutating func next() -> Result<ReaddirElement, any Error>? {
+                return nil
             }
-            .lazy.enumerated()
-            .map { (entryIndex, entry) in
+
+            mutating func close() {}
+        }
+    #else
+        struct ReadEntriesResult: WASIReaddirIterator {
+            let fd: FileDescriptor
+            let stream: FileDescriptor.DirectoryStream
+            var entryIndex: Int
+
+            init(
+                fd: FileDescriptor,
+                cookie: WASIAbi.DirCookie
+            ) throws {
+                // Duplicate fd because readdir takes the ownership of
+                // the given fd and closedir also close the underlying fd
+                let newFd = try WASIAbi.Errno.translatingPlatformErrno {
+                    try fd.open(at: ".", .readOnly, options: [])
+                }
+                let stream: FileDescriptor.DirectoryStream
+                do {
+                    stream = try newFd.contentsOfDirectory()
+                } catch let errno as Errno {
+                    throw try WASIAbi.Errno(platformErrno: errno)
+                }
+
+                self.fd = fd
+                self.entryIndex = 0
+                self.stream = stream
+
+                let skippedCount = Int(cookie)
+                while entryIndex < skippedCount {
+                    guard let entry = next() else { break }
+                    _ = try entry.get()
+                }
+            }
+
+            mutating func next() -> Result<ReaddirElement, any Error>? {
+                guard let entry = stream.next() else {
+                    return nil
+                }
+                defer { entryIndex += 1 }
                 return Result(catching: { () -> ReaddirElement in
                     let entry = try entry.get()
                     let name = entry.name
@@ -212,10 +246,16 @@ extension DirEntry: WASIDir, FdWASIEntry {
                     return (dirent, name)
                 })
             }
-            .dropFirst(Int(cookie))
-            .makeIterator()
-            return AnyIterator(iterator)
-        #endif
+
+            mutating func close() {
+                stream.close()
+            }
+        }
+    #endif
+    func readEntries(
+        cookie: WASIAbi.DirCookie
+    ) throws -> ReadEntriesResult {
+        return try ReadEntriesResult(fd: fd, cookie: cookie)
     }
 
     func createDirectory(atPath path: String) throws {

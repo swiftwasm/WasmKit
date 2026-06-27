@@ -1702,54 +1702,60 @@ final class WASIImplementation: Sendable {
         cookie: WASIAbi.DirCookie,
         memory: M
     ) throws -> WASIAbi.Size {
+        func readDirectoryEntries<D: WASIDir>(
+            from dirEntry: D
+        ) throws -> WASIAbi.Size {
+            var entries = try dirEntry.readEntries(cookie: cookie)
+            defer { entries.close() }
+            var bufferUsed: WASIAbi.Size = 0
+            let totalBufferSize = buffer.count
+            while let result = entries.next() {
+                var (entry, name) = try result.get()
+                do {
+                    // 1. Copy dirent to the buffer
+                    // Copy dirent as much as possible even though the buffer doesn't have enough remaining space
+                    let copyingBytes = min(WASIAbi.Dirent.sizeInGuest, totalBufferSize - bufferUsed)
+                    let rangeStart = buffer.baseAddress.raw.advanced(by: bufferUsed)
+                    let rangeEnd = rangeStart.advanced(by: copyingBytes)
+                    WASIAbi.Dirent.writeToGuest(unalignedAt: rangeStart, end: rangeEnd, in: memory, value: entry)
+                    bufferUsed += copyingBytes
+
+                    // bail out if the remaining buffer space is not enough
+                    if copyingBytes < WASIAbi.Dirent.sizeInGuest {
+                        return totalBufferSize
+                    }
+                }
+
+                do {
+                    // 2. Copy name string to the buffer
+                    // Same truncation rule applied as above
+                    let copyingBytes = min(entry.dirNameLen, totalBufferSize - bufferUsed)
+                    let rangeStart = buffer.baseAddress.raw.advanced(by: bufferUsed)
+                    name.withUTF8 { bytes in
+                        rangeStart.withHostPointer(in: memory, count: Int(copyingBytes)) { hostBuffer in
+                            hostBuffer.copyMemory(
+                                from: UnsafeRawBufferPointer(start: bytes.baseAddress, count: Int(copyingBytes))
+                            )
+                        }
+                    }
+                    bufferUsed += copyingBytes
+
+                    // bail out if the remaining buffer space is not enough
+                    if copyingBytes < entry.dirNameLen {
+                        return totalBufferSize
+                    }
+                }
+            }
+            return bufferUsed
+        }
+
         let dirEntry = try fdTable.withLock { table -> any WASIDir in
             guard case .directory(let dirEntry) = table[fd] else {
                 throw WASIAbi.Errno.EBADF
             }
             return dirEntry
         }
-
-        let entries = try dirEntry.readEntries(cookie: cookie)
-        var bufferUsed: WASIAbi.Size = 0
-        let totalBufferSize = buffer.count
-        while let result = entries.next() {
-            var (entry, name) = try result.get()
-            do {
-                // 1. Copy dirent to the buffer
-                // Copy dirent as much as possible even though the buffer doesn't have enough remaining space
-                let copyingBytes = min(WASIAbi.Dirent.sizeInGuest, totalBufferSize - bufferUsed)
-                let rangeStart = buffer.baseAddress.raw.advanced(by: bufferUsed)
-                let rangeEnd = rangeStart.advanced(by: copyingBytes)
-                WASIAbi.Dirent.writeToGuest(unalignedAt: rangeStart, end: rangeEnd, in: memory, value: entry)
-                bufferUsed += copyingBytes
-
-                // bail out if the remaining buffer space is not enough
-                if copyingBytes < WASIAbi.Dirent.sizeInGuest {
-                    return totalBufferSize
-                }
-            }
-
-            do {
-                // 2. Copy name string to the buffer
-                // Same truncation rule applied as above
-                let copyingBytes = min(entry.dirNameLen, totalBufferSize - bufferUsed)
-                let rangeStart = buffer.baseAddress.raw.advanced(by: bufferUsed)
-                name.withUTF8 { bytes in
-                    rangeStart.withHostPointer(in: memory, count: Int(copyingBytes)) { hostBuffer in
-                        hostBuffer.copyMemory(
-                            from: UnsafeRawBufferPointer(start: bytes.baseAddress, count: Int(copyingBytes))
-                        )
-                    }
-                }
-                bufferUsed += copyingBytes
-
-                // bail out if the remaining buffer space is not enough
-                if copyingBytes < entry.dirNameLen {
-                    return totalBufferSize
-                }
-            }
-        }
-        return bufferUsed
+        return try readDirectoryEntries(from: dirEntry)
     }
 
     /// Atomically replace a file descriptor by renumbering another file descriptor.

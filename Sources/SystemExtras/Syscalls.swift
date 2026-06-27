@@ -145,6 +145,11 @@ internal func system_fdopendir(_ fd: Int32) -> CInterop.DirP? {
 internal func system_readdir(_ dirp: CInterop.DirP) -> UnsafeMutablePointer<dirent>? {
   return readdir(dirp)
 }
+
+// closedir
+internal func system_closedir(_ dirp: CInterop.DirP) -> CInt {
+  return closedir(dirp)
+}
 #endif
 
 #if os(Windows)
