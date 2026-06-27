@@ -571,6 +571,10 @@ extension FileDescriptor {
       self.rawValue = rawValue
     }
 
+    public func close() {
+      _ = system_closedir(rawValue)
+    }
+
     public func next() -> Result<DirectoryEntry, Errno>? {
       // https://man7.org/linux/man-pages/man3/readdir.3.html#RETURN_VALUE
       // > If the end of the directory stream is reached, NULL is returned

@@ -1,8 +1,54 @@
+import Foundation
 import Testing
 import WasmKit
 import WasmTypes
 
 @testable import WASI
+
+#if os(macOS)
+    import Darwin
+#elseif os(Linux)
+    import Glibc
+#endif
+
+#if os(macOS) || os(Linux)
+    private func currentOpenFileDescriptorCount() throws -> Int {
+        #if os(macOS)
+            let fdDirectory = "/dev/fd"
+        #else
+            let fdDirectory = "/proc/self/fd"
+        #endif
+        return try FileManager.default.contentsOfDirectory(atPath: fdDirectory).count
+    }
+
+    private func withReducedOpenFileLimit<Result>(
+        extraDescriptors: Int,
+        _ body: () throws -> Result
+    ) throws -> Result {
+        #if os(macOS)
+            let nofileResource = RLIMIT_NOFILE
+        #else
+            let nofileResource = __rlimit_resource_t(RLIMIT_NOFILE.rawValue)
+        #endif
+        var original = rlimit()
+        guard getrlimit(nofileResource, &original) == 0 else {
+            throw TestSupport.Error(errno: errno)
+        }
+
+        let currentOpen = try currentOpenFileDescriptorCount()
+        let desiredSoft = rlim_t(currentOpen + extraDescriptors)
+        var reduced = original
+        reduced.rlim_cur = min(original.rlim_cur, desiredSoft)
+        guard setrlimit(nofileResource, &reduced) == 0 else {
+            throw TestSupport.Error(errno: errno)
+        }
+        defer {
+            var original = original
+            _ = setrlimit(nofileResource, &original)
+        }
+        return try body()
+    }
+#endif
 
 @Suite
 struct WASITests {
@@ -1615,6 +1661,42 @@ struct WASITests {
 
                     try wasi.path_create_directory(dirFd: dir1Fd, path: "foo/bar")
                     try wasi.path_remove_directory(dirFd: dir1Fd, path: "foo/bar")
+                }
+            }
+        }
+
+        // https://github.com/swiftwasm/WasmKit/issues/362
+        @Test
+        func fdReaddirDoesNotLeakFileDescriptors() throws {
+            let t = try TestSupport.TemporaryDirectory()
+            try t.createDir(at: "dir")
+            try t.createFile(at: "dir/a.txt", contents: "a")
+            try t.createFile(at: "dir/b.txt", contents: "b")
+
+            let bridge = try WASIBridgeToHost(
+                fileSystem: .host().withPreopens([
+                    .init(guestPath: "/dir", hostPath: t.url.appending(component: "dir").path)
+                ])
+            )
+            try bridge.runAndClose { _ in
+                let wasi = bridge.underlying
+                let dirFd: WASIAbi.Fd = 3
+                let memory = TestSupport.TestGuestMemory()
+                let buffer = UnsafeGuestBufferPointer<UInt8>(
+                    baseAddress: UnsafeGuestPointer<UInt8>(offset: 0),
+                    count: 4096
+                )
+
+                try withReducedOpenFileLimit(extraDescriptors: 32) {
+                    for _ in 0..<512 {
+                        let bytesRead = try wasi.fd_readdir(
+                            fd: dirFd,
+                            buffer: buffer,
+                            cookie: 0,
+                            memory: memory
+                        )
+                        #expect(bytesRead > 0)
+                    }
                 }
             }
         }

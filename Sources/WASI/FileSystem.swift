@@ -54,6 +54,7 @@ protocol WASIFile: WASIEntry {
 
 protocol WASIDir: WASIEntry {
     typealias ReaddirElement = (dirent: WASIAbi.Dirent, name: String)
+    associatedtype ReadEntriesResult: WASIReaddirIterator where ReadEntriesResult.Element == ReaddirElement
 
     var preopenPath: String? { get }
 
@@ -72,13 +73,22 @@ protocol WASIDir: WASIEntry {
     func removeFile(atPath path: String) throws
     func symlink(from sourcePath: String, to destPath: String) throws
     func rename(from sourcePath: String, toDir newDir: any WASIDir, to destPath: String) throws
-    func readEntries(cookie: WASIAbi.DirCookie) throws -> AnyIterator<Result<ReaddirElement, any Error>>
+    func readEntries(cookie: WASIAbi.DirCookie) throws -> ReadEntriesResult
     func attributes(path: String, symlinkFollow: Bool) throws -> WASIAbi.Filestat
     func setFilestatTimes(
         path: String,
         atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags, symlinkFollow: Bool
     ) throws
+}
+
+protocol WASIReaddirIterator {
+    associatedtype Element
+    mutating func next() -> Result<Element, any Error>?
+    /// Closes the iterator and releases any owned resources.
+    ///
+    /// Callers must invoke this exactly once after iteration completes.
+    mutating func close()
 }
 
 enum FdEntry {

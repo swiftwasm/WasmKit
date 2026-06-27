@@ -3,6 +3,45 @@ import SystemPackage
 
 /// A WASIDir implementation backed by an in-memory directory node.
 struct MemoryDirEntry: WASIDir {
+    struct ReadEntriesResult: WASIReaddirIterator {
+        let children: [String]
+        let fileSystem: MemoryFileSystem
+        let basePath: String
+        var nextIndex: Int
+
+        mutating func next() -> Result<ReaddirElement, any Error>? {
+            guard nextIndex < children.count else { return nil }
+            let index = nextIndex
+            let name = children[index]
+            nextIndex += 1
+            return Result(catching: {
+                let childPath = MemoryFileSystem.joinGuestPath(basePath, name)
+                guard let childNode = fileSystem.lookup(at: childPath) else {
+                    throw WASIAbi.Errno.ENOENT
+                }
+
+                let fileType: WASIAbi.FileType
+                switch childNode.type {
+                case .directory: fileType = .DIRECTORY
+                case .file: fileType = .REGULAR_FILE
+                case .characterDevice: fileType = .CHARACTER_DEVICE
+                }
+
+                let dirent = WASIAbi.Dirent(
+                    dNext: WASIAbi.DirCookie(index + 1),
+                    dIno: 0,
+                    dirNameLen: WASIAbi.DirNameLen(name.utf8.count),
+                    dType: fileType
+                )
+
+                return (dirent, name)
+            })
+        }
+
+        mutating func close() {
+        }
+    }
+
     let preopenPath: String?
     let dirNode: MemoryDirectoryNode
     let path: String
@@ -106,41 +145,13 @@ struct MemoryDirEntry: WASIDir {
         )
     }
 
-    func readEntries(cookie: WASIAbi.DirCookie) throws -> AnyIterator<Result<ReaddirElement, any Error>> {
-        let children = dirNode.listChildren()
-
-        let fs = self.fileSystem
-        let basePath = self.path
-
-        let iterator = children.enumerated()
-            .dropFirst(Int(cookie))
-            .map { (index, name) -> Result<ReaddirElement, any Error> in
-                return Result(catching: {
-                    let childPath = MemoryFileSystem.joinGuestPath(basePath, name)
-                    guard let childNode = fs.lookup(at: childPath) else {
-                        throw WASIAbi.Errno.ENOENT
-                    }
-
-                    let fileType: WASIAbi.FileType
-                    switch childNode.type {
-                    case .directory: fileType = .DIRECTORY
-                    case .file: fileType = .REGULAR_FILE
-                    case .characterDevice: fileType = .CHARACTER_DEVICE
-                    }
-
-                    let dirent = WASIAbi.Dirent(
-                        dNext: WASIAbi.DirCookie(index + 1),
-                        dIno: 0,
-                        dirNameLen: WASIAbi.DirNameLen(name.utf8.count),
-                        dType: fileType
-                    )
-
-                    return (dirent, name)
-                })
-            }
-            .makeIterator()
-
-        return AnyIterator(iterator)
+    func readEntries(cookie: WASIAbi.DirCookie) throws -> ReadEntriesResult {
+        ReadEntriesResult(
+            children: dirNode.listChildren(),
+            fileSystem: fileSystem,
+            basePath: path,
+            nextIndex: Int(cookie)
+        )
     }
 
     func attributes(path: String, symlinkFollow: Bool) throws -> WASIAbi.Filestat {
