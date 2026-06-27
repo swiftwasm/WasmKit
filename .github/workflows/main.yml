@@ -141,6 +141,9 @@ jobs:
           - swift: "swiftlang/swift:nightly-main-noble"
             test-args: "--traits ComponentModel,WasmDebuggingSupport"
             build-benchmarks: true
+          - swift: "swiftlang/swift:nightly-main-noble"
+            test-args: "--traits ComponentModel,WasmDebuggingSupport --build-system native"
+            build-benchmarks: true
 
     runs-on: ubuntu-24.04
     name: "build-linux (${{ matrix.swift }}${{ matrix.label }})"
