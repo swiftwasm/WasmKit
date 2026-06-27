@@ -156,7 +156,7 @@ extension ImmutableArray: Sequence {
 
 /// A type that can be interned into a unique identifier.
 /// Used for efficient equality comparison.
-package protocol Internable {
+protocol Internable {
     /// Storage representation of an interned value.
     associatedtype Offset: UnsignedInteger & Sendable
 }
@@ -170,7 +170,7 @@ struct Interned<T: Internable>: Equatable, Hashable, Sendable {
 /// A deduplicating interner for values of type `Item`.
 ///
 /// Thread-safe: all access is serialized by an internal `Mutex`.
-package final class Interner<Item: Hashable & Internable & Sendable>: Sendable {
+final class Interner<Item: Hashable & Internable & Sendable>: Sendable {
     private struct State {
         var itemByIntern: [Item]
         var internByItem: [Item: Interned<Item>]
@@ -208,7 +208,7 @@ package final class Interner<Item: Hashable & Internable & Sendable>: Sendable {
 /// A function type is internable for efficient equality comparison.
 /// Usually used for signature checking at indirect calls.
 extension FunctionType: Internable {
-    package typealias Offset = UInt32
+    typealias Offset = UInt32
 }
 
 typealias InternedFuncType = Interned<FunctionType>
