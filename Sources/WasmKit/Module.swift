@@ -57,7 +57,7 @@ public struct Module {
     var functions: [GuestFunction]
     let elements: [ElementSegment]
     let data: [DataSegment]
-    let start: FunctionIndex?
+    private(set) var start: FunctionIndex?
     let globals: [WasmParser.Global]
     let tags: [WasmParser.Tag]
     public let imports: [Import]
@@ -140,6 +140,15 @@ public struct Module {
             )
         }
         return functions[Int(index) - self.moduleImports.numberOfFunctions].type
+    }
+
+    /// Drop the start section information from this module.
+    ///
+    /// This is useful to guarantee that "instantiation" of a module
+    /// will eventually halt.
+    @_spi(Fuzzing)
+    public mutating func dropStartFunction() {
+        self.start = nil
     }
 
     /// Instantiate this module in the given imports.
