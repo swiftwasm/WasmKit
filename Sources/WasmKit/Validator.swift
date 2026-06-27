@@ -1,4 +1,4 @@
-import WasmParser
+import WasmParserCore
 
 /// Validates instructions within a given context.
 struct InstructionValidator {

@@ -1,7 +1,10 @@
-import struct WasmParser.CustomSection
-import struct WasmParser.NameMap
-import struct WasmParser.NameSectionParser
-import class WasmParser.StaticByteStream
+// NameRegistry uses closures with untyped throws (any Error) via materializers array.
+// This is not supported in embedded Swift. Use a stub in embedded mode.
+#if !$Embedded
+import struct WasmParserCore.CustomSection
+import struct WasmParserCore.NameMap
+import struct WasmParserCore.NameSectionParser
+import class WasmParserCore.StaticByteStream
 
 struct NameRegistry {
     private var functionNames: [InternalFunction: String] = [:]
@@ -65,3 +68,14 @@ struct NameRegistry {
         }
     }
 }
+#else  // $Embedded
+import WasmParserCore
+// Minimal NameRegistry stub for embedded Swift
+struct NameRegistry {
+    init() {}
+    mutating func register(instance: InternalInstance, nameSection: CustomSection) {}
+    mutating func flush() {}
+    func symbolicate(_ function: InternalFunction) -> String { return "" }
+    func lookup(_ function: InternalFunction) -> String? { return nil }
+}
+#endif  // !$Embedded

@@ -1,4 +1,5 @@
 import _CWasmKit
+import WasmParserCore
 
 /// An execution state of an invocation of exported function.
 ///
@@ -17,6 +18,11 @@ struct Execution: ~Copyable {
 
     /// The stack of active exception handlers for `try_table` blocks.
     var exceptionHandlers: [ExceptionHandler] = []
+
+    #if $Embedded
+    /// In embedded mode, signals end-of-execution instead of throwing EndOfExecution.
+    var isFinished: Bool = false
+    #endif
 
     /// Storage for caught exceptions that may be referenced via `exnref`.
     var storedExceptions: [WasmKitException] = []
@@ -48,6 +54,19 @@ struct Execution: ~Copyable {
         store: StoreRef,
         body: (inout Execution, Sp) throws -> T
     ) rethrows -> T {
+        let limit = store.value.engine.configuration.stackSize / MemoryLayout<StackSlot>.stride
+        let valueStack = UnsafeMutablePointer<StackSlot>.allocate(capacity: limit)
+        defer {
+            valueStack.deallocate()
+        }
+        var context = Execution(store: store, stackEnd: valueStack.advanced(by: limit))
+        return try body(&context, valueStack)
+    }
+
+    static func withTyped<T, E: Error>(
+        store: StoreRef,
+        body: (inout Execution, Sp) throws(E) -> T
+    ) throws(E) -> T {
         let limit = store.value.engine.configuration.stackSize / MemoryLayout<StackSlot>.stride
         let valueStack = UnsafeMutablePointer<StackSlot>.allocate(capacity: limit)
         defer {
@@ -132,7 +151,7 @@ struct Execution: ~Copyable {
         numberOfNonParameterLocalSlots: Int,
         sp: Sp, returnPC: Pc,
         spAddend: VReg
-    ) throws -> Sp {
+    ) throws(Trap) -> Sp {
         let newSp = sp.advanced(by: Int(spAddend))
         try checkStackBoundary(newSp.advanced(by: iseq.maxStackHeight))
         initializeConstSlots(sp: newSp, iseq: iseq, numberOfNonParameterLocalSlots: numberOfNonParameterLocalSlots)
@@ -334,6 +353,7 @@ extension Pc {
 ///   - arguments: The arguments to be passed to the function.
 ///   - callerInstance: The instance that called the function.
 /// - Returns: The result values of the function.
+#if !$Embedded
 @inline(never)
 func executeWasm(
     store: Store,
@@ -373,9 +393,48 @@ func executeWasm(
         }
     }
 }
+#else  // $Embedded
+@inline(never)
+func executeWasm(
+    store: Store,
+    function handle: InternalFunction,
+    type: FunctionType,
+    arguments: [Value]
+) throws(Trap) -> [Value] {
+    let store = StoreRef(store)
+    return try Execution.withTyped(store: store) { (stack: inout Execution, sp: Sp) throws(Trap) -> [Value] in
+        let sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
+        sp.previousSP = nil
+        sp.currentFunction = nil
+        let layout = FrameHeaderLayout(type: type)
+        for (index, argument) in arguments.enumerated() {
+            let reg = layout.size + layout.paramReg(index)
+            sp.storeValue(argument, at: reg, type: type.parameters[index])
+        }
+        var rootISeq: (CodeSlot, CodeSlot) = (
+            Instruction.endOfExecution.headSlot(threadingModel: store.value.engine.configuration.threadingModel),
+            0
+        )
+        // Use withUnsafeMutablePointer via a do throws(Trap) block to propagate typed error
+        var thrownTrap: Trap? = nil
+        withUnsafeMutablePointer(to: &rootISeq.0) { rootPtr in
+            do throws(Trap) {
+                try stack.executeEmbedded(rootSp: sp, rootISQ: rootPtr, handle: handle, type: type)
+            } catch let trap {
+                thrownTrap = trap
+            }
+        }
+        if let trap = thrownTrap { throw trap }
+        return type.results.enumerated().map { (i, resultType) in
+            let reg = layout.size + layout.returnReg(i)
+            return sp.loadValue(at: reg, type: resultType)
+        }
+    }
+}
+#endif  // !$Embedded
 
 extension Execution {
-    #if WasmDebuggingSupport
+    #if WasmDebuggingSupport && !$Embedded
 
         /// Counterpart to the free `executeWasm` function but implemented as a method of `Execution`,
         /// Useful for representation of debugger state that needs to own `Execution`'s memory.
@@ -472,6 +531,7 @@ extension Execution {
         let pc: Pc
     }
 
+    #if !$Embedded
     /// The entry point for the execution of the WebAssembly function.
     @inline(never)
     mutating func execute(
@@ -500,13 +560,49 @@ extension Execution {
             return
         }
     }
+    #endif  // !$Embedded
+
+    #if $Embedded
+    /// Embedded-mode entry point for execution: typed as throws(Trap) for embedded Swift.
+    @inline(never)
+    mutating func executeEmbedded(
+        rootSp: Sp, rootISQ: UnsafeMutablePointer<CodeSlot>,
+        handle: InternalFunction,
+        type: FunctionType
+    ) throws(Trap) {
+        var sp: Sp = rootSp
+        var md: Md = nil
+        var ms: Ms = 0
+        var pc: Pc = rootISQ
+        (pc, sp) = try invoke(
+            function: handle,
+            callerInstance: nil,
+            spAddend: FrameHeaderLayout.size(of: type),
+            sp: sp, pc: pc, md: &md, ms: &ms
+        )
+        isFinished = false
+        try runTokenThreadedEmbedded(sp: &sp, pc: &pc, md: &md, ms: &ms)
+    }
+
+    @inline(__always)
+    mutating func runTokenThreadedEmbedded(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws(Trap) {
+        var opcode = pc.read(OpcodeID.self)
+        do throws(Trap) {
+            while !isFinished {
+                opcode = try doExecuteEmbedded(opcode, sp: &sp, pc: &pc, md: &md, ms: &ms)
+            }
+        } catch let trap {
+            throw trap.withBacktrace(Self.captureBacktrace(sp: sp, store: store.value))
+        }
+    }
+    #endif  // $Embedded
 
     /// Starts the main execution loop using the direct threading model.
     @inline(never)
     mutating func runDirectThreaded(
         sp: Sp, pc: Pc, md: Md, ms: Ms
     ) throws {
-        #if os(WASI)
+        #if os(WASI) || $Embedded
             fatalError("Direct threading is not supported on WASI")
         #else
             var sp = sp
@@ -633,6 +729,7 @@ extension Execution {
         #endif
         var opcode = pc.read(OpcodeID.self)
         while true {
+            #if !$Embedded
             do {
                 while true {
                     #if EngineStats
@@ -649,6 +746,7 @@ extension Execution {
             } catch let trap as Trap {
                 throw trap.withBacktrace(Self.captureBacktrace(sp: sp, store: store.value))
             }
+            #endif  // !$Embedded
         }
     }
 
@@ -669,7 +767,7 @@ extension Execution {
     }
 
     @inline(__always)
-    func checkStackBoundary(_ sp: Sp) throws {
+    func checkStackBoundary(_ sp: Sp) throws(Trap) {
         guard sp < stackEnd else { throw Trap(.callStackExhausted) }
     }
 
@@ -680,14 +778,24 @@ extension Execution {
         callerInstance: InternalInstance?,
         spAddend: VReg,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
-    ) throws -> (Pc, Sp) {
+    ) throws(Trap) -> (Pc, Sp) {
         if function.isWasm {
             return try invokeWasmFunction(
                 function: function.wasm, callerInstance: callerInstance,
                 spAddend: spAddend, sp: sp, pc: pc, md: &md, ms: &ms
             )
         } else {
-            try invokeHostFunction(function: function.host, sp: sp, spAddend: spAddend)
+            #if !$Embedded
+            do {
+                try invokeHostFunction(function: function.host, sp: sp, spAddend: spAddend)
+            } catch let trap as Trap {
+                throw trap
+            } catch {
+                throw Trap(.message(TrapReason.Message("host function threw an error")))
+            }
+            #else
+            fatalError("Host functions are not supported in embedded Swift")
+            #endif
             return (pc, sp)
         }
     }
@@ -697,14 +805,24 @@ extension Execution {
         function: InternalFunction,
         callerInstance: InternalInstance?,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
-    ) throws -> (Pc, Sp) {
+    ) throws(Trap) -> (Pc, Sp) {
         if function.isWasm {
             return try tailInvokeWasmFunction(
                 function: function.wasm, callerInstance: callerInstance,
                 sp: sp, md: &md, ms: &ms
             )
         } else {
-            try invokeHostFunction(function: function.host, sp: sp, spAddend: 0)
+            #if !$Embedded
+            do {
+                try invokeHostFunction(function: function.host, sp: sp, spAddend: 0)
+            } catch let trap as Trap {
+                throw trap
+            } catch {
+                throw Trap(.message(TrapReason.Message("host function threw an error")))
+            }
+            #else
+            fatalError("Host functions are not supported in embedded Swift")
+            #endif
             return (pc, sp)
         }
     }
@@ -718,7 +836,7 @@ extension Execution {
         function: EntityHandle<WasmFunctionEntity>,
         callerInstance: InternalInstance?,
         sp: Sp, md: inout Md, ms: inout Ms
-    ) throws -> (Pc, Sp) {
+    ) throws(Trap) -> (Pc, Sp) {
         let iseq = try function.ensureCompiled(store: store)
         try checkStackBoundary(sp.advanced(by: iseq.maxStackHeight))
         sp.currentFunction = function
@@ -739,7 +857,7 @@ extension Execution {
         callerInstance: InternalInstance?,
         spAddend: VReg,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
-    ) throws -> (Pc, Sp) {
+    ) throws(Trap) -> (Pc, Sp) {
         let iseq = try function.ensureCompiled(store: store)
 
         let newSp = try pushFrame(

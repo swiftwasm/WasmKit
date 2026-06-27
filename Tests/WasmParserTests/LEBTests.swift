@@ -1,6 +1,7 @@
 import Testing
 
 @testable import WasmParser
+@testable import WasmParserCore
 
 @Suite struct LEBTest {
     @Test func unsigned() throws {

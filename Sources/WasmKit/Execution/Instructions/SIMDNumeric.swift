@@ -37,7 +37,7 @@ extension Execution {
         opcode: SIMDOpcode,
         sp: Sp,
         immediate: Instruction.SimdOperand
-    ) throws -> Bool {
+    ) throws(Trap) -> Bool {
         @inline(__always)
         func v128Unary(_ body: (V128Storage) throws -> V128Storage) rethrows {
             let v0 = sp.loadV128(at: immediate.input0)

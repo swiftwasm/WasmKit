@@ -1,3 +1,6 @@
+// Embedded Swift does not support the Synchronization framework; this entire file
+// is excluded from embedded builds.
+#if !$Embedded
 /// Synchronization primitives for atomic memory wait and notify operations.
 ///
 /// Provides thread-safe waiting and notification mechanisms for shared memory
@@ -174,3 +177,4 @@ enum WaitOutcome {
     case mismatch  // 1 - value didn't match expected
     case timedOut  // 2 - deadline expired
 }
+#endif  // !$Embedded

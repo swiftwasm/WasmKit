@@ -1,4 +1,4 @@
-import WasmParser
+import WasmParserCore
 import WasmTypes
 
 /// A unified error type for the WasmKit module, encompassing validation, translation,
@@ -49,6 +49,21 @@ extension WasmKitError {
 }
 
 extension WasmKitError {
+    #if $Embedded
+    /// Convert a Trap into a WasmKitError in Embedded mode where Trap has no
+    /// CustomStringConvertible conformance.  Extracts the text from the reason
+    /// or falls back to a generic message.
+    @usableFromInline
+    package init(_ trap: Trap) {
+        switch trap.reason {
+        case .message(let m): self.init(m.text)
+        default: self.init("trap")
+        }
+    }
+    #endif
+}
+
+extension WasmKitError {
     /// Wrap a closure that throws WasmParserError into one that throws WasmKitError.
     @usableFromInline
     static func wrap<T>(_ body: () throws(WasmParserError) -> T) throws(WasmKitError) -> T {
@@ -60,6 +75,7 @@ extension WasmKitError {
     }
 }
 
+#if !$Embedded
 extension WasmKitError: CustomStringConvertible {
     public var description: String {
         switch self.kind {
@@ -74,6 +90,7 @@ extension WasmKitError: CustomStringConvertible {
         }
     }
 }
+#endif  // !$Embedded
 
 // MARK: - Validation Messages
 
@@ -206,8 +223,12 @@ extension WasmKitError.Message {
     }
 
     static func expectedTypeOnStackButEmpty(expected: ValueType?) -> Self {
+        #if !$Embedded
         let typeHint = expected.map(String.init(describing:)) ?? "a value"
         return Self("expected \(typeHint) on the stack top but it's empty")
+        #else
+        return Self("expected value on the stack top but it's empty")
+        #endif
     }
 
     static func expectedMoreEndInstructions(count: Int) -> Self {
@@ -245,7 +266,7 @@ extension WasmKitError.Message {
         Self("expect `end` at the end of offset expression")
     }
 
-    static func illegalConstExpressionInstruction(_ constInst: WasmParser.Instruction) -> Self {
+    static func illegalConstExpressionInstruction(_ constInst: WasmParserCore.Instruction) -> Self {
         Self("illegal const expression instruction: \(constInst)")
     }
 

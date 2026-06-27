@@ -1,10 +1,12 @@
+#if !$Embedded
 import Synchronization
-import WasmParser
+#endif
+import WasmParserCore
 
-@_exported import struct WasmParser.GlobalType
-@_exported import struct WasmParser.Limits
-@_exported import struct WasmParser.MemoryType
-@_exported import struct WasmParser.TableType
+@_exported import struct WasmParserCore.GlobalType
+@_exported import struct WasmParserCore.Limits
+@_exported import struct WasmParserCore.MemoryType
+@_exported import struct WasmParserCore.TableType
 
 // This file defines the internal representation of WebAssembly entities and
 // their public API.
@@ -39,7 +41,9 @@ import WasmParser
 ///
 /// This type is designed to eliminate ARC retain/release for entities
 /// known to be alive during a VM execution.
+#if !$Embedded
 @dynamicMemberLookup
+#endif
 package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
     private let pointer: UnsafeMutablePointer<T>
 
@@ -52,12 +56,14 @@ package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
         self.pointer = pointer
     }
 
+    #if !$Embedded
     package subscript<R>(dynamicMember keyPath: KeyPath<T, R>) -> R where T: Copyable {
         withValue { $0[keyPath: keyPath] }
     }
+    #endif  // !$Embedded
 
     @inline(__always)
-    package func withValue<R>(_ body: (inout T) throws -> R) rethrows -> R {
+    package func withValue<R, E: Error>(_ body: (inout T) throws(E) -> R) throws(E) -> R {
         return try body(&pointer.pointee)
     }
 
@@ -72,6 +78,17 @@ extension EntityHandle: ValidatableEntity where T: ValidatableEntity, T: ~Copyab
     }
 }
 
+// Type alias for the exports collection.
+// In non-Embedded mode: Dictionary for O(1) lookups.
+// In Embedded mode: Array to avoid String.hashValue → NFC normalization (~31 KB).
+//   All export lookups go through Exports.find(_:) which does linear search with
+//   byte comparison (Exports.findEntity in Instances.swift).
+#if !$Embedded
+typealias ExportsStorage = [String: InternalExternalValue]
+#else
+typealias ExportsStorage = [(key: String, value: InternalExternalValue)]
+#endif
+
 package struct InstanceEntity /* : ~Copyable */ {
     var types: [FunctionType]
     var functions: ImmutableArray<InternalFunction>
@@ -81,7 +98,7 @@ package struct InstanceEntity /* : ~Copyable */ {
     var tags: ImmutableArray<InternalTag>
     var elementSegments: ImmutableArray<InternalElementSegment>
     var dataSegments: ImmutableArray<InternalDataSegment>
-    var exports: [String: InternalExternalValue]
+    var exports: ExportsStorage
     var functionRefs: Set<InternalFunction>
     var features: WasmFeatureSet
     var dataCount: UInt32?
@@ -99,7 +116,7 @@ package struct InstanceEntity /* : ~Copyable */ {
             tags: ImmutableArray(),
             elementSegments: ImmutableArray(),
             dataSegments: ImmutableArray(),
-            exports: [:],
+            exports: ExportsStorage(),
             functionRefs: [],
             features: [],
             dataCount: nil,
@@ -108,7 +125,7 @@ package struct InstanceEntity /* : ~Copyable */ {
         )
     }
 
-    package func compileAllFunctions(store: Store) throws {
+    package func compileAllFunctions(store: Store) throws(Trap) {
         let store = StoreRef(store)
         for function in functions {
             guard function.isWasm else { continue }
@@ -122,7 +139,7 @@ package typealias InternalInstance = EntityHandle<InstanceEntity>
 /// A map of exported entities by name.
 public struct Exports: Sequence {
     let store: Store
-    let items: [String: InternalExternalValue]
+    let items: ExportsStorage
 
     /// A collection of exported entities without their names.
     public var values: [ExternalValue] {
@@ -131,8 +148,19 @@ public struct Exports: Sequence {
 
     /// Returns the exported entity with the given name.
     public subscript(_ name: String) -> ExternalValue? {
+        #if !$Embedded
         guard let entity = items[name] else { return nil }
         return ExternalValue(handle: entity, store: store)
+        #else
+        // Array linear search in Embedded mode using byte comparison.
+        // Avoids String.== and String.hashValue which pull in NFC normalization.
+        let nameUTF8 = name.utf8
+        for (key, entity) in items {
+            guard key.utf8.elementsEqual(nameUTF8) else { continue }
+            return ExternalValue(handle: entity, store: store)
+        }
+        return nil
+        #endif
     }
 
     /// Returns the exported function with the given name.
@@ -159,9 +187,47 @@ public struct Exports: Sequence {
         return global
     }
 
+    #if $Embedded
+    // Embedded-safe export lookup using StaticString (compile-time constant) to
+    // avoid String.hashValue / String.== which pull in Unicode NFC normalization.
+    // Uses UTF-8 byte comparison via elementsEqual — no normalization path.
+    private func findEntity(_ name: StaticString) -> ExternalValue? {
+        let nameLen = name.utf8CodeUnitCount
+        for (key, entity) in items {
+            guard key.utf8.count == nameLen else { continue }
+            var i = 0
+            var match = true
+            for byte in key.utf8 {
+                if byte != name.utf8Start[i] { match = false; break }
+                i &+= 1
+            }
+            if match { return ExternalValue(handle: entity, store: store) }
+        }
+        return nil
+    }
+
+    /// Finds an exported function by compile-time ASCII name without Unicode normalization.
+    public func find(function name: StaticString) -> Function? {
+        guard case .function(let f) = findEntity(name) else { return nil }
+        return f  // ExternalValue.function already wraps a public Function
+    }
+
+    /// Finds an exported memory by compile-time ASCII name without Unicode normalization.
+    public func find(memory name: StaticString) -> Memory? {
+        guard case .memory(let m) = findEntity(name) else { return nil }
+        return m
+    }
+
+    /// Finds an exported global by compile-time ASCII name without Unicode normalization.
+    public func find(global name: StaticString) -> Global? {
+        guard case .global(let g) = findEntity(name) else { return nil }
+        return g
+    }
+    #endif
+
     public struct Iterator: IteratorProtocol {
         private let store: Store
-        private var iterator: Dictionary<String, InternalExternalValue>.Iterator
+        private var iterator: ExportsStorage.Iterator
 
         init(parent: Exports) {
             self.store = parent.store
@@ -197,8 +263,17 @@ public struct Instance {
     /// - Parameter name: The name of the exported entity.
     /// - Returns: The exported entity if found, otherwise `nil`.
     public func export(_ name: String) -> ExternalValue? {
+        #if !$Embedded
         guard let entity = handle.exports[name] else { return nil }
         return ExternalValue(handle: entity, store: store)
+        #else
+        let nameUTF8 = name.utf8
+        for (key, entity) in handle.exports {
+            guard key.utf8.elementsEqual(nameUTF8) else { continue }
+            return ExternalValue(handle: entity, store: store)
+        }
+        return nil
+        #endif
     }
 
     /// Finds an exported function by name.
@@ -281,7 +356,7 @@ struct TableEntity /* : ~Copyable */ {
         return UInt64(UInt32.max)
     }
 
-    init(_ tableType: TableType, resourceLimiter: any ResourceLimiter) throws {
+    init<RL: ResourceLimiter>(_ tableType: TableType, resourceLimiter: RL) throws(Trap) {
         let emptyElement: Reference
         switch tableType.elementType.heapType {
         case .abstract(.funcRef):
@@ -304,7 +379,7 @@ struct TableEntity /* : ~Copyable */ {
 
     /// > Note: https://webassembly.github.io/spec/core/exec/modules.html#grow-table
     /// Returns true if gorwth succeeds, otherwise returns false
-    mutating func grow(by growthSize: UInt64, value: Reference, resourceLimiter: any ResourceLimiter) throws -> Bool {
+    mutating func grow<RL: ResourceLimiter>(by growthSize: UInt64, value: Reference, resourceLimiter: RL) throws(Trap) -> Bool {
         let oldSize = UInt64(elements.count)
         guard !UInt64(elements.count).addingReportingOverflow(growthSize).overflow else {
             return false
@@ -316,18 +391,16 @@ struct TableEntity /* : ~Copyable */ {
         if newSize > maxLimit {
             return false
         }
-        guard try resourceLimiter.limitTableGrowth(to: Int(newSize)) else {
-            return false
-        }
+        guard try resourceLimiter.limitTableGrowth(to: Int(newSize)) else { return false }
         elements.append(contentsOf: Array(repeating: value, count: Int(growthSize)))
         return true
     }
 
-    mutating func initialize(_ segment: InternalElementSegment, from source: Int, to destination: Int, count: Int) throws {
+    mutating func initialize(_ segment: InternalElementSegment, from source: Int, to destination: Int, count: Int) throws(Trap) {
         try self.initialize(segment.references, from: source, to: destination, count: count)
     }
 
-    mutating func initialize(_ references: [Reference], from source: Int, to destination: Int, count: Int) throws {
+    mutating func initialize(_ references: [Reference], from source: Int, to destination: Int, count: Int) throws(Trap) {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
@@ -345,7 +418,7 @@ struct TableEntity /* : ~Copyable */ {
         }
     }
 
-    mutating func fill(repeating value: Reference, from index: Int, count: Int) throws {
+    mutating func fill(repeating value: Reference, from index: Int, count: Int) throws(Trap) {
         let (end, overflow) = index.addingReportingOverflow(count)
         guard !overflow, end <= elements.count else { throw Trap(.tableOutOfBounds(end)) }
 
@@ -358,7 +431,7 @@ struct TableEntity /* : ~Copyable */ {
         _ sourceTable: UnsafeBufferPointer<Reference>,
         _ destinationTable: UnsafeMutableBufferPointer<Reference>,
         from source: Int, to destination: Int, count: Int
-    ) throws {
+    ) throws(Trap) {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
@@ -389,20 +462,20 @@ extension TableEntity: ValidatableEntity {
 typealias InternalTable = EntityHandle<TableEntity>
 
 extension InternalTable {
-    func copy(_ sourceTable: InternalTable, from source: Int, to destination: Int, count: Int) throws {
+    func copy(_ sourceTable: InternalTable, from source: Int, to destination: Int, count: Int) throws(Trap) {
         // Check if the source and destination tables are the same for dynamic exclusive
         // access enforcement
         if self == sourceTable {
-            try withValue {
-                try $0.elements.withUnsafeMutableBufferPointer {
-                    try TableEntity.copy(UnsafeBufferPointer($0), $0, from: source, to: destination, count: count)
+            try withValue { (t: inout TableEntity) throws(Trap) in
+                try t.elements.withUnsafeMutableBufferPointer { (elems: inout UnsafeMutableBufferPointer<Reference>) throws(Trap) in
+                    try TableEntity.copy(UnsafeBufferPointer(elems), elems, from: source, to: destination, count: count)
                 }
             }
         } else {
-            try withValue { destinationTable in
-                try sourceTable.withValue { sourceTable in
-                    try destinationTable.elements.withUnsafeMutableBufferPointer { dest in
-                        try sourceTable.elements.withUnsafeBufferPointer { src in
+            try withValue { (destinationTable: inout TableEntity) throws(Trap) in
+                try sourceTable.withValue { (sourceTable: inout TableEntity) throws(Trap) in
+                    try destinationTable.elements.withUnsafeMutableBufferPointer { (dest: inout UnsafeMutableBufferPointer<Reference>) throws(Trap) in
+                        try sourceTable.elements.withUnsafeBufferPointer { (src: UnsafeBufferPointer<Reference>) throws(Trap) in
                             try TableEntity.copy(src, dest, from: source, to: destination, count: count)
                         }
                     }
@@ -443,7 +516,7 @@ public struct Table: Equatable {
     /// let imports: Imports = ["env": ["table": table]]
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
-    public init(store: Store, type: TableType) throws {
+    public init(store: Store, type: TableType) throws(Trap) {
         self.init(
             handle: try store.allocator.allocate(tableType: type, resourceLimiter: store.resourceLimiter),
             allocator: store.allocator
@@ -490,7 +563,7 @@ struct MemoryEntity: ~Copyable {
 
         var trapGuardReservationSize: Int { 0 }
 
-        mutating func grow(to newByteCount: Int) throws {
+        mutating func grow(to newByteCount: Int) throws(Trap) {
             let storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: newByteCount)
             let oldStorage = self.buffer
             if newByteCount > 0 { storage.initialize(repeating: 0) }
@@ -506,7 +579,7 @@ struct MemoryEntity: ~Copyable {
         }
     }
 
-    #if os(macOS) || os(Linux)
+    #if (os(macOS) || os(Linux)) && !$Embedded
         private enum Storage {
             case mprotect(MprotectLinearMemory)
             case malloc(MallocStorage)
@@ -563,7 +636,7 @@ struct MemoryEntity: ~Copyable {
                 }
             }
 
-            mutating func grow(to newByteCount: Int) throws {
+            mutating func grow(to newByteCount: Int) throws(Trap) {
                 switch self {
                 case .mprotect(var memory):
                     try memory.grow(to: newByteCount)
@@ -589,9 +662,11 @@ struct MemoryEntity: ~Copyable {
     private var storage: Storage
     let maxPageCount: UInt64
     let limit: Limits
+    #if !$Embedded
     let sharedMutex: Mutex<Void>?
+    #endif
 
-    init(_ memoryType: MemoryType, engineConfiguration: EngineConfiguration, resourceLimiter: any ResourceLimiter) throws {
+    init<RL: ResourceLimiter>(_ memoryType: MemoryType, engineConfiguration: EngineConfiguration, resourceLimiter: RL) throws(Trap) {
         let byteSize = Int(memoryType.min) * Self.pageSize
         guard try resourceLimiter.limitMemoryGrowth(to: byteSize) else {
             throw Trap(.initialMemorySizeExceedsLimit(byteSize: byteSize))
@@ -600,7 +675,9 @@ struct MemoryEntity: ~Copyable {
         let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
         maxPageCount = memoryType.max ?? defaultMaxPageCount
         limit = memoryType
+        #if !$Embedded
         sharedMutex = memoryType.shared ? Mutex<Void>(()) : nil
+        #endif
     }
 
     deinit {
@@ -619,7 +696,7 @@ struct MemoryEntity: ~Copyable {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#grow-mem>
-    mutating func grow(by pageCount: Int, resourceLimiter: any ResourceLimiter) throws -> Value {
+    mutating func grow<RL: ResourceLimiter>(by pageCount: Int, resourceLimiter: RL) throws(Trap) -> Value {
         let currentByteCount = byteCount
         let newPageCount = currentByteCount / Self.pageSize + pageCount
 
@@ -637,7 +714,7 @@ struct MemoryEntity: ~Copyable {
         return limit.isMemory64 ? .i64(UInt64(result)) : .i32(result)
     }
 
-    mutating func copy(from source: UInt64, to destination: UInt64, count: UInt64) throws {
+    mutating func copy(from source: UInt64, to destination: UInt64, count: UInt64) throws(Trap) {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
@@ -663,7 +740,7 @@ struct MemoryEntity: ~Copyable {
         }
     }
 
-    mutating func initialize(_ segment: InternalDataSegment, from source: UInt32, to destination: UInt64, count: UInt32) throws {
+    mutating func initialize(_ segment: InternalDataSegment, from source: UInt32, to destination: UInt64, count: UInt32) throws(Trap) {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(UInt64(count))
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
@@ -684,7 +761,7 @@ struct MemoryEntity: ~Copyable {
         }
     }
 
-    mutating func write(offset: Int, bytes: ArraySlice<UInt8>) throws {
+    mutating func write(offset: Int, bytes: ArraySlice<UInt8>) throws(Trap) {
         let endOffset = offset + bytes.count
         guard endOffset <= byteCount else {
             throw Trap(.memoryOutOfBounds)
@@ -695,7 +772,7 @@ struct MemoryEntity: ~Copyable {
         }
     }
 
-    mutating func fill(offset: Int, value: UInt8, count: Int) throws {
+    mutating func fill(offset: Int, value: UInt8, count: Int) throws(Trap) {
         let endOffset = offset + count
         guard endOffset <= byteCount else {
             throw Trap(.memoryOutOfBounds)
@@ -747,15 +824,23 @@ public struct Memory: Equatable {
     /// let imports: Imports = ["env": ["memory": memory]]
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
+    #if !$Embedded
     public init(store: Store, type: MemoryType) throws {
         // Validate the memory type because the type is not validated at instantiation time.
         try ModuleValidator.checkMemoryType(type, features: store.engine.configuration.features)
-
         self.init(
             handle: try store.allocator.allocate(memoryType: type, engineConfiguration: store.engine.configuration, resourceLimiter: store.resourceLimiter),
             allocator: store.allocator
         )
     }
+    #else
+    public init(store: Store, type: MemoryType) throws(Trap) {
+        self.init(
+            handle: try store.allocator.allocate(memoryType: type, engineConfiguration: store.engine.configuration, resourceLimiter: store.resourceLimiter),
+            allocator: store.allocator
+        )
+    }
+    #endif
 
     /// Returns a copy of the memory data.
     @available(*, deprecated, message: "Use `withUnsafeBufferPointer(offset:count:_:)` or `withUnsafeMutableBufferPointer(offset:count:_:)` instead")
@@ -836,7 +921,7 @@ struct GlobalEntity /* : ~Copyable */ {
     }
     let globalType: GlobalType
 
-    init(globalType: GlobalType, initialValue: Value) throws {
+    init(globalType: GlobalType, initialValue: Value) throws(WasmKitError) {
         try initialValue.checkType(globalType.valueType)
         switch initialValue {
         case .v128(let v):
@@ -872,12 +957,16 @@ public struct Global: Equatable {
     ///
     /// - Parameter value: The new value to assign.
     /// - Throws: `Trap` if the global is immutable.
-    public func assign(_ value: Value) throws {
-        try handle.withValue { global in
+    public func assign(_ value: Value) throws(Trap) {
+        try handle.withValue { (global: inout GlobalEntity) throws(Trap) in
             guard global.globalType.mutability == .variable else {
                 throw Trap(.cannotAssignToImmutableGlobal)
             }
-            try value.checkType(global.globalType.valueType)
+            do throws(WasmKitError) {
+                try value.checkType(global.globalType.valueType)
+            } catch let e {
+                throw Trap(.message(TrapReason.Message("trap")))
+            }
             global.value = value
         }
     }
@@ -918,7 +1007,7 @@ public struct Global: Equatable {
     /// let imports: Imports = ["env": ["i32-global": i32Global]]
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
-    public init(store: Store, type: GlobalType, value: Value) throws {
+    public init(store: Store, type: GlobalType, value: Value) throws(WasmKitError) {
         let handle = try store.allocator.allocate(globalType: type, initialValue: value)
         self.init(handle: handle, allocator: store.allocator)
     }
@@ -1040,3 +1129,75 @@ enum InternalExternalValue {
     case global(InternalGlobal)
     case tag(InternalTag)
 }
+
+// MARK: - Explicit property accessors for Embedded Swift
+// In embedded mode, @dynamicMemberLookup (which uses KeyPath) is not available.
+// These extensions provide direct property access without key paths.
+#if $Embedded
+extension InternalInstance {
+    var types: [FunctionType] { withValue { $0.types } }
+    var functions: ImmutableArray<InternalFunction> { withValue { $0.functions } }
+    var tables: ImmutableArray<InternalTable> { withValue { $0.tables } }
+    var memories: ImmutableArray<InternalMemory> { withValue { $0.memories } }
+    var globals: ImmutableArray<InternalGlobal> { withValue { $0.globals } }
+    var tags: ImmutableArray<InternalTag> { withValue { $0.tags } }
+    var elementSegments: ImmutableArray<InternalElementSegment> { withValue { $0.elementSegments } }
+    var dataSegments: ImmutableArray<InternalDataSegment> { withValue { $0.dataSegments } }
+    var exports: ExportsStorage { withValue { $0.exports } }
+    var functionRefs: Set<InternalFunction> { withValue { $0.functionRefs } }
+    var features: WasmFeatureSet { withValue { $0.features } }
+    // dataCount is defined in Translator.swift extension — no redeclaration needed
+    var isDebuggable: Bool { withValue { $0.isDebuggable } }
+}
+
+extension InternalTable {
+    var elements: [Reference] { withValue { $0.elements } }
+    var tableType: TableType { withValue { $0.tableType } }
+    var limits: Limits { withValue { $0.limits } }
+}
+
+extension InternalMemory {
+    var limit: Limits { withValue { $0.limit } }
+    var maxPageCount: UInt64 { withValue { $0.maxPageCount } }
+    var byteCount: Int { withValue { $0.byteCount } }
+    var data: UnsafeBufferPointer<UInt8> { withValue { $0.data } }
+    var baseAddress: UnsafeMutableRawPointer? { withValue { $0.baseAddress } }
+}
+
+extension InternalGlobal {
+    var value: Value { withValue { $0.value } }
+    var globalType: GlobalType { withValue { $0.globalType } }
+}
+
+extension InternalElementSegment {
+    var type: ReferenceType { withValue { $0.type } }
+    var references: [Reference] { withValue { $0.references } }
+}
+
+extension InternalDataSegment {
+    var data: ArraySlice<UInt8> { withValue { $0.data } }
+}
+
+extension EntityHandle<TagEntity> {
+    var type: InternedFuncType { withValue { $0.type } }
+}
+
+extension EntityHandle<HostFunctionEntity> {
+    var type: InternedFuncType { withValue { $0.type } }
+    var implementation: Function.Implementation { withValue { $0.implementation } }
+}
+
+extension InternalUncompiledCode {
+    var locals: [ValueType] { withValue { $0.locals } }
+    var expression: ArraySlice<UInt8> { withValue { $0.expression } }
+    #if WasmDebuggingSupport
+    var originalAddress: Int { withValue { $0.originalAddress } }
+    #endif
+}
+
+extension InternalInstance {
+    #if WasmDebuggingSupport
+    var instructionMapping: DebuggerInstructionMapping { withValue { $0.instructionMapping } }
+    #endif
+}
+#endif  // $Embedded

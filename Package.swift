@@ -1,4 +1,6 @@
 // swift-tools-version:6.3
+// Note: swift-tools-version is kept at 6.3 for compatibility; the embedded Swift
+// build uses WasmParserCore and WasmKit directly with -enable-experimental-feature Embedded.
 
 import PackageDescription
 
@@ -33,6 +35,9 @@ let package = Package(
         .library(name: "WasmKitWASI", targets: ["WasmKitWASI"]),
         .library(name: "WASI", targets: ["WASI"]),
         .library(name: "WasmParser", targets: ["WasmParser"]),
+        // WasmParserCore is the embedded-Swift-compatible subset of WasmParser
+        // (no file I/O, no SystemPackage dependency).
+        .library(name: "WasmParserCore", targets: ["WasmParserCore"]),
         .library(name: "WAT", targets: ["WAT"]),
         .library(name: "WIT", targets: ["WIT"]),
         .library(name: "_CabiShims", targets: ["_CabiShims"]),
@@ -54,10 +59,14 @@ let package = Package(
             name: "WasmKit",
             dependencies: [
                 "_CWasmKit",
-                "WasmParser",
+                "WasmParserCore",
                 "WasmTypes",
-                "SystemExtras",
-                .product(name: "SystemPackage", package: "swift-system"),
+                // WasmParser (file I/O), SystemExtras, and SystemPackage are only available on
+                // OS-bearing platforms. Bare-metal / embedded targets skip these deps, which
+                // allows WasmKit to compile with -enable-experimental-feature Embedded.
+                .target(name: "WasmParser", condition: .when(platforms: [.macOS, .iOS, .watchOS, .tvOS, .visionOS, .linux, .android, .windows, .wasi])),
+                .target(name: "SystemExtras", condition: .when(platforms: [.macOS, .iOS, .watchOS, .tvOS, .visionOS, .linux, .android, .windows, .wasi])),
+                .product(name: "SystemPackage", package: "swift-system", condition: .when(platforms: [.macOS, .iOS, .watchOS, .tvOS, .visionOS, .linux, .android, .windows, .wasi])),
                 .target(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
@@ -109,15 +118,21 @@ let package = Package(
         ),
 
         .target(
-            name: "WasmParser",
+            name: "WasmParserCore",
             dependencies: [
                 "SystemExtras",
                 "WasmTypes",
-                .product(name: "SystemPackage", package: "swift-system"),
                 .target(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
                 ),
+            ]
+        ),
+        .target(
+            name: "WasmParser",
+            dependencies: [
+                "WasmParserCore",
+                .product(name: "SystemPackage", package: "swift-system"),
             ],
             exclude: ["CMakeLists.txt"],
             swiftSettings: swiftSettings
@@ -126,6 +141,7 @@ let package = Package(
             name: "WasmParserTests",
             dependencies: [
                 "WasmParser",
+                "WasmParserCore",
                 .target(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])

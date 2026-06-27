@@ -68,7 +68,7 @@
         stream: Stream,
         features: WasmFeatureSet
     ) throws -> ParsedComponent {
-        var parser = WasmParser.ComponentParser(stream: stream, features: features)
+        var parser = WasmParserCore.ComponentParser(stream: stream, features: features)
         var builder = ParsedComponentBuilder()
 
         while let payload = try parser.parseNext() {

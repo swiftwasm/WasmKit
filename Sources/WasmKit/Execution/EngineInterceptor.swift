@@ -1,3 +1,6 @@
+// EngineInterceptor uses existential protocol types ([EngineInterceptor]) which
+// are not available in Embedded Swift.
+#if !$Embedded
 @_documentation(visibility: internal)
 public protocol EngineInterceptor {
     func onEnterFunction(_ function: Function)
@@ -27,3 +30,4 @@ public class MultiplexingInterceptor: EngineInterceptor {
         }
     }
 }
+#endif  // !$Embedded

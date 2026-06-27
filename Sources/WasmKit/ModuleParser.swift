@@ -1,6 +1,10 @@
 import SystemExtras
 import SystemPackage
+import WasmParserCore
+
+#if !$Embedded
 import WasmParser
+import SystemPackage
 
 #if os(Windows)
     import ucrt
@@ -26,6 +30,7 @@ public func parseWasm(filePath: FilePath, features: WasmFeatureSet = .default) t
         try fileHandle.close()
     }
 }
+#endif  // !$Embedded
 
 /// Parse a given byte array as a WebAssembly binary format file
 /// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
@@ -37,7 +42,7 @@ public func parseWasm(bytes: [UInt8], features: WasmFeatureSet = .default) throw
 
 /// Parse a given byte slice as a WebAssembly binary format file
 /// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
-public func parseWasm(bytes: ArraySlice<UInt8>, features: WasmFeatureSet = .default) throws -> Module {
+public func parseWasm(bytes: ArraySlice<UInt8>, features: WasmFeatureSet = .default) throws(WasmKitError) -> Module {
     let stream = StaticByteStream(bytes: bytes)
     let module = try parseModule(stream: stream, features: features)
     return module
@@ -51,8 +56,8 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
     var codes: [Code] = []
     var tables: [TableType] = []
     var memories: [MemoryType] = []
-    var globals: [WasmParser.Global] = []
-    var tags: [WasmParser.Tag] = []
+    var globals: [WasmParserCore.Global] = []
+    var tags: [WasmParserCore.Tag] = []
     var elements: [ElementSegment] = []
     var data: [DataSegment] = []
     var start: FunctionIndex?
@@ -61,7 +66,7 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
     var customSections: [CustomSection] = []
     var dataCount: UInt32?
 
-    var parser = WasmParser.Parser<Stream>(
+    var parser = WasmParserCore.Parser<Stream>(
         stream: stream, features: features
     )
 
@@ -77,9 +82,9 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         case .functionSection(let types):
             typeIndices = types
         case .tableSection(let tableSection):
-            tables = tableSection.map(\.type)
+            tables = tableSection.map { $0.type }
         case .memorySection(let memorySection):
-            memories = memorySection.map(\.type)
+            memories = memorySection.map { $0.type }
         case .globalSection(let globalSection):
             globals = globalSection
         case .tagSection(let tagSection):

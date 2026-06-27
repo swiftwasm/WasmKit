@@ -1,5 +1,7 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/instructions.html#variable-instructions>
+import WasmParserCore
+
 extension Execution {
     mutating func globalGet(sp: Sp, immediate: Instruction.GlobalAndVRegOperand) {
         immediate.global.withValue {

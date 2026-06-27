@@ -1,13 +1,16 @@
-import WasmParser
+import WasmParserCore
 
+#if !$Embedded
 /// A container to manage execution state of one or more module instances.
 @available(*, deprecated, message: "Use `Engine` instead")
 public final class Runtime {
     public let store: Store
     let engine: Engine
+    #if !$Embedded
     var interceptor: EngineInterceptor? {
         engine.interceptor
     }
+    #endif
     var funcTypeInterner: Interner<FunctionType> {
         engine.funcTypeInterner
     }
@@ -25,6 +28,7 @@ public final class Runtime {
     /// - Parameter hostModules: Host module names mapped to their corresponding ``HostModule`` definitions.
     /// - Parameter interceptor: An optional runtime interceptor to intercept execution of instructions.
     /// - Parameter configuration: An optional runtime configuration to customize the runtime behavior.
+    #if !$Embedded
     public init(
         hostModules: [String: HostModule] = [:],
         interceptor: EngineInterceptor? = nil,
@@ -32,11 +36,22 @@ public final class Runtime {
     ) {
         self.engine = Engine(configuration: configuration, interceptor: interceptor)
         store = Store(engine: engine)
-
         for (moduleName, hostModule) in hostModules {
             registerUniqueHostModule(hostModule, as: moduleName, engine: engine)
         }
     }
+    #else
+    public init(
+        hostModules: [String: HostModule] = [:],
+        configuration: EngineConfiguration = EngineConfiguration()
+    ) {
+        self.engine = Engine(configuration: configuration)
+        store = Store(engine: engine)
+        for (moduleName, hostModule) in hostModules {
+            registerUniqueHostModule(hostModule, as: moduleName, engine: engine)
+        }
+    }
+    #endif
 
     func resolveType(_ type: InternedFuncType) -> FunctionType {
         return funcTypeInterner.resolve(type)
@@ -96,7 +111,7 @@ public final class Runtime {
         availableExports[name] = moduleExports
     }
 
-    func getExternalValues(_ module: Module, runtime: Runtime) throws -> Imports {
+    func getExternalValues(_ module: Module, runtime: Runtime) throws(ImportError) -> Imports {
         var result = Imports()
 
         for i in module.imports {
@@ -128,7 +143,7 @@ public final class Runtime {
     /// let value = myGlobal.value
     /// ```
     @available(*, deprecated, message: "Use `Instance.export` and `Global.value` instead")
-    public func getGlobal(_ instance: Instance, globalName: String) throws -> Value {
+    public func getGlobal(_ instance: Instance, globalName: String) throws(Trap) -> Value {
         guard case .global(let global) = instance.export(globalName) else {
             throw Trap(.noGlobalExportWithName(globalName: globalName, instance: instance))
         }
@@ -212,3 +227,4 @@ public struct HostModule {
     /// Names of functions exported by this module mapped to corresponding host functions.
     public var functions: [String: HostFunction]
 }
+#endif  // !$Embedded

@@ -29,7 +29,7 @@ extension Execution {
         sp.storeV128(V128Lanes.pack(out, widthBits: 8, laneCount: 16), at: immediate.result)
     }
 
-    mutating func simd(sp: Sp, md: Md, ms: Ms, immediate: Instruction.SimdOperand) throws {
+    mutating func simd(sp: Sp, md: Md, ms: Ms, immediate: Instruction.SimdOperand) throws(Trap) {
         guard let opcode = SIMDOpcode(rawValue: immediate.opcode) else {
             preconditionFailure("Unknown SIMD opcode: \(immediate.opcode)")
         }

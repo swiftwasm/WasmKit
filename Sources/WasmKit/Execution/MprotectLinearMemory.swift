@@ -57,7 +57,7 @@
             }
         }
 
-        mutating func grow(to newCommittedSize: Int) throws {
+        mutating func grow(to newCommittedSize: Int) throws(Trap) {
             precondition(newCommittedSize >= committedSize)
             guard newCommittedSize <= reservationSize else {
                 throw Trap(.memoryOutOfBounds)

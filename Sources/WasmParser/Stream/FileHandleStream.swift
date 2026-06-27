@@ -34,7 +34,7 @@ public final class FileHandleStream: ByteStream {
     @discardableResult
     public func consumeAny() throws(WasmParserError) -> UInt8 {
         guard let consumed = try peek() else {
-            throw WasmParserError(message: .unexpectedEnd, offset: currentIndex)
+            throw WasmParserError(kind: .parserUnexpectedEnd(expected: nil), offset: currentIndex)
         }
         currentIndex = bytes.index(after: currentIndex)
         return consumed

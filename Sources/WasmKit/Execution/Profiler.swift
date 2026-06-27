@@ -1,3 +1,5 @@
+// Profiler depends on SystemExtras and SystemPackage; excluded from embedded builds.
+#if !$Embedded
 import SystemExtras
 import SystemPackage
 
@@ -138,3 +140,4 @@ private enum JSON {
         return output
     }
 }
+#endif  // !$Embedded
