@@ -1,4 +1,4 @@
-<img width="100" height="100" alt="wasmkit" src="wasmkit.svg" />
+<img width="150" height="150" alt="wasmkit" src="wasmkit.svg" />
 
 # WasmKit
 
