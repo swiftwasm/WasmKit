@@ -1,4 +1,4 @@
-<img alt="WasmKit Icon" src="https://raw.github.com/wiki/akkyie/wakit/images/wakit_icon.png" width="100px">
+<img width="100" height="100" alt="wasmkit" src="https://github.com/user-attachments/assets/7db95250-18cb-401c-9009-4477b5d61a0d" />
 
 # WasmKit
 
@@ -28,7 +28,7 @@ To use WasmKit in your package, add it as a [Swift Package Manager](https://www.
 Run the following commands in the same directory as your `Package.swift` manifest to add the dependency:
 
 ```
-swift package add-dependency https://github.com/swiftwasm/WasmKit --up-to-next-minor-from 0.2.0
+swift package add-dependency https://github.com/swiftwasm/WasmKit --up-to-next-minor-from 0.3.0
 swift package add-target-dependency WasmKit <your-package-target-name> --package WasmKit
 ```
 
@@ -37,7 +37,7 @@ You can also add the following snippet manually instead to your `Package.swift` 
 ```swift
 dependencies: [
     // ...other dependencies
-    .package(url: "https://github.com/swiftwasm/WasmKit.git", .upToNextMinor(from: "0.2.0")),
+    .package(url: "https://github.com/swiftwasm/WasmKit.git", .upToNextMinor(from: "0.3.0")),
 ],
 // ...other package configuration
 targets: [
@@ -91,8 +91,8 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | Proposal | Status | WasmKit version |
 |----------|--------|-----------------|
 | [Bulk Memory Operations](https://github.com/WebAssembly/bulk-memory-operations) | ✅ Implemented | [0.0.2] |
-| [Exception Handling](https://github.com/WebAssembly/exception-handling) | ✅ Implemented | `main` branch |
-| [Fixed-width SIMD](https://github.com/webassembly/simd) | ✅ Implemented | `main` branch |
+| [Exception Handling](https://github.com/WebAssembly/exception-handling) | ✅ Implemented | [0.3.0] |
+| [Fixed-width SIMD](https://github.com/webassembly/simd) | ✅ Implemented | [0.3.0] |
 | [Import/Export of Mutable Globals](https://github.com/WebAssembly/mutable-global) | ✅ Implemented | [0.0.2] |
 | [Memory64](https://github.com/WebAssembly/memory64) | ✅ Implemented | [0.0.2] |
 | [Multi-value](https://github.com/WebAssembly/multi-value) | ✅ Implemented | [0.0.2] |
@@ -111,12 +111,13 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 [0.0.2]: https://github.com/swiftwasm/WasmKit/releases/tag/0.0.2
 [0.1.4]: https://github.com/swiftwasm/WasmKit/releases/tag/0.1.4
 [0.2.0]: https://github.com/swiftwasm/WasmKit/releases/tag/0.2.0
+[0.3.0]: https://github.com/swiftwasm/WasmKit/releases/tag/0.3.0
 
 #### Phase 4 - Standardize the Feature (WG)
 
 | Proposal | Status | WasmKit version |
 |----------|--------|-----------------|
-| [Threads and Atomics](https://github.com/webassembly/threads) | ✅ Implemented | `main` branch |
+| [Threads and Atomics](https://github.com/webassembly/threads) | ✅ Implemented | [0.3.0] |
 
 #### Phase 1 - Feature Proposal (CG)
 
