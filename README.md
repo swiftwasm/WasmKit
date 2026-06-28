@@ -1,4 +1,4 @@
-<img width="100" height="100" alt="wasmkit" src="https://github.com/user-attachments/assets/7db95250-18cb-401c-9009-4477b5d61a0d" />
+<img width="150" height="150" alt="wasmkit" src="wasmkit.svg" />
 
 # WasmKit
 
