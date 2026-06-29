@@ -53,6 +53,7 @@ add_compile_definitions(
 include(FetchContent)
 
 option(WASMKIT_BUILD_CLI "Build wasmkit-cli" ON)
+option(WASMKIT_ENABLE_FILESYSTEM "Enable FileSystem support" ON)
 
 if(WASMKIT_BUILD_CLI)
   set(BUILD_TESTING OFF) # disable ArgumentParser tests

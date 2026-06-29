@@ -1,21 +1,8 @@
 #if ComponentModel
     import ComponentModel
-    import SystemPackage
     import WasmParser
 
     // MARK: - Component Parsing
-
-    /// Parse a component binary file from a caller-owned file descriptor.
-    ///
-    /// The descriptor is consumed from its current offset and is not closed by
-    /// this function.
-    public func parseComponent(
-        fileHandle: FileDescriptor,
-        features: WasmFeatureSet = .default
-    ) throws -> ParsedComponent {
-        let stream = try FileHandleStream(fileHandle: fileHandle)
-        return try parseComponent(stream: stream, features: features)
-    }
 
     /// Parse a component binary into a `ParsedComponent` ready for instantiation.
     ///
@@ -608,4 +595,20 @@
         let options: [CanonicalOption]
     }
 
+#endif
+
+#if ComponentModel && FileSystem
+    import struct SystemPackage.FileDescriptor
+
+    /// Parse a component binary file from a caller-owned file descriptor.
+    ///
+    /// The descriptor is consumed from its current offset and is not closed by
+    /// this function.
+    public func parseComponent(
+        fileHandle: FileDescriptor,
+        features: WasmFeatureSet = .default
+    ) throws -> ParsedComponent {
+        let stream = try FileHandleStream(fileHandle: fileHandle)
+        return try parseComponent(stream: stream, features: features)
+    }
 #endif
