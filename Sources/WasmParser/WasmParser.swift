@@ -824,19 +824,19 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-importdesc>
     func parseImportDescriptor() throws(WasmParserError) -> ImportDescriptor {
-        let maxKind: UInt8 = features.contains(.exceptionHandling) ? 0x04 : 0x03
-        let b = try stream.consume(Set(0x00...maxKind))
+        let descriptorOffset = stream.currentIndex
+        let b = try stream.consumeAny()
         switch b {
         case 0x00: return try .function(parseUnsigned())
         case 0x01: return try .table(parseTableType())
         case 0x02: return try .memory(parseMemoryType())
         case 0x03: return try .global(parseGlobalType())
-        case 0x04:
+        case 0x04 where features.contains(.exceptionHandling):
             let attribute: UInt8 = try parseUnsigned()
             guard attribute == 0 else { throw makeError(.invalidTagAttribute(attribute)) }
             return try .tag(parseUnsigned())
         default:
-            preconditionFailure("should never reach here")
+            throw WasmParserError(kind: .parserUnexpectedByte(b, expected: nil), offset: descriptorOffset)
         }
     }
 
@@ -898,16 +898,16 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-exportdesc>
     func parseExportDescriptor() throws(WasmParserError) -> ExportDescriptor {
-        let maxKind: UInt8 = features.contains(.exceptionHandling) ? 0x04 : 0x03
-        let b = try stream.consume(Set(0x00...maxKind))
+        let descriptorOffset = stream.currentIndex
+        let b = try stream.consumeAny()
         switch b {
         case 0x00: return try .function(parseUnsigned())
         case 0x01: return try .table(parseUnsigned())
         case 0x02: return try .memory(parseUnsigned())
         case 0x03: return try .global(parseUnsigned())
-        case 0x04: return try .tag(parseUnsigned())
+        case 0x04 where features.contains(.exceptionHandling): return try .tag(parseUnsigned())
         default:
-            preconditionFailure("should never reach here")
+            throw WasmParserError(kind: .parserUnexpectedByte(b, expected: nil), offset: descriptorOffset)
         }
     }
 

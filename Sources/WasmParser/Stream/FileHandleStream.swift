@@ -40,22 +40,6 @@ public final class FileHandleStream: ByteStream {
         return consumed
     }
 
-    @discardableResult
-    public func consume(_ expected: Set<UInt8>) throws(WasmParserError) -> UInt8 {
-        guard let consumed = try peek() else {
-            throw WasmParserError(kind: .parserUnexpectedEnd(expected: Set(expected)), offset: currentIndex)
-        }
-        guard expected.contains(consumed) else {
-            throw WasmParserError(
-                kind: .parserUnexpectedByte(
-                    consumed,
-                    expected: Set(expected)
-                ), offset: currentIndex)
-        }
-        currentIndex = bytes.index(after: currentIndex)
-        return consumed
-    }
-
     public func consume(count: Int) throws(WasmParserError) -> ArraySlice<UInt8> {
         let bytesToRead = currentIndex + count - endOffset
 
