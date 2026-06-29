@@ -1,5 +1,6 @@
 add_wasmkit_library(CLICommands
     Explore.swift
+    Platform.swift
     Run.swift
     Wat2wasm.swift
 )

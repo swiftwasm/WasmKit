@@ -111,7 +111,6 @@ let package = Package(
         .target(
             name: "WasmParser",
             dependencies: [
-                "SystemExtras",
                 "WasmTypes",
                 .product(name: "SystemPackage", package: "swift-system"),
                 .target(

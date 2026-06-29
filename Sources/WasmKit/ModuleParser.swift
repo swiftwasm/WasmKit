@@ -19,12 +19,20 @@ public func parseWasm(filePath: FilePath, features: WasmFeatureSet = .default) t
     #endif
     let fileHandle = try FileDescriptor.open(filePath, accessMode)
     return try withThrowing {
-        let stream = try FileHandleStream(fileHandle: fileHandle)
-        let module = try parseModule(stream: stream, features: features)
-        return module
+        try parseWasm(fileHandle: fileHandle, features: features)
     } defer: {
         try fileHandle.close()
     }
+}
+
+/// Parse a WebAssembly binary file from a caller-owned file descriptor.
+///
+/// The descriptor is consumed from its current offset and is not closed by
+/// this function.
+public func parseWasm(fileHandle: FileDescriptor, features: WasmFeatureSet = .default) throws -> Module {
+    let stream = try FileHandleStream(fileHandle: fileHandle)
+    let module = try parseModule(stream: stream, features: features)
+    return module
 }
 
 /// Parse a given byte array as a WebAssembly binary format file
