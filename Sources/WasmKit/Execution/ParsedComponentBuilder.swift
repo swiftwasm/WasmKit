@@ -1,31 +1,20 @@
 #if ComponentModel
     import ComponentModel
-    import SystemExtras
     import SystemPackage
     import WasmParser
 
     // MARK: - Component Parsing
 
-    /// Parse a component binary file into a `ParsedComponent` ready for instantiation.
+    /// Parse a component binary file from a caller-owned file descriptor.
     ///
-    /// This function reads the component from a file using streaming I/O for efficiency.
-    ///
-    /// - Parameters:
-    ///   - filePath: Path to the WebAssembly component binary file
-    ///   - features: Enabled WebAssembly features for parsing
-    /// - Returns: A `ParsedComponent` ready for instantiation
-    /// - Throws: `WasmKitError` if parsing fails, `ComponentParseError` for semantic errors
+    /// The descriptor is consumed from its current offset and is not closed by
+    /// this function.
     public func parseComponent(
-        filePath: FilePath,
+        fileHandle: FileDescriptor,
         features: WasmFeatureSet = .default
     ) throws -> ParsedComponent {
-        let fileHandle = try FileDescriptor.open(filePath, .readOnly)
-        return try withThrowing {
-            let stream = try FileHandleStream(fileHandle: fileHandle)
-            return try parseComponent(stream: stream, features: features)
-        } defer: {
-            try fileHandle.close()
-        }
+        let stream = try FileHandleStream(fileHandle: fileHandle)
+        return try parseComponent(stream: stream, features: features)
     }
 
     /// Parse a component binary into a `ParsedComponent` ready for instantiation.
