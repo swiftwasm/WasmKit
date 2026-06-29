@@ -2,17 +2,12 @@ public protocol ByteStream: ~Copyable {
     var currentIndex: Int { get }
 
     func consumeAny() throws(WasmParserError) -> UInt8
-    func consume(_ expected: Set<UInt8>) throws(WasmParserError) -> UInt8
     func consume(count: Int) throws(WasmParserError) -> ArraySlice<UInt8>
 
     func peek() throws(WasmParserError) -> UInt8?
 }
 
 extension ByteStream {
-    func consume(_ expected: UInt8) throws(WasmParserError) -> UInt8 {
-        try consume(Set([expected]))
-    }
-
     @usableFromInline
     func hasReachedEnd() throws(WasmParserError) -> Bool {
         try peek() == nil
@@ -39,25 +34,6 @@ public final class StaticByteStream: ByteStream {
         }
 
         let consumed = bytes[currentIndex]
-        currentIndex = bytes.index(after: currentIndex)
-        return consumed
-    }
-
-    @discardableResult
-    public func consume(_ expected: Set<UInt8>) throws(WasmParserError) -> UInt8 {
-        guard bytes.indices.contains(currentIndex) else {
-            throw WasmParserError(kind: .parserUnexpectedEnd(expected: Set(expected)), offset: currentIndex)
-        }
-
-        let consumed = bytes[currentIndex]
-        guard expected.contains(consumed) else {
-            throw WasmParserError(
-                kind: .parserUnexpectedByte(
-                    consumed,
-                    expected: Set(expected)
-                ), offset: currentIndex)
-        }
-
         currentIndex = bytes.index(after: currentIndex)
         return consumed
     }
