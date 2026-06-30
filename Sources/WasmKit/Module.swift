@@ -209,7 +209,8 @@ public struct Module {
         }
 
         // Step 16.
-        for case .active(let data) in data {
+        for (dataIndex, dataSegment) in data.enumerated() {
+            guard case .active(let data) = dataSegment else { continue }
             let memory = try instance.memories[validating: Int(data.index)]
             let offsetValue = try data.offset.evaluate(
                 context: constEvalContext,
@@ -222,6 +223,12 @@ public struct Module {
                     )
                 }
                 try memory.write(offset: Int(offset), bytes: data.initializer)
+                store.engine.interceptor?.onDataSegmentInitialized(
+                    segment: UInt32(dataIndex),
+                    sourceOffset: 0,
+                    destinationOffset: offset,
+                    length: UInt64(data.initializer.count)
+                )
             }
         }
 

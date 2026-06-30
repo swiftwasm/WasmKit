@@ -30,6 +30,15 @@ struct Run: AsyncParsableCommand {
     )
     var profileOutput: String?
 
+    @Option(
+        name: .customLong("trace-output"),
+        help: ArgumentHelp(
+            "Output a runtime usage trace as JSON",
+            valueName: "path"
+        )
+    )
+    var traceOutput: String?
+
     @Flag(
         inversion: .prefixedEnableDisable,
         help: "Enable or disable Signpost logging (macOS only)"
@@ -206,6 +215,21 @@ struct Run: AsyncParsableCommand {
                 profiler.finalize()
                 try! fileHandle.close()
                 print("\nProfile Completed: \(outputPath) can be viewed using https://ui.perfetto.dev/")
+            }
+        }
+        if let outputPath = self.traceOutput {
+            let traceRecorder = WasmExecutionTraceRecorder()
+            interceptors.append(traceRecorder)
+            finalizers.append {
+                let fileHandle = try! FileDescriptor.open(
+                    FilePath(outputPath), .writeOnly, options: [.create, .truncate],
+                    permissions: [.ownerReadWrite, .groupRead, .otherRead]
+                )
+                defer { try! fileHandle.close() }
+
+                var trace = traceRecorder.snapshot().jsonString + "\n"
+                _ = trace.withUTF8 { try! fileHandle.writeAll($0) }
+                print("Trace Completed: \(outputPath)")
             }
         }
         // If no interceptors are present, return nil explicitly

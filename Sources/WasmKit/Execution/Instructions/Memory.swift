@@ -14,6 +14,7 @@ extension Execution {
             let address = loadOperand.offset + i
             let loaded = md.unsafelyUnwrapped.loadUnaligned(fromByteOffset: Int(address), as: T.self)
             sp[loadOperand.result] = castToValue(loaded)
+            store.value.engine.interceptor?.onMemoryRead(memory: 0, offset: address, length: length)
         } else {
             try throwOutOfBoundsMemoryAccess()
         }
@@ -30,6 +31,7 @@ extension Execution {
             let toStore = castFromValue(value)
             md.unsafelyUnwrapped.advanced(by: Int(address))
                 .bindMemory(to: T.self, capacity: 1).pointee = toStore.littleEndian
+            store.value.engine.interceptor?.onMemoryWrite(memory: 0, offset: address, length: length)
         } else {
             try throwOutOfBoundsMemoryAccess()
         }
@@ -65,6 +67,12 @@ extension Execution {
             let source = sp[immediate.sourceOffset].i32
             let destination = sp[immediate.destOffset].asAddressOffset(memory.limit.isMemory64)
             try memory.initialize(segment, from: source, to: destination, count: size)
+            store.value.engine.interceptor?.onDataSegmentInitialized(
+                segment: immediate.segmentIndex,
+                sourceOffset: UInt64(source),
+                destinationOffset: destination,
+                length: UInt64(size)
+            )
         }
     }
     mutating func memoryDataDrop(sp: Sp, immediate: Instruction.MemoryDataDropOperand) {

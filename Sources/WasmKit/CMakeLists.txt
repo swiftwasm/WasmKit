@@ -23,6 +23,7 @@ add_wasmkit_library(WasmKit
   Execution/EngineInterceptor.swift
   Execution/Errors.swift
   Execution/Execution.swift
+  Execution/ExecutionTrace.swift
   Execution/Function.swift
   Execution/Instances.swift
   Execution/IO.swift
