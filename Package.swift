@@ -209,7 +209,14 @@ let package = Package(
             ],
             swiftSettings: swiftSettings
         ),
-        .testTarget(name: "WITTests", dependencies: ["WIT"], swiftSettings: swiftSettings),
+        .testTarget(
+            name: "WITTests",
+            dependencies: [
+                "WIT",
+                .target(name: "WasmTools", condition: .when(traits: ["ComponentModel"])),
+            ],
+            swiftSettings: swiftSettings
+        ),
 
         .target(
             name: "WAVE",
