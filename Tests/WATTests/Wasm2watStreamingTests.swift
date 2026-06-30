@@ -11,7 +11,7 @@ struct Wasm2watStreamingTests {
         let bytes = try #require(info.codeSectionBytes)
         #expect(bytes.count > 0)
         // Verify a streaming parse over the captured slice yields the expected count.
-        var p = WasmParser.Parser(sectionBodyBytes: bytes, features: info.features)
+        let p = WasmParser.Parser(sectionBodyBytes: bytes, features: info.features)
         let count: UInt32 = try p.parseUnsigned()
         #expect(count == 3)
     }

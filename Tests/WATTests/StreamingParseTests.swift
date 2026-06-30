@@ -25,10 +25,10 @@ struct StreamingParseTests {
         let binary = try wat2wasm(wat)
         let sectionBytes = try Self.sectionBytes(kind: .code, in: binary)
 
-        var p1 = WasmParser.Parser(sectionBodyBytes: sectionBytes)
+        let p1 = WasmParser.Parser(sectionBodyBytes: sectionBytes)
         let viaVector = try p1.parseCodeSection()
 
-        var p2 = WasmParser.Parser(sectionBodyBytes: sectionBytes)
+        let p2 = WasmParser.Parser(sectionBodyBytes: sectionBytes)
         let count: UInt32 = try p2.parseUnsigned()
         var viaEntry: [Code] = []
         for _ in 0..<count { viaEntry.append(try p2.parseCodeEntry()) }

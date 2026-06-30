@@ -57,7 +57,7 @@ struct Wasm2watTests {
         #expect(info.functionTypeIndices.count == 1)
         // Code is now stored as a raw slice; parse one entry to verify it.
         let codeBytes = try #require(info.codeSectionBytes)
-        var parser = WasmParser.Parser(sectionBodyBytes: codeBytes)
+        let parser = WasmParser.Parser(sectionBodyBytes: codeBytes)
         let count: UInt32 = try parser.parseUnsigned()
         #expect(count == 1)
         let code = try parser.parseCodeEntry()

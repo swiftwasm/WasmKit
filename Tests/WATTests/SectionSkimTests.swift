@@ -39,7 +39,7 @@ struct SectionSkimTests {
         do {
             _ = try parser.parseNextRawSection()
             Issue.record("Expected malformedSectionID throw")
-        } catch let error as WasmParserError {
+        } catch let error {
             guard case .message(let m) = error.kind, m.text.contains("malformed section id: 99") else {
                 Issue.record("Wrong error: \(error)")
                 return
@@ -59,7 +59,7 @@ struct SectionSkimTests {
         do {
             _ = try parser.parseNextRawSection()
             Issue.record("Expected sectionOrder throw")
-        } catch let error as WasmParserError {
+        } catch let error {
             guard case .message(let m) = error.kind, m.text == "Sections in the module are out of order" else {
                 Issue.record("Wrong error: \(error)")
                 return
@@ -94,7 +94,7 @@ struct SectionSkimTests {
         let section = try parser.parseNextRawSection()
         #expect(section?.kind == .type)
         #expect(section?.body.count == 0)
-        var sub = WasmParser.Parser(sectionBodyBytes: section!.body)
+        let sub = WasmParser.Parser(sectionBodyBytes: section!.body)
         #expect(throws: WasmParserError.self) { let _: UInt32 = try sub.parseUnsigned() }
     }
 
@@ -112,7 +112,7 @@ struct SectionSkimTests {
         do {
             _ = try parser.parseNextRawSection()
             Issue.record("Expected sectionSizeMismatch throw")
-        } catch let error as WasmParserError {
+        } catch let error {
             guard case .message(let m) = error.kind,
                 m.text.contains("Section size mismatch")
             else {
@@ -146,7 +146,7 @@ struct SectionSkimTests {
         do {
             _ = try parser.parseNextRawSection()
             Issue.record("Expected malformedSectionID throw without EH feature")
-        } catch let error as WasmParserError {
+        } catch let error {
             guard case .message(let m) = error.kind, m.text.contains("malformed section id: 13") else {
                 Issue.record("Wrong error: \(error)")
                 return
