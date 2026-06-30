@@ -1538,7 +1538,7 @@ final class WASIImplementation: Sendable {
             }
             return fileEntry
         }
-        return try fileEntry.datasync()
+        try fileEntry.datasync()
     }
 
     /// Get the attributes of a file descriptor.
@@ -1599,7 +1599,7 @@ final class WASIImplementation: Sendable {
             }
             return entry
         }
-        return try entry.setFilestatSize(size)
+        try entry.setFilestatSize(size)
     }
 
     /// Adjust the timestamps of an open file or directory.
@@ -1793,7 +1793,7 @@ final class WASIImplementation: Sendable {
             }
             return fileEntry
         }
-        return try fileEntry.sync()
+        try fileEntry.sync()
     }
 
     /// Return the current offset of a file descriptor.
