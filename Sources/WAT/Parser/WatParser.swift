@@ -499,8 +499,11 @@ struct WatParser {
                 offset = .source(parser.lexer)
                 try parser.skipParenBlock()
             } else if try parser.peek(.leftParen) != nil {
-                try parser.consume()  // consume (
+                // Abbreviated offset given as a bare folded instruction, e.g. `(data (i32.const 0) "a")`.
+                // Capture the lexer at the `(`, not after it, so the offset parses as a folded instruction
+                // flattened to post-order; consuming the `(` first would emit the operator before its operands.
                 offset = .source(parser.lexer)
+                try parser.consume()  // consume (
                 try parser.skipParenBlock()  // skip offset expr
             }
             let data = try dataString()
