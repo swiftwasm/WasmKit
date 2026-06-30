@@ -1,3 +1,4 @@
+import Synchronization
 import WasmParser
 
 /// A simple bump allocator for a single type.
@@ -157,41 +158,50 @@ extension ImmutableArray: Sequence {
 /// Used for efficient equality comparison.
 protocol Internable {
     /// Storage representation of an interned value.
-    associatedtype Offset: UnsignedInteger
+    associatedtype Offset: UnsignedInteger & Sendable
 }
 
 /// An interned value of type `T`.
 /// Two interned values should be equal if their corresponding `T` values are equal.
-struct Interned<T: Internable>: Equatable, Hashable {
+struct Interned<T: Internable>: Equatable, Hashable, Sendable {
     let id: T.Offset
 }
 
 /// A deduplicating interner for values of type `Item`.
-class Interner<Item: Hashable & Internable> {
-    private var itemByIntern: [Item]
-    private var internByItem: [Item: Interned<Item>]
+///
+/// Thread-safe: all access is serialized by an internal `Mutex`.
+final class Interner<Item: Hashable & Internable & Sendable>: Sendable {
+    private struct State {
+        var itemByIntern: [Item]
+        var internByItem: [Item: Interned<Item>]
+    }
+
+    private let state: Mutex<State>
 
     init() {
-        itemByIntern = []
-        internByItem = [:]
+        state = Mutex(State(itemByIntern: [], internByItem: [:]))
     }
 
     /// Interns the given `item` and returns an interned value.
     /// If the item is already interned, returns the existing interned value.
     func intern(_ item: Item) -> Interned<Item> {
-        if let interned = internByItem[item] {
-            return interned
+        state.withLock { state in
+            if let interned = state.internByItem[item] {
+                return interned
+            }
+            let id = state.itemByIntern.count
+            state.itemByIntern.append(item)
+            let newInterned = Interned<Item>(id: Item.Offset(id))
+            state.internByItem[item] = newInterned
+            return newInterned
         }
-        let id = itemByIntern.count
-        itemByIntern.append(item)
-        let newInterned = Interned<Item>(id: Item.Offset(id))
-        internByItem[item] = newInterned
-        return newInterned
     }
 
     /// Resolves the given `interned` value to the original value.
     func resolve(_ interned: Interned<Item>) -> Item {
-        return itemByIntern[Int(interned.id)]
+        state.withLock { state in
+            state.itemByIntern[Int(interned.id)]
+        }
     }
 }
 
@@ -211,6 +221,7 @@ class StoreAllocator {
     private var hostFunctions: BumpAllocator<HostFunctionEntity>
     private var tables: BumpAllocator<TableEntity>
     private var memories: BumpAllocator<MemoryEntity>
+    private var sharedMemoryStorages: BumpAllocator<SharedMemoryStorage>
     private var globals: BumpAllocator<GlobalEntity>
     private var tags: BumpAllocator<TagEntity>
     private var elements: BumpAllocator<ElementSegmentEntity>
@@ -234,6 +245,7 @@ class StoreAllocator {
         codes = BumpAllocator(initialCapacity: 64)
         tables = BumpAllocator(initialCapacity: 2)
         memories = BumpAllocator(initialCapacity: 2)
+        sharedMemoryStorages = BumpAllocator(initialCapacity: 1)
         globals = BumpAllocator(initialCapacity: 256)
         tags = BumpAllocator(initialCapacity: 2)
         elements = BumpAllocator(initialCapacity: 2)
@@ -268,7 +280,6 @@ extension StoreAllocator {
     ) throws -> InternalInstance {
         // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
 
-        let types = module.types
         var importedFunctions: [InternalFunction] = []
         var importedTables: [InternalTable] = []
         var importedMemories: [InternalMemory] = []
@@ -350,6 +361,35 @@ extension StoreAllocator {
             }
         }
 
+        return try allocateCore(
+            module: module, engine: engine, resourceLimiter: resourceLimiter,
+            importedFunctions: importedFunctions, importedTables: importedTables,
+            importedMemories: importedMemories, importedGlobals: importedGlobals,
+            importedTags: importedTags,
+            isDebuggable: isDebuggable
+        )
+    }
+
+    /// Shared core of module allocation: entity allocation, const eval,
+    /// element/data segments, exports, and InstanceEntity construction.
+    ///
+    /// - Parameters:
+    ///   - localMemoryResolver: Optional override for allocating each local
+    ///     memory. When `nil`, local memories are allocated fresh.
+    private func allocateCore(
+        module: Module,
+        engine: Engine,
+        resourceLimiter: any ResourceLimiter,
+        importedFunctions: [InternalFunction],
+        importedTables: [InternalTable],
+        importedMemories: [InternalMemory],
+        importedGlobals: [InternalGlobal],
+        importedTags: [InternalTag],
+        isDebuggable: Bool,
+        localMemoryResolver: ((_ memoryIndex: Int, _ memoryType: MemoryType) throws -> InternalMemory)? = nil
+    ) throws -> InternalInstance {
+        let types = module.types
+
         func allocateEntities<EntityHandle, Internals: Collection>(
             imports: [EntityHandle],
             internals: Internals, allocateHandle: (Internals.Element, Int) throws -> EntityHandle
@@ -397,11 +437,20 @@ extension StoreAllocator {
         )
 
         // Step 4.
-        let memories = try allocateEntities(
-            imports: importedMemories,
-            internals: module.internalMemories,
-            allocateHandle: { m, _ in try allocate(memoryType: m, engineConfiguration: engine.configuration, resourceLimiter: resourceLimiter) }
-        )
+        let memories: ImmutableArray<InternalMemory>
+        if let resolver = localMemoryResolver {
+            memories = try allocateEntities(
+                imports: importedMemories,
+                internals: module.internalMemories,
+                allocateHandle: { m, absoluteIndex in try resolver(absoluteIndex, m) }
+            )
+        } else {
+            memories = try allocateEntities(
+                imports: importedMemories,
+                internals: module.internalMemories,
+                allocateHandle: { m, _ in try allocate(memoryType: m, engineConfiguration: engine.configuration, resourceLimiter: resourceLimiter) }
+            )
+        }
 
         var functionRefs: Set<InternalFunction> = []
         // Step 5.
@@ -558,7 +607,32 @@ extension StoreAllocator {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-mem>
     func allocate(memoryType: MemoryType, engineConfiguration: EngineConfiguration, resourceLimiter: any ResourceLimiter) throws -> InternalMemory {
-        let pointer = try memories.allocate(initializing: MemoryEntity(memoryType, engineConfiguration: engineConfiguration, resourceLimiter: resourceLimiter))
+        if memoryType.shared {
+            let storage = try SharedMemoryStorage(
+                memoryType: memoryType, engineConfiguration: engineConfiguration,
+                resourceLimiter: resourceLimiter)
+            let storagePointer = sharedMemoryStorages.allocate(initializing: storage)
+            let sharedHandle = SharedMemoryEntity(unsafe: storagePointer)
+            let pointer = memories.allocate(
+                initializing: MemoryEntity(memoryType, sharedStorage: sharedHandle)
+            )
+            return InternalMemory(unsafe: pointer)
+        } else {
+            let pointer = try memories.allocate(
+                initializing: MemoryEntity(memoryType, engineConfiguration: engineConfiguration, resourceLimiter: resourceLimiter)
+            )
+            return InternalMemory(unsafe: pointer)
+        }
+    }
+
+    /// Allocate a memory entity wrapping an existing shared memory storage.
+    ///
+    /// Used by `wasi_thread_spawn` to provide the same shared memory as an
+    /// import to child Store instances.
+    func allocate(memoryType: MemoryType, sharedStorage: SharedMemoryEntity) -> InternalMemory {
+        let pointer = memories.allocate(
+            initializing: MemoryEntity(memoryType, sharedStorage: sharedStorage)
+        )
         return InternalMemory(unsafe: pointer)
     }
 

@@ -513,7 +513,13 @@ extension Execution {
             var pc = pc
             var md = md
             var ms = ms
-            let shouldUseMprotectTrapGuards = store.value.engine.configuration.memoryBoundsChecking == .mprotect
+            // Shared memory always uses software bounds checking. A guard-page fault
+            // recovered by siglongjmp would unwind the interpreter past a lock held by a
+            // concurrent grow or atomic operation, so the multi-threaded path must stay
+            // free of non-local jumps. mprotect guards are reserved for non-shared memory.
+            let isNonSharedMemory = sp.currentInstance?.memories.first?.withValue { $0.sharedStorage == nil } ?? true
+            let shouldUseMprotectTrapGuards =
+                store.value.engine.configuration.memoryBoundsChecking == .mprotect && isNonSharedMemory
             let storeValue = store.value
             while true {
                 let handler = pc.read(wasmkit_tc_exec.self)
