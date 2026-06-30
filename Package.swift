@@ -38,7 +38,8 @@ let package = Package(
         .library(name: "_CabiShims", targets: ["_CabiShims"]),
     ],
     traits: [
-        .default(enabledTraits: []),
+        .default(enabledTraits: ["FileSystem"]),
+        "FileSystem",
         "ComponentModel",
         "WasmDebuggingSupport",
     ],
@@ -112,7 +113,10 @@ let package = Package(
             name: "WasmParser",
             dependencies: [
                 "WasmTypes",
-                .product(name: "SystemPackage", package: "swift-system"),
+                .product(
+                    name: "SystemPackage", package: "swift-system",
+                    condition: .when(traits: ["FileSystem"])
+                ),
                 .target(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])

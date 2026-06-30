@@ -3,6 +3,7 @@ add_wasmkit_library(WasmKit
   Imports.swift
   Module.swift
   ModuleParser.swift
+  ModuleParser+FileSystem.swift
   SIMDOpcode.swift
   Translator.swift
   Validator.swift
@@ -46,6 +47,11 @@ add_wasmkit_library(WasmKit
   Execution/Value.swift
   Execution/V128Storage.swift
 )
+
+if(WASMKIT_ENABLE_FILESYSTEM)
+  target_compile_options(WasmKit PRIVATE
+    $<$<COMPILE_LANGUAGE:Swift>:-D;FileSystem>)
+endif()
 
 target_link_wasmkit_libraries(WasmKit PUBLIC
   _CWasmKit WasmParser SystemExtras WasmTypes SystemPackage)

@@ -11,4 +11,12 @@ add_wasmkit_library(WasmParser
 )
 
 target_link_wasmkit_libraries(WasmParser PUBLIC
-  SystemExtras WasmTypes SystemPackage)
+  WasmTypes)
+
+if(WASMKIT_ENABLE_FILESYSTEM)
+  target_compile_options(WasmParser PRIVATE
+    $<$<COMPILE_LANGUAGE:Swift>:-D;FileSystem>)
+  target_link_wasmkit_libraries(WasmParser PUBLIC
+    SystemPackage)
+endif()
+
