@@ -222,6 +222,9 @@ public enum WastExpectValue {
     /// A value that is expected to be an arithmetic NaN.
     /// Corresponds to `f64.const nan:arithmetic` in WAST.
     case f64ArithmeticNaN
+    /// A relaxed-SIMD non-deterministic expectation: the result matches if it equals any candidate.
+    /// Corresponds to `(either <result>…)` in WAST.
+    indirect case either([WastExpectValue])
 }
 
 /// A directive in a WAST script.

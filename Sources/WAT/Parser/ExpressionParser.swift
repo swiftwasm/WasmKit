@@ -156,6 +156,16 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
             return nil
         }
 
+        // Relaxed-SIMD `(either <result>…)`: a non-deterministic expectation matching any candidate.
+        if try parser.takeParenBlockStart("either") {
+            var candidates: [WastExpectValue] = []
+            while let candidate = try parseWastExpectValue() {
+                candidates.append(candidate)
+            }
+            try parser.expect(.rightParen)
+            return .either(candidates)
+        }
+
         if try parser.takeParenBlockStart("v128.const") {
             func appendLittleEndianBytes<T: FixedWidthInteger>(_ value: T, into bytes: inout [UInt8]) {
                 var value = value
