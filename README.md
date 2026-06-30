@@ -106,7 +106,7 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | [Extended Constant Expressions](https://github.com/WebAssembly/extended-const) | ❌ Not implemented | |
 | [Garbage Collection](https://github.com/WebAssembly/gc) | ❌ Not implemented | |
 | [Multiple Memories](https://github.com/WebAssembly/multi-memory) | ❌ Not implemented | |
-| [Relaxed SIMD](https://github.com/WebAssembly/relaxed-simd) | ❌ Not implemented | |
+| [Relaxed SIMD](https://github.com/WebAssembly/relaxed-simd) | ✅ Implemented | `main` branch |
 
 [0.0.2]: https://github.com/swiftwasm/WasmKit/releases/tag/0.0.2
 [0.1.4]: https://github.com/swiftwasm/WasmKit/releases/tag/0.1.4
