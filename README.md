@@ -103,7 +103,7 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | [Typed Function References](https://github.com/WebAssembly/function-references) | 🚧 Parser implemented | [0.2.0] |
 | [Branch Hinting](https://github.com/WebAssembly/branch-hinting) | ❌ Not implemented | |
 | [Custom Annotation Syntax in the Text Format](https://github.com/WebAssembly/annotations) | ❌ Not implemented | |
-| [Extended Constant Expressions](https://github.com/WebAssembly/extended-const) | ❌ Not implemented | |
+| [Extended Constant Expressions](https://github.com/WebAssembly/extended-const) | ✅ Implemented | `main` branch |
 | [Garbage Collection](https://github.com/WebAssembly/gc) | ❌ Not implemented | |
 | [Multiple Memories](https://github.com/WebAssembly/multi-memory) | ❌ Not implemented | |
 | [Relaxed SIMD](https://github.com/WebAssembly/relaxed-simd) | ❌ Not implemented | |
