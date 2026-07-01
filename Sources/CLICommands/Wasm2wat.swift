@@ -1,4 +1,5 @@
 import ArgumentParser
+import SystemExtras
 import SystemPackage
 import WAT
 import WasmParser
@@ -26,24 +27,29 @@ package struct Wasm2wat: ParsableCommand {
     package func run() throws {
         let filePath = FilePath(path)
         let fileHandle = try FileDescriptor.open(filePath, .readOnly)
-        defer { try? fileHandle.close() }
+        try withThrowing {
+            let stream = try FileHandleStream(fileHandle: fileHandle)
 
-        let stream = try FileHandleStream(fileHandle: fileHandle)
+            let wat = try wasm2wat(stream)
 
-        let wat = try wasm2wat(stream)
-
-        if let outputPath = output {
-            let outPath = FilePath(outputPath)
-            let outHandle = try FileDescriptor.open(
-                outPath,
-                .writeOnly,
-                options: [.create, .truncate],
-                permissions: [.ownerReadWrite, .groupRead, .otherRead]
-            )
-            defer { try? outHandle.close() }
-            try outHandle.writeAll(Array(wat.utf8))
-        } else {
-            print(wat)
+            if let outputPath = output {
+                let outPath = FilePath(outputPath)
+                let outHandle = try FileDescriptor.open(
+                    outPath,
+                    .writeOnly,
+                    options: [.create, .truncate],
+                    permissions: [.ownerReadWrite, .groupRead, .otherRead]
+                )
+                try withThrowing {
+                    try outHandle.writeAll(Array(wat.utf8))
+                } defer: {
+                    try outHandle.close()
+                }
+            } else {
+                print(wat)
+            }
+        } defer: {
+            try fileHandle.close()
         }
     }
 }
