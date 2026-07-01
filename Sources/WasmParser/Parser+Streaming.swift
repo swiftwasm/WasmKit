@@ -38,23 +38,24 @@ extension Parser {
     /// active-into-explicit-memory-index.
     @usableFromInline
     package mutating func parseDataSegmentEntry() throws(WasmParserError) -> DataSegment {
-        let kind: UInt32 = try parseUnsigned()
+        let rawKind: UInt32 = try parseUnsigned()
+        guard let kind = DataSegment.Kind(rawValue: rawKind) else {
+            throw makeError(.malformedDataSegmentKind(rawKind))
+        }
         switch kind {
-        case 0:
+        case .activeDefaultMemory:
             let offset = try parseConstExpression()
             let initializer = try parseVectorBytes()
             return .active(.init(index: 0, offset: offset, initializer: initializer))
 
-        case 1:
+        case .passive:
             return try .passive(parseVectorBytes())
 
-        case 2:
+        case .activeExplicitMemory:
             let index: UInt32 = try parseUnsigned()
             let offset = try parseConstExpression()
             let initializer = try parseVectorBytes()
             return .active(.init(index: index, offset: offset, initializer: initializer))
-        default:
-            throw makeError(.malformedDataSegmentKind(kind))
         }
     }
 

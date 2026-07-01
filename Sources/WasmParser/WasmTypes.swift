@@ -273,6 +273,16 @@ public struct ElementSegment: Equatable, Sendable {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#data-segments>
 public enum DataSegment: Equatable, Sendable {
+    /// Binary-format kind of a data segment: the leading `u32` flag. The raw
+    /// value matches the binary encoding.
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#data-section>
+    @usableFromInline
+    enum Kind: UInt32, Sendable {
+        case activeDefaultMemory = 0
+        case passive = 1
+        case activeExplicitMemory = 2
+    }
+
     public struct Active: Equatable, Sendable {
         public let index: UInt32
         public let offset: ConstExpression

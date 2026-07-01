@@ -84,4 +84,16 @@ struct StreamingParseTests {
 
         #expect(viaVector == viaEntry)
     }
+
+    @Test func dataSegmentRejectsUnknownKind() throws {
+        var parser = WasmParser.Parser(sectionBodyBytes: [0x03])
+        let error = try #require(throws: WasmParserError.self) {
+            _ = try parser.parseDataSegmentEntry()
+        }
+        guard case .message(let message) = error.kind else {
+            Issue.record("Expected a .message error, got \(error.kind)")
+            return
+        }
+        #expect(message.text == "Malformed data segment kind: 3")
+    }
 }
