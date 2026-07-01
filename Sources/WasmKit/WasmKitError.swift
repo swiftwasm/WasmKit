@@ -245,6 +245,10 @@ extension WasmKitError.Message {
         Self("expect `end` at the end of offset expression")
     }
 
+    static func invalidConstExpressionArity(count: Int) -> Self {
+        Self("constant expression must produce exactly one value, but produced \(count)")
+    }
+
     static func illegalConstExpressionInstruction(_ constInst: WasmParser.Instruction) -> Self {
         Self("illegal const expression instruction: \(constInst)")
     }

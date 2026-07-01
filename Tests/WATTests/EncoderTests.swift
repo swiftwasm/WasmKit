@@ -13,6 +13,7 @@ struct EncoderTests {
         "--enable-memory64",
         "--enable-tail-call",
         "--enable-threads",
+        "--enable-extended-const",
     ]
 
     // MARK: - Supporting Types

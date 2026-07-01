@@ -16,6 +16,7 @@ struct SpectestTests {
             Self.testsuite.appendingPathComponent("proposals/tail-call").path,
             Self.testsuite.appendingPathComponent("proposals/threads").path,
             Self.testsuite.appendingPathComponent("proposals/exception-handling").path,
+            Self.testsuite.appendingPathComponent("proposals/extended-const").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite").path,
         ]
     }
