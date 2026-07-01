@@ -107,6 +107,21 @@ struct TextInstructionVisitor: AnyInstructionVisitor {
         case .typedSelect(let t):
             emit("select (result \(valueTypeName(t)))")
 
+        // ── Exception handling ─────────────────────────────────────────────────
+        case .throw(let tagIndex):
+            emit("throw \(tagIndex)")
+        case .throwRef:
+            emit("throw_ref")
+        case .tryTable(let blockType, let tryCatch):
+            let label = "try_\(labelStack.count)"
+            // Format clauses before pushing the label: catch labels resolve in the
+            // enclosing scope (inverse of ExpressionParser.visitTryTable).
+            let clauses = tryCatch.catches.map { catchClauseText($0) }
+            let clausesSuffix = clauses.isEmpty ? "" : " " + clauses.joined(separator: " ")
+            emit("try_table $\(label)\(blockTypeSuffix(blockType))\(clausesSuffix)")
+            labelStack.append(label)
+            indentLevel += 1
+
         // ── Variables ────────────────────────────────────────────────────────
         case .localGet(let i):
             emit("local.get \(localRef(i))")
@@ -229,6 +244,19 @@ struct TextInstructionVisitor: AnyInstructionVisitor {
             return "$\(labelStack[stackIdx])"
         }
         return "\(relativeDepth)"
+    }
+
+    private func catchClauseText(_ clause: CatchClause) -> String {
+        switch clause {
+        case .catch(let tagIndex, let labelIndex):
+            return "(catch \(tagIndex) \(labelText(labelIndex)))"
+        case .catchRef(let tagIndex, let labelIndex):
+            return "(catch_ref \(tagIndex) \(labelText(labelIndex)))"
+        case .catchAll(let labelIndex):
+            return "(catch_all \(labelText(labelIndex)))"
+        case .catchAllRef(let labelIndex):
+            return "(catch_all_ref \(labelText(labelIndex)))"
+        }
     }
 
     // MARK: - Name helpers
