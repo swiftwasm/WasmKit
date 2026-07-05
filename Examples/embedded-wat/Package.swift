@@ -8,11 +8,13 @@ let package = Package(
         .package(path: "../../", traits: [])
     ],
     targets: [
+        .target(name: "CEmbeddedShims"),
         .executableTarget(
             name: "embedded-wat",
             dependencies: [
-                .product(name: "WAT", package: "WasmKit")
+                .product(name: "WAT", package: "WasmKit"),
+                "CEmbeddedShims",
             ]
-        )
+        ),
     ]
 )

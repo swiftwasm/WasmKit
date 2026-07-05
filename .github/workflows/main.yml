@@ -103,6 +103,15 @@ jobs:
           EOS
       - run: ./Vendor/checkout-dependency --category default --category component-model
       - run: swift test ${{ matrix.test-args }}
+      - name: Build embedded-wat example with Embedded Swift
+        run: |
+          swift_bin="${{ steps.setup-development.outputs.toolchain-path }}/usr/bin/swift"
+          embedded_lib_dir="${{ steps.setup-development.outputs.toolchain-path }}/usr/lib/swift/embedded/$(uname -m)-apple-macos"
+          unicode_lib=$(find "$embedded_lib_dir" -name libswiftUnicodeDataTables.a | head -1)
+          test -n "$unicode_lib" || { echo "::error::libswiftUnicodeDataTables.a not found under $embedded_lib_dir"; exit 1; }
+          "$swift_bin" build --package-path Examples/embedded-wat \
+            -Xswiftc -enable-experimental-feature -Xswiftc Embedded \
+            -Xlinker "$unicode_lib"
 
   build-xcode:
     runs-on: macos-26
@@ -298,3 +307,9 @@ jobs:
         run: swift sdk install https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz --checksum cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
       - name: Build with the Swift SDK
         run: swift build --swift-sdk "$(swiftc -print-target-info | jq -r '.swiftCompilerTag')_wasm" --traits FileSystem,ComponentModel --explicit-target-dependency-import-check error --product wasmkit-cli
+      - name: Build embedded-wat example with Embedded Swift
+        run: |
+          sdk="$(swiftc -print-target-info | jq -r '.swiftCompilerTag')_wasm-embedded"
+          unicode_lib=$(find "$HOME/.swiftpm/swift-sdks" -name libswiftUnicodeDataTables.a -path '*/embedded/wasm32-unknown-wasip1/*' | head -1)
+          test -n "$unicode_lib" || { echo "::error::libswiftUnicodeDataTables.a not found in installed wasm SDK"; exit 1; }
+          swift build --package-path Examples/embedded-wat --swift-sdk "$sdk" -Xlinker "$unicode_lib"
