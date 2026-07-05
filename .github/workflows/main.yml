@@ -310,6 +310,7 @@ jobs:
       - name: Build embedded-wat example with Embedded Swift
         run: |
           sdk="$(swiftc -print-target-info | jq -r '.swiftCompilerTag')_wasm-embedded"
-          unicode_lib=$(find "$HOME/.swiftpm/swift-sdks" -name libswiftUnicodeDataTables.a -path '*/embedded/wasm32-unknown-wasip1/*' | head -1)
-          test -n "$unicode_lib" || { echo "::error::libswiftUnicodeDataTables.a not found in installed wasm SDK"; exit 1; }
+          swift_resources=$(swift sdk configure --show-configuration "$sdk" wasm32-unknown-wasip1 | sed -n 's/^swiftResourcesPath: *//p')
+          unicode_lib="$swift_resources/embedded/wasm32-unknown-wasip1/libswiftUnicodeDataTables.a"
+          test -f "$unicode_lib" || { echo "::error::libswiftUnicodeDataTables.a not found at $unicode_lib"; exit 1; }
           swift build --package-path Examples/embedded-wat --swift-sdk "$sdk" -Xlinker "$unicode_lib"
