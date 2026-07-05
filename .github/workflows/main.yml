@@ -103,15 +103,17 @@ jobs:
           EOS
       - run: ./Vendor/checkout-dependency --category default --category component-model
       - run: swift test ${{ matrix.test-args }}
-      - name: Build embedded-wat example with Embedded Swift
+      - name: Build & smoke-test embedded-wat example with Embedded Swift
         run: |
           swift_bin="${{ steps.setup-development.outputs.toolchain-path }}/usr/bin/swift"
           embedded_lib_dir="${{ steps.setup-development.outputs.toolchain-path }}/usr/lib/swift/embedded/$(uname -m)-apple-macos"
           unicode_lib=$(find "$embedded_lib_dir" -name libswiftUnicodeDataTables.a | head -1)
           test -n "$unicode_lib" || { echo "::error::libswiftUnicodeDataTables.a not found under $embedded_lib_dir"; exit 1; }
-          "$swift_bin" build --package-path Examples/embedded-wat \
-            -Xswiftc -enable-experimental-feature -Xswiftc Embedded \
-            -Xlinker "$unicode_lib"
+          out=$(printf '%s' '(module (func (result f64) (f64.const 3.14)))' | \
+            "$swift_bin" run --package-path Examples/embedded-wat \
+              -Xswiftc -enable-experimental-feature -Xswiftc Embedded -Xlinker "$unicode_lib")
+          echo "$out" | tr '\n' ' ' | grep -qF '0x44 0x1f 0x85 0xeb 0x51 0xb8 0x1e 0x9 0x40' \
+            || { echo "::error::embedded-wat smoke test produced wrong output"; echo "$out"; exit 1; }
 
   build-xcode:
     runs-on: macos-26
@@ -307,10 +309,13 @@ jobs:
         run: swift sdk install https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz --checksum cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
       - name: Build with the Swift SDK
         run: swift build --swift-sdk "$(swiftc -print-target-info | jq -r '.swiftCompilerTag')_wasm" --traits FileSystem,ComponentModel --explicit-target-dependency-import-check error --product wasmkit-cli
-      - name: Build embedded-wat example with Embedded Swift
+      - name: Build & smoke-test embedded-wat example with Embedded Swift
         run: |
           sdk="$(swiftc -print-target-info | jq -r '.swiftCompilerTag')_wasm-embedded"
           swift_resources=$(swift sdk configure --show-configuration "$sdk" wasm32-unknown-wasip1 | sed -n 's/^swiftResourcesPath: *//p')
           unicode_lib="$swift_resources/embedded/wasm32-unknown-wasip1/libswiftUnicodeDataTables.a"
           test -f "$unicode_lib" || { echo "::error::libswiftUnicodeDataTables.a not found at $unicode_lib"; exit 1; }
-          swift build --package-path Examples/embedded-wat --swift-sdk "$sdk" -Xlinker "$unicode_lib"
+          out=$(printf '%s' '(module (func (result f64) (f64.const 3.14)))' | \
+            swift run --package-path Examples/embedded-wat --swift-sdk "$sdk" -Xlinker "$unicode_lib")
+          echo "$out" | tr '\n' ' ' | grep -qF '0x44 0x1f 0x85 0xeb 0x51 0xb8 0x1e 0x9 0x40' \
+            || { echo "::error::embedded-wat smoke test produced wrong output"; echo "$out"; exit 1; }
