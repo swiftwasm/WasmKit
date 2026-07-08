@@ -72,7 +72,7 @@ if(NOT SwiftSystem_FOUND)
   message("-- Vending SwiftSystem")
   FetchContent_Declare(SwiftSystem
     GIT_REPOSITORY https://github.com/apple/swift-system
-    GIT_TAG 1.5.0
+    GIT_TAG 1.7.2
   )
   FetchContent_MakeAvailable(SwiftSystem)
 endif()
