@@ -187,7 +187,7 @@ jobs:
         run: |
           ./build-exec apt-get update
           ./build-exec apt-get install -y libjemalloc-dev
-          ./build-exec swift package --build-system native --package-path Benchmarks benchmark
+          ./build-exec swift package --package-path Benchmarks benchmark
 
       - if: matrix.build-dev-dashboard
         run: ./build-exec ./CI/build-dev-dashboard.sh
