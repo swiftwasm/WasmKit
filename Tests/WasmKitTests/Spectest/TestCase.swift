@@ -157,7 +157,7 @@ extension TestCase {
                     handler(self, location, .failed("\(error)"))
                 }
             }
-        } catch let parseError as WatParserError {
+        } catch let parseError {
             if let location = parseError.location {
                 handler(self, location, .failed(parseError.message))
             } else {
