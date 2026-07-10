@@ -187,7 +187,7 @@ jobs:
         run: |
           ./build-exec apt-get update
           ./build-exec apt-get install -y libjemalloc-dev
-          ./build-exec swift package --build-system native --package-path Benchmarks benchmark
+          ./build-exec swift package --package-path Benchmarks benchmark
 
       - if: matrix.build-dev-dashboard
         run: ./build-exec ./CI/build-dev-dashboard.sh
@@ -220,8 +220,8 @@ jobs:
       matrix:
         include:
           - swift: 6.3-noble
-            musl-swift-sdk-download: "https://download.swift.org/swift-6.3.2-release/static-sdk/swift-6.3.2-RELEASE/swift-6.3.2-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz"
-            musl-swift-sdk-checksum: "3fd798bef6f4408f1ea5a6f94ce4d4052830c4326ab85ebc04f983f01b3da407"
+            musl-swift-sdk-download: "https://download.swift.org/swift-6.3.3-release/static-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz"
+            musl-swift-sdk-checksum: 87c3eaf908e67c0e13a84367119e12273cec1d2cd3d81f7d74bb36722d6b607b
     steps:
       - uses: actions/checkout@v6
       - name: Configure container
@@ -295,6 +295,6 @@ jobs:
       - name: Install jq
         run: apt-get update && apt-get install -y jq
       - name: Install Swift SDK
-        run: swift sdk install https://download.swift.org/swift-6.3.2-release/wasm-sdk/swift-6.3.2-RELEASE/swift-6.3.2-RELEASE_wasm.artifactbundle.tar.gz --checksum a61f0584c93283589f8b2f42db05c1f9a182b506c2957271402992655591dd7c
+        run: swift sdk install https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz --checksum cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
       - name: Build with the Swift SDK
         run: swift build --swift-sdk "$(swiftc -print-target-info | jq -r '.swiftCompilerTag')_wasm" --traits FileSystem,ComponentModel --explicit-target-dependency-import-check error --product wasmkit-cli

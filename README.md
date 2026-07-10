@@ -28,7 +28,7 @@ To use WasmKit in your package, add it as a [Swift Package Manager](https://www.
 Run the following commands in the same directory as your `Package.swift` manifest to add the dependency:
 
 ```
-swift package add-dependency https://github.com/swiftwasm/WasmKit --up-to-next-minor-from 0.3.0
+swift package add-dependency https://github.com/swiftwasm/WasmKit --up-to-next-minor-from 0.3.1
 swift package add-target-dependency WasmKit <your-package-target-name> --package WasmKit
 ```
 
@@ -37,7 +37,7 @@ You can also add the following snippet manually instead to your `Package.swift` 
 ```swift
 dependencies: [
     // ...other dependencies
-    .package(url: "https://github.com/swiftwasm/WasmKit.git", .upToNextMinor(from: "0.3.0")),
+    .package(url: "https://github.com/swiftwasm/WasmKit.git", .upToNextMinor(from: "0.3.1")),
 ],
 // ...other package configuration
 targets: [
@@ -63,7 +63,7 @@ targets: [
 
 ## Supported Platforms
 
-WasmKit engine works on all major platforms supported by Swift. It is continuously tested on macOS, Ubuntu, Amazon Linux 2, Android, and Windows,
+WasmKit engine works on all major platforms supported by Swift. It is continuously tested on macOS, Ubuntu, Amazon Linux 2023, Android, and Windows,
 and should work on the following platforms:
 
 - macOS 10.13+, iOS 12.0+, tvOS 12.0+, watchOS 6.0+
@@ -106,7 +106,7 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | [Extended Constant Expressions](https://github.com/WebAssembly/extended-const) | ✅ Implemented | `main` branch |
 | [Garbage Collection](https://github.com/WebAssembly/gc) | ❌ Not implemented | |
 | [Multiple Memories](https://github.com/WebAssembly/multi-memory) | ❌ Not implemented | |
-| [Relaxed SIMD](https://github.com/WebAssembly/relaxed-simd) | ❌ Not implemented | |
+| [Relaxed SIMD](https://github.com/WebAssembly/relaxed-simd) | ✅ Implemented | `main` branch |
 
 [0.0.2]: https://github.com/swiftwasm/WasmKit/releases/tag/0.0.2
 [0.1.4]: https://github.com/swiftwasm/WasmKit/releases/tag/0.1.4

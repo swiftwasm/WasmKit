@@ -204,32 +204,26 @@ enum SIMDOpcode: UInt16 {
     case i32x4TruncSatF32X4U = 199
     case f32x4ConvertI32X4S = 200
     case f32x4ConvertI32X4U = 201
-    case i8x16RelaxedSwizzle = 202
-    case i16x8RelaxedLaneselect = 203
-    case i32x4RelaxedLaneselect = 204
-    case i8x16RelaxedMinS = 205
-    case i8x16RelaxedMinU = 206
-    case i16x8RelaxedMinS = 207
-    case i16x8RelaxedMinU = 208
-    case i32x4RelaxedMinS = 209
-    case i32x4RelaxedMinU = 210
-    case i8x16RelaxedMaxS = 211
-    case i8x16RelaxedMaxU = 212
-    case i16x8RelaxedMaxS = 213
-    case i16x8RelaxedMaxU = 214
-    case i32x4RelaxedMaxS = 215
-    case i32x4RelaxedMaxU = 216
-    case f32x4RelaxedMin = 217
-    case f32x4RelaxedMax = 218
-    case f64x2RelaxedMin = 219
-    case f64x2RelaxedMax = 220
-    case i16x8RelaxedQ15mulrS = 221
-    case i16x8RelaxedDotI8x16I7x16S = 222
-    case i32x4RelaxedDotI8x16I7x16AddS = 223
-    case f32x4RelaxedMadd = 224
-    case f32x4RelaxedNmadd = 225
-    case f64x2RelaxedMadd = 226
-    case f64x2RelaxedNmadd = 227
+    case i8x16RelaxedSwizzle = 205
+    case i32x4RelaxedTruncF32X4S = 206
+    case i32x4RelaxedTruncF32X4U = 207
+    case i32x4RelaxedTruncF64X2SZero = 208
+    case i32x4RelaxedTruncF64X2UZero = 209
+    case f32x4RelaxedMadd = 210
+    case f32x4RelaxedNmadd = 211
+    case f64x2RelaxedMadd = 212
+    case f64x2RelaxedNmadd = 213
+    case i8x16RelaxedLaneselect = 214
+    case i16x8RelaxedLaneselect = 215
+    case i32x4RelaxedLaneselect = 216
+    case i64x2RelaxedLaneselect = 217
+    case f32x4RelaxedMin = 218
+    case f32x4RelaxedMax = 219
+    case f64x2RelaxedMin = 220
+    case f64x2RelaxedMax = 221
+    case i16x8RelaxedQ15MulrS = 222
+    case i16x8RelaxedDotI8X16I7X16S = 223
+    case i32x4RelaxedDotI8X16I7X16AddS = 224
     case i16x8ExtmulLowI8X16S = 228
     case i16x8ExtmulHighI8X16S = 229
     case i16x8ExtmulLowI8X16U = 230
@@ -491,6 +485,26 @@ extension SIMDOpcode {
         case .i16x8ExtaddPairwiseI8X16U: return .i16x8ExtaddPairwiseI8X16U
         case .i32x4ExtaddPairwiseI16X8S: return .i32x4ExtaddPairwiseI16X8S
         case .i32x4ExtaddPairwiseI16X8U: return .i32x4ExtaddPairwiseI16X8U
+        case .i8x16RelaxedSwizzle: return .i8x16RelaxedSwizzle
+        case .i32x4RelaxedTruncF32X4S: return .i32x4RelaxedTruncF32X4S
+        case .i32x4RelaxedTruncF32X4U: return .i32x4RelaxedTruncF32X4U
+        case .i32x4RelaxedTruncF64X2SZero: return .i32x4RelaxedTruncF64X2SZero
+        case .i32x4RelaxedTruncF64X2UZero: return .i32x4RelaxedTruncF64X2UZero
+        case .f32x4RelaxedMadd: return .f32x4RelaxedMadd
+        case .f32x4RelaxedNmadd: return .f32x4RelaxedNmadd
+        case .f64x2RelaxedMadd: return .f64x2RelaxedMadd
+        case .f64x2RelaxedNmadd: return .f64x2RelaxedNmadd
+        case .i8x16RelaxedLaneselect: return .i8x16RelaxedLaneselect
+        case .i16x8RelaxedLaneselect: return .i16x8RelaxedLaneselect
+        case .i32x4RelaxedLaneselect: return .i32x4RelaxedLaneselect
+        case .i64x2RelaxedLaneselect: return .i64x2RelaxedLaneselect
+        case .f32x4RelaxedMin: return .f32x4RelaxedMin
+        case .f32x4RelaxedMax: return .f32x4RelaxedMax
+        case .f64x2RelaxedMin: return .f64x2RelaxedMin
+        case .f64x2RelaxedMax: return .f64x2RelaxedMax
+        case .i16x8RelaxedQ15MulrS: return .i16x8RelaxedQ15MulrS
+        case .i16x8RelaxedDotI8X16I7X16S: return .i16x8RelaxedDotI8X16I7X16S
+        case .i32x4RelaxedDotI8X16I7X16AddS: return .i32x4RelaxedDotI8X16I7X16AddS
         }
     }
 

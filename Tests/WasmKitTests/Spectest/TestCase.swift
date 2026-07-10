@@ -503,6 +503,9 @@ extension Value {
             (.ref(.function(nil)), .refNull(.abstract(.funcRef))),
             (.ref(.exception(nil)), .refNull(.abstract(.exnRef))):
             return true
+        case (_, .either(let candidates)):
+            // Relaxed-SIMD non-determinism: match if the actual equals any candidate.
+            return candidates.contains { self.isTestEquivalent(to: $0) }
         default:
             return false
         }

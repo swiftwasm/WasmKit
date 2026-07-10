@@ -1020,6 +1020,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8Abs)
+            case 0x02:
+                return .simd(.i8x16RelaxedSwizzle)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1029,6 +1031,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8Neg)
+            case 0x02:
+                return .simd(.i32x4RelaxedTruncF32X4S)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1038,6 +1042,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8Q15MulrSatS)
+            case 0x02:
+                return .simd(.i32x4RelaxedTruncF32X4U)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1047,6 +1053,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8AllTrue)
+            case 0x02:
+                return .simd(.i32x4RelaxedTruncF64X2SZero)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1056,6 +1064,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8Bitmask)
+            case 0x02:
+                return .simd(.i32x4RelaxedTruncF64X2UZero)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1065,6 +1075,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8NarrowI32X4S)
+            case 0x02:
+                return .simd(.f32x4RelaxedMadd)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1074,6 +1086,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8NarrowI32X4U)
+            case 0x02:
+                return .simd(.f32x4RelaxedNmadd)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1083,6 +1097,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8ExtendLowI8X16S)
+            case 0x02:
+                return .simd(.f64x2RelaxedMadd)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1092,6 +1108,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8ExtendHighI8X16S)
+            case 0x02:
+                return .simd(.f64x2RelaxedNmadd)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1101,6 +1119,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8ExtendLowI8X16U)
+            case 0x02:
+                return .simd(.i8x16RelaxedLaneselect)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1110,6 +1130,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8ExtendHighI8X16U)
+            case 0x02:
+                return .simd(.i16x8RelaxedLaneselect)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1119,6 +1141,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8Shl)
+            case 0x02:
+                return .simd(.i32x4RelaxedLaneselect)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1128,6 +1152,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8ShrS)
+            case 0x02:
+                return .simd(.i64x2RelaxedLaneselect)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1137,6 +1163,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8ShrU)
+            case 0x02:
+                return .simd(.f32x4RelaxedMin)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1146,6 +1174,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8Add)
+            case 0x02:
+                return .simd(.f32x4RelaxedMax)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1155,6 +1185,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8AddSatS)
+            case 0x02:
+                return .simd(.f64x2RelaxedMin)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1164,6 +1196,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8AddSatU)
+            case 0x02:
+                return .simd(.f64x2RelaxedMax)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1173,6 +1207,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8Sub)
+            case 0x02:
+                return .simd(.i16x8RelaxedQ15MulrS)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1182,6 +1218,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8SubSatS)
+            case 0x02:
+                return .simd(.i16x8RelaxedDotI8X16I7X16S)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
@@ -1191,6 +1229,8 @@ func parseBinaryInstruction(
             switch opcode2 {
             case 0x01:
                 return .simd(.i16x8SubSatU)
+            case 0x02:
+                return .simd(.i32x4RelaxedDotI8X16I7X16AddS)
             default:
                 try decoder.throwUnknown([opcode0, opcode1, opcode2])
             }
