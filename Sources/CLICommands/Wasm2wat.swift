@@ -29,7 +29,6 @@ package struct Wasm2wat: ParsableCommand {
         let fileHandle = try FileDescriptor.open(filePath, .readOnly)
         try withThrowing {
             let stream = try FileHandleStream(fileHandle: fileHandle)
-
             let wat = try wasm2wat(stream)
 
             if let outputPath = output {

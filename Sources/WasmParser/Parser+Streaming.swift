@@ -1,12 +1,6 @@
 import WasmTypes
 
 extension Parser {
-    /// Parses one function-body encoding from the code section: a
-    /// size-in-bytes prefix, the locals-declaration vector, and the raw
-    /// expression bytes (including the trailing `end`). The returned
-    /// `Code.expression` is an `ArraySlice` of the parser's stream;
-    /// `Code.offset` is the absolute parent-buffer index where the
-    /// expression begins.
     @usableFromInline
     package func parseCodeEntry() throws(WasmParserError) -> Code {
         let size = try parseUnsigned() as UInt32
@@ -33,9 +27,6 @@ extension Parser {
         )
     }
 
-    /// Parses one data segment from the data section. Three encoding
-    /// kinds (0/1/2) are supported: active-into-memory-0, passive,
-    /// active-into-explicit-memory-index.
     @usableFromInline
     package mutating func parseDataSegmentEntry() throws(WasmParserError) -> DataSegment {
         let rawKind: UInt32 = try parseUnsigned()
@@ -59,9 +50,6 @@ extension Parser {
         }
     }
 
-    /// Parses one element segment from the element section. The flag byte
-    /// encoding determines mode (active/passive/declarative), reference
-    /// type, and initializer shape.
     @usableFromInline
     package mutating func parseElementEntry() throws(WasmParserError) -> ElementSegment {
         let flag = try ElementSegment.Flag(rawValue: parseUnsigned())

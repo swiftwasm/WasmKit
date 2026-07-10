@@ -10,7 +10,6 @@ import WasmTypes
 package struct ModuleInfo {
     package var types: [FunctionType] = []
     package var imports: [Import] = []
-    /// Type indices from the function section (one per local function).
     package var functionTypeIndices: [TypeIndex] = []
     package var tables: [Table] = []
     package var memories: [Memory] = []
@@ -20,7 +19,6 @@ package struct ModuleInfo {
     /// Tags from the EH proposal's tag section.
     package var tags: [Tag] = []
 
-    /// Raw byte slices for the big sections; sub-parsed during emit.
     package var codeSectionBytes: ArraySlice<UInt8>? = nil
     package var dataSectionBytes: ArraySlice<UInt8>? = nil
     package var elementSectionBytes: ArraySlice<UInt8>? = nil
@@ -29,8 +27,6 @@ package struct ModuleInfo {
     /// against the data section's actual segment count during emit.
     package var dataCount: UInt32? = nil
 
-    /// Threaded so the per-section sub-parsers in WatPrinter use the same
-    /// feature set as the original parse.
     package var features: WasmFeatureSet = .default
 
     // Names from the `name` custom section (all 10 ParsedNames cases).
