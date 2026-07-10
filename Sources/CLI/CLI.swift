@@ -11,6 +11,7 @@ struct CLI: AsyncParsableCommand {
             Explore.self,
             Run.self,
             Wat2wasm.self,
+            Wasm2wat.self,
         ]
     )
 }

@@ -11,7 +11,7 @@ public struct Code: Sendable {
 
     // Parser state used to parse the expression body lazily
     @usableFromInline
-    internal let offset: Int
+    package let offset: Int
     @usableFromInline
     internal let features: WasmFeatureSet
 
@@ -273,6 +273,16 @@ public struct ElementSegment: Equatable, Sendable {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#data-segments>
 public enum DataSegment: Equatable, Sendable {
+    /// Binary-format kind of a data segment: the leading `u32` flag. The raw
+    /// value matches the binary encoding.
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#data-section>
+    @usableFromInline
+    enum Kind: UInt32, Sendable {
+        case activeDefaultMemory = 0
+        case passive = 1
+        case activeExplicitMemory = 2
+    }
+
     public struct Active: Equatable, Sendable {
         public let index: UInt32
         public let offset: ConstExpression
@@ -351,31 +361,31 @@ public enum ImportDescriptor: Equatable, Sendable {
 }
 
 @usableFromInline
-protocol RawUnsignedInteger: FixedWidthInteger & UnsignedInteger {
+package protocol RawUnsignedInteger: FixedWidthInteger & UnsignedInteger {
     associatedtype Signed: RawSignedInteger where Signed.Unsigned == Self
     init(bitPattern: Signed)
 }
 
 @usableFromInline
-protocol RawSignedInteger: FixedWidthInteger & SignedInteger {
+package protocol RawSignedInteger: FixedWidthInteger & SignedInteger {
     associatedtype Unsigned: RawUnsignedInteger where Unsigned.Signed == Self
     init(bitPattern: Unsigned)
 }
 
 extension UInt8: RawUnsignedInteger {
-    @usableFromInline typealias Signed = Int8
+    @usableFromInline package typealias Signed = Int8
 }
 
 extension UInt16: RawUnsignedInteger {
-    @usableFromInline typealias Signed = Int16
+    @usableFromInline package typealias Signed = Int16
 }
 
 extension UInt32: RawUnsignedInteger {
-    @usableFromInline typealias Signed = Int32
+    @usableFromInline package typealias Signed = Int32
 }
 
 extension UInt64: RawUnsignedInteger {
-    @usableFromInline typealias Signed = Int64
+    @usableFromInline package typealias Signed = Int64
 }
 
 extension Int8: RawSignedInteger {}
