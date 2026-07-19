@@ -239,7 +239,7 @@ public struct Instance {
             let stackLayout = try StackLayout(
                 type: store.engine.funcTypeInterner.resolve(function.type),
                 locals: localTypes,
-                codeSize: code.expression.count
+                codeSize: code.bodyByteCount
             )
             stackLayout.dump(to: &target, iseq: iseq)
 

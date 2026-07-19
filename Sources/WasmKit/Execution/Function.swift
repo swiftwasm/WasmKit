@@ -267,7 +267,7 @@ struct WasmFunctionEntity {
                 type: engine.resolveType(type),
                 locals: code.locals,
                 functionIndex: index,
-                codeSize: code.expression.count,
+                codeSize: code.bodyByteCount,
                 isIntercepting: engine.interceptor != nil
             ).translate(code: code)
         }

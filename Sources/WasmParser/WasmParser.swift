@@ -94,7 +94,7 @@ public struct ExpressionParser {
     /// is not a part of the initial `FileHandleStream` buffer
     let initialStreamOffset: Int
     @usableFromInline
-    var parser: Parser<StaticByteStream>
+    var parser: Parser<ModuleBackingStream>
 
     /// Whether the final `end` opcode has been returned. We track this explicitly
     /// rather than checking `hasReachedEnd()` upfront because an exhausted stream
@@ -108,7 +108,7 @@ public struct ExpressionParser {
 
     public init(code: Code) {
         self.parser = Parser(
-            stream: StaticByteStream(bytes: code.expression),
+            stream: ModuleBackingStream(backing: code.backing, range: code.bodyRange),
             features: code.features
         )
         self.codeOffset = code.offset
@@ -1001,11 +1001,11 @@ extension Parser {
                 return Array(repeating: type, count: Int(n))
             }
             let expressionStart = stream.currentIndex
-            let expressionBytes = try stream.consume(
+            let (backing, bodyRange) = try stream.consumeBody(
                 count: Int(size) - (expressionStart - bodyStart)
             )
             return Code(
-                locals: locals, expression: expressionBytes,
+                locals: locals, backing: backing, bodyRange: bodyRange,
                 offset: expressionStart, features: features
             )
         }

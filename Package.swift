@@ -10,6 +10,12 @@ let swiftSettings: [SwiftSetting] = [
     .treatAllWarnings(as: .error, .when(platforms: DarwinPlatforms + [.linux, .wasi, .android, .openbsd]))
 ]
 
+// Targets that expose parsed function bodies as `RawSpan` views into memory-mapped module storage
+// need lifetime-dependency support (`@_lifetime`), which is still gated behind this experimental feature.
+let lifetimeSwiftSettings: [SwiftSetting] = swiftSettings + [
+    .enableExperimentalFeature("Lifetimes")
+]
+
 let cliCommandsTarget = Target.target(
     name: "CLICommands",
     dependencies: [
@@ -68,7 +74,7 @@ let package = Package(
                 ),
             ],
             exclude: ["CMakeLists.txt"],
-            swiftSettings: swiftSettings
+            swiftSettings: lifetimeSwiftSettings
         ),
         .target(name: "_CWasmKit"),
         .target(
@@ -120,7 +126,7 @@ let package = Package(
                 ),
             ],
             exclude: ["CMakeLists.txt"],
-            swiftSettings: swiftSettings
+            swiftSettings: lifetimeSwiftSettings
         ),
         .testTarget(
             name: "WasmParserTests",

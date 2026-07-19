@@ -6,8 +6,14 @@ import WasmTypes
 public struct Code: Sendable {
     /// Local variables in the function
     public let locals: [ValueType]
-    /// Expression body of the function
-    public let expression: ArraySlice<UInt8>
+
+    /// Shared owner of the module's raw bytes; keeps them (e.g. a memory-mapped file) alive for as long
+    /// as this `Code` exists. The expression body is a sub-range of it, decoded lazily per instantiation.
+    @usableFromInline
+    internal let backing: ModuleBacking
+    /// Byte range of the expression body within `backing`.
+    @usableFromInline
+    internal let bodyRange: Range<Int>
 
     // Parser state used to parse the expression body lazily
     @usableFromInline
@@ -19,10 +25,27 @@ public struct Code: Sendable {
         package var originalAddress: Int { self.offset }
     #endif
 
+    /// The size in bytes of the expression body.
     @inlinable
-    init(locals: [ValueType], expression: ArraySlice<UInt8>, offset: Int, features: WasmFeatureSet) {
+    public var bodyByteCount: Int { bodyRange.count }
+
+    /// The expression body as a zero-copy `RawSpan` view into the module's backing storage.
+    public var expression: RawSpan {
+        @_lifetime(borrow self)
+        get {
+            // The span points into memory owned by `backing`, which `self` retains; tie its lifetime to
+            // the `self` borrow so the compiler tracks it past the temporary `backing.buffer` value.
+            let start = bodyRange.isEmpty ? nil : backing.buffer.baseAddress?.advanced(by: bodyRange.lowerBound)
+            let span = unsafe RawSpan(_unsafeStart: start ?? UnsafeRawPointer(bitPattern: -1)!, byteCount: bodyRange.count)
+            return unsafe _overrideLifetime(span, borrowing: self)
+        }
+    }
+
+    @inlinable
+    init(locals: [ValueType], backing: ModuleBacking, bodyRange: Range<Int>, offset: Int, features: WasmFeatureSet) {
         self.locals = locals
-        self.expression = expression
+        self.backing = backing
+        self.bodyRange = bodyRange
         self.offset = offset
         self.features = features
     }
@@ -30,7 +53,12 @@ public struct Code: Sendable {
 
 extension Code: Equatable {
     public static func == (lhs: Code, rhs: Code) -> Bool {
-        return lhs.locals == rhs.locals && lhs.expression == rhs.expression
+        guard lhs.locals == rhs.locals, lhs.bodyRange.count == rhs.bodyRange.count else { return false }
+        let a = lhs.expression, b = rhs.expression
+        for i in 0..<a.byteCount where a.unsafeLoad(fromByteOffset: i, as: UInt8.self) != b.unsafeLoad(fromByteOffset: i, as: UInt8.self) {
+            return false
+        }
+        return true
     }
 }
 
