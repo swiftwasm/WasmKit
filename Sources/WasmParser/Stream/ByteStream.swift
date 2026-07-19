@@ -5,11 +5,11 @@ public protocol ByteStream: ~Copyable {
     func consume(_ expected: Set<UInt8>) throws(WasmParserError) -> UInt8
     func consume(count: Int) throws(WasmParserError) -> ArraySlice<UInt8>
 
-    /// Consume `count` bytes as a range of a ``ModuleBacking`` without copying them out. Streams backed
-    /// by stable whole-module memory (an array or a memory-mapped file) return that shared backing and
-    /// the range in place; the default copies. Used for function bodies, which are retained past parsing
-    /// and decoded lazily per instantiation, so avoiding the copy keeps parse from touching body bytes.
-    func consumeBody(count: Int) throws(WasmParserError) -> (backing: ModuleBacking, range: Range<Int>)
+    /// Consume `count` bytes as a zero-copy ``ModuleBytes`` view without copying them out. Streams backed
+    /// by stable whole-module memory (an array or a memory-mapped file) return a view into that shared
+    /// backing; the default copies. Used for ranges retained past parsing (function bodies, data-segment
+    /// initializers) so parse never touches or duplicates those bytes.
+    func consumeBytes(count: Int) throws(WasmParserError) -> ModuleBytes
 
     func peek() throws(WasmParserError) -> UInt8?
 }
@@ -20,9 +20,9 @@ extension ByteStream {
     }
 
     /// Default: copy the consumed range into a freshly-owned backing.
-    public func consumeBody(count: Int) throws(WasmParserError) -> (backing: ModuleBacking, range: Range<Int>) {
+    public func consumeBytes(count: Int) throws(WasmParserError) -> ModuleBytes {
         let array = Array(try consume(count: count))
-        return (ModuleBacking(retaining: array), 0..<array.count)
+        return ModuleBytes(backing: ModuleBacking(retaining: array), range: 0..<array.count)
     }
 
     @usableFromInline
@@ -96,15 +96,15 @@ public final class StaticByteStream: ByteStream {
         return bytes[currentIndex..<updatedIndex]
     }
 
-    public func consumeBody(count: Int) throws(WasmParserError) -> (backing: ModuleBacking, range: Range<Int>) {
-        guard count > 0 else { return (backing, currentIndex..<currentIndex) }
+    public func consumeBytes(count: Int) throws(WasmParserError) -> ModuleBytes {
+        guard count > 0 else { return ModuleBytes(backing: backing, range: currentIndex..<currentIndex) }
         let updatedIndex = currentIndex + count
         guard bytes.indices.contains(updatedIndex - 1) else {
             throw WasmParserError(kind: .parserUnexpectedEnd(expected: nil), offset: currentIndex)
         }
         defer { currentIndex = updatedIndex }
         // `currentIndex` is a zero-based offset into `backing` (see init), so no copy is needed.
-        return (backing, currentIndex..<updatedIndex)
+        return ModuleBytes(backing: backing, range: currentIndex..<updatedIndex)
     }
 
     public func peek() -> UInt8? {

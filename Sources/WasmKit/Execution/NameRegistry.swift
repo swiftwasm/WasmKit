@@ -11,7 +11,7 @@ struct NameRegistry {
 
     mutating func register(instance: InternalInstance, nameSection: CustomSection) throws {
         materializers.append { registry in
-            let stream = StaticByteStream(bytes: Array(nameSection.bytes))
+            let stream = StaticByteStream(bytes: nameSection.bytes.withUnsafeBytes { Array($0) })
             let parser = NameSectionParser(stream: stream)
             for result in try parser.parseAll() {
                 switch result {

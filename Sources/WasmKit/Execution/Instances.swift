@@ -239,7 +239,7 @@ public struct Instance {
             let stackLayout = try StackLayout(
                 type: store.engine.funcTypeInterner.resolve(function.type),
                 locals: localTypes,
-                codeSize: code.bodyByteCount
+                codeSize: code.body.count
             )
             stackLayout.dump(to: &target, iseq: iseq)
 
@@ -673,10 +673,10 @@ struct MemoryEntity: ~Copyable {
         else {
             throw Trap(.memoryOutOfBounds)
         }
-        segment.data.withUnsafeBufferPointer { segment in
+        segment.data.withUnsafeBytes { segment in
             guard
                 let memory = baseAddress,
-                let segment = UnsafeRawPointer(segment.baseAddress)
+                let segment = segment.baseAddress
             else { return }
             let dest = memory.advanced(by: Int(destination))
             let src = segment.advanced(by: Int(source))
@@ -684,14 +684,15 @@ struct MemoryEntity: ~Copyable {
         }
     }
 
-    mutating func write(offset: Int, bytes: ArraySlice<UInt8>) throws {
+    mutating func write(offset: Int, bytes: ModuleBytes) throws {
         let endOffset = offset + bytes.count
         guard endOffset <= byteCount else {
             throw Trap(.memoryOutOfBounds)
         }
         guard bytes.count > 0 else { return }
-        bytes.withUnsafeBufferPointer { source in
-            baseAddress!.advanced(by: offset).assumingMemoryBound(to: UInt8.self).update(from: source.baseAddress!, count: bytes.count)
+        bytes.withUnsafeBytes { source in
+            guard let src = source.baseAddress else { return }
+            baseAddress!.advanced(by: offset).copyMemory(from: src, byteCount: bytes.count)
         }
     }
 
@@ -970,10 +971,10 @@ typealias InternalElementSegment = EntityHandle<ElementSegmentEntity>
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#syntax-datainst>
 struct DataSegmentEntity {
     /// Bytes stored in this data instance.
-    let data: ArraySlice<UInt8>
+    let data: ModuleBytes
 
     mutating func drop() {
-        self = DataSegmentEntity(data: [])
+        self = DataSegmentEntity(data: .empty)
     }
 }
 

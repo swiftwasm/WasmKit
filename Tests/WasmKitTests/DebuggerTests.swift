@@ -619,7 +619,7 @@
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let startBase = module.functions[0].code.originalAddress
-            let startEnd = startBase + module.functions[0].code.expression.byteCount
+            let startEnd = startBase + module.functions[0].code.body.count
 
             // _start body: return_call 1 (2 bytes) + end (1 byte)
             try debugger.stopAtEntrypoint()

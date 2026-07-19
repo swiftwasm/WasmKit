@@ -128,15 +128,15 @@ public func parseWasm(filePath: FilePath, features: WasmFeatureSet = .default) t
             return [UInt8](buffer)[...]
         }
 
-        func consumeBody(count: Int) throws(WasmParserError) -> (backing: ModuleBacking, range: Range<Int>) {
-            guard count > 0 else { return (backing, currentIndex..<currentIndex) }
+        func consumeBytes(count: Int) throws(WasmParserError) -> ModuleBytes {
+            guard count > 0 else { return ModuleBytes(backing: backing, range: currentIndex..<currentIndex) }
             let updatedIndex = currentIndex + count
             guard updatedIndex <= self.count else {
                 throw WasmParserError(kind: .parserUnexpectedEnd(expected: nil), offset: currentIndex)
             }
             defer { currentIndex = updatedIndex }
-            // Zero-copy: the body is a range of the shared memory-mapped backing.
-            return (backing, currentIndex..<updatedIndex)
+            // Zero-copy: a range of the shared memory-mapped backing.
+            return ModuleBytes(backing: backing, range: currentIndex..<updatedIndex)
         }
 
         func peek() -> UInt8? {

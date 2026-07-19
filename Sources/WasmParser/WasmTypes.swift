@@ -3,17 +3,13 @@ import WasmTypes
 /// Function code in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-code>
-public struct Code: Sendable {
+public struct Code: Sendable, Equatable {
     /// Local variables in the function
     public let locals: [ValueType]
 
-    /// Shared owner of the module's raw bytes; keeps them (e.g. a memory-mapped file) alive for as long
-    /// as this `Code` exists. The expression body is a sub-range of it, decoded lazily per instantiation.
-    @usableFromInline
-    internal let backing: ModuleBacking
-    /// Byte range of the expression body within `backing`.
-    @usableFromInline
-    internal let bodyRange: Range<Int>
+    /// The function's expression body, as a zero-copy view into the module's backing storage. Keeps that
+    /// storage (e.g. a memory-mapped file) alive; decoded lazily per instantiation.
+    public let body: ModuleBytes
 
     // Parser state used to parse the expression body lazily
     @usableFromInline
@@ -25,40 +21,12 @@ public struct Code: Sendable {
         package var originalAddress: Int { self.offset }
     #endif
 
-    /// The size in bytes of the expression body.
     @inlinable
-    public var bodyByteCount: Int { bodyRange.count }
-
-    /// The expression body as a zero-copy `RawSpan` view into the module's backing storage.
-    public var expression: RawSpan {
-        @_lifetime(borrow self)
-        get {
-            // The span points into memory owned by `backing`, which `self` retains; tie its lifetime to
-            // the `self` borrow so the compiler tracks it past the temporary `backing.buffer` value.
-            let start = bodyRange.isEmpty ? nil : backing.buffer.baseAddress?.advanced(by: bodyRange.lowerBound)
-            let span = unsafe RawSpan(_unsafeStart: start ?? UnsafeRawPointer(bitPattern: -1)!, byteCount: bodyRange.count)
-            return unsafe _overrideLifetime(span, borrowing: self)
-        }
-    }
-
-    @inlinable
-    init(locals: [ValueType], backing: ModuleBacking, bodyRange: Range<Int>, offset: Int, features: WasmFeatureSet) {
+    init(locals: [ValueType], body: ModuleBytes, offset: Int, features: WasmFeatureSet) {
         self.locals = locals
-        self.backing = backing
-        self.bodyRange = bodyRange
+        self.body = body
         self.offset = offset
         self.features = features
-    }
-}
-
-extension Code: Equatable {
-    public static func == (lhs: Code, rhs: Code) -> Bool {
-        guard lhs.locals == rhs.locals, lhs.bodyRange.count == rhs.bodyRange.count else { return false }
-        let a = lhs.expression, b = rhs.expression
-        for i in 0..<a.byteCount where a.unsafeLoad(fromByteOffset: i, as: UInt8.self) != b.unsafeLoad(fromByteOffset: i, as: UInt8.self) {
-            return false
-        }
-        return true
     }
 }
 
@@ -168,7 +136,9 @@ public struct BrTable: Equatable, Sendable {
 /// A custom section in a module
 public struct CustomSection: Equatable, Sendable {
     public let name: String
-    public let bytes: ArraySlice<UInt8>
+    /// The section payload, as a zero-copy view into the module's backing storage. Most custom sections
+    /// (debug info, Swift metadata) are never read, so keeping them as views avoids copying them at parse.
+    public let bytes: ModuleBytes
 }
 
 /// > Note:
@@ -304,16 +274,17 @@ public enum DataSegment: Equatable, Sendable {
     public struct Active: Equatable, Sendable {
         public let index: UInt32
         public let offset: ConstExpression
-        public let initializer: ArraySlice<UInt8>
+        /// The initializer bytes, as a zero-copy view into the module's backing storage.
+        public let initializer: ModuleBytes
 
-        @inlinable init(index: UInt32, offset: ConstExpression, initializer: ArraySlice<UInt8>) {
+        @inlinable init(index: UInt32, offset: ConstExpression, initializer: ModuleBytes) {
             self.index = index
             self.offset = offset
             self.initializer = initializer
         }
     }
 
-    case passive(ArraySlice<UInt8>)
+    case passive(ModuleBytes)
     case active(Active)
 }
 

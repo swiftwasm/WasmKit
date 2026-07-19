@@ -108,7 +108,7 @@ public struct ExpressionParser {
 
     public init(code: Code) {
         self.parser = Parser(
-            stream: ModuleBackingStream(backing: code.backing, range: code.bodyRange),
+            stream: ModuleBackingStream(backing: code.body.backing, range: code.body.range),
             features: code.features
         )
         self.codeOffset = code.offset
@@ -497,9 +497,9 @@ extension Parser {
         return MemArg(offset: offset, align: align)
     }
 
-    @inlinable func parseVectorBytes() throws(WasmParserError) -> ArraySlice<UInt8> {
+    @inlinable func parseVectorBytes() throws(WasmParserError) -> ModuleBytes {
         let count: UInt32 = try parseUnsigned()
-        return try stream.consume(count: Int(count))
+        return try stream.consumeBytes(count: Int(count))
     }
 }
 
@@ -797,7 +797,7 @@ extension Parser {
             throw makeError(.invalidSectionSize(size))
         }
 
-        let bytes = try stream.consume(count: contentSize)
+        let bytes = try stream.consumeBytes(count: contentSize)
 
         return CustomSection(name: name, bytes: bytes)
     }
@@ -1001,11 +1001,11 @@ extension Parser {
                 return Array(repeating: type, count: Int(n))
             }
             let expressionStart = stream.currentIndex
-            let (backing, bodyRange) = try stream.consumeBody(
+            let body = try stream.consumeBytes(
                 count: Int(size) - (expressionStart - bodyStart)
             )
             return Code(
-                locals: locals, backing: backing, bodyRange: bodyRange,
+                locals: locals, body: body,
                 offset: expressionStart, features: features
             )
         }

@@ -461,7 +461,7 @@ extension StoreAllocator {
                     // Active segments are copied into memories while instantiation
                     // They are semantically dropped after instantiation, so we don't
                     // need them at runtime
-                    segment = allocate(bytes: [])
+                    segment = allocate(bytes: .empty)
                 }
                 buffer.initializeElement(at: index, to: segment)
             }
@@ -585,7 +585,7 @@ extension StoreAllocator {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#data-segments>
-    private func allocate(bytes: ArraySlice<UInt8>) -> InternalDataSegment {
+    private func allocate(bytes: ModuleBytes) -> InternalDataSegment {
         let pointer = datas.allocate(initializing: DataSegmentEntity(data: bytes))
         return EntityHandle(unsafe: pointer)
     }
