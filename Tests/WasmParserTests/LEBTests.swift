@@ -56,14 +56,14 @@ import Testing
 
 extension FixedWidthInteger where Self: UnsignedInteger {
     fileprivate init(LEB bytes: [UInt8]) throws {
-        let stream = StaticByteStream(bytes: bytes)
-        self = try decodeLEB128(stream: stream)
+        var stream = ByteStream(StaticByteStreamSource(bytes: bytes))
+        self = try decodeLEB128(stream: &stream)
     }
 }
 
 extension FixedWidthInteger where Self: RawSignedInteger {
     fileprivate init(LEB bytes: [UInt8]) throws {
-        let stream = StaticByteStream(bytes: bytes)
-        self = try decodeLEB128(stream: stream)
+        var stream = ByteStream(StaticByteStreamSource(bytes: bytes))
+        self = try decodeLEB128(stream: &stream)
     }
 }

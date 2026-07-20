@@ -8,7 +8,7 @@
         import ucrt
     #endif
 
-    extension Parser where Stream == FileHandleStream {
+    extension Parser where Source == FileHandleStreamSource {
 
         /// Initialize a new parser with the given file handle
         ///
@@ -16,7 +16,7 @@
         ///   - fileHandle: The file handle to the WebAssembly binary file to parse
         ///   - features: Enabled WebAssembly features for parsing
         public init(fileHandle: FileDescriptor, features: WasmFeatureSet = .default) throws {
-            self.init(stream: try FileHandleStream(fileHandle: fileHandle), features: features)
+            self.init(stream: try FileHandleStreamSource(fileHandle: fileHandle), features: features)
         }
 
         /// Initialize a new parser with the given file path
@@ -34,90 +34,74 @@
                 let accessMode: FileDescriptor.AccessMode = .readOnly
             #endif
             let fileHandle = try FileDescriptor.open(filePath, accessMode)
-            self.init(stream: try FileHandleStream(fileHandle: fileHandle), features: features)
+            self.init(stream: try FileHandleStreamSource(fileHandle: fileHandle), features: features)
         }
     }
 
-    public final class FileHandleStream: ByteStream {
-        private(set) public var currentIndex: Int = 0
-
+    public final class FileHandleStreamSource: ByteStreamSource {
         private let fileHandle: FileDescriptor
         private let bufferLength: Int
 
-        private var endOffset: Int = 0
-        private var startOffset: Int = 0
+        private var bufferEndOffset: Int = 0
+        private var bufferStartOffset: Int = 0
         private var bytes: [UInt8] = []
 
         public init(fileHandle: FileDescriptor, bufferLength: Int = 1024 * 8) throws {
             self.fileHandle = fileHandle
             self.bufferLength = bufferLength
 
-            try readMoreIfNeeded()
+            try readMoreIfNeeded(offset: 0)
         }
 
-        private func readMoreIfNeeded() throws(WasmParserError) {
-            guard Int(endOffset) == currentIndex else { return }
-            startOffset = currentIndex
+        public func readByte(at offset: Int) throws(WasmParserError) -> UInt8? {
+            try readMoreIfNeeded(offset: offset)
+
+            let index = offset - bufferStartOffset
+            guard bytes.indices.contains(index) else {
+                return nil
+            }
+            return bytes[index]
+        }
+
+        public func readBytes(from startOffset: Int, to endOffset: Int) throws(WasmParserError) -> ArraySlice<UInt8>? {
+            let bytesToRead = endOffset - bufferEndOffset
+
+            if bytesToRead > 0 {
+                let data: [UInt8]
+                do {
+                    data = try fileHandle.read(upToCount: bytesToRead)
+                } catch {
+                    throw WasmParserError("I/O error: \(error)", offset: startOffset)
+                }
+                // Fewer bytes than requested means the stream ended early; that is
+                // an out-of-range read, which `ByteStream` reports as needed.
+                guard data.count == bytesToRead else {
+                    return nil
+                }
+
+                bytes.append(contentsOf: [UInt8](data))
+                bufferEndOffset = bufferEndOffset + data.count
+            }
+
+            // `bytes` is indexed relative to `bufferStartOffset`, so translate the
+            // absolute [startOffset, endOffset) range into buffer-local indices.
+            let lowerIndex = startOffset - bufferStartOffset
+            let upperIndex = endOffset - bufferStartOffset
+            return bytes[lowerIndex..<upperIndex]
+        }
+
+        private func readMoreIfNeeded(offset: Int) throws(WasmParserError) {
+            guard Int(bufferEndOffset) == offset else { return }
+            bufferStartOffset = offset
 
             do {
                 let data = try fileHandle.read(upToCount: bufferLength)
 
                 bytes = [UInt8](data)
             } catch {
-                throw WasmParserError("I/O error: \(error)", offset: currentIndex)
+                throw WasmParserError("I/O error: \(error)", offset: offset)
             }
-            endOffset = startOffset + bytes.count
-        }
-
-        @discardableResult
-        public func consumeAny() throws(WasmParserError) -> UInt8 {
-            guard let consumed = try peek() else {
-                throw WasmParserError(message: .unexpectedEnd, offset: currentIndex)
-            }
-            currentIndex = bytes.index(after: currentIndex)
-            return consumed
-        }
-
-        public func consume(count: Int) throws(WasmParserError) -> ArraySlice<UInt8> {
-            let bytesToRead = currentIndex + count - endOffset
-
-            guard bytesToRead > 0 else {
-                let bytesIndex = currentIndex - startOffset
-                let result = bytes[bytesIndex..<bytesIndex + count]
-                currentIndex = currentIndex + count
-                return result
-            }
-
-            let data: [UInt8]
-            do {
-                data = try fileHandle.read(upToCount: bytesToRead)
-            } catch {
-                throw WasmParserError("I/O error: \(error)", offset: currentIndex)
-            }
-            guard data.count == bytesToRead else {
-                throw WasmParserError(kind: .parserUnexpectedEnd(expected: nil), offset: currentIndex)
-            }
-
-            bytes.append(contentsOf: [UInt8](data))
-            endOffset = endOffset + data.count
-
-            let bytesIndex = currentIndex - startOffset
-            let result = bytes[bytesIndex..<bytesIndex + count]
-
-            currentIndex = endOffset
-
-            return result
-        }
-
-        public func peek() throws(WasmParserError) -> UInt8? {
-            try readMoreIfNeeded()
-
-            let index = currentIndex - startOffset
-            guard bytes.indices.contains(index) else {
-                return nil
-            }
-
-            return bytes[index]
+            bufferEndOffset = bufferStartOffset + bytes.count
         }
     }
 
