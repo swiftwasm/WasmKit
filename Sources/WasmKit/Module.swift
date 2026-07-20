@@ -273,11 +273,11 @@ public struct Module: Sendable {
     /// Initialize active data segments into instance memories.
     ///
     /// When `sharedMemories` is non-nil (child thread instantiation), active
-    /// data segments targeting shared memories are skipped — re-applying them
+    /// data segments targeting shared memories are skipped; re-applying them
     /// would overwrite memory the parent has already modified.
     private func initializeActiveDataSegments(
         instance: InternalInstance, constEvalContext: ConstEvaluationContext,
-        sharedMemories: [SharedMemoryEntity?]? = nil
+        sharedMemories: [SharedMemoryStorage?]? = nil
     ) throws {
         for case .active(let data) in self.data {
             // Skip data segments targeting shared memories in child threads

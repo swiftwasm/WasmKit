@@ -80,8 +80,8 @@ public struct WasmKitException: Error, CustomStringConvertible {
 }
 
 /// A reason for a trap that occurred during execution of a WebAssembly module.
-package enum TrapReason: Error, Equatable, CustomStringConvertible {
-    package struct Message: Equatable {
+package enum TrapReason: Error, CustomStringConvertible {
+    package struct Message {
         let text: String
 
         init(_ text: String) {
@@ -161,11 +161,11 @@ extension TrapReason.Message {
     static func mmapFailed(reserveBytes: Int) -> Self {
         Self("failed to reserve \(reserveBytes) bytes of virtual address space for shared memory")
     }
-    static var sharedMemoryGuardRegistryFull: Self {
-        Self("shared memory guard registry is full (too many concurrent shared memories)")
+    static var sharedMemoryRequiresMprotect: Self {
+        Self("shared memory requires mprotect-based bounds checking, which is unavailable in this configuration")
     }
-    static var atomicWaitUnsupported: Self {
-        Self("memory.atomic.wait is not supported on this platform (no thread-blocking primitive)")
+    static var atomicWaitOnUnsharedMemory: Self {
+        Self("`memory.atomic.wait` requires a shared memory")
     }
     static func noGlobalExportWithName(globalName: String, instance: Instance) -> Self {
         Self("no global export with name \(globalName) in a module instance \(instance)")

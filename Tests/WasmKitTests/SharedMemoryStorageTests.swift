@@ -4,7 +4,26 @@ import WAT
 
 @_spi(Fuzzing) @_spi(OnlyForCLI) @testable import WasmKit
 
-@Suite struct SharedMemoryStorageTests {
+extension SharedMemoryStorage {
+    /// Test convenience: construct from a `MemoryType`. Production code decomposes these
+    /// values at the caller (`MemoryEntity.init`).
+    convenience init(memoryType: MemoryType, engineConfiguration: EngineConfiguration) throws(Trap) {
+        let maxPages = memoryType.max ?? UInt64(MemoryEntity.maxPageCount(isMemory64: memoryType.isMemory64))
+        try self.init(
+            initialBytes: Int(memoryType.min) * MemoryEntity.pageSize,
+            maxBytes: Int(clamping: maxPages) * MemoryEntity.pageSize,
+            isMemory64: memoryType.isMemory64,
+            engineConfiguration: engineConfiguration
+        )
+    }
+}
+
+private let sharedMemorySupported = SharedMemoryStorage.isSupported(
+    engineConfiguration: Engine(configuration: .init(features: [.threads])).configuration,
+    isMemory64: false
+)
+
+@Suite(.enabled(if: sharedMemorySupported)) struct SharedMemoryStorageTests {
     /// Asserts `body` throws a `Trap` whose `reason` equals `expected`, without relying on
     /// `Trap: Equatable`. Closure-based counterpart to `ExecutionTests.expectTrap` (which runs
     /// a WAT module); both capture the trap and assert on its reason rather than comparing
@@ -18,7 +37,7 @@ import WAT
             try body()
             Issue.record("expected a trap (\(expected)), but no error was thrown", sourceLocation: sourceLocation)
         } catch let trap as Trap {
-            #expect(trap.reason == expected, sourceLocation: sourceLocation)
+            #expect(trap.reason.description == expected.description, sourceLocation: sourceLocation)
         } catch {
             Issue.record("expected a trap (\(expected)), but caught: \(error)", sourceLocation: sourceLocation)
         }
@@ -28,35 +47,19 @@ import WAT
 
     @Test func initSharedMemory_correctInitialState() throws {
         let engine = Engine(configuration: .init(features: [.threads]))
-        let store = Store(engine: engine)
         let memType = MemoryType(min: 2, max: 10, shared: true)
-        let memory = try Memory(store: store, type: memType)
+        let storage = try SharedMemoryStorage(
+            memoryType: memType, engineConfiguration: engine.configuration)
 
-        memory.handle.withValue { entity in
-            let shared = entity.sharedStorage!
-            shared.withValue { storage in
-                #expect(storage.currentByteCount.load(ordering: .acquiring) == 2 * 65536)
-                #expect(storage.maxByteCount == 10 * 65536)
-                // The full wasm32 reservation (4 GiB+) is only taken when the engine
-                // actually resolved to mprotect bounds checking. Under AddressSanitizer or
-                // token threading the engine downgrades to software checks (see Engine.init),
-                // where the reservation is just maxByteCount.
-                #if os(macOS) || os(Linux)
-                    if engine.configuration.memoryBoundsChecking == .mprotect {
-                        #expect(storage.reservationSize >= (1 << 32))
-                    } else {
-                        #expect(storage.reservationSize == 10 * 65536)
-                    }
-                #else
-                    #expect(storage.reservationSize == 10 * 65536)
-                #endif
-                // Verify initial region is zero-filled
-                let firstByte = storage.basePointer.load(as: UInt8.self)
-                #expect(firstByte == 0)
-                let lastByte = storage.basePointer.load(fromByteOffset: 2 * 65536 - 1, as: UInt8.self)
-                #expect(lastByte == 0)
-            }
-        }
+        #expect(storage.currentByteCount.load(ordering: .acquiring) == 2 * 65536)
+        #expect(storage.maxByteCount == 10 * 65536)
+        // Guard-page backed: reserves the full wasm32 range plus the offset guard region.
+        #expect(storage.reservationSize == (1 << 32) + engine.configuration.memoryOffsetGuardSize)
+        // Initial region is zero-filled.
+        let firstByte = storage.basePointer.load(as: UInt8.self)
+        #expect(firstByte == 0)
+        let lastByte = storage.basePointer.load(fromByteOffset: 2 * 65536 - 1, as: UInt8.self)
+        #expect(lastByte == 0)
     }
 
     @Test func growSharedMemory_basePointerStable() throws {
@@ -407,10 +410,8 @@ import WAT
         let memType = MemoryType(min: 1, max: 2, shared: true)
         let memory = try Memory(store: store, type: memType)
 
-        // Verify trapGuardReservationSize is nonzero (meaning unchecked instructions will be used)
-        memory.handle.withValue { entity in
-            #expect(entity.trapGuardReservationSize > 0, "Shared memory must report reservation size for unchecked instructions")
-        }
+        // An OOB access one page past the committed region must trap (via the software
+        // check), not reach the PROT_NONE tail.
 
         // Run a module that does an OOB access -- must trap, not silently succeed
         let module = try parseWasm(
@@ -465,71 +466,34 @@ import WAT
         }
     }
 
-    // MARK: - Step 6: Ms staleness reload path tests
+    // MARK: - Access to grown region + unsupported-mode guard
 
-    @Test func sharedMemory_stalenessReloadPath_software() throws {
-        // Shared memory always uses software bounds checking. After a host grow, the
-        // running frame's cached `ms` is stale, so this exercises the shared load
-        // variant's reload (reloadSharedMemorySize) before it would otherwise trap.
+    @Test func sharedMemory_requiresMprotect_softwareModeThrows() {
+        // Shared memory relies on the mprotect guard-page reservation for OOB detection,
+        // so creating it under software bounds checking is unsupported and traps.
         let engine = Engine(
             configuration: .init(
                 features: [.threads],
                 memoryBoundsChecking: .software
             ))
-        let store = Store(engine: engine)
-
-        let sharedMem = try Memory(store: store, type: MemoryType(min: 1, max: 4, shared: true))
-
-        let module = try parseWasm(
-            bytes: try wat2wasm(
-                """
-                (module
-                    (import "test" "memory" (memory 1 4 shared))
-                    (import "test" "grow" (func $grow))
-                    (func (export "test_staleness") (result i32)
-                        ;; Call host to grow by 1 page. After returning, the cached ms
-                        ;; (memory size) is stale -- it still reflects the pre-grow size.
-                        call $grow
-                        ;; Access the first byte of the newly grown page. With software
-                        ;; bounds checking, this exercises the boundsOk slow path which
-                        ;; calls reloadSharedMemorySize to get the fresh size.
-                        (i32.load (i32.const 65536))
-                    )
-                )
-                """,
-                features: [.threads]),
-            features: [.threads])
-
-        let growCalled = Atomic<Bool>(false)
-        let sharedStorage = sharedMem.handle.withValue { $0.sharedStorage! }
-        let limiter = store.resourceLimiter
-        let growFunc = Function(store: store, type: FunctionType(parameters: [], results: [])) { _, _ in
-            sharedStorage.withValue { storage in
-                _ = try! storage.grow(by: 1, resourceLimiter: limiter)
-            }
-            growCalled.store(true, ordering: .releasing)
-            return []
+        let sharedType = MemoryType(min: 1, max: 4, shared: true)
+        #expect(throws: Trap.self) {
+            _ = try SharedMemoryStorage(memoryType: sharedType, engineConfiguration: engine.configuration)
         }
-
-        let imports: Imports = ["test": ["memory": sharedMem, "grow": growFunc]]
-        let instance = try module.instantiate(store: store, imports: imports)
-        let testStaleness = try #require(instance.exports[function: "test_staleness"])
-
-        // The load should succeed (reading from the grown page, which is zero-initialized)
-        let result = try testStaleness()
-        #expect(result == [.i32(0)])
-        let didGrow = growCalled.load(ordering: .acquiring)
-        #expect(didGrow, "Host grow function must have been called")
     }
 
-    @Test func sharedMemory_stalenessReloadPath_atomic() throws {
-        // Use default engine config (mprotect bounds checking). i32.atomic.load always
-        // uses the checked path (atomics have no unchecked variants), so this exercises
-        // the boundsOk slow path via the atomic load instruction.
+    @Test func sharedMemory_accessGrownRegion_atomic() throws {
+        // Default engine config (mprotect bounds checking). After a host grow, an atomic
+        // load from the newly committed page must succeed: `ms` is the constant guard-page
+        // reservation, so the software check passes and the freshly committed pages are
+        // accessible.
         let engine = Engine(configuration: .init(features: [.threads]))
         let store = Store(engine: engine)
 
-        let sharedMem = try Memory(store: store, type: MemoryType(min: 1, max: 4, shared: true))
+        let sharedType = MemoryType(min: 1, max: 4, shared: true)
+        let sharedStorage = try SharedMemoryStorage(
+            memoryType: sharedType, engineConfiguration: engine.configuration)
+        let sharedMem = Memory(store: store, type: sharedType, sharedStorage: sharedStorage)
 
         let module = try parseWasm(
             bytes: try wat2wasm(
@@ -550,12 +514,9 @@ import WAT
             features: [.threads])
 
         let growCalled = Atomic<Bool>(false)
-        let sharedStorage = sharedMem.handle.withValue { $0.sharedStorage! }
         let limiter = store.resourceLimiter
         let growFunc = Function(store: store, type: FunctionType(parameters: [], results: [])) { _, _ in
-            sharedStorage.withValue { storage in
-                _ = try! storage.grow(by: 1, resourceLimiter: limiter)
-            }
+            _ = try! sharedStorage.grow(by: 1, resourceLimiter: limiter)
             growCalled.store(true, ordering: .releasing)
             return []
         }
@@ -639,7 +600,7 @@ import WAT
         #expect(try grow1() == [.i32(1)])
         _ = try store32([.i32(65636), .i32(99)])
 
-        // Read back both values — data in page 1 must survive grow
+        // Read back both values: data in page 1 must survive grow
         #expect(try load32([.i32(100)]) == [.i32(42)])
         #expect(try load32([.i32(65636)]) == [.i32(99)])
     }
@@ -741,7 +702,7 @@ import WAT
         let waitMismatch = try #require(instance.exports[function: "wait_mismatch"])
         // Value mismatch returns code 1 (not-equal) without entering the wait,
         // but the timeout argument is decoded before the mismatch check in
-        // some implementations — this still proves the bit-pattern conversion
+        // some implementations; this still proves the bit-pattern conversion
         // doesn't crash.
         #expect(try waitMismatch([]) == [.i32(1)])
     }
@@ -772,13 +733,30 @@ import WAT
         #expect(try waitZero([]) == [.i32(2)])
     }
 
-    // Directly verifies translation-time handler selection: shared-memory scalar
-    // loads/stores route to the reload-capable `…Shared` opcode variants, and
-    // non-shared memory to the plain `origin/main` handlers. Guards the per-case
-    // ternaries in Translator.visitLoad/visitStore against drift.
+    // Guards against reintroducing `...Shared` opcode variants: shared and non-shared
+    // memory must select the same load/store opcodes.
     @Test func loadStoreOpcodeSelection_byMemoryShared() throws {
+        // `dumpFunctions` needs token threading (readable disassembly), but shared memory
+        // needs mprotect (direct threading). Dumping only translates, never executes, so for
+        // the shared case we create the backing under an mprotect engine and *import* it into
+        // the token-threaded dump instance.
         func dumpLoadStore(shared: Bool) throws -> String {
-            let memoryDecl = shared ? "(memory 1 1 shared)" : "(memory 1)"
+            let dumpEngine = Engine(configuration: .init(threadingModel: .token, features: shared ? [.threads] : []))
+            let dumpStore = Store(engine: dumpEngine)
+
+            let memoryDecl: String
+            let imports: Imports
+            if shared {
+                memoryDecl = #"(import "env" "mem" (memory 1 1 shared))"#
+                let ownerEngine = Engine(configuration: .init(features: [.threads]))
+                let sharedType = MemoryType(min: 1, max: 1, shared: true)
+                let storage = try SharedMemoryStorage(memoryType: sharedType, engineConfiguration: ownerEngine.configuration)
+                imports = ["env": ["mem": Memory(store: dumpStore, type: sharedType, sharedStorage: storage)]]
+            } else {
+                memoryDecl = "(memory 1)"
+                imports = [:]
+            }
+
             let module = try parseWasm(
                 bytes: try wat2wasm(
                     """
@@ -792,10 +770,7 @@ import WAT
                 ),
                 features: shared ? [.threads] : []
             )
-            // dumpFunctions requires the token threading model.
-            let engine = Engine(configuration: .init(threadingModel: .token, features: shared ? [.threads] : []))
-            let store = Store(engine: engine)
-            let instance = try module.instantiate(store: store)
+            let instance = try module.instantiate(store: dumpStore, imports: imports)
             var out = ""
             try instance.dumpFunctions(to: &out, module: module)
             return out
@@ -806,18 +781,23 @@ import WAT
         #expect(plain.contains("i32.store"))
         #expect(!plain.contains("Shared"))
 
+        // Shared memory emits the same opcodes; no `...Shared` variant.
         let shared = try dumpLoadStore(shared: true)
-        #expect(shared.contains("i32LoadShared"))
-        #expect(shared.contains("i32StoreShared"))
+        #expect(shared.contains("i32.load"))
+        #expect(shared.contains("i32.store"))
+        #expect(!shared.contains("Shared"))
     }
 
     // SIMD (v128) loads on shared memory must tolerate a stale cached size after a
     // concurrent grow, consistent with scalar loads. After a host grow, the v128.load
     // into the freshly-grown page must succeed (zero-filled), not trap.
-    @Test func sharedMemory_stalenessReloadPath_simd() throws {
+    @Test func sharedMemory_accessGrownRegion_simd() throws {
         let engine = Engine(configuration: .init(features: [.threads, .simd]))
         let store = Store(engine: engine)
-        let sharedMem = try Memory(store: store, type: MemoryType(min: 1, max: 4, shared: true))
+        let sharedType = MemoryType(min: 1, max: 4, shared: true)
+        let sharedStorage = try SharedMemoryStorage(
+            memoryType: sharedType, engineConfiguration: engine.configuration)
+        let sharedMem = Memory(store: store, type: sharedType, sharedStorage: sharedStorage)
         let module = try parseWasm(
             bytes: try wat2wasm(
                 """
@@ -833,12 +813,9 @@ import WAT
                 features: [.threads, .simd]),
             features: [.threads, .simd])
         let growCalled = Atomic<Bool>(false)
-        let sharedStorage = sharedMem.handle.withValue { $0.sharedStorage! }
         let limiter = store.resourceLimiter
         let growFunc = Function(store: store, type: FunctionType(parameters: [], results: [])) { _, _ in
-            sharedStorage.withValue { storage in
-                _ = try! storage.grow(by: 1, resourceLimiter: limiter)
-            }
+            _ = try! sharedStorage.grow(by: 1, resourceLimiter: limiter)
             growCalled.store(true, ordering: .releasing)
             return []
         }

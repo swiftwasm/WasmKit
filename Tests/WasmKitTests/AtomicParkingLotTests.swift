@@ -25,7 +25,7 @@ import Testing
             ///
             /// Ordering is forced with no reliance on wall-clock timing:
             ///   1. the waiter registers, then blocks in `beforeSleep`;
-            ///   2. the notifier `unpark`s — removing and counting the slot — then pauses in the
+            ///   2. the notifier `unpark`s (removing and counting the slot) then pauses in the
             ///      seam, before `wake()`, so `woken` stays false and the slot is already absent;
             ///   3. the waiter resumes with a zero timeout, reads `woken == false`, and runs its
             ///      timeout-path registry check against the now-absent slot.
@@ -124,7 +124,7 @@ import Testing
                         case .mismatch:
                             // Unreachable here: `validate` is constant-true, so the slot is always
                             // appended and the wait runs. `continue` (not `break`) makes the intent
-                            // explicit — a bare `break` would exit only the switch, not the loop.
+                            // explicit; a bare `break` would exit only the switch, not the loop.
                             continue
                         }
                     }
@@ -167,7 +167,7 @@ import Testing
                 )
                 // Non-vacuity: confirm notifies actually woke some waiters this run (else
                 // 0 == 0 is meaningless). This proves notify reached waiters; it does NOT by
-                // itself prove the timeout/notify overlap window was hit — that race is what
+                // itself prove the timeout/notify overlap window was hit; that race is what
                 // `timedOutWaiterClaimedByNotifyReportsWoken` covers deterministically.
                 // A failure here means too little contention: raise runDuration / counts.
                 #expect(t.woken > 0, "no waiter was woken by a notify (raise contention/runDuration)")

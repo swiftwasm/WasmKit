@@ -426,7 +426,11 @@ extension Execution {
         @inline(__always)
         static func assign(md: inout Md, ms: inout Ms, memory: inout MemoryEntity) {
             md = memory.baseAddress
-            ms = memory.byteCount
+            // For shared memory this is the guard-page reservation, not the committed size,
+            // so the software check never rejects a valid address that another thread just
+            // grew into; the guard pages enforce the real bound. For non-shared memory it is
+            // the committed size (the tight software bound).
+            ms = memory.boundsCheckLimit
             wasmkit_trap_guard_set_current_memory(md, memory.trapGuardReservationSize)
         }
 
@@ -513,13 +517,7 @@ extension Execution {
             var pc = pc
             var md = md
             var ms = ms
-            // Shared memory always uses software bounds checking. A guard-page fault
-            // recovered by siglongjmp would unwind the interpreter past a lock held by a
-            // concurrent grow or atomic operation, so the multi-threaded path must stay
-            // free of non-local jumps. mprotect guards are reserved for non-shared memory.
-            let isNonSharedMemory = sp.currentInstance?.memories.first?.withValue { $0.sharedStorage == nil } ?? true
-            let shouldUseMprotectTrapGuards =
-                store.value.engine.configuration.memoryBoundsChecking == .mprotect && isNonSharedMemory
+            let shouldUseMprotectTrapGuards = store.value.engine.configuration.memoryBoundsChecking == .mprotect
             let storeValue = store.value
             while true {
                 let handler = pc.read(wasmkit_tc_exec.self)

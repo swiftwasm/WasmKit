@@ -70,12 +70,6 @@ extension InternalInstance {
         let memory = try self.memories[validating: Int(index), MemoryEntity.createOutOfBoundsError]
         return memory.withValue { $0.limit.isMemory64 }
     }
-    /// Whether the given memory is a shared (threads-proposal) memory. Used to select
-    /// the reload-capable `…Shared` load/store opcode variants at translation time.
-    func memoryIsShared(memoryIndex index: MemoryIndex) throws(WasmKitError) -> Bool {
-        let memory = try self.memories[validating: Int(index), MemoryEntity.createOutOfBoundsError]
-        return memory.withValue { $0.limit.shared }
-    }
     func isMemory64(tableIndex index: TableIndex) throws(WasmKitError) -> Bool {
         return try self.tables[validating: Int(index)].limits.isMemory64
     }
@@ -2231,14 +2225,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
     mutating func visitLoad(_ load: WasmParser.Instruction.Load, memarg: MemArg) throws(WasmKitError) {
         let instruction: (Instruction.LoadOperand) -> Instruction
-        // Shared memories use the reload-capable `…Shared` variants (paired in
-        // `memorySharedLoadStoreInsts`); non-shared memories keep the plain handlers.
-        let isShared = try module.memoryIsShared(memoryIndex: 0)
         switch load {
-        case .i32Load: instruction = isShared ? { .i32LoadShared($0) } : { .i32Load($0) }
-        case .i64Load: instruction = isShared ? { .i64LoadShared($0) } : { .i64Load($0) }
-        case .f32Load: instruction = isShared ? { .f32LoadShared($0) } : { .f32Load($0) }
-        case .f64Load: instruction = isShared ? { .f64LoadShared($0) } : { .f64Load($0) }
+        case .i32Load: instruction = Instruction.i32Load
+        case .i64Load: instruction = Instruction.i64Load
+        case .f32Load: instruction = Instruction.f32Load
+        case .f64Load: instruction = Instruction.f64Load
         case .v128Load, .v128Load8X8S, .v128Load8X8U, .v128Load16X4S, .v128Load16X4U,
             .v128Load32X2S, .v128Load32X2U, .v128Load8Splat, .v128Load16Splat, .v128Load32Splat,
             .v128Load64Splat, .v128Load32Zero, .v128Load64Zero:
@@ -2259,16 +2250,16 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                     ))
             }
             return
-        case .i32Load8S: instruction = isShared ? { .i32Load8SShared($0) } : { .i32Load8S($0) }
-        case .i32Load8U: instruction = isShared ? { .i32Load8UShared($0) } : { .i32Load8U($0) }
-        case .i32Load16S: instruction = isShared ? { .i32Load16SShared($0) } : { .i32Load16S($0) }
-        case .i32Load16U: instruction = isShared ? { .i32Load16UShared($0) } : { .i32Load16U($0) }
-        case .i64Load8S: instruction = isShared ? { .i64Load8SShared($0) } : { .i64Load8S($0) }
-        case .i64Load8U: instruction = isShared ? { .i64Load8UShared($0) } : { .i64Load8U($0) }
-        case .i64Load16S: instruction = isShared ? { .i64Load16SShared($0) } : { .i64Load16S($0) }
-        case .i64Load16U: instruction = isShared ? { .i64Load16UShared($0) } : { .i64Load16U($0) }
-        case .i64Load32S: instruction = isShared ? { .i64Load32SShared($0) } : { .i64Load32S($0) }
-        case .i64Load32U: instruction = isShared ? { .i64Load32UShared($0) } : { .i64Load32U($0) }
+        case .i32Load8S: instruction = Instruction.i32Load8S
+        case .i32Load8U: instruction = Instruction.i32Load8U
+        case .i32Load16S: instruction = Instruction.i32Load16S
+        case .i32Load16U: instruction = Instruction.i32Load16U
+        case .i64Load8S: instruction = Instruction.i64Load8S
+        case .i64Load8U: instruction = Instruction.i64Load8U
+        case .i64Load16S: instruction = Instruction.i64Load16S
+        case .i64Load16U: instruction = Instruction.i64Load16U
+        case .i64Load32S: instruction = Instruction.i64Load32S
+        case .i64Load32U: instruction = Instruction.i64Load32U
         case .i32AtomicLoad: instruction = Instruction.i32AtomicLoad
         case .i64AtomicLoad: instruction = Instruction.i64AtomicLoad
         case .i32AtomicLoad8U: instruction = Instruction.i32AtomicLoad8U
@@ -2283,12 +2274,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
     mutating func visitStore(_ store: WasmParser.Instruction.Store, memarg: MemArg) throws(WasmKitError) {
         let instruction: (Instruction.StoreOperand) -> Instruction
-        let isShared = try module.memoryIsShared(memoryIndex: 0)
         switch store {
-        case .i32Store: instruction = isShared ? { .i32StoreShared($0) } : { .i32Store($0) }
-        case .i64Store: instruction = isShared ? { .i64StoreShared($0) } : { .i64Store($0) }
-        case .f32Store: instruction = isShared ? { .f32StoreShared($0) } : { .f32Store($0) }
-        case .f64Store: instruction = isShared ? { .f64StoreShared($0) } : { .f64Store($0) }
+        case .i32Store: instruction = Instruction.i32Store
+        case .i64Store: instruction = Instruction.i64Store
+        case .f32Store: instruction = Instruction.f32Store
+        case .f64Store: instruction = Instruction.f64Store
         case .v128Store:
             let isMemory64 = try module.isMemory64(memoryIndex: 0)
             try validator.validateMemArg(memarg, naturalAlignment: store.naturalAlignment)
@@ -2310,11 +2300,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                         )))
             }
             return
-        case .i32Store8: instruction = isShared ? { .i32Store8Shared($0) } : { .i32Store8($0) }
-        case .i32Store16: instruction = isShared ? { .i32Store16Shared($0) } : { .i32Store16($0) }
-        case .i64Store8: instruction = isShared ? { .i64Store8Shared($0) } : { .i64Store8($0) }
-        case .i64Store16: instruction = isShared ? { .i64Store16Shared($0) } : { .i64Store16($0) }
-        case .i64Store32: instruction = isShared ? { .i64Store32Shared($0) } : { .i64Store32($0) }
+        case .i32Store8: instruction = Instruction.i32Store8
+        case .i32Store16: instruction = Instruction.i32Store16
+        case .i64Store8: instruction = Instruction.i64Store8
+        case .i64Store16: instruction = Instruction.i64Store16
+        case .i64Store32: instruction = Instruction.i64Store32
         case .i32AtomicStore: instruction = Instruction.i32AtomicStore
         case .i64AtomicStore: instruction = Instruction.i64AtomicStore
         case .i32AtomicStore8: instruction = Instruction.i32AtomicStore8

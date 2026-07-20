@@ -18,12 +18,6 @@ public final class Store {
     /// The engine associated with this store.
     public let engine: Engine
 
-    /// Parking lot for atomic wait/notify operations.
-    /// Excluded on Windows, which has no pthread blocking primitive (see AtomicParkingLot.swift).
-    #if !os(Windows)
-        let atomicParkingLot = AtomicParkingLot()
-    #endif
-
     /// Create a new store associated with the given engine.
     public init(engine: Engine) {
         self.engine = engine
