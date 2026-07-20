@@ -10,7 +10,7 @@ protocol BinaryInstructionDecoder {
     var offset: Int { get }
 
     /// Claim the next byte to be decoded
-    @inlinable func claimNextByte() throws(WasmParserError) -> UInt8
+    @inlinable mutating func claimNextByte() throws(WasmParserError) -> UInt8
 
     /// Throw an error due to unknown opcode.
     func throwUnknown(_ opcode: [UInt8]) throws(WasmParserError) -> Never

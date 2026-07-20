@@ -391,8 +391,8 @@ struct EncoderTests {
             customSections.append(section)
         }
         let nameSection = customSections.first(where: { $0.name == "name" })
-        let nameParser = NameSectionParser(
-            stream: StaticByteStream(bytes: nameSection?.bytes ?? [])
+        var nameParser = NameSectionParser(
+            stream: StaticByteStreamSource(bytes: nameSection?.bytes ?? [])
         )
         let names = try nameParser.parseAll()
         #expect(names.count == 1)
@@ -435,8 +435,8 @@ struct EncoderTests {
             }
         }
         let sectionBytes = Array(nameBytes ?? [])
-        let nameParser = NameSectionParser(
-            stream: StaticByteStream(bytes: sectionBytes)
+        var nameParser = NameSectionParser(
+            stream: StaticByteStreamSource(bytes: sectionBytes)
         )
         let parsed = try nameParser.parseAll()
         #expect(parsed.count == 10)

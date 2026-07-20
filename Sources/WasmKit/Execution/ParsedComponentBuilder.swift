@@ -18,7 +18,7 @@
         bytes: [UInt8],
         features: WasmFeatureSet = .default
     ) throws -> ParsedComponent {
-        let stream = StaticByteStream(bytes: bytes)
+        let stream = StaticByteStreamSource(bytes: bytes)
         return try parseComponent(stream: stream, features: features)
     }
 
@@ -35,13 +35,13 @@
         bytes: ArraySlice<UInt8>,
         features: WasmFeatureSet = .default
     ) throws -> ParsedComponent {
-        let stream = StaticByteStream(bytes: bytes)
+        let stream = StaticByteStreamSource(bytes: bytes)
         return try parseComponent(stream: stream, features: features)
     }
 
     /// Internal implementation that parses from any ByteStream.
-    private func parseComponent<Stream: ByteStream>(
-        stream: Stream,
+    private func parseComponent<Source: ByteStreamSource>(
+        stream: Source,
         features: WasmFeatureSet
     ) throws -> ParsedComponent {
         var parser = WasmParser.ComponentParser(stream: stream, features: features)
@@ -608,7 +608,7 @@
         fileHandle: FileDescriptor,
         features: WasmFeatureSet = .default
     ) throws -> ParsedComponent {
-        let stream = try FileHandleStream(fileHandle: fileHandle)
+        let stream = try FileHandleStreamSource(fileHandle: fileHandle)
         return try parseComponent(stream: stream, features: features)
     }
 #endif

@@ -31,8 +31,8 @@
     /// The descriptor is consumed from its current offset and is not closed by
     /// this function.
     public func parseWasm(fileHandle: FileDescriptor, features: WasmFeatureSet = .default) throws -> Module {
-        let stream = try FileHandleStream(fileHandle: fileHandle)
-        let module = try parseModule(stream: stream, features: features)
+        let parser = try WasmParser.Parser(fileHandle: fileHandle, features: features)
+        let module = try parseModule(parser: parser, features: features)
         return module
     }
 #endif

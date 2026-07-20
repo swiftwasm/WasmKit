@@ -1,7 +1,7 @@
 import struct WasmParser.CustomSection
 import struct WasmParser.NameMap
 import struct WasmParser.NameSectionParser
-import class WasmParser.StaticByteStream
+import class WasmParser.StaticByteStreamSource
 
 struct NameRegistry {
     private var functionNames: [InternalFunction: String] = [:]
@@ -11,8 +11,8 @@ struct NameRegistry {
 
     mutating func register(instance: InternalInstance, nameSection: CustomSection) throws {
         materializers.append { registry in
-            let stream = StaticByteStream(bytes: Array(nameSection.bytes))
-            let parser = NameSectionParser(stream: stream)
+            let stream = StaticByteStreamSource(bytes: Array(nameSection.bytes))
+            var parser = NameSectionParser(stream: stream)
             for result in try parser.parseAll() {
                 switch result {
                 case .functions(let nameMap):
