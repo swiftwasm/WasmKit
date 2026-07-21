@@ -2811,9 +2811,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         try visitConversion(from, to, instruction)
     }
 
-    mutating func visitMemoryInit(dataIndex: UInt32) throws(WasmKitError) -> Output {
+    mutating func visitMemoryInit(dataIndex: UInt32, memory: UInt32) throws(WasmKitError) -> Output {
         try self.validator.validateDataSegment(dataIndex)
-        let addressType = try module.addressType(memoryIndex: 0)
+        let addressType = try module.addressType(memoryIndex: memory)
         try pop3Emit((.i32, .i32, addressType)) { values, stack in
             let (size, sourceOffset, destOffset) = values
             return .memoryInit(
@@ -2821,7 +2821,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                     segmentIndex: dataIndex,
                     destOffset: destOffset,
                     sourceOffset: sourceOffset,
-                    size: size
+                    size: size,
+                    memory: memory
                 )
             )
         }
@@ -2831,35 +2832,42 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         emit(.memoryDataDrop(Instruction.MemoryDataDropOperand(segmentIndex: dataIndex)))
     }
     mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws(WasmKitError) -> Output {
-        //     C.mems[0] = it limits
-        // -----------------------------
-        // C ⊦ memory.fill : [it i32 it] → []
+        //   C.mems[d] = iN limits   C.mems[s] = iM limits    K = min {N, M}
+        // -----------------------------------------------------------------------------
+        // C |- memory.copy d s : [iN iM iK] -> []
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
-        let addressType = try module.addressType(memoryIndex: 0)
-        try pop3Emit((addressType, addressType, addressType)) { values, stack in
+        let destIsMemory64 = try module.isMemory64(memoryIndex: dstMem)
+        let sourceIsMemory64 = try module.isMemory64(memoryIndex: srcMem)
+        let lengthIsMemory64 = destIsMemory64 && sourceIsMemory64
+        try pop3Emit(
+            (
+                .address(isMemory64: lengthIsMemory64),
+                .address(isMemory64: sourceIsMemory64),
+                .address(isMemory64: destIsMemory64)
+            )
+        ) { values, stack in
             let (size, sourceOffset, destOffset) = values
             return .memoryCopy(
                 Instruction.MemoryCopyOperand(
                     destOffset: destOffset,
                     sourceOffset: sourceOffset,
-                    size: LVReg(size)
+                    size: LVReg(size),
+                    destMemory: dstMem,
+                    sourceMemory: srcMem
                 )
             )
         }
     }
     mutating func visitMemoryFill(memory: UInt32) throws(WasmKitError) -> Output {
-        //     C.mems[0] = it limits
-        // -----------------------------
-        // C ⊦ memory.fill : [it i32 it] → []
-        // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
-        let addressType = try module.addressType(memoryIndex: 0)
+        let addressType = try module.addressType(memoryIndex: memory)
         try pop3Emit((addressType, .i32, addressType)) { values, stack in
             let (size, value, destOffset) = values
             return .memoryFill(
                 Instruction.MemoryFillOperand(
                     destOffset: destOffset,
                     value: value,
-                    size: LVReg(size)
+                    size: LVReg(size),
+                    memory: memory
                 )
             )
         }

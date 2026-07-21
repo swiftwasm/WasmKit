@@ -156,7 +156,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
             return nil
         }
 
-        // Relaxed-SIMD `(either <result>…)`: a non-deterministic expectation matching any candidate.
+        // Relaxed-SIMD `(either <result>...)`: a non-deterministic expectation matching any candidate.
         if try parser.takeParenBlockStart("either") {
             var candidates: [WastExpectValue] = []
             while let candidate = try parseWastExpectValue() {
@@ -936,8 +936,23 @@ extension ExpressionParser {
     mutating func visitRefFunc(wat: inout Wat) throws(WatParserError) -> UInt32 {
         return try functionIndex(wat: &wat)
     }
-    mutating func visitMemoryInit(wat: inout Wat) throws(WatParserError) -> UInt32 {
-        return try dataIndex(wat: &wat)
+    mutating func visitMemoryInit(wat: inout Wat) throws(WatParserError) -> (dataIndex: UInt32, memory: UInt32) {
+        // Two styles; when both indices are present the memory index is first:
+        //   memory.init $dataidx
+        //   memory.init $memidx $dataidx
+        let dataUse: Parser.IndexOrId
+        let memoryUse: Parser.IndexOrId?
+        let use1 = try parser.expectIndexOrId()
+        if let use2 = try parser.takeIndexOrId() {
+            dataUse = use2
+            memoryUse = use1
+        } else {
+            dataUse = use1
+            memoryUse = nil
+        }
+        let memory = try memoryUse.map { use throws(WatParserError) in UInt32(try wat.memories.resolve(use: use).index) } ?? 0
+        let dataIndex = UInt32(try wat.data.resolve(use: dataUse).index)
+        return (dataIndex, memory)
     }
     mutating func visitDataDrop(wat: inout Wat) throws(WatParserError) -> UInt32 {
         return try dataIndex(wat: &wat)

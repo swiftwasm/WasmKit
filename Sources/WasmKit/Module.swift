@@ -161,6 +161,12 @@ public struct Module: Sendable {
         Instance(handle: try self.instantiateHandle(store: store, imports: imports), store: store)
     }
 
+    /// Validate this module without instantiating it, for the WAST `(module definition ...)`
+    /// directive that asserts validity without building an instance.
+    package func validate() throws(WasmKitError) {
+        try ModuleValidator(module: self).validate()
+    }
+
     #if WasmDebuggingSupport
         /// Instantiate this module with the given imports.
         ///

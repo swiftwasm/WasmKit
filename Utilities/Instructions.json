@@ -190,7 +190,7 @@
   ["signExtension"       , "i64.extend8_s"                , ["0xC2"]                , []                                                 , "unary"      ],
   ["signExtension"       , "i64.extend16_s"               , ["0xC3"]                , []                                                 , "unary"      ],
   ["signExtension"       , "i64.extend32_s"               , ["0xC4"]                , []                                                 , "unary"      ],
-  ["bulkMemory"          , "memory.init"                  , ["0xFC", "0x08"]        , [["dataIndex", "UInt32"]]                          , null         ],
+  ["bulkMemory"          , "memory.init"                        , ["0xFC", "0x08"]        , [["dataIndex", "UInt32"], ["memory", "UInt32"]]    , null         ],
   ["bulkMemory"          , "data.drop"                    , ["0xFC", "0x09"]        , [["dataIndex", "UInt32"]]                          , null         ],
   ["bulkMemory"          , "memory.copy"                  , ["0xFC", "0x0A"]        , [["dstMem", "UInt32"], ["srcMem", "UInt32"]]       , null         ],
   ["bulkMemory"          , "memory.fill"                  , ["0xFC", "0x0B"]        , [["memory", "UInt32"]]                             , null         ],

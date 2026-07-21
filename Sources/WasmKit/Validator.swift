@@ -73,7 +73,7 @@ struct ModuleValidator {
     }
 
     func validate() throws(WasmKitError) {
-        if module.memoryTypes.count > 1 {
+        if module.memoryTypes.count > 1 && !module.features.contains(.multiMemory) {
             throw WasmKitError(message: .multipleMemoriesNotPermitted)
         }
         // Multiple tables are allowed with reference types feature

@@ -79,7 +79,7 @@ protocol BinaryInstructionDecoder {
     /// Decode `br_on_non_null` immediates
     @inlinable mutating func visitBrOnNonNull() throws(WasmParserError) -> UInt32
     /// Decode `memory.init` immediates
-    @inlinable mutating func visitMemoryInit() throws(WasmParserError) -> UInt32
+    @inlinable mutating func visitMemoryInit() throws(WasmParserError) -> (dataIndex: UInt32, memory: UInt32)
     /// Decode `data.drop` immediates
     @inlinable mutating func visitDataDrop() throws(WasmParserError) -> UInt32
     /// Decode `memory.copy` immediates
@@ -684,8 +684,8 @@ func parseBinaryInstruction(
         case 0x07:
             return .conversion(.i64TruncSatF64U)
         case 0x08:
-            let (dataIndex) = try decoder.visitMemoryInit()
-            return .memoryInit(dataIndex: dataIndex)
+            let (dataIndex, memory) = try decoder.visitMemoryInit()
+            return .memoryInit(dataIndex: dataIndex, memory: memory)
         case 0x09:
             let (dataIndex) = try decoder.visitDataDrop()
             return .dataDrop(dataIndex: dataIndex)

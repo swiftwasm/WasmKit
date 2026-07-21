@@ -83,6 +83,64 @@ struct ParserTests {
     }
 
     @Test
+    func parseModuleDefinitionDoesNotThrow() throws {
+        #expect(throws: Never.self) {
+            _ = try self.parseWast("(module definition (memory 65536))")
+        }
+    }
+
+    @Test
+    func parseModuleDefinitionBare() throws {
+        let m = try #require(try parseModule("(module definition (memory 65536))"))
+        #expect(m.isModuleDefinition)
+        #expect(m.id == nil)
+        #expect({ if case .text = m.source { return true } else { return false } }())
+    }
+
+    @Test
+    func parseModuleDefinitionNamed() throws {
+        // Id appears AFTER `definition` (instance.wast:3/109 shape).
+        let m = try #require(try parseModule("(module definition $M (memory 0))"))
+        #expect(m.isModuleDefinition)
+        #expect(m.id == "$M")
+    }
+
+    @Test
+    func parseModuleDefinitionBinary() throws {
+        // `definition` with a binary source (exact-func-import.wast:219 shape).
+        let m = try #require(try parseModule(#"(module definition binary "\00asm\01\00\00\00")"#))
+        #expect(m.isModuleDefinition)
+        #expect({ if case .binary(let b) = m.source { return b == [0, 97, 115, 109, 1, 0, 0, 0] } else { return false } }())
+    }
+
+    @Test
+    func parsePlainModuleIsNotDefinition() throws {
+        let m = try #require(try parseModule("(module (memory 1))"))
+        #expect(!m.isModuleDefinition)
+    }
+
+    @Test
+    func parseAssertInvalidWrappedDefinitionThreadsFlag() throws {
+        // The flag must thread through the wrapped construction site. The harness ignores the flag
+        // for assert_invalid, so behavior there is unchanged.
+        let directives = try parseWast(#"(assert_invalid (module definition (memory 65537)) "size")"#)
+        guard case .assertInvalid(let module, _) = try #require(directives.first) else {
+            #expect(Bool(false), "expected assert_invalid directive")
+            return
+        }
+        #expect(module.isModuleDefinition)
+    }
+
+    @Test
+    func parseEitherAssertReturnDoesNotThrow() throws {
+        #expect(throws: Never.self) {
+            _ = try self.parseWast(
+                #"(module (func (export "f") (result v128) (v128.const i32x4 0 0 0 0)))"#
+                    + #"(assert_return (invoke "f") (either (v128.const i32x4 0 0 0 0) (v128.const i32x4 1 0 0 0)))"#)
+        }
+    }
+
+    @Test
     func parseWastModuleSkip() throws {
         let directives = try parseWast(
             #"""
