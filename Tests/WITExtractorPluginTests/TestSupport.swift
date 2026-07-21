@@ -1,27 +1,12 @@
 import Foundation
 
 struct TestSupport {
-    struct Configuration: Codable {
-        let hostSwiftExecutablePath: URL
-        let hostSdkRootPath: String?
-
-        static let `default`: Configuration? = {
-            let decoder = JSONDecoder()
-            let defaultsPath = URL(fileURLWithPath: #filePath)
-                .deletingLastPathComponent()  // WITExtractorPluginTests
-                .deletingLastPathComponent()  // Tests
-                .appendingPathComponent("default.json")
-            guard let bytes = try? Data(contentsOf: defaultsPath) else { return nil }
-            return try? decoder.decode(Configuration.self, from: bytes)
-        }()
-    }
-
     static func withTemporaryDirectory<Result>(
         _ body: (String) throws -> Result
     ) throws -> Result {
         let tempdir = URL(fileURLWithPath: NSTemporaryDirectory())
         let templatePath = tempdir.appendingPathComponent("WasmKit.XXXXXX")
-        var template = [UInt8](templatePath.path.utf8).map({ UInt8($0) }) + [UInt8(0)]
+        var template = [UInt8](templatePath.path.utf8).map({ Int8($0) }) + [Int8(0)]
 
         if mkdtemp(&template) == nil {
             #if os(Android)
@@ -31,7 +16,7 @@ struct TestSupport {
             #endif
         }
 
-        let path = String(decoding: template.dropLast(), as: UTF8.self)
+        let path = String(decoding: template.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
         defer { _ = try? FileManager.default.removeItem(atPath: path) }
         return try body(path)
     }
@@ -49,82 +34,102 @@ struct TestSupport {
     }
 }
 
-func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) throws -> String {
+struct ExtractResult {
+    let witContents: String
+    /// SwiftPM does not forward command-plugin stderr; diagnostics come via the output-mapping JSON.
+    let diagnostics: String
+}
+
+/// `xcrun --find swift` honors the TOOLCHAINS env var.
+private func hostSwiftExecutable() throws -> URL {
+    if let override = ProcessInfo.processInfo.environment["WASMKIT_TEST_SWIFT"] {
+        return URL(fileURLWithPath: override)
+    }
+    #if os(macOS)
+        return URL(fileURLWithPath: try captureStdout("/usr/bin/xcrun", ["--find", "swift"]))
+    #else
+        return URL(fileURLWithPath: try captureStdout("/usr/bin/env", ["which", "swift"]))
+    #endif
+}
+
+private func captureStdout(_ launchPath: String, _ arguments: [String]) throws -> String {
+    // Single-line output: reading after waitUntilExit cannot fill the pipe and deadlock.
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: launchPath)
+    process.arguments = arguments
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    guard process.terminationStatus == 0 else {
+        throw TestSupport.Error(
+            description: "\(launchPath) \(arguments.joined(separator: " ")) failed (\(process.terminationStatus))")
+    }
+    return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+private func fixtureURL(_ fixturePackage: String) -> URL {
+    URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .appendingPathComponent("Fixtures")
+        .appendingPathComponent(fixturePackage)
+}
+
+/// Writes output to a log file: a large build log would fill a pipe and deadlock waitUntilExit.
+private func runSwift(_ swift: URL, _ arguments: [String], buildDir: String) throws {
+    let logURL = URL(fileURLWithPath: buildDir).appendingPathComponent("swift.log")
+    FileManager.default.createFile(atPath: logURL.path, contents: nil)
+    let logHandle = try FileHandle(forWritingTo: logURL)
+    defer { try? logHandle.close() }
+    let process = Process()
+    process.executableURL = swift
+    process.arguments = arguments
+    process.standardOutput = logHandle
+    process.standardError = logHandle
+    try process.run()
+    process.waitUntilExit()
+    guard process.terminationStatus == 0 else {
+        let log = (try? String(contentsOf: logURL, encoding: .utf8)) ?? ""
+        throw TestSupport.Error(
+            description: "swift \(arguments.joined(separator: " ")) failed (\(process.terminationStatus)):\n\(log)")
+    }
+}
+
+func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) throws -> ExtractResult {
     #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
         fatalError("WITExtractor does not support platforms where Foundation.Process is unavailable")
     #else
-        guard let config = TestSupport.Configuration.default else {
-            fatalError("Please create 'Tests/default.json'")
-        }
-        func lossyUTF8(_ data: Data) -> String {
-            String(decoding: data, as: UTF8.self)
-        }
-
-        func commandLine(_ executable: URL, _ arguments: [String]) -> String {
-            ([executable.path] + arguments).joined(separator: " ")
-        }
-
-        let swiftExecutable = config.hostSwiftExecutablePath
-        let packagePath = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .appendingPathComponent("Fixtures")
-            .appendingPathComponent(fixturePackage)
-
+        let swift = try hostSwiftExecutable()
         return try TestSupport.withTemporaryDirectory { buildDir in
-            var arguments = ["package", "--package-path", packagePath.path, "--scratch-path", buildDir, "extract-wit"]
-            if let sdkRootPath = config.hostSdkRootPath {
-                arguments += ["--sdk", sdkRootPath]
-            }
             let outputMappingPath = URL(fileURLWithPath: buildDir).appendingPathComponent("output-mapping.json").path
-            arguments += ["--output-mapping", outputMappingPath]
-            arguments += trailingArguments
-            let stdoutPipe = Pipe()
-            let stderrPipe = Pipe()
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: swiftExecutable.path)
-            process.arguments = arguments
-            process.standardOutput = stdoutPipe
-            process.standardError = stderrPipe
-            try process.run()
-            process.waitUntilExit()
-
-            let stdoutBytes = try stdoutPipe.fileHandleForReading.readToEnd() ?? Data()
-            let stderrBytes = try stderrPipe.fileHandleForReading.readToEnd() ?? Data()
-
-            let command = commandLine(swiftExecutable, arguments)
-            guard process.terminationStatus == 0 else {
-                throw TestSupport.Error(
-                    description: """
-                        Failed to execute: \(command)
-                        terminationStatus: \(process.terminationStatus)
-                        stdout (lossy utf8):
-                        \(lossyUTF8(stdoutBytes))
-                        stderr (lossy utf8):
-                        \(lossyUTF8(stderrBytes))
-                        """
-                )
-            }
+            let arguments =
+                ["package", "--package-path", fixtureURL(fixturePackage).path, "--scratch-path", buildDir,
+                    "extract-wit", "--output-mapping", outputMappingPath] + trailingArguments
+            try runSwift(swift, arguments, buildDir: buildDir)
             struct Output: Codable {
                 let witOutputPath: String
                 let swiftOutputPath: String
+                let diagnostics: String?
             }
-            let jsonOutput: Output
-            do {
-                let jsonData = try Data(contentsOf: URL(fileURLWithPath: outputMappingPath))
-                jsonOutput = try JSONDecoder().decode(Output.self, from: jsonData)
-            } catch {
-                throw TestSupport.Error(
-                    description: """
-                        Failed to decode JSON from swift stdout for: \(command)
-                        decode error: \(error)
-                        stdout (lossy utf8):
-                        \(lossyUTF8(stdoutBytes))
-                        stderr (lossy utf8):
-                        \(lossyUTF8(stderrBytes))
-                        """
-                )
-            }
-            return try String(contentsOfFile: jsonOutput.witOutputPath, encoding: .utf8)
+            let jsonOutput = try JSONDecoder().decode(
+                Output.self, from: try Data(contentsOf: URL(fileURLWithPath: outputMappingPath)))
+            return ExtractResult(
+                witContents: try String(contentsOfFile: jsonOutput.witOutputPath, encoding: .utf8),
+                diagnostics: jsonOutput.diagnostics ?? "")
+        }
+    #endif
+}
+
+func assertSwiftBuilds(fixturePackage: String) throws {
+    #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+        fatalError("WITExtractor does not support platforms where Foundation.Process is unavailable")
+    #else
+        let swift = try hostSwiftExecutable()
+        try TestSupport.withTemporaryDirectory { buildDir in
+            try runSwift(
+                swift, ["build", "--package-path", fixtureURL(fixturePackage).path, "--scratch-path", buildDir],
+                buildDir: buildDir)
         }
     #endif
 }

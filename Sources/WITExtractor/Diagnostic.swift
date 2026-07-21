@@ -1,13 +1,13 @@
-public struct Diagnostic: CustomStringConvertible {
-    public enum Severity {
+package struct Diagnostic: CustomStringConvertible {
+    package enum Severity {
         case warning
         case error
     }
 
-    public let message: String
-    public let severity: Severity
+    package let message: String
+    package let severity: Severity
 
-    public var description: String {
+    package var description: String {
         "\(severity):\(message)"
     }
 
@@ -19,6 +19,22 @@ public struct Diagnostic: CustomStringConvertible {
 extension Diagnostic {
     static func skipField(context: String, field: String, missingType: String) -> Diagnostic {
         .warning("Skipping \(context)/\(field) field due to missing corresponding WIT type for \"\(missingType)\"")
+    }
+
+    static func skipStaticField(context: String, field: String) -> Diagnostic {
+        .warning("Skipping static field \(context)/\(field): static members are not WIT record fields")
+    }
+
+    static func unsupportedDecl(kind: String, name: String) -> Diagnostic {
+        .warning("Skipping \(kind) '\(name)': only struct, enum, and top-level function declarations export to WIT")
+    }
+
+    static func nameCollision(dropped: String, witName: String, keeping: String) -> Diagnostic {
+        .warning("Skipping \(dropped): WIT name \"\(witName)\" is already used by \(keeping)")
+    }
+
+    static func skipInlinedType(name: String, reason: String) -> Diagnostic {
+        .warning("Skipping inlined dependency type \(name): \(reason)")
     }
 }
 

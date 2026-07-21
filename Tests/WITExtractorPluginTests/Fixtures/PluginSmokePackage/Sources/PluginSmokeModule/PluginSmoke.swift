@@ -1,8 +1,10 @@
-@_spi(WIT)
-public struct StructA {
-    @_spi(WIT) public var memberB: Int
+import WITMarker
 
-    @_spi(WIT) public struct NestedStructC {
-        @_spi(WIT) public var memberD: Int
+@WIT
+public struct StructA {
+    @WIT public var memberB: Int
+
+    @WIT public struct NestedStructC {
+        @WIT public var memberD: Int
     }
 }

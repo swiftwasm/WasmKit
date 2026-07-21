@@ -1,154 +1,93 @@
-@available(macOS 11, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 struct ModuleTranslation {
     let diagnostics: DiagnosticCollection
-    let typeMapping: TypeMapping
+    let resolver: TypeResolver
     var builder: WITBuilder
 
-    mutating func translate(sourceSummary: SwiftSourceSummary) {
-        for (_, typeSource) in sourceSummary.typesByWITName {
-            translateType(source: typeSource)
-        }
+    mutating func translate(inventory: DeclInventory) {
+        // Fixed type-then-function order keeps WIT output stable against Swift source reordering.
+        for type in inventory.types { translateType(type) }
+        for function in inventory.functions { translateFunction(function) }
+    }
 
-        for (_, functionSource) in sourceSummary.functionsByWITName {
-            translateFunction(source: functionSource)
+    mutating func translateType(_ type: TypeEntry) {
+        switch type.kind {
+        case .structType: translateStruct(type)
+        case .enumType: translateEnum(type)
         }
     }
 
-    mutating func translateType(source: SwiftTypeSource) {
-        switch source {
-        case .structType(let source):
-            translateStruct(source: source)
-        case .enumType(let source):
-            translateEnum(source: source)
-        }
-    }
-
-    mutating func translateStruct(source: SwiftStructSource) {
-        guard let witTypeName = typeMapping.lookupWITType(byUsr: source.usr) else {
-            return
-        }
+    mutating func translateStruct(_ type: TypeEntry) {
+        let scope = type.scopePath + [type.name]
+        let witTypeName = type.witName
         var fields: [WITRecord.Field] = []
-
-        for field in source.fields {
+        for field in type.fields {
             let fieldName = ConvertCase.witIdentifier(identifier: field.name)
-            guard let fieldWITType = typeMapping.lookupWITType(byNode: field.type, diagnostics: diagnostics) else {
+            guard let fieldWITType = resolver.resolve(field.type, inScope: scope) else {
                 diagnostics.add(
                     .skipField(
-                        context: source.node.parent.printedName,
-                        field: field.name,
-                        missingType: field.type.parent.parent.printedName
-                    )
-                )
+                        context: type.qualifiedName, field: field.name,
+                        missingType: field.type.trimmedDescription))
                 continue
             }
             fields.append(WITRecord.Field(name: fieldName, type: fieldWITType))
         }
-
-        builder.define(
-            record: WITRecord(name: witTypeName, fields: fields)
-        )
+        builder.define(record: WITRecord(name: witTypeName, fields: fields))
     }
 
-    mutating func translateEnum(source: SwiftEnumSource) {
-        guard let witTypeName = typeMapping.lookupWITType(byUsr: source.usr) else {
-            return
-        }
-
+    mutating func translateEnum(_ type: TypeEntry) {
+        let scope = type.scopePath + [type.name]
+        let witTypeName = type.witName
         var cases: [(name: String, type: String?)] = []
-        var hasPayload = false
-
-        for enumCase in source.cases {
+        let hasPayload = type.cases.contains { !$0.payload.isEmpty }
+        for enumCase in type.cases {
             let caseName = ConvertCase.witIdentifier(identifier: enumCase.name)
-
             var payloadWITType: String?
-            if let payloadTypeNode = enumCase.payloadType {
-                hasPayload = true
-                payloadWITType = typeMapping.lookupWITType(byNode: payloadTypeNode, diagnostics: diagnostics)
+            if !enumCase.payload.isEmpty {
+                payloadWITType = resolver.resolvePayload(enumCase.payload, inScope: scope)
                 if payloadWITType == nil {
+                    // Drop only the payload, not the case: the overlay maps cases positionally
+                    // (SourceDefinitionMapping.enumCaseSwiftNames), so the case set must stay in sync.
                     diagnostics.add(
                         .skipField(
-                            context: source.node.parent.printedName,
-                            field: enumCase.name,
-                            missingType: payloadTypeNode.parent.parent.printedName
-                        )
-                    )
+                            context: type.qualifiedName, field: enumCase.name,
+                            missingType: enumCase.payload.map(\.trimmedDescription).joined(separator: ", ")))
                 }
             }
             cases.append((caseName, payloadWITType))
         }
-
-        // If the given Swift enum has at least one case with payload, turn it into variant,
-        // otherwise optimize to be enum.
         if hasPayload {
-            builder.define(variant: WITVariant(name: witTypeName, cases: cases.map { WITVariant.Case(name: $0, type: $1) }))
+            builder.define(
+                variant: WITVariant(name: witTypeName, cases: cases.map { WITVariant.Case(name: $0, type: $1) }))
         } else {
             builder.define(enum: WITEnum(name: witTypeName, cases: cases.map { name, _ in name }))
         }
     }
 
-    mutating func translateFunction(source: SwiftFunctionSource) {
-        let witName = ConvertCase.witIdentifier(identifier: source.name)
-        let witResultTypeNames = source.results.compactMap { result -> String? in
-            guard let singleResult = typeMapping.lookupWITType(byNode: result.type, diagnostics: diagnostics) else {
-                diagnostics.add(
-                    .skipField(
-                        context: source.name,
-                        field: "result",
-                        missingType: result.type.parent.parent.printedName
-                    )
-                )
-                return nil
-            }
-            return singleResult
-        }
-
-        guard witResultTypeNames.count == source.results.count else {
-            // Skip emitting if there is any missing WIT type
+    mutating func translateFunction(_ function: FunctionEntry) {
+        let witName = function.witName
+        guard let parameterTypes = resolver.resolveParameters(function.parameters.map(\.type), inScope: []) else {
+            diagnostics.add(
+                .skipField(
+                    context: function.name, field: "parameter",
+                    missingType: function.parameters.map(\.type.trimmedDescription).joined(separator: ", ")))
             return
         }
-
-        let witResults: WITFunction.Results
-        switch source.results.count {
-        case 0:
-            witResults = .named([])
-        case 1:
-            witResults = .anon(witResultTypeNames[0])
-        default:
-            var resultNames = AlphabeticalIterator()
-            witResults = .named(
-                zip(source.results, witResultTypeNames).map { source, witType in
-                    WITFunction.Parameter(name: source.name ?? resultNames.next(), type: witType)
-                })
-        }
-
-        var parameterNames = AlphabeticalIterator()
-        let witParameters = source.parameters.compactMap { param -> WITFunction.Parameter? in
-            let name = parameterNames.next()
-            guard let type = typeMapping.lookupWITType(byNode: param.type, diagnostics: diagnostics) else {
-                diagnostics.add(
-                    .skipField(
-                        context: source.name,
-                        field: param.name ?? "parameter",
-                        missingType: param.type.parent.parent.printedName
-                    )
-                )
-                return nil
-            }
-            return WITFunction.Parameter(name: name, type: type)
-        }
-
-        guard witParameters.count == source.parameters.count else {
-            // Skip emitting if there is any missing WIT type
+        guard let resultTypes = resolver.resolveResults(function.returnClause, inScope: []) else {
+            diagnostics.add(
+                .skipField(
+                    context: function.name, field: "result",
+                    missingType: function.returnClause?.type.trimmedDescription ?? ""))
             return
         }
-
-        builder.define(
-            function: WITFunction(
-                name: witName,
-                parameters: witParameters,
-                results: witResults
-            )
-        )
+        // An anonymous param (`_:`) has no internal name; use an alphabetical placeholder.
+        var fallback = AlphabeticalIterator()
+        let witParameters = zip(function.parameters, parameterTypes).map { param, witType in
+            let name = param.internalName.map { ConvertCase.witIdentifier(identifier: $0) } ?? fallback.next()
+            return WITFunction.Parameter(name: name, type: witType)
+        }
+        // WIT permits at most one result; a multi-element tuple return collapses to one `tuple<...>`.
+        let witResults: WITFunction.Results = resultTypes.isEmpty ? .none : .single(resultTypes[0])
+        builder.define(function: WITFunction(name: witName, parameters: witParameters, results: witResults))
     }
 }
 
