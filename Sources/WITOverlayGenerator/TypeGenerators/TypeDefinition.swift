@@ -68,12 +68,12 @@ struct TypeDefinition {
             printer.write(line: "}")
         case .flags(let flags):
             let typeName = try ConvertCase.pascalCase(typeDef.name)
-            printer.write(line: "\(accessLevel) struct \(typeName): OptionSet {")
+            printer.write(line: "\(accessLevel) struct \(typeName): Swift.OptionSet {")
             try printer.indent {
                 let rawValueType = CanonicalABI.rawType(ofFlags: flags.flags.count)
                 let rawSwiftTypes = rawValueType.swiftTypeNames
                 if rawSwiftTypes.count > 1 {
-                    printer.write(line: "\(accessLevel) struct RawValue: Equatable, Hashable {")
+                    printer.write(line: "\(accessLevel) struct RawValue: Swift.Equatable, Swift.Hashable {")
                     printer.indent {
                         for (i, rawSwiftType) in rawSwiftTypes.enumerated() {
                             printer.write(line: "let field\(i): \(rawSwiftType)")
