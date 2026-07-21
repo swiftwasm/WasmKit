@@ -510,9 +510,9 @@ struct MemoryEntity: ~Copyable {
     private enum Storage {
         #if os(macOS) || os(Linux)
             case mprotect(MprotectLinearMemory)
+            case shared(SharedMemoryStorage)
         #endif
         case malloc(MallocStorage)
-        case shared(SharedMemoryStorage)
 
         init(
             initialBytes: Int,
@@ -522,8 +522,12 @@ struct MemoryEntity: ~Copyable {
             engineConfiguration: EngineConfiguration
         ) throws(Trap) {
             if isShared {
-                self = .shared(try SharedMemoryStorage(initialBytes: initialBytes, maxBytes: maxBytes, isMemory64: isMemory64, engineConfiguration: engineConfiguration))
-                return
+                #if os(macOS) || os(Linux)
+                    self = .shared(try SharedMemoryStorage(initialBytes: initialBytes, maxBytes: maxBytes, isMemory64: isMemory64, engineConfiguration: engineConfiguration))
+                    return
+                #else
+                    throw Trap(.sharedMemoryRequiresMprotect)
+                #endif
             }
 
             #if os(macOS) || os(Linux)
@@ -548,11 +552,13 @@ struct MemoryEntity: ~Copyable {
             #endif
             case .malloc(let buffer):
                 return buffer.data
-            case .shared(let shared):
-                return UnsafeBufferPointer(
-                    start: shared.basePointer.assumingMemoryBound(to: UInt8.self),
-                    count: shared.currentByteCount.load(ordering: .acquiring)
-                )
+            #if os(macOS) || os(Linux)
+                case .shared(let shared):
+                    return UnsafeBufferPointer(
+                        start: shared.basePointer.assumingMemoryBound(to: UInt8.self),
+                        count: shared.currentByteCount.load(ordering: .acquiring)
+                    )
+            #endif
             }
         }
 
@@ -564,8 +570,10 @@ struct MemoryEntity: ~Copyable {
             #endif
             case .malloc(let buffer):
                 return buffer.baseAddress
-            case .shared(let shared):
-                return shared.basePointer
+            #if os(macOS) || os(Linux)
+                case .shared(let shared):
+                    return shared.basePointer
+            #endif
             }
         }
 
@@ -577,8 +585,10 @@ struct MemoryEntity: ~Copyable {
             #endif
             case .malloc(let buffer):
                 return buffer.byteCount
-            case .shared(let shared):
-                return shared.currentByteCount.load(ordering: .acquiring)
+            #if os(macOS) || os(Linux)
+                case .shared(let shared):
+                    return shared.currentByteCount.load(ordering: .acquiring)
+            #endif
             }
         }
 
@@ -590,8 +600,10 @@ struct MemoryEntity: ~Copyable {
             #endif
             case .malloc(let buffer):
                 return buffer.trapGuardReservationSize
-            case .shared(let shared):
-                return shared.reservationSize
+            #if os(macOS) || os(Linux)
+                case .shared(let shared):
+                    return shared.reservationSize
+            #endif
             }
         }
 
@@ -606,8 +618,10 @@ struct MemoryEntity: ~Copyable {
             #endif
             case .malloc(let buffer):
                 return buffer.byteCount
-            case .shared(let shared):
-                return shared.reservationSize
+            #if os(macOS) || os(Linux)
+                case .shared(let shared):
+                    return shared.reservationSize
+            #endif
             }
         }
 
@@ -628,8 +642,10 @@ struct MemoryEntity: ~Copyable {
                 try buffer.grow(to: target.newByteCount)
                 self = .malloc(buffer)
                 return target.oldPages
-            case .shared(let shared):
-                return try shared.grow(by: pageCount, resourceLimiter: resourceLimiter)
+            #if os(macOS) || os(Linux)
+                case .shared(let shared):
+                    return try shared.grow(by: pageCount, resourceLimiter: resourceLimiter)
+            #endif
             }
         }
 
@@ -654,9 +670,11 @@ struct MemoryEntity: ~Copyable {
             #endif
             case .malloc(let buffer):
                 buffer.deallocate()
-            case .shared:
-                // Ref-counted; ARC frees the backing when the last importer is released.
-                break
+            #if os(macOS) || os(Linux)
+                case .shared:
+                    // Ref-counted; ARC frees the backing when the last importer is released.
+                    break
+            #endif
             }
         }
     }
@@ -666,7 +684,9 @@ struct MemoryEntity: ~Copyable {
 
     /// The shared backing's `atomic.wait`/`notify` parking lot, or nil if not shared.
     var sharedParkingLot: AtomicParkingLot? {
-        if case .shared(let shared) = storage { return shared.parkingLot }
+        #if os(macOS) || os(Linux)
+            if case .shared(let shared) = storage { return shared.parkingLot }
+        #endif
         return nil
     }
 
@@ -678,11 +698,7 @@ struct MemoryEntity: ~Copyable {
 
         let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
         let maxPages = memoryType.max ?? defaultMaxPageCount
-        // `max` is only a growth ceiling, not an amount we allocate. If it overflows the
-        // representable range (e.g. a large memory64 maximum), clamp it to the largest
-        // page-aligned value instead of failing: the real cap is the reservation / the host
-        // address space, enforced at grow time. This mirrors wasmtime, which silently clamps
-        // the effective maximum (only the *minimum* overflowing is an instantiation error).
+        // Clamp an overflowing maximum rather than failing; the real cap is enforced at grow.
         let (product, overflow) = Int(clamping: maxPages).multipliedReportingOverflow(by: Self.pageSize)
         let maxBytes = overflow ? (Int.max / Self.pageSize) * Self.pageSize : product
 
@@ -698,13 +714,15 @@ struct MemoryEntity: ~Copyable {
         limit = memoryType
     }
 
-    /// Creates a memory entity for a shared memory backed by pre-allocated `SharedMemoryStorage`.
-    init(_ memoryType: MemoryType, sharedStorage: SharedMemoryStorage) {
-        precondition(memoryType.shared)
-        self.storage = .shared(sharedStorage)
-        self.maxPageCount = memoryType.max ?? Self.maxPageCount(isMemory64: memoryType.isMemory64)
-        self.limit = memoryType
-    }
+    #if os(macOS) || os(Linux)
+        /// Creates a memory entity for a shared memory backed by pre-allocated `SharedMemoryStorage`.
+        init(_ memoryType: MemoryType, sharedStorage: SharedMemoryStorage) {
+            precondition(memoryType.shared)
+            self.storage = .shared(sharedStorage)
+            self.maxPageCount = memoryType.max ?? Self.maxPageCount(isMemory64: memoryType.isMemory64)
+            self.limit = memoryType
+        }
+    #endif
 
     deinit {
         // Frees the inline `.mprotect`/`.malloc` backing. `.shared` is a no-op: ARC
@@ -852,14 +870,16 @@ public struct Memory: Equatable {
         )
     }
 
-    /// Wrap an existing `SharedMemoryStorage` in a new `Memory`, so one shared memory can
-    /// be imported into child `Store`s (the `wasi_thread_spawn` path).
-    init(store: Store, type: MemoryType, sharedStorage: SharedMemoryStorage) {
-        self.init(
-            handle: store.allocator.allocate(memoryType: type, sharedStorage: sharedStorage),
-            allocator: store.allocator
-        )
-    }
+    #if os(macOS) || os(Linux)
+        /// Wrap an existing `SharedMemoryStorage` in a new `Memory`, so one shared memory can
+        /// be imported into child `Store`s (the `wasi_thread_spawn` path).
+        init(store: Store, type: MemoryType, sharedStorage: SharedMemoryStorage) {
+            self.init(
+                handle: store.allocator.allocate(memoryType: type, sharedStorage: sharedStorage),
+                allocator: store.allocator
+            )
+        }
+    #endif
 
     /// Returns a copy of the memory data.
     @available(*, deprecated, message: "Use `withUnsafeBufferPointer(offset:count:_:)` or `withUnsafeMutableBufferPointer(offset:count:_:)` instead")

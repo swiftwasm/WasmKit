@@ -572,16 +572,18 @@ extension StoreAllocator {
         return InternalMemory(unsafe: pointer)
     }
 
-    /// Allocate a memory entity wrapping an existing shared memory storage.
-    ///
-    /// Used by `wasi_thread_spawn` to provide the same shared memory as an
-    /// import to child Store instances.
-    func allocate(memoryType: MemoryType, sharedStorage: SharedMemoryStorage) -> InternalMemory {
-        let pointer = memories.allocate(
-            initializing: MemoryEntity(memoryType, sharedStorage: sharedStorage)
-        )
-        return InternalMemory(unsafe: pointer)
-    }
+    #if os(macOS) || os(Linux)
+        /// Allocate a memory entity wrapping an existing shared memory storage.
+        ///
+        /// Used by `wasi_thread_spawn` to provide the same shared memory as an
+        /// import to child Store instances.
+        func allocate(memoryType: MemoryType, sharedStorage: SharedMemoryStorage) -> InternalMemory {
+            let pointer = memories.allocate(
+                initializing: MemoryEntity(memoryType, sharedStorage: sharedStorage)
+            )
+            return InternalMemory(unsafe: pointer)
+        }
+    #endif
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-global>
