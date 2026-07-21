@@ -35,6 +35,7 @@ protocol BinaryInstructionEncoder: InstructionVisitor {
     mutating func encodeImmediates(value: Int64) throws(VisitorError)
     mutating func encodeImmediates(value: V128) throws(VisitorError)
     mutating func encodeImmediates(blockType: BlockType, tryCatch: TryCatch) throws(VisitorError)
+    mutating func encodeImmediates(dataIndex: UInt32, memory: UInt32) throws(VisitorError)
     mutating func encodeImmediates(dstMem: UInt32, srcMem: UInt32) throws(VisitorError)
     mutating func encodeImmediates(dstTable: UInt32, srcTable: UInt32) throws(VisitorError)
     mutating func encodeImmediates(elemIndex: UInt32, table: UInt32) throws(VisitorError)
@@ -405,9 +406,9 @@ extension BinaryInstructionEncoder {
 
         try encodeInstruction(opcode)
     }
-    mutating func visitMemoryInit(dataIndex: UInt32) throws(VisitorError) {
+    mutating func visitMemoryInit(dataIndex: UInt32, memory: UInt32) throws(VisitorError) {
         try encodeInstruction([0xFC, 0x08])
-        try encodeImmediates(dataIndex: dataIndex)
+        try encodeImmediates(dataIndex: dataIndex, memory: memory)
     }
     mutating func visitDataDrop(dataIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0xFC, 0x09])
