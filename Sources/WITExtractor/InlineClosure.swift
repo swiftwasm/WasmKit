@@ -57,8 +57,10 @@ struct InlineClosure {
                     diagnostics.add(
                         .skipInlinedType(
                             name: qualified,
-                            reason:
-                                "its memberwise initializer is not public; add a public initializer matching its stored properties so the generated overlay can construct it across modules"))
+                            reason: """
+                                its memberwise initializer is not public; add a public initializer matching its \
+                                stored properties so the generated overlay can construct it across modules
+                                """))
                     continue
                 }
                 kind = .structType

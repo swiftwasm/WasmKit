@@ -79,7 +79,7 @@ private func fixtureURL(_ fixturePackage: String) -> URL {
 /// Writes output to a log file: a large build log would fill a pipe and deadlock waitUntilExit.
 private func runSwift(_ swift: URL, _ arguments: [String], buildDir: String) throws {
     let logURL = URL(fileURLWithPath: buildDir).appendingPathComponent("swift.log")
-    FileManager.default.createFile(atPath: logURL.path, contents: nil)
+    _ = FileManager.default.createFile(atPath: logURL.path, contents: nil)
     let logHandle = try FileHandle(forWritingTo: logURL)
     defer { try? logHandle.close() }
     let process = Process()
@@ -104,8 +104,10 @@ func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) t
         return try TestSupport.withTemporaryDirectory { buildDir in
             let outputMappingPath = URL(fileURLWithPath: buildDir).appendingPathComponent("output-mapping.json").path
             let arguments =
-                ["package", "--package-path", fixtureURL(fixturePackage).path, "--scratch-path", buildDir,
-                    "extract-wit", "--output-mapping", outputMappingPath] + trailingArguments
+                [
+                    "package", "--package-path", fixtureURL(fixturePackage).path, "--scratch-path", buildDir,
+                    "extract-wit", "--output-mapping", outputMappingPath,
+                ] + trailingArguments
             try runSwift(swift, arguments, buildDir: buildDir)
             struct Output: Codable {
                 let witOutputPath: String

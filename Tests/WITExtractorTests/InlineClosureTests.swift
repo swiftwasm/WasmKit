@@ -38,9 +38,11 @@ struct InlineClosureTests {
     @Test func recursesIntoInlinedDependencyMembers() {
         let widened = widen(
             main: ModuleSource(module: "Main", source: "@WIT public struct Root { public var mid: Mid }"),
-            dependencies: [ModuleSource(
-                module: "Dep",
-                source: "public struct Mid { public var leaf: Leaf; public init(leaf: Leaf) { self.leaf = leaf } }\npublic struct Leaf { public var n: Int; public init(n: Int) { self.n = n } }")])
+            dependencies: [
+                ModuleSource(
+                    module: "Dep",
+                    source: "public struct Mid { public var leaf: Leaf; public init(leaf: Leaf) { self.leaf = leaf } }\npublic struct Leaf { public var n: Int; public init(n: Int) { self.n = n } }")
+            ])
         #expect(widened.types.map(\.witName) == ["root", "mid", "leaf"])
         #expect(widened.types.first { $0.witName == "leaf" }?.swiftQualifiedName == "Dep.Leaf")
     }
@@ -64,9 +66,11 @@ struct InlineClosureTests {
         let diagnostics = DiagnosticCollection()
         let widened = widen(
             main: ModuleSource(module: "Main", source: "@WIT public struct Root { public var p: Public }"),
-            dependencies: [ModuleSource(
-                module: "Dep",
-                source: "public struct Public { public var inner: Hidden; public init(inner: Hidden) { self.inner = inner } }\nstruct Hidden { public var n: Int }")],
+            dependencies: [
+                ModuleSource(
+                    module: "Dep",
+                    source: "public struct Public { public var inner: Hidden; public init(inner: Hidden) { self.inner = inner } }\nstruct Hidden { public var n: Int }")
+            ],
             diagnostics: diagnostics)
         #expect(widened.types.map(\.witName) == ["root", "public"])
         #expect(
@@ -80,9 +84,11 @@ struct InlineClosureTests {
         let diagnostics = DiagnosticCollection()
         let widened = widen(
             main: ModuleSource(module: "Main", source: "@WIT public struct UsesExternal { public var ext: External }"),
-            dependencies: [ModuleSource(
-                module: "ExternalLib",
-                source: "public struct External { public var label: String; public init?(label: String) { self.label = label } }")],
+            dependencies: [
+                ModuleSource(
+                    module: "ExternalLib",
+                    source: "public struct External { public var label: String; public init?(label: String) { self.label = label } }")
+            ],
             diagnostics: diagnostics)
         #expect(widened.types.map(\.witName) == ["uses-external"])
         #expect(diagnostics.diagnostics.contains { $0.message.contains("External") })
