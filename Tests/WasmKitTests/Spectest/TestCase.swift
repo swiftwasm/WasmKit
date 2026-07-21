@@ -141,10 +141,11 @@ extension TestCase {
         let context = WastRunContext(store: store, rootPath: rootPath.string)
         context.importsSpace.define(module: "spectest", spectestInstance.exports)
 
-        // Add shared_memory export for threads proposal tests
-        if configuration.features.contains(.threads) {
-            let sharedMemoryType = MemoryType(min: 1, max: 2, shared: true)
-            let sharedMemory = try Memory(store: store, type: sharedMemoryType)
+        // Add shared_memory export for threads proposal tests. Skip it where shared memory is
+        // unsupported (e.g. Android, or non-mprotect configurations); such tests can't run there.
+        if configuration.features.contains(.threads),
+            let sharedMemory = try? Memory(store: store, type: MemoryType(min: 1, max: 2, shared: true))
+        {
             context.importsSpace.define(module: "spectest", name: "shared_memory", sharedMemory)
         }
         do {

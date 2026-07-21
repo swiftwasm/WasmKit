@@ -18,9 +18,6 @@ public final class Store {
     /// The engine associated with this store.
     public let engine: Engine
 
-    /// Parking lot for atomic wait/notify operations
-    let atomicParkingLot = AtomicParkingLot()
-
     /// Create a new store associated with the given engine.
     public init(engine: Engine) {
         self.engine = engine

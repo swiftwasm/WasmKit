@@ -158,6 +158,15 @@ extension TrapReason.Message {
     static var cannotAssignToImmutableGlobal: Self {
         Self("cannot assign to an immutable global")
     }
+    static func mmapFailed(reserveBytes: Int) -> Self {
+        Self("failed to reserve \(reserveBytes) bytes of virtual address space for shared memory")
+    }
+    static var sharedMemoryRequiresMprotect: Self {
+        Self("shared memory requires mprotect-based bounds checking, which is unavailable in this configuration")
+    }
+    static var atomicWaitOnUnsharedMemory: Self {
+        Self("`memory.atomic.wait` requires a shared memory")
+    }
     static func noGlobalExportWithName(globalName: String, instance: Instance) -> Self {
         Self("no global export with name \(globalName) in a module instance \(instance)")
     }

@@ -426,7 +426,11 @@ extension Execution {
         @inline(__always)
         static func assign(md: inout Md, ms: inout Ms, memory: inout MemoryEntity) {
             md = memory.baseAddress
-            ms = memory.byteCount
+            // For shared memory this is the guard-page reservation, not the committed size,
+            // so the software check never rejects a valid address that another thread just
+            // grew into; the guard pages enforce the real bound. For non-shared memory it is
+            // the committed size (the tight software bound).
+            ms = memory.boundsCheckLimit
             wasmkit_trap_guard_set_current_memory(md, memory.trapGuardReservationSize)
         }
 

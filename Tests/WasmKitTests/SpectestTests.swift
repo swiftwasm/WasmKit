@@ -9,17 +9,28 @@ struct SpectestTests {
     static let testsuite =
         projectDir
         .appendingPathComponent("Vendor/testsuite")
+    /// Whether the default engine can back a shared memory here (requires mprotect: not ASan,
+    /// not token threading, 64-bit macOS/Linux). The threads proposal tests declare shared
+    /// memories, so they are skipped where one cannot be created.
+    static let sharedMemorySupported: Bool = {
+        let store = Store(engine: Engine(configuration: EngineConfiguration()))
+        return (try? Memory(store: store, type: MemoryType(min: 1, max: 1, shared: true))) != nil
+    }()
+
     static var testPaths: [String] {
-        [
+        var paths = [
             Self.testsuite.path,
             Self.testsuite.appendingPathComponent("proposals/memory64").path,
             Self.testsuite.appendingPathComponent("proposals/tail-call").path,
-            Self.testsuite.appendingPathComponent("proposals/threads").path,
             Self.testsuite.appendingPathComponent("proposals/exception-handling").path,
             Self.testsuite.appendingPathComponent("proposals/extended-const").path,
             Self.testsuite.appendingPathComponent("proposals/relaxed-simd").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite").path,
         ]
+        if sharedMemorySupported {
+            paths.append(Self.testsuite.appendingPathComponent("proposals/threads").path)
+        }
+        return paths
     }
 
     #if !os(Android)

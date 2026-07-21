@@ -1,3 +1,4 @@
+import Synchronization
 import WasmParser
 
 /// A simple bump allocator for a single type.
@@ -157,41 +158,50 @@ extension ImmutableArray: Sequence {
 /// Used for efficient equality comparison.
 protocol Internable {
     /// Storage representation of an interned value.
-    associatedtype Offset: UnsignedInteger
+    associatedtype Offset: UnsignedInteger & Sendable
 }
 
 /// An interned value of type `T`.
 /// Two interned values should be equal if their corresponding `T` values are equal.
-struct Interned<T: Internable>: Equatable, Hashable {
+struct Interned<T: Internable>: Equatable, Hashable, Sendable {
     let id: T.Offset
 }
 
 /// A deduplicating interner for values of type `Item`.
-class Interner<Item: Hashable & Internable> {
-    private var itemByIntern: [Item]
-    private var internByItem: [Item: Interned<Item>]
+///
+/// Thread-safe: all access is serialized by an internal `Mutex`.
+final class Interner<Item: Hashable & Internable & Sendable>: Sendable {
+    private struct State {
+        var itemByIntern: [Item]
+        var internByItem: [Item: Interned<Item>]
+    }
+
+    private let state: Mutex<State>
 
     init() {
-        itemByIntern = []
-        internByItem = [:]
+        state = Mutex(State(itemByIntern: [], internByItem: [:]))
     }
 
     /// Interns the given `item` and returns an interned value.
     /// If the item is already interned, returns the existing interned value.
     func intern(_ item: Item) -> Interned<Item> {
-        if let interned = internByItem[item] {
-            return interned
+        state.withLock { state in
+            if let interned = state.internByItem[item] {
+                return interned
+            }
+            let id = state.itemByIntern.count
+            state.itemByIntern.append(item)
+            let newInterned = Interned<Item>(id: Item.Offset(id))
+            state.internByItem[item] = newInterned
+            return newInterned
         }
-        let id = itemByIntern.count
-        itemByIntern.append(item)
-        let newInterned = Interned<Item>(id: Item.Offset(id))
-        internByItem[item] = newInterned
-        return newInterned
     }
 
     /// Resolves the given `interned` value to the original value.
     func resolve(_ interned: Interned<Item>) -> Item {
-        return itemByIntern[Int(interned.id)]
+        state.withLock { state in
+            state.itemByIntern[Int(interned.id)]
+        }
     }
 }
 
@@ -561,6 +571,19 @@ extension StoreAllocator {
         let pointer = try memories.allocate(initializing: MemoryEntity(memoryType, engineConfiguration: engineConfiguration, resourceLimiter: resourceLimiter))
         return InternalMemory(unsafe: pointer)
     }
+
+    #if os(macOS) || os(Linux)
+        /// Allocate a memory entity wrapping an existing shared memory storage.
+        ///
+        /// Used by `wasi_thread_spawn` to provide the same shared memory as an
+        /// import to child Store instances.
+        func allocate(memoryType: MemoryType, sharedStorage: SharedMemoryStorage) -> InternalMemory {
+            let pointer = memories.allocate(
+                initializing: MemoryEntity(memoryType, sharedStorage: sharedStorage)
+            )
+            return InternalMemory(unsafe: pointer)
+        }
+    #endif
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-global>
