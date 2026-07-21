@@ -962,6 +962,37 @@ extension MemoryEntity: ValidatableEntity {
 
 typealias InternalMemory = EntityHandle<MemoryEntity>
 
+extension InternalMemory {
+    /// Implements cross-memory `memory.copy` (multi-memory) between two memory handles.
+    func copy(from sourceMemory: InternalMemory, sourceOffset: UInt64, destOffset: UInt64, count: UInt64) throws {
+        // Aliased handle: two exclusive `withValue` accesses would overlap, so dispatch to the
+        // overlap-safe intra-memory copy under one access.
+        if self == sourceMemory {
+            try withValue { try $0.copy(from: sourceOffset, to: destOffset, count: count) }
+            return
+        }
+        // Distinct memory handles cannot overlap, so `copyMemory`'s non-overlap requirement holds.
+        try withValue { destination in
+            try sourceMemory.withValue { source in
+                let (destinationEnd, destinationOverflow) = destOffset.addingReportingOverflow(count)
+                let (sourceEnd, sourceOverflow) = sourceOffset.addingReportingOverflow(count)
+                guard !destinationOverflow, destinationEnd <= destination.byteCount,
+                    !sourceOverflow, sourceEnd <= source.byteCount
+                else {
+                    throw Trap(.memoryOutOfBounds)
+                }
+                let count = Int(count)
+                guard count > 0 else { return }
+                guard let destinationBase = destination.baseAddress,
+                    let sourceBase = source.baseAddress
+                else { return }
+                destinationBase.advanced(by: Int(destOffset))
+                    .copyMemory(from: sourceBase.advanced(by: Int(sourceOffset)), byteCount: count)
+            }
+        }
+    }
+}
+
 /// A WebAssembly `memory` instance.
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#memory-instances>
