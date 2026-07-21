@@ -60,6 +60,11 @@
         private var memoryView: DebuggerMemoryView
         private let wasi: WASIBridgeToHost
 
+        // Requested and resolved addresses diverge when the requested address lands on an elided
+        // instruction (e.g. local.get) that resolves forward; the host expects stop replies at the
+        // address it set the breakpoint on, not the resolved one.
+        private var resolvedToRequestedBreakpoint = [Int: Int]()
+
         package init(
             moduleFilePath: FilePath,
             engineConfiguration: EngineConfiguration,
@@ -128,11 +133,13 @@
                 ]
                 switch self.debugger.state {
                 case .stoppedAtBreakpoint(let breakpoint):
-                    let pc = breakpoint.wasmPc
+                    let requested = self.resolvedToRequestedBreakpoint[breakpoint.wasmPc]
+                    let pc = requested ?? breakpoint.wasmPc
                     let pcInHostAddressSpace = UInt64(pc) + DebuggerMemoryView.executableCodeOffset
                     result.append(("thread-pcs", self.hexDump(pcInHostAddressSpace, endianness: .big)))
                     result.append(("00", self.hexDump(pcInHostAddressSpace, endianness: .little)))
-                    result.append(("reason", "trace"))
+                    // "breakpoint" only at a host-set site; step/entrypoint landings are "trace".
+                    result.append(("reason", requested != nil ? "breakpoint" : "trace"))
                     return .keyValuePairs(result)
 
                 case .entrypointReturned(let values):
@@ -302,25 +309,29 @@
                 throw Error.killRequestReceived
 
             case .insertSoftwareBreakpoint:
-                try self.debugger.enableBreakpoint(
-                    address: Int(
-                        self.firstHexArgument(
-                            argumentsString: command.arguments,
-                            separator: ",",
-                            endianness: .big
-                        ) - DebuggerMemoryView.executableCodeOffset)
-                )
+                let requested = Int(
+                    try self.firstHexArgument(
+                        argumentsString: command.arguments,
+                        separator: ",",
+                        endianness: .big
+                    ) - DebuggerMemoryView.executableCodeOffset)
+                let resolved = try self.debugger.enableBreakpoint(address: requested)
+                self.resolvedToRequestedBreakpoint[resolved] = requested
                 responseKind = .ok
 
             case .removeSoftwareBreakpoint:
-                try self.debugger.disableBreakpoint(
-                    address: Int(
-                        self.firstHexArgument(
-                            argumentsString: command.arguments,
-                            separator: ",",
-                            endianness: .big
-                        ) - DebuggerMemoryView.executableCodeOffset)
-                )
+                let requested = Int(
+                    try self.firstHexArgument(
+                        argumentsString: command.arguments,
+                        separator: ",",
+                        endianness: .big
+                    ) - DebuggerMemoryView.executableCodeOffset)
+                if let resolved = self.resolvedToRequestedBreakpoint.first(where: { $0.value == requested })?.key {
+                    try self.debugger.disableBreakpoint(address: resolved)
+                    self.resolvedToRequestedBreakpoint[resolved] = nil
+                } else {
+                    try self.debugger.disableBreakpoint(address: requested)
+                }
                 responseKind = .ok
 
             case .wasmLocal:
