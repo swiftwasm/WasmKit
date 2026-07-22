@@ -6,7 +6,7 @@ let package = Package(
     name: "PluginSmokePackage",
     platforms: [.macOS(.v15)],
     dependencies: [
-        .package(path: "../../../../")
+        .package(name: "WasmKit", path: "../../../../")
     ],
     targets: [
         .target(

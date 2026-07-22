@@ -6,7 +6,7 @@ let package = Package(
     name: "CrossModulePackage",
     platforms: [.macOS(.v15)],
     dependencies: [
-        .package(path: "../../../../")
+        .package(name: "WasmKit", path: "../../../../")
     ],
     targets: [
         .target(name: "ExternalLib"),
