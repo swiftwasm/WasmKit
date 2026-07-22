@@ -2,7 +2,7 @@ import Foundation
 import Testing
 
 @Suite struct PluginSmokeTests {
-    #if !(os(iOS) || os(watchOS) || os(tvOS) || os(visionOS))
+    #if os(macOS) || os(Linux)
         @Test(
             .disabled(
                 if: ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] != nil,

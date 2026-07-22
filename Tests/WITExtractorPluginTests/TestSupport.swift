@@ -97,9 +97,7 @@ private func runSwift(_ swift: URL, _ arguments: [String], buildDir: String) thr
 }
 
 func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) throws -> ExtractResult {
-    #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-        fatalError("WITExtractor does not support platforms where Foundation.Process is unavailable")
-    #else
+    #if os(macOS) || os(Linux)
         let swift = try hostSwiftExecutable()
         return try TestSupport.withTemporaryDirectory { buildDir in
             let outputMappingPath = URL(fileURLWithPath: buildDir).appendingPathComponent("output-mapping.json").path
@@ -120,18 +118,20 @@ func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) t
                 witContents: try String(contentsOfFile: jsonOutput.witOutputPath, encoding: .utf8),
                 diagnostics: jsonOutput.diagnostics ?? "")
         }
+    #else
+        fatalError("WITExtractor tests require a host Swift toolchain, available only on macOS and Linux")
     #endif
 }
 
 func assertSwiftBuilds(fixturePackage: String) throws {
-    #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-        fatalError("WITExtractor does not support platforms where Foundation.Process is unavailable")
-    #else
+    #if os(macOS) || os(Linux)
         let swift = try hostSwiftExecutable()
         try TestSupport.withTemporaryDirectory { buildDir in
             try runSwift(
                 swift, ["build", "--package-path", fixtureURL(fixturePackage).path, "--scratch-path", buildDir],
                 buildDir: buildDir)
         }
+    #else
+        fatalError("WITExtractor tests require a host Swift toolchain, available only on macOS and Linux")
     #endif
 }
