@@ -273,15 +273,7 @@ let package = Package(
             ],
             swiftSettings: swiftSettings
         ),
-        .macro(
-            name: "WITMacroPlugin",
-            dependencies: [
-                .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
-                .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
-            ],
-            swiftSettings: swiftSettings
-        ),
-        .target(name: "WITMarker", dependencies: ["WITMacroPlugin"], swiftSettings: swiftSettings),
+        .target(name: "WITMarker", swiftSettings: swiftSettings),
         .testTarget(name: "WITExtractorTests", dependencies: ["WITExtractor", "WIT"], swiftSettings: swiftSettings),
 
         .target(
