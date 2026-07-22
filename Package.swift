@@ -35,6 +35,7 @@ let package = Package(
         .library(name: "WasmParser", targets: ["WasmParser"]),
         .library(name: "WAT", targets: ["WAT"]),
         .library(name: "WIT", targets: ["WIT"]),
+        .library(name: "WITMarker", targets: ["WITMarker"]),
         .library(name: "_CabiShims", targets: ["_CabiShims"]),
     ],
     traits: [
@@ -263,7 +264,15 @@ let package = Package(
         .target(name: "WITOverlayGenerator", dependencies: ["WIT"], swiftSettings: swiftSettings),
         .target(name: "_CabiShims"),
 
-        .target(name: "WITExtractor", swiftSettings: swiftSettings),
+        .target(
+            name: "WITExtractor",
+            dependencies: [
+                .product(name: "SwiftParser", package: "swift-syntax"),
+                .product(name: "SwiftSyntax", package: "swift-syntax"),
+            ],
+            swiftSettings: swiftSettings
+        ),
+        .target(name: "WITMarker", swiftSettings: swiftSettings),
         .testTarget(name: "WITExtractorTests", dependencies: ["WITExtractor", "WIT"], swiftSettings: swiftSettings),
 
         .target(
@@ -290,6 +299,7 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         .package(url: "https://github.com/apple/swift-system", from: "1.7.2"),
         .package(url: "https://github.com/apple/swift-nio", from: "2.90.0"),
         .package(url: "https://github.com/apple/swift-log", from: "1.7.1"),
+        .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"604.0.0"),
     ]
 } else {
     package.dependencies += [
@@ -297,6 +307,7 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         .package(path: "../swift-system"),
         .package(path: "../swift-nio"),
         .package(path: "../swift-log"),
+        .package(path: "../swift-syntax"),
     ]
 }
 

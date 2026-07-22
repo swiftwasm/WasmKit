@@ -70,8 +70,9 @@ struct WITFunction {
         let type: String
     }
     enum Results {
-        case named([Parameter])
-        case anon(String)
+        case none
+        /// WIT permits at most one result; a multi-value return lowers to a single `tuple<...>`.
+        case single(String)
     }
     let name: String
     let parameters: [Parameter]
@@ -88,16 +89,12 @@ extension WITFunction: SourcePrintable {
         let params = paramsString(parameters)
         let result: String
         switch results {
-        case .anon(let type):
+        case .none:
+            result = ""
+        case .single(let type):
             result = " -> " + type
-        case .named(let types):
-            if !types.isEmpty {
-                result = " -> (" + paramsString(types) + ")"
-            } else {
-                result = ""
-            }
         }
-        printer.write(line: name + ": func(\(params))" + result)
+        printer.write(line: name + ": func(\(params))" + result + ";")
     }
 }
 
