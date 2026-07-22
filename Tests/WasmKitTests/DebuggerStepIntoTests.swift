@@ -79,7 +79,8 @@
 
             try debugger.step()
             let landing = try requireStopped(debugger)
-            #expect(landing >= calleeOrigin && landing < startBase,
+            #expect(
+                landing >= calleeOrigin && landing < startBase,
                 "step should land inside the callee [\(calleeOrigin), \(startBase)), got \(landing)")
             #expect(landing != bp + 1, "must not be a step-over")
         }
