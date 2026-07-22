@@ -61,4 +61,20 @@ struct GDBRemoteProtocolTests {
         #expect(packet == expectedPacket)
         #expect(decoder.accummulatedChecksum == 0)
     }
+
+    @Test
+    func decodingWasmGlobal() throws {
+        var decoder = self.decoder
+        var buffer = ByteBuffer(string: "+$qWasmGlobal:0;1#30")
+        let packet = try decoder.decode(buffer: &buffer)
+        #expect(packet?.payload.kind == .wasmGlobal)
+        #expect(packet?.payload.arguments == "0;1")
+    }
+
+    @Test
+    func wasmGlobalMemberwiseInit() {
+        let command = GDBHostCommand(kind: .wasmGlobal, arguments: "0;1")
+        #expect(command.kind == .wasmGlobal)
+        #expect(command.arguments == "0;1")
+    }
 }
