@@ -1,8 +1,9 @@
-import Foundation
-import Testing
+#if os(macOS) || os(Linux)
 
-@Suite struct PluginSmokeTests {
-    #if os(macOS) || os(Linux)
+    import Foundation
+    import Testing
+
+    @Suite struct PluginSmokeTests {
         @Test(
             .disabled(
                 if: ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] != nil,
@@ -96,5 +97,6 @@ import Testing
         func crossModuleFixtureCompiles() throws {
             try assertSwiftBuilds(fixturePackage: "CrossModulePackage")
         }
-    #endif
-}
+    }
+
+#endif
