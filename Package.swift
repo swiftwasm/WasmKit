@@ -1,6 +1,5 @@
 // swift-tools-version:6.3
 
-import CompilerPluginSupport
 import PackageDescription
 
 import class Foundation.ProcessInfo
