@@ -48,6 +48,7 @@ package struct GDBHostCommand: Equatable {
         case insertSoftwareBreakpoint
         case removeSoftwareBreakpoint
         case wasmLocal
+        case wasmGlobal
         case memoryRegionInfo
         case detach
 
@@ -103,6 +104,8 @@ package struct GDBHostCommand: Equatable {
                 self = .kill
             case "qWasmLocal":
                 self = .wasmLocal
+            case "qWasmGlobal":
+                self = .wasmGlobal
             case "qMemoryRegionInfo":
                 self = .memoryRegionInfo
             case "D":

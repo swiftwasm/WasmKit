@@ -558,16 +558,15 @@
             )
         }
 
-        /// Verifies that `step` on a `call` instruction correctly steps over the call
-        /// and stops at the next instruction in the caller.
         @Test
-        func stepStepsOverCall() throws {
+        func stepEntersCall() throws {
             let store = Store(engine: Engine())
             let bytes = try wat2wasm(callWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let startBase = module.functions[0].code.originalAddress
+            let calleeOrigin = module.functions[1].code.originalAddress  // $add_one, defined after _start
             // _start body: i32.const 10 (2) + call 1 (2) + end (1)
             let breakpointAddress = try debugger.enableBreakpoint(address: startBase + 2)
 
@@ -577,22 +576,19 @@
             try debugger.step()
             let wasmPc = try requireBreakpoint(debugger)
 
-            #expect(
-                wasmPc > breakpointAddress,
-                "step on call should advance past the call site (offset 2), got offset \(wasmPc - startBase)"
-            )
+            #expect(wasmPc >= calleeOrigin, "step on call should enter the callee at/after \(calleeOrigin), got \(wasmPc)")
+            #expect(wasmPc != breakpointAddress + 1, "must not be a step-over")
         }
 
-        /// Verifies that `step` on a `call_indirect` instruction correctly steps over
-        /// the indirect call and stops at the next instruction in the caller.
         @Test
-        func stepStepsOverCallIndirect() throws {
+        func stepEntersCallIndirect() throws {
             let store = Store(engine: Engine())
             let bytes = try wat2wasm(callIndirectWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let startBase = module.functions[0].code.originalAddress
+            let calleeOrigin = module.functions[1].code.originalAddress  // $add_one, defined after _start
             // _start body: i32.const 10 (2) + i32.const 0 (2) + call_indirect (3) + end (1)
             let breakpointAddress = try debugger.enableBreakpoint(address: startBase + 4)
 
@@ -602,10 +598,8 @@
             try debugger.step()
             let wasmPc = try requireBreakpoint(debugger)
 
-            #expect(
-                wasmPc > breakpointAddress,
-                "step on call_indirect should advance past the call site (offset 4), got offset \(wasmPc - startBase)"
-            )
+            #expect(wasmPc >= calleeOrigin, "step on call_indirect should enter the callee at/after \(calleeOrigin), got \(wasmPc)")
+            #expect(wasmPc != breakpointAddress + 1, "must not be a step-over")
         }
 
         /// Verifies that `step` on a `return_call` (tail call) lands at the

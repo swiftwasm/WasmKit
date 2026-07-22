@@ -11,6 +11,10 @@ struct DebuggerInstructionMapping {
         /// Used for handling breakpoint requests issued by a ``Debugger`` instance.
         private var wasmToIseq = [Int: Pc]()
 
+        /// Last iseq slot per wasm address. A call with args lowers to prep slots then the call, all
+        /// sharing one wasm address; `wasmToIseq` keeps the first (a prep slot), this keeps the call.
+        private var lastWasmToIseq = [Int: Pc]()
+
         /// Wasm addresses sorted in ascending order for binary search when of the next closest mapped
         /// instruction, when no key is found in `wasmToIseqMapping`.
         private var wasmMappings = [Int]()
@@ -23,6 +27,7 @@ struct DebuggerInstructionMapping {
             if self.wasmToIseq[wasm] == nil {
                 self.wasmToIseq[wasm] = iseq
             }
+            self.lastWasmToIseq[wasm] = iseq
             // Insert in sorted order to maintain the binary search invariant.
             // With lazy compilation, functions may be compiled out of address order,
             // so simple append would break the sorted invariant.
@@ -67,6 +72,10 @@ struct DebuggerInstructionMapping {
 
         func findWasm(forIseqAddress pc: Pc) -> Int? {
             self.iseqToWasm[pc]
+        }
+
+        func lastIseq(forWasmAddress address: Int) -> Pc? {
+            self.lastWasmToIseq[address]
         }
     #endif
 }
