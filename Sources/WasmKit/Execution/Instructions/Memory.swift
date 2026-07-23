@@ -66,7 +66,7 @@ extension Execution {
     }
     mutating func memoryInit(sp: Sp, immediate: Instruction.MemoryInitOperand) throws {
         let instance = currentInstance(sp: sp)
-        let memory = instance.memories[0]
+        let memory = instance.memories[Int(immediate.memory)]
         try memory.withValue { memory in
             let segment = instance.dataSegments[Int(immediate.segmentIndex)]
 
@@ -81,17 +81,18 @@ extension Execution {
         segment.withValue { $0.drop() }
     }
     mutating func memoryCopy(sp: Sp, immediate: Instruction.MemoryCopyOperand) throws {
-        let memory = currentInstance(sp: sp).memories[0]
-        try memory.withValue { memory in
-            let isMemory64 = memory.limit.isMemory64
-            let size = sp[immediate.size].asAddressOffset(isMemory64)
-            let source = sp[immediate.sourceOffset].asAddressOffset(isMemory64)
-            let destination = sp[immediate.destOffset].asAddressOffset(isMemory64)
-            try memory.copy(from: source, to: destination, count: size)
-        }
+        let instance = currentInstance(sp: sp)
+        let destinationMemory = instance.memories[Int(immediate.destMemory)]
+        let sourceMemory = instance.memories[Int(immediate.sourceMemory)]
+        let destIsMemory64 = destinationMemory.withValue { $0.limit.isMemory64 }
+        let sourceIsMemory64 = sourceMemory.withValue { $0.limit.isMemory64 }
+        let size = sp[immediate.size].asAddressOffset(destIsMemory64 || sourceIsMemory64)
+        let source = sp[immediate.sourceOffset].asAddressOffset(sourceIsMemory64)
+        let destination = sp[immediate.destOffset].asAddressOffset(destIsMemory64)
+        try destinationMemory.copy(from: sourceMemory, sourceOffset: source, destOffset: destination, count: size)
     }
     mutating func memoryFill(sp: Sp, immediate: Instruction.MemoryFillOperand) throws {
-        let memory = currentInstance(sp: sp).memories[0]
+        let memory = currentInstance(sp: sp).memories[Int(immediate.memory)]
         try memory.withValue { memoryInstance in
             let isMemory64 = memoryInstance.limit.isMemory64
             let copyCounter = Int(sp[immediate.size].asAddressOffset(isMemory64))

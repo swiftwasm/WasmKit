@@ -159,11 +159,14 @@ public struct WasmFeatureSet: OptionSet, Sendable {
     /// The WebAssembly exception handling proposal
     @_alwaysEmitIntoClient
     public static var exceptionHandling: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 5) }
+    /// The WebAssembly multi-memory proposal
+    @_alwaysEmitIntoClient
+    public static var multiMemory: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 6) }
 
     /// The default feature set
     public static let `default`: WasmFeatureSet = [.referenceTypes, .exceptionHandling]
     /// The feature set with all features enabled
-    public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads, .tailCall, .simd, .exceptionHandling]
+    public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads, .tailCall, .simd, .exceptionHandling, .multiMemory]
 }
 
 /// > Note:
@@ -531,6 +534,10 @@ extension Parser {
 /// <https://webassembly.github.io/spec/core/binary/instructions.html>
 extension Parser: BinaryInstructionDecoder {
     @inlinable mutating func parseMemoryIndex() throws(WasmParserError) -> UInt32 {
+        // Pre-multi-memory, the spec encodes this as a reserved zero byte, not a memory index.
+        if features.contains(.multiMemory) {
+            return try parseUnsigned()
+        }
         let zero = try stream.consumeAny()
         guard zero == 0x00 else {
             throw makeError(.zeroExpected(actual: zero))
@@ -665,10 +672,10 @@ extension Parser: BinaryInstructionDecoder {
     }
 
     @inlinable mutating func visitRefFunc() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
-    @inlinable mutating func visitMemoryInit() throws(WasmParserError) -> UInt32 {
+    @inlinable mutating func visitMemoryInit() throws(WasmParserError) -> (dataIndex: UInt32, memory: UInt32) {
         let dataIndex: DataIndex = try parseUnsigned()
-        _ = try parseMemoryIndex()
-        return dataIndex
+        let memory = try parseMemoryIndex()
+        return (dataIndex, memory)
     }
 
     @inlinable mutating func visitDataDrop() throws(WasmParserError) -> UInt32 {
@@ -676,17 +683,13 @@ extension Parser: BinaryInstructionDecoder {
     }
 
     @inlinable mutating func visitMemoryCopy() throws(WasmParserError) -> (dstMem: UInt32, srcMem: UInt32) {
-        _ = try parseMemoryIndex()
-        _ = try parseMemoryIndex()
-        return (0, 0)
+        let destination = try parseMemoryIndex()
+        let source = try parseMemoryIndex()
+        return (destination, source)
     }
 
     @inlinable mutating func visitMemoryFill() throws(WasmParserError) -> UInt32 {
-        let zero = try stream.consumeAny()
-        guard zero == 0x00 else {
-            throw makeError(.zeroExpected(actual: zero))
-        }
-        return 0
+        try parseMemoryIndex()
     }
 
     @inlinable mutating func visitTableInit() throws(WasmParserError) -> (elemIndex: UInt32, table: UInt32) {

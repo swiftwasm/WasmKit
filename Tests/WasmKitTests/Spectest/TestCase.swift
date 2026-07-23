@@ -221,6 +221,17 @@ extension WastRunContext {
                 return .failed("module could not be parsed: \(error)")
             }
 
+            // `(module definition ...)`: decode and validate WITHOUT instantiating (no allocation, no
+            // start function, no current-instance mutation). A WAST module-linking script directive.
+            if moduleDirective.isModuleDefinition {
+                do {
+                    try module.validate()
+                } catch {
+                    return .failed("module definition could not be validated: \(error)")
+                }
+                return .passed
+            }
+
             do {
                 currentInstance = try instantiate(module: module, name: moduleDirective.id)
             } catch {

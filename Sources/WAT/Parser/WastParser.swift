@@ -26,7 +26,8 @@ struct WastParser {
                 let location = originalParser.lexer.location()
                 return .module(
                     ModuleDirective(
-                        source: .text(try parseWAT(&originalParser, features: features)), id: nil, location: location
+                        source: .text(try parseWAT(&originalParser, features: features)), id: nil, location: location,
+                        isModuleDefinition: false
                     ))
             }
             throw WatParserError("unexpected wast directive token", location: parser.lexer.location())
@@ -223,7 +224,7 @@ public enum WastExpectValue {
     /// Corresponds to `f64.const nan:arithmetic` in WAST.
     case f64ArithmeticNaN
     /// A relaxed-SIMD non-deterministic expectation: the result matches if it equals any candidate.
-    /// Corresponds to `(either <result>…)` in WAST.
+    /// Corresponds to `(either <result>...)` in WAST.
     indirect case either([WastExpectValue])
 }
 
@@ -327,13 +328,16 @@ public struct ModuleDirective {
     public let id: String?
     /// The location of the module in the source
     public let location: Location
+    /// The `(module definition ...)` form decodes and validates without instantiating.
+    public let isModuleDefinition: Bool
 
     static func parse(wastParser: inout WastParser) throws(WatParserError) -> ModuleDirective {
         let location = wastParser.parser.lexer.location()
         try wastParser.parser.expectKeyword("module")
+        let isModuleDefinition = try wastParser.parser.takeKeyword("definition")
         let id = try wastParser.parser.takeId()
         let source = try ModuleSource.parse(wastParser: &wastParser)
-        return ModuleDirective(source: source, id: id?.value, location: location)
+        return ModuleDirective(source: source, id: id?.value, location: location, isModuleDefinition: isModuleDefinition)
     }
 }
 
