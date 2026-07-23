@@ -355,6 +355,19 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
             exclude: ["LICENSE.txt"],
             swiftSettings: swiftSettings
         ),
+        .testTarget(
+            name: "WasmKitGDBHandlerTests",
+            dependencies: [
+                "WasmKitGDBHandler",
+                "GDBRemoteProtocol",
+                "WAT",
+                "WasmKit",
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "SystemPackage", package: "swift-system"),
+            ],
+            swiftSettings: swiftSettings
+        ),
     ])
 
     cliCommandsTarget.dependencies.append(contentsOf: [
