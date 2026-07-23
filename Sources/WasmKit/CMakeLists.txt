@@ -40,6 +40,8 @@ add_wasmkit_library(WasmKit
   Execution/Profiler.swift
   Execution/Runtime.swift
   Execution/SharedMemoryStorage.swift
+  Execution/PlatformThread.swift
+  Execution/ThreadGroup.swift
   Execution/SignpostTracer.swift
   Execution/Store.swift
   Execution/StoreAllocator.swift
@@ -57,3 +59,5 @@ endif()
 
 target_link_wasmkit_libraries(WasmKit PUBLIC
   _CWasmKit WasmParser SystemExtras WasmTypes SystemPackage)
+
+target_link_wasmkit_libraries(WasmKit PRIVATE BasicContainers)

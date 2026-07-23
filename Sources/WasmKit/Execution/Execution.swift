@@ -677,6 +677,25 @@ extension Execution {
         guard sp < stackEnd else { throw Trap(.callStackExhausted) }
     }
 
+    /// True if this store's wasi-threads group has been signaled to terminate. Always false for
+    /// stores outside a group (and off macOS/Linux).
+    @inline(__always)
+    func terminationSignaled() -> Bool {
+        #if os(macOS) || os(Linux)
+            if let flag = store.value.terminationFlag { return flag.isSignaled() }
+        #endif
+        return false
+    }
+
+    /// Throws `Trap(.threadTerminated)` if this store's wasi-threads group has been signaled to
+    /// terminate.
+    @inline(__always)
+    func checkTermination() throws {
+        if _slowPath(terminationSignaled()) {
+            throw Trap(.threadTerminated)
+        }
+    }
+
     /// Returns the new program counter and stack pointer.
     @inline(never)
     func invoke(
@@ -685,6 +704,7 @@ extension Execution {
         spAddend: VReg,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
+        try checkTermination()
         if function.isWasm {
             return try invokeWasmFunction(
                 function: function.wasm, callerInstance: callerInstance,
@@ -702,6 +722,7 @@ extension Execution {
         callerInstance: InternalInstance?,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
+        try checkTermination()
         if function.isWasm {
             return try tailInvokeWasmFunction(
                 function: function.wasm, callerInstance: callerInstance,
