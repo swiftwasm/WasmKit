@@ -102,7 +102,7 @@ let package = Package(
         ),
         .testTarget(
             name: "WasmKitTests",
-            dependencies: ["WasmKit", "WAT", "WasmKitFuzzing"],
+            dependencies: ["WasmKit", "WAT", "WasmKitFuzzing", "WasmKitWASI"],
             exclude: ["ExtraSuite", "CMakeLists.txt"],
             swiftSettings: swiftSettings
         ),

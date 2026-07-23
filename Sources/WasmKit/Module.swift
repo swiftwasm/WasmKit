@@ -224,6 +224,50 @@ public struct Module: Sendable {
         return instance
     }
 
+    #if os(macOS) || os(Linux)
+        /// Instantiate this module for a wasi-threads child thread.
+        ///
+        /// Shared memories are reused from `threadGroup` rather than allocated, data segments
+        /// targeting them are not re-applied, and the start function is not called: the child's
+        /// entry point is `wasi_thread_start(tid, arg)`.
+        package func instantiateForThread(
+            store: Store,
+            threadGroup: ThreadGroup,
+            imports: Imports
+        ) throws -> Instance {
+            let instance = try store.allocator.allocateForThread(
+                module: self,
+                engine: store.engine,
+                resourceLimiter: store.resourceLimiter,
+                imports: imports,
+                threadGroup: threadGroup
+            )
+
+            if let nameSection = customSections.first(where: { $0.name == "name" }) {
+                try? store.nameRegistry.register(instance: instance, nameSection: nameSection)
+            }
+
+            let constEvalContext = ConstEvaluationContext(instance: instance, moduleImports: moduleImports)
+
+            // Tables are per-instance, so unlike shared data segments these apply to a child too.
+            try initializeActiveElementSegments(instance: instance, constEvalContext: constEvalContext)
+
+            try initializeActiveDataSegments(
+                instance: instance,
+                constEvalContext: constEvalContext,
+                sharedMemories: threadGroup.sharedMemories.map { $0 != nil }
+            )
+
+            if store.engine.configuration.compilationMode == .eager {
+                try instance.withValue {
+                    try $0.compileAllFunctions(store: store)
+                }
+            }
+
+            return Instance(handle: instance, store: store)
+        }
+    #endif
+
     /// Materialize lazily-computed elements in this module
     @available(*, deprecated, message: "Module materialization is no longer supported. Instantiate the module explicitly instead.")
     public mutating func materializeAll() throws {}
@@ -271,10 +315,17 @@ public struct Module: Sendable {
     }
 
     /// Initialize active data segments into instance memories.
+    ///
+    /// A segment targeting a memory flagged in `sharedMemories` is skipped, since re-applying it
+    /// would overwrite what the parent thread has already written there.
     private func initializeActiveDataSegments(
-        instance: InternalInstance, constEvalContext: ConstEvaluationContext
+        instance: InternalInstance, constEvalContext: ConstEvaluationContext,
+        sharedMemories: [Bool]? = nil
     ) throws {
         for case .active(let data) in self.data {
+            if let sharedMemories, Int(data.index) < sharedMemories.count, sharedMemories[Int(data.index)] {
+                continue
+            }
             let memory = try instance.memories[validating: Int(data.index), MemoryEntity.createOutOfBoundsError]
             let isMemory64 = memory.withValue { $0.limit.isMemory64 }
             let offsetValue = try data.offset.evaluate(

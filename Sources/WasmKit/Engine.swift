@@ -13,7 +13,8 @@ public final class Engine {
     /// The engine configuration.
     public let configuration: EngineConfiguration
     let interceptor: EngineInterceptor?
-    let funcTypeInterner: Interner<FunctionType>
+    /// Shared with wasi-threads child engines, so interned type indices are comparable across threads.
+    package let funcTypeInterner: Interner<FunctionType>
 
     /// Create a new execution engine.
     ///
@@ -39,6 +40,17 @@ public final class Engine {
         self.configuration = configuration
         self.interceptor = interceptor
         self.funcTypeInterner = Interner()
+    }
+
+    /// Create an engine for a wasi-threads child thread. The configuration comes from the parent
+    /// engine, already normalized, so the bounds-checking fallback above does not repeat here.
+    init(
+        configuration: EngineConfiguration,
+        funcTypeInterner: Interner<FunctionType>
+    ) {
+        self.configuration = configuration
+        self.interceptor = nil
+        self.funcTypeInterner = funcTypeInterner
     }
 
     /// Migration aid for the old ``Runtime/instantiate(module:)``

@@ -23,7 +23,7 @@
     ///
     /// `@unchecked Sendable`: `basePointer` is immutable; `currentByteCount` is atomic
     /// (release after commit, acquire on read); `grow` is serialized by `growLock`.
-    final class SharedMemoryStorage: @unchecked Sendable {
+    package final class SharedMemoryStorage: @unchecked Sendable {
         /// The reserved virtual memory backing this storage. The base never moves.
         let vm: SystemVirtualMemory
 

@@ -614,6 +614,21 @@ extension Execution {
         guard sp < stackEnd else { throw Trap(.callStackExhausted) }
     }
 
+    @inline(__always)
+    func terminationSignaled() -> Bool {
+        #if os(macOS) || os(Linux)
+            if let flag = store.value.terminationFlag { return flag.isSignaled() }
+        #endif
+        return false
+    }
+
+    @inline(__always)
+    func checkTermination() throws {
+        if _slowPath(terminationSignaled()) {
+            throw Trap(.threadTerminated)
+        }
+    }
+
     /// Returns the new program counter and stack pointer.
     @inline(never)
     func invoke(
@@ -622,6 +637,7 @@ extension Execution {
         spAddend: VReg,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
+        try checkTermination()
         if function.isWasm {
             return try invokeWasmFunction(
                 function: function.wasm, callerInstance: callerInstance,
@@ -639,6 +655,7 @@ extension Execution {
         callerInstance: InternalInstance?,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
+        try checkTermination()
         if function.isWasm {
             return try tailInvokeWasmFunction(
                 function: function.wasm, callerInstance: callerInstance,
