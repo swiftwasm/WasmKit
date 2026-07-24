@@ -6,7 +6,12 @@
 
     @testable import WasmKit
 
-    @Suite struct WASIThreadSafetyTests {
+    private let sharedMemorySupported = SharedMemoryStorage.isSupported(
+        engineConfiguration: Engine(configuration: .init(features: [.threads])).configuration,
+        isMemory64: false
+    )
+
+    @Suite(.enabled(if: sharedMemorySupported)) struct WASIThreadSafetyTests {
         private func makeEngine() -> Engine {
             Engine(configuration: .init(features: [.threads]))
         }

@@ -5,7 +5,12 @@
 
     @testable import WasmKit
 
-    @Suite struct ThreadInstantiationTests {
+    private let sharedMemorySupported = SharedMemoryStorage.isSupported(
+        engineConfiguration: Engine(configuration: .init(features: [.threads])).configuration,
+        isMemory64: false
+    )
+
+    @Suite(.enabled(if: sharedMemorySupported)) struct ThreadInstantiationTests {
         /// Helper: build a ThreadGroup from a parent instance.
         private func makeThreadGroup(
             module: Module,

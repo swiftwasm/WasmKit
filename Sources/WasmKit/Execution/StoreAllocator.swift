@@ -409,9 +409,7 @@ extension StoreAllocator {
 
         // Step 4.
         // wasi-threads child instantiation supplies a resolver that reuses the ThreadGroup's existing
-        // `SharedMemoryStorage` instead of allocating fresh backing. `allocateEntities` invokes it only
-        // for the module's *defined* memories, so this is what shares a module's own `(memory ... shared)`;
-        // an *imported* shared memory reaches the child through `imports` (see `buildChildImports`) instead.
+        // `SharedMemoryStorage` instead of allocating fresh backing.
         let memories: ImmutableArray<InternalMemory>
         if let localMemoryResolver {
             memories = try allocateEntities(
