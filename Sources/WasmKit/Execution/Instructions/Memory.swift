@@ -256,6 +256,9 @@ extension Execution {
                 return
             }
 
+            // Fast path: bail before parking if the group is already terminating (the wait can block indefinitely).
+            try checkTermination()
+
             // Value matches - wait for notification or timeout.
             // Per the threads spec: timeout is a signed i64 in nanoseconds.
             //   timeout < 0: never expires (wait indefinitely)
@@ -274,12 +277,17 @@ extension Execution {
             let result = parkingLot.parkConditionally(
                 address: UInt64(address),
                 validate: {
-                    // Re-check the value atomically
+                    // Serialized against `unparkAll` under the parking-lot lock, so termination
+                    // signaled between the pre-park check and registration cannot be lost here.
+                    if self.terminationSignaled() { return false }
                     let currentValue = wasmkit_atomic_load_32(rawPtr)
                     return currentValue == expectedValue
                 },
                 deadline: deadline
             )
+
+            // A wait woken or invalidated by group termination must unwind now, not return a value.
+            try checkTermination()
 
             let resultValue: Int32
             switch result {
@@ -318,6 +326,9 @@ extension Execution {
                 return
             }
 
+            // Fast path: bail before parking if the group is already terminating (the wait can block indefinitely).
+            try checkTermination()
+
             // Value matches - wait for notification or timeout.
             // Per the threads spec: timeout is a signed i64 in nanoseconds.
             //   timeout < 0: never expires (wait indefinitely)
@@ -336,12 +347,17 @@ extension Execution {
             let result = parkingLot.parkConditionally(
                 address: UInt64(address),
                 validate: {
-                    // Re-check the value atomically
+                    // Serialized against `unparkAll` under the parking-lot lock, so termination
+                    // signaled between the pre-park check and registration cannot be lost here.
+                    if self.terminationSignaled() { return false }
                     let currentValue = wasmkit_atomic_load_64(rawPtr)
                     return currentValue == expectedValue
                 },
                 deadline: deadline
             )
+
+            // A wait woken or invalidated by group termination must unwind now, not return a value.
+            try checkTermination()
 
             let resultValue: Int32
             switch result {

@@ -78,6 +78,17 @@ if(NOT SwiftSystem_FOUND)
   FetchContent_MakeAvailable(SwiftSystem)
 endif()
 
+# BasicContainers provides the noncopyable UniqueArray backing wasi-threads' thread registry.
+find_package(SwiftCollections CONFIG)
+if(NOT SwiftCollections_FOUND)
+  message("-- Vending SwiftCollections")
+  FetchContent_Declare(SwiftCollections
+    GIT_REPOSITORY https://github.com/apple/swift-collections
+    GIT_TAG 1.6.0
+  )
+  FetchContent_MakeAvailable(SwiftCollections)
+endif()
+
 
 add_subdirectory(Sources)
 add_subdirectory(Tests)

@@ -112,6 +112,8 @@ package enum TrapReason: Error, CustomStringConvertible {
     case integerOverflow
     /// Invalid conversion to integer
     case invalidConversionToInteger
+    /// Thread terminated by another thread in the wasi-threads group
+    case threadTerminated
 
     /// The description of the trap reason.
     package var description: String {
@@ -138,6 +140,8 @@ package enum TrapReason: Error, CustomStringConvertible {
             return "indirect call type mismatch, expected \(expected), got \(actual)"
         case .tableOutOfBounds(let index):
             return "out of bounds table access at \(index) (undefined element)"
+        case .threadTerminated:
+            return "thread terminated by another thread in the group"
         }
     }
 }

@@ -18,10 +18,19 @@ public final class Store {
     /// The engine associated with this store.
     public let engine: Engine
 
+    #if os(macOS) || os(Linux)
+        /// Shared with the store's wasi-threads group, or `nil` for a standalone store. See
+        /// ``TerminationFlag``.
+        package var terminationFlag: TerminationFlag?
+    #endif
+
     /// Create a new store associated with the given engine.
     public init(engine: Engine) {
         self.engine = engine
         self.allocator = StoreAllocator(funcTypeInterner: engine.funcTypeInterner)
+        #if os(macOS) || os(Linux)
+            self.terminationFlag = nil
+        #endif
     }
 }
 

@@ -217,6 +217,11 @@ package final class AtomicParkingLot: Sendable {
         /// (registry lock released) and before `wake()` runs, used to deterministically
         /// exercise the timeout/notify race. Never set outside tests; compiled out of release.
         let _afterDequeueBeforeWake = Mutex<(@Sendable () -> Void)?>(nil)
+
+        /// Test-only hook fired in `parkConditionally` after the pre-lock `validate()` and before the
+        /// registry lock is taken, used to deterministically drive the terminate-before-register ordering.
+        /// Never set outside tests; compiled out of release.
+        let _beforeRegistryLock = Mutex<(@Sendable () -> Void)?>(nil)
     #endif
 
     init() {
@@ -245,6 +250,10 @@ package final class AtomicParkingLot: Sendable {
         if !validate() {
             return .mismatch
         }
+
+        #if DEBUG
+            _beforeRegistryLock.withLock { $0 }?()
+        #endif
 
         let slot = BlockingSlot()
 
@@ -283,8 +292,10 @@ package final class AtomicParkingLot: Sendable {
             // a concurrent `unpark` claimed and counted us in the gap between our timeout
             // and its `wake()`, and we report `.woken` to keep `unpark`'s returned count
             // equal to the wakeups waiters observe. Each slot is appended exactly once, so
-            // `firstIndex` finds the unique entry. This relies on `unpark` being the only
-            // dequeuer; `unparkAll`, when wired for termination, must revisit it (see Risks).
+            // `firstIndex` finds the unique entry. `unparkAll` (group termination) is the
+            // only other dequeuer: a slot it drained also reports `.woken` here, which is
+            // harmless because `unparkAll` returns no count and the caller's post-park
+            // termination check unwinds the waiter regardless.
             let genuinelyTimedOut = registry.withLock { reg -> Bool in
                 guard var slots = reg[address],
                     let index = slots.firstIndex(where: { $0 === slot })

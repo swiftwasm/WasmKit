@@ -690,6 +690,13 @@ struct MemoryEntity: ~Copyable {
         return nil
     }
 
+    #if os(macOS) || os(Linux)
+        var sharedStorage: SharedMemoryStorage? {
+            if case .shared(let shared) = storage { return shared }
+            return nil
+        }
+    #endif
+
     init(_ memoryType: MemoryType, engineConfiguration: EngineConfiguration, resourceLimiter: any ResourceLimiter) throws {
         let initialBytes = Int(memoryType.min) * Self.pageSize
         guard try resourceLimiter.limitMemoryGrowth(to: initialBytes) else {
@@ -873,7 +880,7 @@ public struct Memory: Equatable {
     #if os(macOS) || os(Linux)
         /// Wrap an existing `SharedMemoryStorage` in a new `Memory`, so one shared memory can
         /// be imported into child `Store`s (the `wasi_thread_spawn` path).
-        init(store: Store, type: MemoryType, sharedStorage: SharedMemoryStorage) {
+        package init(store: Store, type: MemoryType, sharedStorage: SharedMemoryStorage) {
             self.init(
                 handle: store.allocator.allocate(memoryType: type, sharedStorage: sharedStorage),
                 allocator: store.allocator
@@ -896,6 +903,14 @@ public struct Memory: Equatable {
     public var byteCount: Int {
         handle.withValue { $0.byteCount }
     }
+
+    #if os(macOS) || os(Linux)
+        /// The backing `SharedMemoryStorage` if this is a shared memory, else nil. Used by the
+        /// wasi-threads host bridge to share one memory across child stores.
+        package var sharedStorage: SharedMemoryStorage? {
+            handle.withValue { $0.sharedStorage }
+        }
+    #endif
 }
 
 extension Memory: GuestMemory {
