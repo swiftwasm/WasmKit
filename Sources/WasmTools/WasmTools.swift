@@ -296,6 +296,47 @@ package func wasm2wat(
     return result.stdoutString
 }
 
+/// Formats a WIT package directory to canonical WIT text using `wasm-tools component wit`.
+///
+/// Loads the `.wit` files (including any under `deps/`) into an in-memory filesystem rather than
+/// preopening the host directory, so it opens no host file descriptors and is safe to run
+/// concurrently with the suite's `.host()`-based WASI tests.
+package func componentWit(
+    wasmToolsPath: String = defaultWasmToolsPath,
+    packageDirectory: String,
+    allFeatures: Bool = true,
+    noDocs: Bool = true
+) throws -> String {
+    let guestRoot = "/package"
+    // Resolve symlinks so the enumerator's URLs share this prefix (macOS temp dirs symlink /var to
+    // /private/var, which would otherwise break the relative-path slicing below).
+    let hostBase = URL(fileURLWithPath: packageDirectory).resolvingSymlinksInPath()
+    guard
+        let enumerator = FileManager.default.enumerator(
+            at: hostBase, includingPropertiesForKeys: [.isRegularFileKey])
+    else {
+        throw WasmToolsError.fileNotFound(path: packageDirectory)
+    }
+
+    let context = try WasmToolsContext()
+    for case let fileURL as URL in enumerator where fileURL.pathExtension == "wit" {
+        // Mirror the host layout (e.g. "/random.wit", "/deps/io/streams.wit") under the guest root.
+        let relative = fileURL.resolvingSymlinksInPath().path.dropFirst(hostBase.path.count)
+        let content = try [UInt8](Data(contentsOf: fileURL))
+        try context.memoryFS.addFile(at: guestRoot + relative, content: content)
+    }
+
+    var args = ["component", "wit", guestRoot]
+    if allFeatures { args.append("--all-features") }
+    if noDocs { args.append("--no-docs") }
+
+    let result = try runWasmTools(wasmToolsPath: wasmToolsPath, args: args, context: context)
+    guard result.exitCode == 0 else {
+        throw WasmToolsError.executionFailed(exitCode: result.exitCode, stderr: result.stderrString)
+    }
+    return result.stdoutString
+}
+
 package func wat2wasm(
     wasmToolsPath: String = defaultWasmToolsPath,
     watContent: [UInt8]
