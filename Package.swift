@@ -39,13 +39,17 @@ let package = Package(
         .library(name: "_CabiShims", targets: ["_CabiShims"]),
     ],
     traits: [
-        .default(enabledTraits: ["FileSystem"]),
+        .default(enabledTraits: ["FileSystem", "MultiThread"]),
         "FileSystem",
         "ComponentModel",
         "WasmDebuggingSupport",
         // Collects instruction-trigram statistics during execution and dumps
         // them to stderr on exit. Development-only diagnostics.
         "EngineStats",
+        // Serializes shared engine state with real locks. Disable only for
+        // single-threaded environments (e.g. bare-metal Embedded Swift) where
+        // the Synchronization module provides no Mutex.
+        "MultiThread",
     ],
     targets: [
         cliCommandsTarget,

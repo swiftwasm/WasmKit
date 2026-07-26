@@ -47,13 +47,19 @@ add_wasmkit_library(WasmKit
   Execution/Value.swift
   Execution/V128Storage.swift
   Platform/AtomicParkingLot.swift
+  Platform/PlatformMutex.swift
   Platform/SystemVirtualMemory.swift
 )
 
+# Joined -DName form: separate "-D;Name" pairs lose their "-D" to CMake's
+# COMPILE_OPTIONS de-duplication when more than one define is present.
 if(WASMKIT_ENABLE_FILESYSTEM)
   target_compile_options(WasmKit PRIVATE
-    $<$<COMPILE_LANGUAGE:Swift>:-D;FileSystem>)
+    $<$<COMPILE_LANGUAGE:Swift>:-DFileSystem>)
 endif()
+
+target_compile_options(WasmKit PRIVATE
+  $<$<COMPILE_LANGUAGE:Swift>:-DMultiThread>)
 
 target_link_wasmkit_libraries(WasmKit PUBLIC
   _CWasmKit WasmParser SystemExtras WasmTypes SystemPackage)
