@@ -1,12 +1,25 @@
 #ifndef WASMKIT_PLATFORM_H
 #define WASMKIT_PLATFORM_H
 
+// Clang nullability annotations; no-op on other compilers.
+#if defined(__clang__)
+#  define WASMKIT_NONNULL _Nonnull
+#  define WASMKIT_NULLABLE _Nullable
+#else
+#  define WASMKIT_NONNULL
+#  define WASMKIT_NULLABLE
+#endif
+
 // NOTE: The `swiftasynccc` attribute is considered to be a Clang extension
 // rather than a language standard feature after LLVM 19. We check
-// `__has_attribute(swiftasynccc)` too for compatibility with older versions.
+// `__has_extension(swiftasynccc)` too for compatibility with older versions.
 // See https://github.com/llvm/llvm-project/pull/85347
-#if !defined(__wasi__) && (__has_feature(swiftasynccc) || __has_extension(swiftasynccc))
-#  define WASMKIT_HAS_SWIFTASYNCCC 1
+#if defined(__clang__) && !defined(__wasi__)
+#  if __has_feature(swiftasynccc) || __has_extension(swiftasynccc)
+#    define WASMKIT_HAS_SWIFTASYNCCC 1
+#  else
+#    define WASMKIT_HAS_SWIFTASYNCCC 0
+#  endif
 #else
 #  define WASMKIT_HAS_SWIFTASYNCCC 0
 #endif

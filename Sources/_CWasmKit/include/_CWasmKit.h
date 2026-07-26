@@ -14,32 +14,32 @@
 #endif
 
 #define WASMKIT_DEFINE_ATOMICS(WIDTH, CTYPE) \
-static inline CTYPE wasmkit_atomic_load_##WIDTH(const void *_Nonnull ptr) { \
+static inline CTYPE wasmkit_atomic_load_##WIDTH(const void *WASMKIT_NONNULL ptr) { \
     return __atomic_load_n((const CTYPE *)ptr, __ATOMIC_SEQ_CST); \
 } \
-static inline void wasmkit_atomic_store_##WIDTH(void *_Nonnull ptr, CTYPE val) { \
+static inline void wasmkit_atomic_store_##WIDTH(void *WASMKIT_NONNULL ptr, CTYPE val) { \
     __atomic_store_n((CTYPE *)ptr, val, __ATOMIC_SEQ_CST); \
 } \
-static inline CTYPE wasmkit_atomic_rmw_add_##WIDTH(void *_Nonnull ptr, CTYPE val) { \
+static inline CTYPE wasmkit_atomic_rmw_add_##WIDTH(void *WASMKIT_NONNULL ptr, CTYPE val) { \
     return __atomic_fetch_add((CTYPE *)ptr, val, __ATOMIC_SEQ_CST); \
 } \
-static inline CTYPE wasmkit_atomic_rmw_sub_##WIDTH(void *_Nonnull ptr, CTYPE val) { \
+static inline CTYPE wasmkit_atomic_rmw_sub_##WIDTH(void *WASMKIT_NONNULL ptr, CTYPE val) { \
     return __atomic_fetch_sub((CTYPE *)ptr, val, __ATOMIC_SEQ_CST); \
 } \
-static inline CTYPE wasmkit_atomic_rmw_and_##WIDTH(void *_Nonnull ptr, CTYPE val) { \
+static inline CTYPE wasmkit_atomic_rmw_and_##WIDTH(void *WASMKIT_NONNULL ptr, CTYPE val) { \
     return __atomic_fetch_and((CTYPE *)ptr, val, __ATOMIC_SEQ_CST); \
 } \
-static inline CTYPE wasmkit_atomic_rmw_or_##WIDTH(void *_Nonnull ptr, CTYPE val) { \
+static inline CTYPE wasmkit_atomic_rmw_or_##WIDTH(void *WASMKIT_NONNULL ptr, CTYPE val) { \
     return __atomic_fetch_or((CTYPE *)ptr, val, __ATOMIC_SEQ_CST); \
 } \
-static inline CTYPE wasmkit_atomic_rmw_xor_##WIDTH(void *_Nonnull ptr, CTYPE val) { \
+static inline CTYPE wasmkit_atomic_rmw_xor_##WIDTH(void *WASMKIT_NONNULL ptr, CTYPE val) { \
     return __atomic_fetch_xor((CTYPE *)ptr, val, __ATOMIC_SEQ_CST); \
 } \
-static inline CTYPE wasmkit_atomic_rmw_xchg_##WIDTH(void *_Nonnull ptr, CTYPE val) { \
+static inline CTYPE wasmkit_atomic_rmw_xchg_##WIDTH(void *WASMKIT_NONNULL ptr, CTYPE val) { \
     return __atomic_exchange_n((CTYPE *)ptr, val, __ATOMIC_SEQ_CST); \
 } \
 static inline _Bool wasmkit_atomic_cmpxchg_##WIDTH( \
-    void *_Nonnull ptr, CTYPE *_Nonnull expected, CTYPE desired \
+    void *WASMKIT_NONNULL ptr, CTYPE *WASMKIT_NONNULL expected, CTYPE desired \
 ) { \
     return __atomic_compare_exchange_n( \
         (CTYPE *)ptr, expected, desired, 0, \
@@ -59,9 +59,9 @@ static inline void wasmkit_atomic_fence(void) {
 // MARK: - Execution Parameters
 // See ExecutionContext.swift for more information about each execution
 // parameter.
-typedef uint64_t *_Nonnull Sp;
-typedef void *_Nullable Pc;
-typedef void *_Nullable Md;
+typedef uint64_t *WASMKIT_NONNULL Sp;
+typedef void *WASMKIT_NULLABLE Pc;
+typedef void *WASMKIT_NULLABLE Md;
 typedef size_t Ms;
 
 #include "TrapGuard.h"
@@ -73,8 +73,8 @@ typedef size_t Ms;
 ///
 /// See https://clang.llvm.org/docs/AttributeReference.html#swiftasynccall for
 /// more information about `swiftasynccall`.
-typedef SWIFT_CC(swiftasync) void (* _Nonnull wasmkit_tc_exec)(
-    uint64_t *_Nonnull sp, Pc, Md, Ms, SWIFT_CONTEXT void *_Nullable state);
+typedef SWIFT_CC(swiftasync) void (* WASMKIT_NONNULL wasmkit_tc_exec)(
+    uint64_t *WASMKIT_NONNULL sp, Pc, Md, Ms, SWIFT_CONTEXT void *WASMKIT_NULLABLE state);
 
 /// The entry point for executing a direct-threaded interpreter loop.
 /// The interpreter loop is implemented as a tail-recursive function that
@@ -86,7 +86,7 @@ typedef SWIFT_CC(swiftasync) void (* _Nonnull wasmkit_tc_exec)(
 /// convention and it leads to a miscompilation of the tail call.
 /// See https://github.com/swiftlang/swift/issues/69264
 static inline void wasmkit_tc_start(
-    wasmkit_tc_exec exec, Sp sp, Pc pc, Md md, Ms ms, void *_Nullable state
+    wasmkit_tc_exec exec, Sp sp, Pc pc, Md md, Ms ms, void *WASMKIT_NULLABLE state
 ) {
   exec(sp, pc, md, ms, state);
 }
@@ -100,15 +100,15 @@ struct SwiftError;
 #ifdef __cplusplus
 extern "C" {
 #endif
-extern void swift_errorRelease(const struct SwiftError *_Nonnull object);
+extern void swift_errorRelease(const struct SwiftError *WASMKIT_NONNULL object);
 #ifdef __cplusplus
 }
 #endif
 
 /// Releases the given Swift error object.
-static inline void wasmkit_swift_errorRelease(const void *_Nonnull object) {
+static inline void wasmkit_swift_errorRelease(const void *WASMKIT_NONNULL object) {
 #ifdef __cplusplus
-    swift_errorRelease(static_cast<const struct SwiftError *_Nonnull>(object));
+    swift_errorRelease(static_cast<const struct SwiftError *WASMKIT_NONNULL>(object));
 #else
     swift_errorRelease(object);
 #endif
