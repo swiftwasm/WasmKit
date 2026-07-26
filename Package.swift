@@ -43,6 +43,9 @@ let package = Package(
         "FileSystem",
         "ComponentModel",
         "WasmDebuggingSupport",
+        // Collects instruction-trigram statistics during execution and dumps
+        // them to stderr on exit. Development-only diagnostics.
+        "EngineStats",
     ],
     targets: [
         cliCommandsTarget,
