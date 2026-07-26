@@ -99,7 +99,9 @@ extension DirEntry: WASIDir, FdWASIEntry {
                 try fd.setTimes(access: access, modification: modification)
             }
         } defer: {
-            try fd.close()
+            try WASIAbi.Errno.translatingPlatformErrno {
+                try fd.close()
+            }
         }
     }
 

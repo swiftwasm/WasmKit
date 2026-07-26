@@ -16,6 +16,43 @@ import Foundation
 #endif
 enum TestSupport {
 
+    #if os(macOS) || os(Linux)
+        /// Comparing paths rather than descriptor counts keeps assertions immune to whatever tests
+        /// run in parallel.
+        static func openDescriptorPaths() throws -> Set<String> {
+            #if os(macOS)
+                let fdDirectory = "/dev/fd"
+            #else
+                let fdDirectory = "/proc/self/fd"
+            #endif
+            var paths: Set<String> = []
+            for entry in try FileManager.default.contentsOfDirectory(atPath: fdDirectory) {
+                var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+                #if os(macOS)
+                    guard let fd = Int32(entry), fcntl(fd, F_GETPATH, &buffer) != -1 else { continue }
+                #else
+                    let length = readlink("\(fdDirectory)/\(entry)", &buffer, buffer.count - 1)
+                    guard length > 0 else { continue }
+                    buffer[length] = 0
+                #endif
+                paths.insert(string(fromCString: buffer))
+            }
+            return paths
+        }
+
+        /// `realpath`, not `URL.resolvingSymlinksInPath()`: the latter leaves a macOS temp path under
+        /// `/var/folders`, while the kernel reports descriptors under `/private/var/folders`.
+        static func realPath(_ path: String) throws -> String {
+            var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+            guard realpath(path, &buffer) != nil else { throw Error(errno: errno) }
+            return string(fromCString: buffer)
+        }
+
+        private static func string(fromCString buffer: [CChar]) -> String {
+            String(decoding: buffer.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        }
+    #endif
+
     struct Error: Swift.Error, CustomStringConvertible {
         let description: String
 

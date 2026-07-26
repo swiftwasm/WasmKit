@@ -21,6 +21,7 @@
     import SystemPackage
     import WasmKit
     import WasmKitGDBHandler
+    import WasmKitWASI
 
     struct DebuggerServer {
         var host = "127.0.0.1"
@@ -28,6 +29,7 @@
         var logLevel = Logger.Level.info
         let wasmModulePath: FilePath
         let engineConfiguration: EngineConfiguration
+        let wasiConfiguration: WASIConfiguration
 
         func run() async throws {
             let logger = {
@@ -68,15 +70,14 @@
                         )
                     }
                 }
-                /* the server will now be accepting connections */
-                logger.info("Debugger server listening on port \(port)")
-
                 let debuggerHandler = try await WasmKitGDBHandler(
                     moduleFilePath: self.wasmModulePath,
                     engineConfiguration: self.engineConfiguration,
+                    wasiConfiguration: self.wasiConfiguration,
                     logger: logger,
                     allocator: serverChannel.channel.allocator
                 )
+                logger.info("Debugger server listening on port \(port)")
 
                 // Discarding task group was designed for persistent server purposes, where a single failing request
                 // isn't taking down the entire server. In our case we need to be able to shut down the server on

@@ -16,7 +16,9 @@
     import Logging
     import NIOCore
     import NIOFileSystem
+    import SystemExtras
     import SystemPackage
+    import WASI
     import WasmKit
     import WasmKitWASI
 
@@ -63,6 +65,7 @@
         package init(
             moduleFilePath: FilePath,
             engineConfiguration: EngineConfiguration,
+            wasiConfiguration: WASIConfiguration,
             logger: Logger,
             allocator: ByteBufferAllocator
         ) async throws {
@@ -77,7 +80,7 @@
 
             let store = Store(engine: Engine(configuration: engineConfiguration))
             var imports = Imports()
-            let wasi = try WASIBridgeToHost()
+            let wasi = try WASIBridgeToHost(configuration: wasiConfiguration)
             wasi.link(to: &imports, store: store)
             self.wasi = wasi
 
@@ -89,8 +92,7 @@
                     throw Error.stoppingAtEntrypointFailed
                 }
             } catch {
-                try wasi.close()
-                throw error
+                throw CleanupFailure.preserving(error, cleanup: wasi.close)
             }
 
             self.memoryView = DebuggerMemoryView(allocator: allocator, wasmBinary: wasmBinary)

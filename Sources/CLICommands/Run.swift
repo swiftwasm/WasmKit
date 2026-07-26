@@ -47,7 +47,7 @@ package struct Run: AsyncParsableCommand {
         let key: String
         let value: String
         init?(argument: String) {
-            var parts = argument.split(separator: "=", maxSplits: 2).makeIterator()
+            var parts = argument.split(separator: "=", maxSplits: 1).makeIterator()
             guard let key = parts.next(), let value = parts.next() else { return nil }
             self.key = String(key)
             self.value = String(value)
@@ -62,8 +62,39 @@ package struct Run: AsyncParsableCommand {
         ))
     var environment: [EnvOption] = []
 
-    @Option(name: .customLong("dir"), help: "Grant access to the given host directory")
-    var directories: [String] = []
+    struct DirOption: ExpressibleByArgument {
+        let argument: String
+
+        /// nil when the value has more than one `::`. Rejecting it from `init?` instead would replace
+        /// the message `derivePreopens()` throws with ArgumentParser's generic one.
+        let paths: (hostPath: String, guestPath: String)?
+
+        init?(argument: String) {
+            self.argument = argument
+            let components = argument.split(separator: "::", omittingEmptySubsequences: false)
+            switch components.count {
+            case 1: self.paths = (argument, argument)
+            case 2: self.paths = (String(components[0]), String(components[1]))
+            default: self.paths = nil
+            }
+        }
+    }
+
+    @Option(
+        name: .customLong("dir"),
+        help: ArgumentHelp(
+            "Grant access to the given host directory, optionally under a different guest path",
+            valueName: "host[::guest]"
+        ))
+    var directories: [DirOption] = []
+
+    @Option(
+        name: .customLong("argv0"),
+        help: ArgumentHelp(
+            "Override argv[0] passed to the WASI program",
+            valueName: "value"
+        ))
+    var argv0: String?
 
     enum ThreadingModel: String, ExpressibleByArgument, CaseIterable {
         #if !os(WASI)
@@ -141,15 +172,12 @@ package struct Run: AsyncParsableCommand {
         #if WasmDebuggingSupport
 
             if let debuggerPort {
-                guard !self.signpost && self.profileOutput == nil else {
-                    fatalError("Signpost logging and profiling are currently not supported while debugging Wasm modules.")
-                }
-
                 let debuggerServer = DebuggerServer(
                     port: debuggerPort,
                     logLevel: self.verbose ? .trace : .info,
                     wasmModulePath: FilePath(self.path),
-                    engineConfiguration: self.deriveRuntimeConfiguration()
+                    engineConfiguration: self.deriveRuntimeConfiguration(),
+                    wasiConfiguration: try self.deriveWASIConfiguration()
                 )
                 try await debuggerServer.run()
                 return
@@ -329,13 +357,52 @@ package struct Run: AsyncParsableCommand {
         )
     }
 
-    func instantiateWASI(module: Module, interceptor: EngineInterceptor?) throws -> () throws -> Void {
-        // Flatten environment variables into a dictionary (Respect the last value if a key is duplicated)
-        let environment = environment.reduce(into: [String: String]()) {
+    package func deriveEnvironment() -> [String: String] {
+        environment.reduce(into: [String: String]()) {
             $0[$1.key] = $1.value
         }
-        let preopens = directories.map { WASIBridgeToHost.Preopen(guestPath: $0, hostPath: $0) }
-        let wasi = try WASIBridgeToHost(args: [path] + arguments, environment: environment, preopens: preopens)
+    }
+
+    package func derivePreopens() throws -> [WASIBridgeToHost.Preopen] {
+        try directories.map { directory in
+            guard let paths = directory.paths else {
+                throw ValidationError(
+                    """
+                    The value '\(directory.argument)' for '--dir' contains more than one '::'. \
+                    Use at most one separator, as in 'host::guest'.
+                    """
+                )
+            }
+            return WASIBridgeToHost.Preopen(guestPath: paths.guestPath, hostPath: paths.hostPath)
+        }
+    }
+
+    package mutating func validate() throws {
+        _ = try derivePreopens()
+
+        #if WasmDebuggingSupport
+            if debuggerPort != nil, signpost || profileOutput != nil {
+                throw ValidationError(
+                    "Signpost logging and profiling are not supported while debugging Wasm modules."
+                )
+            }
+        #endif
+    }
+
+    package func deriveWASIArguments() -> [String] {
+        [argv0 ?? path] + arguments
+    }
+
+    package func deriveWASIConfiguration() throws -> WASIConfiguration {
+        WASIConfiguration(
+            arguments: deriveWASIArguments(),
+            environment: deriveEnvironment(),
+            preopens: try derivePreopens()
+        )
+    }
+
+    func instantiateWASI(module: Module, interceptor: EngineInterceptor?) throws -> () throws -> Void {
+        let wasi = try WASIBridgeToHost(configuration: deriveWASIConfiguration())
         let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
         let store = Store(engine: engine)
         return {
