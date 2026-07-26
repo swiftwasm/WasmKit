@@ -1018,6 +1018,182 @@ extension Execution {
             }
             return true
 
+        case .i8x16RelaxedSwizzle:
+            v128Binary { lhs, rhs in
+                let a = V128Lanes.extract(lhs, widthBits: 8, laneCount: 16)
+                let s = V128Lanes.extract(rhs, widthBits: 8, laneCount: 16)
+                var out: [UInt64] = []
+                out.reserveCapacity(16)
+                for i in 0..<16 {
+                    let idx = Int(s[i])
+                    out.append(idx < 16 ? a[idx] : 0)
+                }
+                return V128Lanes.pack(out, widthBits: 8, laneCount: 16)
+            }
+            return true
+
+        case .i8x16RelaxedLaneselect, .i16x8RelaxedLaneselect,
+            .i32x4RelaxedLaneselect, .i64x2RelaxedLaneselect:
+            // Relaxed: deterministic bitwise select (== v128.bitselect), an allowed result.
+            v128Ternary { a, b, m in
+                .init(lo: (a.lo & m.lo) | (b.lo & ~m.lo), hi: (a.hi & m.hi) | (b.hi & ~m.hi))
+            }
+            return true
+
+        case .f32x4RelaxedMadd, .f32x4RelaxedNmadd:
+            // Relaxed: unfused a*b+c / -(a*b)+c, an allowed result.
+            v128Ternary { a, b, c in
+                let la = V128Lanes.extract(a, widthBits: 32, laneCount: 4)
+                let lb = V128Lanes.extract(b, widthBits: 32, laneCount: 4)
+                let lc = V128Lanes.extract(c, widthBits: 32, laneCount: 4)
+                var out: [UInt64] = []
+                out.reserveCapacity(4)
+                for i in 0..<4 {
+                    let x = Float32(bitPattern: UInt32(truncatingIfNeeded: la[i]))
+                    let y = Float32(bitPattern: UInt32(truncatingIfNeeded: lb[i]))
+                    let z = Float32(bitPattern: UInt32(truncatingIfNeeded: lc[i]))
+                    let r: Float32 = opcode == .f32x4RelaxedMadd ? (x * y + z) : (-(x * y) + z)
+                    out.append(UInt64(r.bitPattern))
+                }
+                return V128Lanes.pack(out, widthBits: 32, laneCount: 4)
+            }
+            return true
+        case .f64x2RelaxedMadd, .f64x2RelaxedNmadd:
+            v128Ternary { a, b, c in
+                let la = V128Lanes.extract(a, widthBits: 64, laneCount: 2)
+                let lb = V128Lanes.extract(b, widthBits: 64, laneCount: 2)
+                let lc = V128Lanes.extract(c, widthBits: 64, laneCount: 2)
+                var out: [UInt64] = []
+                out.reserveCapacity(2)
+                for i in 0..<2 {
+                    let x = Float64(bitPattern: la[i])
+                    let y = Float64(bitPattern: lb[i])
+                    let z = Float64(bitPattern: lc[i])
+                    let r: Float64 = opcode == .f64x2RelaxedMadd ? (x * y + z) : (-(x * y) + z)
+                    out.append(r.bitPattern)
+                }
+                return V128Lanes.pack(out, widthBits: 64, laneCount: 2)
+            }
+            return true
+
+        case .f32x4RelaxedMin, .f32x4RelaxedMax:
+            // Relaxed: deterministic IEEE min/max (mirrors f32x4.min/max), an allowed result.
+            v128Binary { lhs, rhs in
+                let a = V128Lanes.extract(lhs, widthBits: 32, laneCount: 4)
+                let b = V128Lanes.extract(rhs, widthBits: 32, laneCount: 4)
+                var out: [UInt64] = []
+                out.reserveCapacity(4)
+                for i in 0..<4 {
+                    let x = Float32(bitPattern: UInt32(truncatingIfNeeded: a[i]))
+                    let y = Float32(bitPattern: UInt32(truncatingIfNeeded: b[i]))
+                    let r = opcode == .f32x4RelaxedMin ? x.min(y) : x.max(y)
+                    out.append(UInt64(r.bitPattern))
+                }
+                return V128Lanes.pack(out, widthBits: 32, laneCount: 4)
+            }
+            return true
+        case .f64x2RelaxedMin, .f64x2RelaxedMax:
+            v128Binary { lhs, rhs in
+                let a = V128Lanes.extract(lhs, widthBits: 64, laneCount: 2)
+                let b = V128Lanes.extract(rhs, widthBits: 64, laneCount: 2)
+                var out: [UInt64] = []
+                out.reserveCapacity(2)
+                for i in 0..<2 {
+                    let x = Float64(bitPattern: a[i])
+                    let y = Float64(bitPattern: b[i])
+                    let r = opcode == .f64x2RelaxedMin ? x.min(y) : x.max(y)
+                    out.append(r.bitPattern)
+                }
+                return V128Lanes.pack(out, widthBits: 64, laneCount: 2)
+            }
+            return true
+
+        case .i16x8RelaxedQ15MulrS:
+            // Relaxed: deterministic q15mulr_sat_s (mirrors i16x8.q15mulr_sat_s), an allowed result.
+            v128Binary { lhs, rhs in
+                let a = V128Lanes.extract(lhs, widthBits: 16, laneCount: 8)
+                let b = V128Lanes.extract(rhs, widthBits: 16, laneCount: 8)
+                var out: [UInt64] = []
+                out.reserveCapacity(8)
+                for i in 0..<8 {
+                    let x = Int32(Int16(bitPattern: UInt16(truncatingIfNeeded: a[i])))
+                    let y = Int32(Int16(bitPattern: UInt16(truncatingIfNeeded: b[i])))
+                    let prod = x * y
+                    let rounded = (prod + 0x4000) >> 15
+                    out.append(UInt64(UInt16(bitPattern: Int16(clamping: rounded))))
+                }
+                return V128Lanes.pack(out, widthBits: 16, laneCount: 8)
+            }
+            return true
+
+        case .i32x4RelaxedTruncF32X4S, .i32x4RelaxedTruncF32X4U:
+            // Relaxed: deterministic trunc_sat (mirrors i32x4.trunc_sat_f32x4_s/u), an allowed result.
+            v128Unary { input in
+                let a = V128Lanes.extract(input, widthBits: 32, laneCount: 4)
+                let out = a.map { bits -> UInt64 in
+                    let x = Float32(bitPattern: UInt32(truncatingIfNeeded: bits))
+                    let y: UInt32 = opcode == .i32x4RelaxedTruncF32X4S ? (try! x.truncSatToI32S) : (try! x.truncSatToI32U)
+                    return UInt64(y)
+                }
+                return V128Lanes.pack(out, widthBits: 32, laneCount: 4)
+            }
+            return true
+        case .i32x4RelaxedTruncF64X2SZero, .i32x4RelaxedTruncF64X2UZero:
+            v128Unary { input in
+                let a = V128Lanes.extract(input, widthBits: 64, laneCount: 2)
+                var out: [UInt64] = [0, 0, 0, 0]
+                for i in 0..<2 {
+                    let x = Float64(bitPattern: a[i])
+                    let y: UInt32 = opcode == .i32x4RelaxedTruncF64X2SZero ? (try! x.truncSatToI32S) : (try! x.truncSatToI32U)
+                    out[i] = UInt64(y)
+                }
+                return V128Lanes.pack(out, widthBits: 32, laneCount: 4)
+            }
+            return true
+
+        case .i16x8RelaxedDotI8X16I7X16S:
+            // Relaxed: signed i8 x i8 products, adjacent pairs summed, saturating to i16 (an allowed result).
+            v128Binary { lhs, rhs in
+                let a = V128Lanes.extract(lhs, widthBits: 8, laneCount: 16)
+                let b = V128Lanes.extract(rhs, widthBits: 8, laneCount: 16)
+                var out: [UInt64] = []
+                out.reserveCapacity(8)
+                for j in 0..<8 {
+                    let a0 = Int32(Int8(bitPattern: UInt8(truncatingIfNeeded: a[2 * j])))
+                    let a1 = Int32(Int8(bitPattern: UInt8(truncatingIfNeeded: a[2 * j + 1])))
+                    let b0 = Int32(Int8(bitPattern: UInt8(truncatingIfNeeded: b[2 * j])))
+                    let b1 = Int32(Int8(bitPattern: UInt8(truncatingIfNeeded: b[2 * j + 1])))
+                    let sum = a0 &* b0 &+ a1 &* b1
+                    out.append(UInt64(UInt16(bitPattern: Int16(clamping: sum))))
+                }
+                return V128Lanes.pack(out, widthBits: 16, laneCount: 8)
+            }
+            return true
+        case .i32x4RelaxedDotI8X16I7X16AddS:
+            // Relaxed: the i16x8 dot above, pairwise-extended to i32x4 (wide), plus c (wrapping).
+            v128Ternary { lhsV, rhsV, cV in
+                let a = V128Lanes.extract(lhsV, widthBits: 8, laneCount: 16)
+                let b = V128Lanes.extract(rhsV, widthBits: 8, laneCount: 16)
+                let c = V128Lanes.extract(cV, widthBits: 32, laneCount: 4)
+                var dot: [Int32] = []
+                dot.reserveCapacity(8)
+                for j in 0..<8 {
+                    let a0 = Int32(Int8(bitPattern: UInt8(truncatingIfNeeded: a[2 * j])))
+                    let a1 = Int32(Int8(bitPattern: UInt8(truncatingIfNeeded: a[2 * j + 1])))
+                    let b0 = Int32(Int8(bitPattern: UInt8(truncatingIfNeeded: b[2 * j])))
+                    let b1 = Int32(Int8(bitPattern: UInt8(truncatingIfNeeded: b[2 * j + 1])))
+                    dot.append(Int32(Int16(clamping: a0 &* b0 &+ a1 &* b1)))
+                }
+                var out: [UInt64] = []
+                out.reserveCapacity(4)
+                for k in 0..<4 {
+                    let acc = dot[2 * k] &+ dot[2 * k + 1] &+ Int32(bitPattern: UInt32(truncatingIfNeeded: c[k]))
+                    out.append(UInt64(UInt32(bitPattern: acc)))
+                }
+                return V128Lanes.pack(out, widthBits: 32, laneCount: 4)
+            }
+            return true
+
         default:
             return false
         }

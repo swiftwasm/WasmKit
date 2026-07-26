@@ -59,7 +59,7 @@ struct HostStaticCanonicalLifting: StaticCanonicalLifting {
         printer.write(line: "}")
 
         return .call(
-            "try CanonicalLifting.liftList",
+            "try WasmKit.CanonicalLifting.liftList",
             arguments: [
                 ("pointer", pointer),
                 ("length", length),
@@ -81,7 +81,7 @@ struct HostStaticCanonicalLowering: StaticCanonicalLowering {
 
     func lowerString(_ value: Operand, encoding: String) throws -> (pointer: Operand, length: Operand) {
         let lowered = Operand.call(
-            "try CanonicalLowering.lowerString",
+            "try WasmKit.CanonicalLowering.lowerString",
             arguments: [
                 (nil, value), ("context", .variable(context.contextVar)),
             ])
@@ -104,7 +104,7 @@ struct HostStaticCanonicalLowering: StaticCanonicalLowering {
         }
         printer.write(line: "}")
         let lowered = Operand.call(
-            "try CanonicalLowering.lowerList",
+            "try WasmKit.CanonicalLowering.lowerList",
             arguments: [
                 (nil, value),
                 ("elementSize", .literal(CanonicalABI.size(type: element).description)),
@@ -262,8 +262,8 @@ struct HostExportFunction {
         printer.write(line: signature.description + " {")
         try printer.indent {
             let optionsVar = builder.variable("options")
-            printer.write(line: "let \(optionsVar) = CanonicalOptions._derive(from: instance, exportName: \"\(name.abiName)\")")
-            printer.write(line: "let \(context.contextVar) = CanonicalCallContext(options: \(optionsVar), instance: instance)")
+            printer.write(line: "let \(optionsVar) = WasmKit.CanonicalOptions._derive(from: instance, exportName: \"\(name.abiName)\")")
+            printer.write(line: "let \(context.contextVar) = WasmKit.CanonicalCallContext(options: \(optionsVar), instance: instance)")
             // Suppress unused variable warning for "context"
             printer.write(line: "_ = \(context.contextVar)")
 
@@ -275,7 +275,7 @@ struct HostExportFunction {
             printer.write(
                 multiline: """
                     guard let \(functionVar) = instance.exports[function: \"\(name.abiName)\"] else {
-                        throw CanonicalABIError(description: "Function \\"\(name.abiName)\\" not found in the instance")
+                        throw WasmKit.CanonicalABIError(description: "Function \\"\(name.abiName)\\" not found in the instance")
                     }
                     """)
             var call = "try \(functionVar)("

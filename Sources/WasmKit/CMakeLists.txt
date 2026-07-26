@@ -14,7 +14,6 @@ add_wasmkit_library(WasmKit
   Component/CanonicalCall.swift
   Component/CanonicalOptions.swift
   Component/ComponentTypes.swift
-  Execution/AtomicParkingLot.swift
   Execution/DebuggerInstructionMapping.swift
   Execution/Instructions/Control.swift
   Execution/Instructions/ExceptionHandling.swift
@@ -36,16 +35,19 @@ add_wasmkit_library(WasmKit
   Execution/Instances.swift
   Execution/MprotectLinearMemory.swift
   Execution/MprotectTrapGuard.swift
-  Execution/IO.swift
+  Execution/StatsCollector.swift
   Execution/NameRegistry.swift
   Execution/Profiler.swift
   Execution/Runtime.swift
+  Execution/SharedMemoryStorage.swift
   Execution/SignpostTracer.swift
   Execution/Store.swift
   Execution/StoreAllocator.swift
   Execution/UntypedValue.swift
   Execution/Value.swift
   Execution/V128Storage.swift
+  Platform/AtomicParkingLot.swift
+  Platform/SystemVirtualMemory.swift
 )
 
 if(WASMKIT_ENABLE_FILESYSTEM)

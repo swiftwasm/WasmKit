@@ -22,6 +22,8 @@
             case noReverseInstructionMappingAvailable(UnsafeMutablePointer<UInt64>)
             case stackFrameIndexOOB(UInt)
             case stackLocalIndexOOB(UInt)
+            case globalIndexOOB(UInt)
+            case globalUnsupportedType(UInt)
             case notStoppedAtBreakpoint
             case linearMemoryNotInitialized
             case linearMemoryOOB(Range<Int>)
@@ -65,6 +67,15 @@
         /// For token threading the head slot is the opcode ID itself; for direct
         /// threading it is a function pointer that we map back.
         private let headSlotToOpcodeID: [CodeSlot: OpcodeID]
+
+        private static let callFamilyOpcodes: Set<OpcodeID> = [
+            Instruction.call(.init(rawCallee: UInt64(0), spAddend: VReg(0))).opcodeID,
+            Instruction.compilingCall(.init(rawCallee: UInt64(0), spAddend: VReg(0))).opcodeID,
+            Instruction.internalCall(.init(rawCallee: UInt64(0), spAddend: VReg(0))).opcodeID,
+            Instruction.callIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg(0), spAddend: VReg(0))).opcodeID,
+            Instruction.returnCall(.init(rawCallee: UInt64(0))).opcodeID,
+            Instruction.returnCallIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg(0))).opcodeID,
+        ]
 
         /// Initializes a new debugger state instance.
         /// - Parameters:
@@ -323,6 +334,17 @@
             throw Error.stackFrameIndexOOB(frameIndex)
         }
 
+        /// Globals are module-wide, so the GDB `qWasmGlobal:<frame>;<index>` frame argument is
+        /// irrelevant (matches LLDB eWasmTagGlobal).
+        package func getGlobal(index: UInt) throws -> UInt64 {
+            let globals = self.instance.handle.globals
+            guard index < UInt(globals.count) else { throw Error.globalIndexOOB(index) }
+            switch globals[Int(index)].storage {
+            case .scalar(let untyped): return untyped.storage
+            case .v128: throw Error.globalUnsupportedType(index)  // 128-bit can't fit a single reply
+            }
+        }
+
         package func readLinearMemory<T>(address: UInt, length: UInt, reader: (UnsafeRawBufferPointer) -> T) throws(Error) -> T {
             guard let md, ms > 0 else {
                 throw Error.linearMemoryNotInitialized
@@ -381,8 +403,51 @@
                 return
             }
 
+            // The head slot is non-control because a call with args maps its wasm address to a
+            // prep slot, not the call.
+            if let calleeEntry = self.stepInTargetIfCall(breakpoint: breakpoint) {
+                try self.enableBreakpoint(address: calleeEntry)
+                return
+            }
+
             // Non-control instruction: fall back to next Wasm address
             try self.enableBreakpoint(address: breakpoint.wasmPc + 1)
+        }
+
+        /// The call is the last iseq emit for its wasm address (prep slots come first), so `lastIseq`
+        /// points at the real call head, never an operand. Callee resolution, including the
+        /// indirect-call runtime table index, is left to the existing `predictNext_*` predictors, which
+        /// also compile the callee. Their iseq base may be an elided instruction with no reverse wasm
+        /// mapping, so it is mapped through the callee function's originalAddress; enableBreakpoint then
+        /// forward-resolves that to the first emitted instruction.
+        private mutating func stepInTargetIfCall(breakpoint: BreakpointState) -> Int? {
+            let mapping = self.instance.handle.instructionMapping
+            guard let headPc = mapping.lastIseq(forWasmAddress: breakpoint.wasmPc),
+                // Equal means the breakpoint already sits on the head; the control-head path handled it.
+                headPc != breakpoint.iseq.pc,
+                let opcodeID = headSlotToOpcodeID[headPc.pointee],
+                Self.callFamilyOpcodes.contains(opcodeID),
+                let targets = Instruction.predictNextPcs(
+                    opcodeID: opcodeID, operandPc: headPc.advanced(by: 1), sp: breakpoint.iseq.sp,
+                    predictor: &self
+                ),
+                // Empty for a host/imported or unresolvable callee.
+                let calleeIseq = targets.first
+            else { return nil }
+
+            return self.wasmOrigin(ofIseqBase: calleeIseq)
+        }
+
+        private func wasmOrigin(ofIseqBase base: Pc) -> Int? {
+            for entry in self.functionAddresses {
+                let iseq: InstructionSequence
+                switch self.instance.handle.functions[entry.instanceFunctionIndex].wasm.code {
+                case .debuggable(_, let compiled), .compiled(let compiled): iseq = compiled
+                case .uncompiled: continue
+                }
+                if iseq.instructions.baseAddress == base { return entry.address }
+            }
+            return nil
         }
 
         deinit {

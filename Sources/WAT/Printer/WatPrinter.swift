@@ -70,7 +70,7 @@ struct WatPrinter {
 
     private mutating func printFunctions() throws {
         guard let codeBytes = info.codeSectionBytes else { return }
-        let parser = WasmParser.Parser(sectionBodyBytes: codeBytes, features: info.features)
+        var parser = WasmParser.Parser(sectionBodyBytes: codeBytes, features: info.features)
         let codeCount: UInt32 = try parser.parseUnsigned()
         let importedFuncCount = info.importedFunctionCount
         let typeCount = info.functionTypeIndices.count
@@ -181,8 +181,8 @@ struct WatPrinter {
                 mut
                 ? "(mut \(valueTypeName(global.type.valueType)))"
                 : valueTypeName(global.type.valueType)
-            let initStr = constExprStr(global.initializer)
-            writeLine("  (global\(name) (;\(idx);) \(typeStr) (\(initStr)))")
+            let initStr = constExprGlobalStr(global.initializer)
+            writeLine("  (global\(name) (;\(idx);) \(typeStr) \(initStr))")
         }
     }
 
@@ -240,11 +240,7 @@ struct WatPrinter {
         let indicesPart: String
         if useExpressions {
             let exprs = elem.initializer.map { expr -> String in
-                let parts = constExprParts(expr)
-                if parts.count == 1 {
-                    return "(\(singleInstrStr(parts[0])))"
-                }
-                return "(" + parts.map { singleInstrStr($0) }.joined(separator: " ") + ")"
+                "(item " + constExprStr(expr) + ")"
             }
             indicesPart = "\(typeStr) \(exprs.joined(separator: " "))"
         } else {
@@ -257,11 +253,11 @@ struct WatPrinter {
 
         switch elem.mode {
         case .active(let table, let offset):
-            let offsetStr = constExprStr(offset)
+            let offsetStr = constExprOffsetStr(offset)
             if table == 0 {
-                writeLine("  (elem\(name) (;\(i);) (\(offsetStr)) \(indicesPart))")
+                writeLine("  (elem\(name) (;\(i);) \(offsetStr) \(indicesPart))")
             } else {
-                writeLine("  (elem\(name) (;\(i);) (table \(table)) (\(offsetStr)) \(indicesPart))")
+                writeLine("  (elem\(name) (;\(i);) (table \(table)) \(offsetStr) \(indicesPart))")
             }
         case .passive:
             writeLine("  (elem\(name) (;\(i);) \(indicesPart))")
@@ -300,9 +296,9 @@ struct WatPrinter {
         let name = info.dataNames[UInt32(i)].map { " $\($0)" } ?? ""
         switch seg {
         case .active(let active):
-            let offsetStr = constExprStr(active.offset)
+            let offsetStr = constExprOffsetStr(active.offset)
             let dataStr = bytesToWatString(Array(active.initializer))
-            writeLine("  (data\(name) (;\(i);) (\(offsetStr)) \"\(dataStr)\")")
+            writeLine("  (data\(name) (;\(i);) \(offsetStr) \"\(dataStr)\")")
         case .passive(let bytes):
             let dataStr = bytesToWatString(Array(bytes))
             writeLine("  (data\(name) (;\(i);) \"\(dataStr)\")")
@@ -360,6 +356,23 @@ struct WatPrinter {
         return parts.map { singleInstrStr($0) }.joined(separator: " ")
     }
 
+    /// A const expression in a `global` definition. One instruction folds; a
+    /// sequence must stay plain, because folding would read the instructions
+    /// after the first as its operands.
+    private func constExprGlobalStr(_ expr: ConstExpression) -> String {
+        let texts = constExprParts(expr).map { singleInstrStr($0) }
+        if texts.count == 1 { return "(\(texts[0]))" }
+        return texts.joined(separator: " ")
+    }
+
+    /// A const expression used as an elem or data offset. The one-instruction
+    /// shorthand folds; longer sequences need the explicit `offset` form.
+    private func constExprOffsetStr(_ expr: ConstExpression) -> String {
+        let texts = constExprParts(expr).map { singleInstrStr($0) }
+        if texts.count == 1 { return "(\(texts[0]))" }
+        return "(offset " + texts.joined(separator: " ") + ")"
+    }
+
     /// Returns the instructions of a const expression without the trailing `end`.
     private func constExprParts(_ expr: ConstExpression) -> [Instruction] {
         if let last = expr.last, last == .end {
@@ -383,7 +396,18 @@ struct WatPrinter {
         case .refFunc(let fi):
             return "ref.func \(info.functionNames[fi].map { "$\($0)" } ?? "\(fi)")"
         default:
-            return "nop"
+            // extended-const admits arithmetic here. Reuse the instruction
+            // printer rather than growing a second, partial mnemonic table.
+            var text = ""
+            var visitor = TextInstructionVisitor(
+                functionNames: info.functionNames,
+                globalNames: [:],
+                localNames: [:],
+                indentLevel: 0,
+                append: { text += $0 }
+            )
+            visitor.visit(instr)
+            return text.trimmingCharacters(in: .whitespacesAndNewlines)
         }
     }
 

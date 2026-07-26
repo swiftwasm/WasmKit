@@ -141,10 +141,11 @@ extension TestCase {
         let context = WastRunContext(store: store, rootPath: rootPath.string)
         context.importsSpace.define(module: "spectest", spectestInstance.exports)
 
-        // Add shared_memory export for threads proposal tests
-        if configuration.features.contains(.threads) {
-            let sharedMemoryType = MemoryType(min: 1, max: 2, shared: true)
-            let sharedMemory = try Memory(store: store, type: sharedMemoryType)
+        // Add shared_memory export for threads proposal tests. Skip it where shared memory is
+        // unsupported (e.g. Android, or non-mprotect configurations); such tests can't run there.
+        if configuration.features.contains(.threads),
+            let sharedMemory = try? Memory(store: store, type: MemoryType(min: 1, max: 2, shared: true))
+        {
             context.importsSpace.define(module: "spectest", name: "shared_memory", sharedMemory)
         }
         do {
@@ -157,7 +158,7 @@ extension TestCase {
                     handler(self, location, .failed("\(error)"))
                 }
             }
-        } catch let parseError as WatParserError {
+        } catch let parseError {
             if let location = parseError.location {
                 handler(self, location, .failed(parseError.message))
             } else {
@@ -503,6 +504,9 @@ extension Value {
             (.ref(.function(nil)), .refNull(.abstract(.funcRef))),
             (.ref(.exception(nil)), .refNull(.abstract(.exnRef))):
             return true
+        case (_, .either(let candidates)):
+            // Relaxed-SIMD non-determinism: match if the actual equals any candidate.
+            return candidates.contains { self.isTestEquivalent(to: $0) }
         default:
             return false
         }

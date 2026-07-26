@@ -25,13 +25,13 @@ package struct RawSection: Sendable {
     package let body: ArraySlice<UInt8>
 }
 
-extension Parser where Stream == StaticByteStream {
+extension Parser where Source == StaticByteStreamSource {
     /// Sub-parser over a single section's body bytes. The new parser is
     /// positioned at the start of the section body; magic + version
     /// are NOT expected. Calling `parseNextRawSection` on a sub-parser
     /// is undefined behaviour.
     package init(sectionBodyBytes: ArraySlice<UInt8>, features: WasmFeatureSet = .default) {
-        self.init(stream: StaticByteStream(bytes: Array(sectionBodyBytes)), features: features)
+        self.init(stream: StaticByteStreamSource(bytes: sectionBodyBytes), features: features)
         self.nextParseTarget = .section
     }
 }

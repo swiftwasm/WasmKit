@@ -3,22 +3,22 @@ import WasmParser
 /// Parse a given byte array as a WebAssembly binary format file
 /// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
 public func parseWasm(bytes: [UInt8], features: WasmFeatureSet = .default) throws(WasmKitError) -> Module {
-    let stream = StaticByteStream(bytes: bytes)
-    let module = try parseModule(stream: stream, features: features)
+    let parser = Parser(bytes: bytes, features: features)
+    let module = try parseModule(parser: parser, features: features)
     return module
 }
 
 /// Parse a given byte slice as a WebAssembly binary format file
 /// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
 public func parseWasm(bytes: ArraySlice<UInt8>, features: WasmFeatureSet = .default) throws -> Module {
-    let stream = StaticByteStream(bytes: bytes)
-    let module = try parseModule(stream: stream, features: features)
+    let parser = Parser(bytes: bytes, features: features)
+    let module = try parseModule(parser: parser, features: features)
     return module
 }
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
-func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = .default) throws(WasmKitError) -> Module {
+func parseModule<Source: ByteStreamSource>(parser: consuming WasmParser.Parser<Source>, features: WasmFeatureSet = .default) throws(WasmKitError) -> Module {
     var types: [FunctionType] = []
     var typeIndices: [TypeIndex] = []
     var codes: [Code] = []
@@ -33,10 +33,6 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
     var exports: [Export] = []
     var customSections: [CustomSection] = []
     var dataCount: UInt32?
-
-    var parser = WasmParser.Parser<Stream>(
-        stream: stream, features: features
-    )
 
     while let payload = try WasmKitError.wrap({ () throws(WasmParserError) in try parser.parseNext() }) {
         switch payload {

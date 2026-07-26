@@ -94,7 +94,7 @@ struct SectionSkimTests {
         let section = try parser.parseNextRawSection()
         #expect(section?.kind == .type)
         #expect(section?.body.count == 0)
-        let sub = WasmParser.Parser(sectionBodyBytes: section!.body)
+        var sub = WasmParser.Parser(sectionBodyBytes: section!.body)
         #expect(throws: WasmParserError.self) { let _: UInt32 = try sub.parseUnsigned() }
     }
 

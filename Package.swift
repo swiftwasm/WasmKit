@@ -35,6 +35,7 @@ let package = Package(
         .library(name: "WasmParser", targets: ["WasmParser"]),
         .library(name: "WAT", targets: ["WAT"]),
         .library(name: "WIT", targets: ["WIT"]),
+        .library(name: "WITMarker", targets: ["WITMarker"]),
         .library(name: "_CabiShims", targets: ["_CabiShims"]),
     ],
     traits: [
@@ -42,6 +43,9 @@ let package = Package(
         "FileSystem",
         "ComponentModel",
         "WasmDebuggingSupport",
+        // Collects instruction-trigram statistics during execution and dumps
+        // them to stderr on exit. Development-only diagnostics.
+        "EngineStats",
     ],
     targets: [
         cliCommandsTarget,
@@ -263,7 +267,15 @@ let package = Package(
         .target(name: "WITOverlayGenerator", dependencies: ["WIT"], swiftSettings: swiftSettings),
         .target(name: "_CabiShims"),
 
-        .target(name: "WITExtractor", swiftSettings: swiftSettings),
+        .target(
+            name: "WITExtractor",
+            dependencies: [
+                .product(name: "SwiftParser", package: "swift-syntax"),
+                .product(name: "SwiftSyntax", package: "swift-syntax"),
+            ],
+            swiftSettings: swiftSettings
+        ),
+        .target(name: "WITMarker", swiftSettings: swiftSettings),
         .testTarget(name: "WITExtractorTests", dependencies: ["WITExtractor", "WIT"], swiftSettings: swiftSettings),
 
         .target(
@@ -287,13 +299,10 @@ let package = Package(
 if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
     package.dependencies += [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.1"),
-        // Upper-bounded: swift-system 1.7.0 moved the `stat` members into `CSystem`,
-        // which breaks swift-nio's `_NIOFileSystem` (a test/benchmark dependency) on
-        // Linux/Swift 6.2 under `MemberImportVisibility`. Drop the bound once swift-nio
-        // builds against swift-system 1.7.0.
-        .package(url: "https://github.com/apple/swift-system", "1.5.0"..<"1.7.0"),
+        .package(url: "https://github.com/apple/swift-system", from: "1.7.2"),
         .package(url: "https://github.com/apple/swift-nio", from: "2.90.0"),
         .package(url: "https://github.com/apple/swift-log", from: "1.7.1"),
+        .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"604.0.0"),
     ]
 } else {
     package.dependencies += [
@@ -301,6 +310,7 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         .package(path: "../swift-system"),
         .package(path: "../swift-nio"),
         .package(path: "../swift-log"),
+        .package(path: "../swift-syntax"),
     ]
 }
 

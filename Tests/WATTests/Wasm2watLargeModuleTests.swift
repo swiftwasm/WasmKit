@@ -11,7 +11,7 @@ struct Wasm2watLargeModuleTests {
         let chunk = String(repeating: "a", count: 1024 * 1024)
         wat += "  (data \"\(chunk)\")\n)"
         let binary = try wat2wasm(wat)
-        let text = try wasm2wat(StaticByteStream(bytes: binary))
+        let text = try wasm2wat(StaticByteStreamSource(bytes: binary))
         let binary2 = try wat2wasm(text)
         #expect(binary == binary2)
     }
@@ -34,7 +34,7 @@ struct Wasm2watLargeModuleTests {
         }
         wat += ")"
         let binary = try wat2wasm(wat)
-        let text = try wasm2wat(StaticByteStream(bytes: binary))
+        let text = try wasm2wat(StaticByteStreamSource(bytes: binary))
         let binary2 = try wat2wasm(text)
         #expect(binary == binary2)
     }
@@ -50,7 +50,7 @@ struct Wasm2watLargeModuleTests {
                     (data (memory 0) (i32.const 100) "third"))
             """
         let binary = try wat2wasm(wat)
-        let text = try wasm2wat(StaticByteStream(bytes: binary))
+        let text = try wasm2wat(StaticByteStreamSource(bytes: binary))
         let binary2 = try wat2wasm(text)
         #expect(binary == binary2)
     }
@@ -65,7 +65,7 @@ struct Wasm2watLargeModuleTests {
             (module (func (result v128) v128.const i32x4 1 2 3 4))
             """
         let binary = try wat2wasm(wat, features: .all)
-        let text = try wasm2wat(StaticByteStream(bytes: binary), features: .all)
+        let text = try wasm2wat(StaticByteStreamSource(bytes: binary), features: .all)
         let binary2 = try wat2wasm(text, features: .all)
         #expect(binary == binary2)
     }
@@ -80,7 +80,7 @@ struct Wasm2watLargeModuleTests {
         ]
         for wat in cases {
             let binary = try wat2wasm(wat)
-            let text = try wasm2wat(StaticByteStream(bytes: binary))
+            let text = try wasm2wat(StaticByteStreamSource(bytes: binary))
             let binary2 = try wat2wasm(text)
             #expect(binary == binary2, "Roundtrip mismatch for: \(wat)")
         }
@@ -97,7 +97,7 @@ struct Wasm2watLargeModuleTests {
         var withCustom = Array(originalBinary[0..<8])
         withCustom += [0x00, 0x0B, 0x09, 0x70, 0x72, 0x6F, 0x64, 0x75, 0x63, 0x65, 0x72, 0x73, 0x00]
         withCustom += Array(originalBinary[8...])
-        let text = try wasm2wat(StaticByteStream(bytes: withCustom))
+        let text = try wasm2wat(StaticByteStreamSource(bytes: withCustom))
         let binary2 = try wat2wasm(text)
         // wasm2wat doesn't emit custom sections, so binary2 matches the
         // original (without custom).
@@ -117,7 +117,7 @@ struct Wasm2watLargeModuleTests {
               (tag (type 0)))
             """
         let binary = try wat2wasm(wat)
-        let text = try wasm2wat(StaticByteStream(bytes: binary))
+        let text = try wasm2wat(StaticByteStreamSource(bytes: binary))
         let binary2 = try wat2wasm(text)
         #expect(binary == binary2)
     }
@@ -141,7 +141,7 @@ struct Wasm2watLargeModuleTests {
             """
         let opts = EncodeOptions(nameSection: true)
         let binary = try wat2wasm(wat, options: opts)
-        let text = try wasm2wat(StaticByteStream(bytes: binary))
+        let text = try wasm2wat(StaticByteStreamSource(bytes: binary))
         // Spot-check that each $name kind survived the binary→text trip.
         #expect(text.contains("$myMod"))
         #expect(text.contains("$T"))

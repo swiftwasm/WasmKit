@@ -7,7 +7,7 @@ import WasmTypes
 
 /// An instruction encoder that is responsible for encoding opcodes and immediates
 /// in Wasm binary format.
-protocol BinaryInstructionEncoder: InstructionVisitor {
+public protocol BinaryInstructionEncoder: InstructionVisitor {
     /// Encodes an instruction opcode.
     mutating func encodeInstruction(_ opcode: [UInt8]) throws(VisitorError)
 
@@ -44,95 +44,95 @@ protocol BinaryInstructionEncoder: InstructionVisitor {
 
 // BinaryInstructionEncoder implements the InstructionVisitor protocol to call the corresponding encode method.
 extension BinaryInstructionEncoder {
-    mutating func visitUnreachable() throws(VisitorError) { try encodeInstruction([0x00]) }
-    mutating func visitNop() throws(VisitorError) { try encodeInstruction([0x01]) }
-    mutating func visitBlock(blockType: BlockType) throws(VisitorError) {
+    public mutating func visitUnreachable() throws(VisitorError) { try encodeInstruction([0x00]) }
+    public mutating func visitNop() throws(VisitorError) { try encodeInstruction([0x01]) }
+    public mutating func visitBlock(blockType: BlockType) throws(VisitorError) {
         try encodeInstruction([0x02])
         try encodeImmediates(blockType: blockType)
     }
-    mutating func visitLoop(blockType: BlockType) throws(VisitorError) {
+    public mutating func visitLoop(blockType: BlockType) throws(VisitorError) {
         try encodeInstruction([0x03])
         try encodeImmediates(blockType: blockType)
     }
-    mutating func visitIf(blockType: BlockType) throws(VisitorError) {
+    public mutating func visitIf(blockType: BlockType) throws(VisitorError) {
         try encodeInstruction([0x04])
         try encodeImmediates(blockType: blockType)
     }
-    mutating func visitElse() throws(VisitorError) { try encodeInstruction([0x05]) }
-    mutating func visitThrow(tagIndex: UInt32) throws(VisitorError) {
+    public mutating func visitElse() throws(VisitorError) { try encodeInstruction([0x05]) }
+    public mutating func visitThrow(tagIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0x08])
         try encodeImmediates(tagIndex: tagIndex)
     }
-    mutating func visitThrowRef() throws(VisitorError) { try encodeInstruction([0x0A]) }
-    mutating func visitEnd() throws(VisitorError) { try encodeInstruction([0x0B]) }
-    mutating func visitBr(relativeDepth: UInt32) throws(VisitorError) {
+    public mutating func visitThrowRef() throws(VisitorError) { try encodeInstruction([0x0A]) }
+    public mutating func visitEnd() throws(VisitorError) { try encodeInstruction([0x0B]) }
+    public mutating func visitBr(relativeDepth: UInt32) throws(VisitorError) {
         try encodeInstruction([0x0C])
         try encodeImmediates(relativeDepth: relativeDepth)
     }
-    mutating func visitBrIf(relativeDepth: UInt32) throws(VisitorError) {
+    public mutating func visitBrIf(relativeDepth: UInt32) throws(VisitorError) {
         try encodeInstruction([0x0D])
         try encodeImmediates(relativeDepth: relativeDepth)
     }
-    mutating func visitBrTable(targets: BrTable) throws(VisitorError) {
+    public mutating func visitBrTable(targets: BrTable) throws(VisitorError) {
         try encodeInstruction([0x0E])
         try encodeImmediates(targets: targets)
     }
-    mutating func visitReturn() throws(VisitorError) { try encodeInstruction([0x0F]) }
-    mutating func visitCall(functionIndex: UInt32) throws(VisitorError) {
+    public mutating func visitReturn() throws(VisitorError) { try encodeInstruction([0x0F]) }
+    public mutating func visitCall(functionIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0x10])
         try encodeImmediates(functionIndex: functionIndex)
     }
-    mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(VisitorError) {
+    public mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0x11])
         try encodeImmediates(typeIndex: typeIndex, tableIndex: tableIndex)
     }
-    mutating func visitReturnCall(functionIndex: UInt32) throws(VisitorError) {
+    public mutating func visitReturnCall(functionIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0x12])
         try encodeImmediates(functionIndex: functionIndex)
     }
-    mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(VisitorError) {
+    public mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0x13])
         try encodeImmediates(typeIndex: typeIndex, tableIndex: tableIndex)
     }
-    mutating func visitCallRef(typeIndex: UInt32) throws(VisitorError) {
+    public mutating func visitCallRef(typeIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0x14])
         try encodeImmediates(typeIndex: typeIndex)
     }
-    mutating func visitReturnCallRef(typeIndex: UInt32) throws(VisitorError) {
+    public mutating func visitReturnCallRef(typeIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0x15])
         try encodeImmediates(typeIndex: typeIndex)
     }
-    mutating func visitTryTable(blockType: BlockType, tryCatch: TryCatch) throws(VisitorError) {
+    public mutating func visitTryTable(blockType: BlockType, tryCatch: TryCatch) throws(VisitorError) {
         try encodeInstruction([0x1F])
         try encodeImmediates(blockType: blockType, tryCatch: tryCatch)
     }
-    mutating func visitDrop() throws(VisitorError) { try encodeInstruction([0x1A]) }
-    mutating func visitSelect() throws(VisitorError) { try encodeInstruction([0x1B]) }
-    mutating func visitTypedSelect(type: ValueType) throws(VisitorError) {
+    public mutating func visitDrop() throws(VisitorError) { try encodeInstruction([0x1A]) }
+    public mutating func visitSelect() throws(VisitorError) { try encodeInstruction([0x1B]) }
+    public mutating func visitTypedSelect(type: ValueType) throws(VisitorError) {
         try encodeInstruction([0x1C])
         try encodeImmediates(type: type)
     }
-    mutating func visitLocalGet(localIndex: UInt32) throws(VisitorError) {
+    public mutating func visitLocalGet(localIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0x20])
         try encodeImmediates(localIndex: localIndex)
     }
-    mutating func visitLocalSet(localIndex: UInt32) throws(VisitorError) {
+    public mutating func visitLocalSet(localIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0x21])
         try encodeImmediates(localIndex: localIndex)
     }
-    mutating func visitLocalTee(localIndex: UInt32) throws(VisitorError) {
+    public mutating func visitLocalTee(localIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0x22])
         try encodeImmediates(localIndex: localIndex)
     }
-    mutating func visitGlobalGet(globalIndex: UInt32) throws(VisitorError) {
+    public mutating func visitGlobalGet(globalIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0x23])
         try encodeImmediates(globalIndex: globalIndex)
     }
-    mutating func visitGlobalSet(globalIndex: UInt32) throws(VisitorError) {
+    public mutating func visitGlobalSet(globalIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0x24])
         try encodeImmediates(globalIndex: globalIndex)
     }
-    mutating func visitLoad(_ load: Instruction.Load, memarg: MemArg) throws(VisitorError) {
+    public mutating func visitLoad(_ load: Instruction.Load, memarg: MemArg) throws(VisitorError) {
         let opcode: [UInt8]
         switch load {
         case .i32Load: opcode = [0x28]
@@ -174,7 +174,7 @@ extension BinaryInstructionEncoder {
         try encodeInstruction(opcode)
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitStore(_ store: Instruction.Store, memarg: MemArg) throws(VisitorError) {
+    public mutating func visitStore(_ store: Instruction.Store, memarg: MemArg) throws(VisitorError) {
         let opcode: [UInt8]
         switch store {
         case .i32Store: opcode = [0x36]
@@ -199,50 +199,50 @@ extension BinaryInstructionEncoder {
         try encodeInstruction(opcode)
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitMemorySize(memory: UInt32) throws(VisitorError) {
+    public mutating func visitMemorySize(memory: UInt32) throws(VisitorError) {
         try encodeInstruction([0x3F])
         try encodeImmediates(memory: memory)
     }
-    mutating func visitMemoryGrow(memory: UInt32) throws(VisitorError) {
+    public mutating func visitMemoryGrow(memory: UInt32) throws(VisitorError) {
         try encodeInstruction([0x40])
         try encodeImmediates(memory: memory)
     }
-    mutating func visitI32Const(value: Int32) throws(VisitorError) {
+    public mutating func visitI32Const(value: Int32) throws(VisitorError) {
         try encodeInstruction([0x41])
         try encodeImmediates(value: value)
     }
-    mutating func visitI64Const(value: Int64) throws(VisitorError) {
+    public mutating func visitI64Const(value: Int64) throws(VisitorError) {
         try encodeInstruction([0x42])
         try encodeImmediates(value: value)
     }
-    mutating func visitF32Const(value: IEEE754.Float32) throws(VisitorError) {
+    public mutating func visitF32Const(value: IEEE754.Float32) throws(VisitorError) {
         try encodeInstruction([0x43])
         try encodeImmediates(value: value)
     }
-    mutating func visitF64Const(value: IEEE754.Float64) throws(VisitorError) {
+    public mutating func visitF64Const(value: IEEE754.Float64) throws(VisitorError) {
         try encodeInstruction([0x44])
         try encodeImmediates(value: value)
     }
-    mutating func visitRefNull(type: HeapType) throws(VisitorError) {
+    public mutating func visitRefNull(type: HeapType) throws(VisitorError) {
         try encodeInstruction([0xD0])
         try encodeImmediates(type: type)
     }
-    mutating func visitRefIsNull() throws(VisitorError) { try encodeInstruction([0xD1]) }
-    mutating func visitRefFunc(functionIndex: UInt32) throws(VisitorError) {
+    public mutating func visitRefIsNull() throws(VisitorError) { try encodeInstruction([0xD1]) }
+    public mutating func visitRefFunc(functionIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0xD2])
         try encodeImmediates(functionIndex: functionIndex)
     }
-    mutating func visitRefAsNonNull() throws(VisitorError) { try encodeInstruction([0xD4]) }
-    mutating func visitBrOnNull(relativeDepth: UInt32) throws(VisitorError) {
+    public mutating func visitRefAsNonNull() throws(VisitorError) { try encodeInstruction([0xD4]) }
+    public mutating func visitBrOnNull(relativeDepth: UInt32) throws(VisitorError) {
         try encodeInstruction([0xD5])
         try encodeImmediates(relativeDepth: relativeDepth)
     }
-    mutating func visitBrOnNonNull(relativeDepth: UInt32) throws(VisitorError) {
+    public mutating func visitBrOnNonNull(relativeDepth: UInt32) throws(VisitorError) {
         try encodeInstruction([0xD6])
         try encodeImmediates(relativeDepth: relativeDepth)
     }
-    mutating func visitI32Eqz() throws(VisitorError) { try encodeInstruction([0x45]) }
-    mutating func visitCmp(_ cmp: Instruction.Cmp) throws(VisitorError) {
+    public mutating func visitI32Eqz() throws(VisitorError) { try encodeInstruction([0x45]) }
+    public mutating func visitCmp(_ cmp: Instruction.Cmp) throws(VisitorError) {
         let opcode: [UInt8]
         switch cmp {
         case .i32Eq: opcode = [0x46]
@@ -281,8 +281,8 @@ extension BinaryInstructionEncoder {
 
         try encodeInstruction(opcode)
     }
-    mutating func visitI64Eqz() throws(VisitorError) { try encodeInstruction([0x50]) }
-    mutating func visitUnary(_ unary: Instruction.Unary) throws(VisitorError) {
+    public mutating func visitI64Eqz() throws(VisitorError) { try encodeInstruction([0x50]) }
+    public mutating func visitUnary(_ unary: Instruction.Unary) throws(VisitorError) {
         let opcode: [UInt8]
         switch unary {
         case .i32Clz: opcode = [0x67]
@@ -314,7 +314,7 @@ extension BinaryInstructionEncoder {
 
         try encodeInstruction(opcode)
     }
-    mutating func visitBinary(_ binary: Instruction.Binary) throws(VisitorError) {
+    public mutating func visitBinary(_ binary: Instruction.Binary) throws(VisitorError) {
         let opcode: [UInt8]
         switch binary {
         case .i32Add: opcode = [0x6A]
@@ -365,7 +365,7 @@ extension BinaryInstructionEncoder {
 
         try encodeInstruction(opcode)
     }
-    mutating func visitConversion(_ conversion: Instruction.Conversion) throws(VisitorError) {
+    public mutating func visitConversion(_ conversion: Instruction.Conversion) throws(VisitorError) {
         let opcode: [UInt8]
         switch conversion {
         case .i32WrapI64: opcode = [0xA7]
@@ -405,272 +405,272 @@ extension BinaryInstructionEncoder {
 
         try encodeInstruction(opcode)
     }
-    mutating func visitMemoryInit(dataIndex: UInt32) throws(VisitorError) {
+    public mutating func visitMemoryInit(dataIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0xFC, 0x08])
         try encodeImmediates(dataIndex: dataIndex)
     }
-    mutating func visitDataDrop(dataIndex: UInt32) throws(VisitorError) {
+    public mutating func visitDataDrop(dataIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0xFC, 0x09])
         try encodeImmediates(dataIndex: dataIndex)
     }
-    mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws(VisitorError) {
+    public mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws(VisitorError) {
         try encodeInstruction([0xFC, 0x0A])
         try encodeImmediates(dstMem: dstMem, srcMem: srcMem)
     }
-    mutating func visitMemoryFill(memory: UInt32) throws(VisitorError) {
+    public mutating func visitMemoryFill(memory: UInt32) throws(VisitorError) {
         try encodeInstruction([0xFC, 0x0B])
         try encodeImmediates(memory: memory)
     }
-    mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws(VisitorError) {
+    public mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws(VisitorError) {
         try encodeInstruction([0xFC, 0x0C])
         try encodeImmediates(elemIndex: elemIndex, table: table)
     }
-    mutating func visitElemDrop(elemIndex: UInt32) throws(VisitorError) {
+    public mutating func visitElemDrop(elemIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0xFC, 0x0D])
         try encodeImmediates(elemIndex: elemIndex)
     }
-    mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws(VisitorError) {
+    public mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws(VisitorError) {
         try encodeInstruction([0xFC, 0x0E])
         try encodeImmediates(dstTable: dstTable, srcTable: srcTable)
     }
-    mutating func visitTableFill(table: UInt32) throws(VisitorError) {
+    public mutating func visitTableFill(table: UInt32) throws(VisitorError) {
         try encodeInstruction([0xFC, 0x11])
         try encodeImmediates(table: table)
     }
-    mutating func visitTableGet(table: UInt32) throws(VisitorError) {
+    public mutating func visitTableGet(table: UInt32) throws(VisitorError) {
         try encodeInstruction([0x25])
         try encodeImmediates(table: table)
     }
-    mutating func visitTableSet(table: UInt32) throws(VisitorError) {
+    public mutating func visitTableSet(table: UInt32) throws(VisitorError) {
         try encodeInstruction([0x26])
         try encodeImmediates(table: table)
     }
-    mutating func visitTableGrow(table: UInt32) throws(VisitorError) {
+    public mutating func visitTableGrow(table: UInt32) throws(VisitorError) {
         try encodeInstruction([0xFC, 0x0F])
         try encodeImmediates(table: table)
     }
-    mutating func visitTableSize(table: UInt32) throws(VisitorError) {
+    public mutating func visitTableSize(table: UInt32) throws(VisitorError) {
         try encodeInstruction([0xFC, 0x10])
         try encodeImmediates(table: table)
     }
-    mutating func visitAtomicFence() throws(VisitorError) { try encodeInstruction([0xFE, 0x03, 0x00]) }
-    mutating func visitMemoryAtomicNotify(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitAtomicFence() throws(VisitorError) { try encodeInstruction([0xFE, 0x03, 0x00]) }
+    public mutating func visitMemoryAtomicNotify(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x00])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitMemoryAtomicWait32(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitMemoryAtomicWait32(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x01])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitMemoryAtomicWait64(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitMemoryAtomicWait64(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x02])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmwAdd(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmwAdd(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x1E])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmwAdd(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmwAdd(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x1F])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmw8AddU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmw8AddU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x20])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmw16AddU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmw16AddU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x21])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw8AddU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw8AddU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x22])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw16AddU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw16AddU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x23])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw32AddU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw32AddU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x24])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmwSub(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmwSub(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x25])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmwSub(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmwSub(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x26])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmw8SubU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmw8SubU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x27])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmw16SubU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmw16SubU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x28])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw8SubU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw8SubU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x29])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw16SubU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw16SubU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x2A])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw32SubU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw32SubU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x2B])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmwAnd(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmwAnd(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x2C])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmwAnd(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmwAnd(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x2D])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmw8AndU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmw8AndU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x2E])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmw16AndU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmw16AndU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x2F])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw8AndU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw8AndU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x30])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw16AndU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw16AndU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x31])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw32AndU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw32AndU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x32])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmwOr(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmwOr(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x33])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmwOr(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmwOr(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x34])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmw8OrU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmw8OrU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x35])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmw16OrU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmw16OrU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x36])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw8OrU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw8OrU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x37])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw16OrU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw16OrU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x38])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw32OrU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw32OrU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x39])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmwXor(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmwXor(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x3A])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmwXor(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmwXor(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x3B])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmw8XorU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmw8XorU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x3C])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmw16XorU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmw16XorU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x3D])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw8XorU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw8XorU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x3E])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw16XorU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw16XorU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x3F])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw32XorU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw32XorU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x40])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmwXchg(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmwXchg(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x41])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmwXchg(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmwXchg(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x42])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmw8XchgU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmw8XchgU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x43])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmw16XchgU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmw16XchgU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x44])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw8XchgU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw8XchgU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x45])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw16XchgU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw16XchgU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x46])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw32XchgU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw32XchgU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x47])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmwCmpxchg(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmwCmpxchg(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x48])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmwCmpxchg(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmwCmpxchg(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x49])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmw8CmpxchgU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmw8CmpxchgU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x4A])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32AtomicRmw16CmpxchgU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI32AtomicRmw16CmpxchgU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x4B])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw8CmpxchgU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw8CmpxchgU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x4C])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw16CmpxchgU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw16CmpxchgU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x4D])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws(VisitorError) {
+    public mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x4E])
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitV128Const(value: V128) throws(VisitorError) {
+    public mutating func visitV128Const(value: V128) throws(VisitorError) {
         try encodeInstruction([0xFD, 0x0C])
         try encodeImmediates(value: value)
     }
-    mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws(VisitorError) {
+    public mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws(VisitorError) {
         try encodeInstruction([0xFD, 0x0D])
         try encodeImmediates(lanes: lanes)
     }
-    mutating func visitSimd(_ simd: Instruction.Simd) throws(VisitorError) {
+    public mutating func visitSimd(_ simd: Instruction.Simd) throws(VisitorError) {
         let opcode: [UInt8]
         switch simd {
         case .i8x16Swizzle: opcode = [0xFD, 0x0E]
@@ -871,11 +871,31 @@ extension BinaryInstructionEncoder {
         case .i16x8ExtaddPairwiseI8X16U: opcode = [0xFD, 0x7D]
         case .i32x4ExtaddPairwiseI16X8S: opcode = [0xFD, 0x7E]
         case .i32x4ExtaddPairwiseI16X8U: opcode = [0xFD, 0x7F]
+        case .i8x16RelaxedSwizzle: opcode = [0xFD, 0x80, 0x02]
+        case .i32x4RelaxedTruncF32X4S: opcode = [0xFD, 0x81, 0x02]
+        case .i32x4RelaxedTruncF32X4U: opcode = [0xFD, 0x82, 0x02]
+        case .i32x4RelaxedTruncF64X2SZero: opcode = [0xFD, 0x83, 0x02]
+        case .i32x4RelaxedTruncF64X2UZero: opcode = [0xFD, 0x84, 0x02]
+        case .f32x4RelaxedMadd: opcode = [0xFD, 0x85, 0x02]
+        case .f32x4RelaxedNmadd: opcode = [0xFD, 0x86, 0x02]
+        case .f64x2RelaxedMadd: opcode = [0xFD, 0x87, 0x02]
+        case .f64x2RelaxedNmadd: opcode = [0xFD, 0x88, 0x02]
+        case .i8x16RelaxedLaneselect: opcode = [0xFD, 0x89, 0x02]
+        case .i16x8RelaxedLaneselect: opcode = [0xFD, 0x8A, 0x02]
+        case .i32x4RelaxedLaneselect: opcode = [0xFD, 0x8B, 0x02]
+        case .i64x2RelaxedLaneselect: opcode = [0xFD, 0x8C, 0x02]
+        case .f32x4RelaxedMin: opcode = [0xFD, 0x8D, 0x02]
+        case .f32x4RelaxedMax: opcode = [0xFD, 0x8E, 0x02]
+        case .f64x2RelaxedMin: opcode = [0xFD, 0x8F, 0x02]
+        case .f64x2RelaxedMax: opcode = [0xFD, 0x90, 0x02]
+        case .i16x8RelaxedQ15MulrS: opcode = [0xFD, 0x91, 0x02]
+        case .i16x8RelaxedDotI8X16I7X16S: opcode = [0xFD, 0x92, 0x02]
+        case .i32x4RelaxedDotI8X16I7X16AddS: opcode = [0xFD, 0x93, 0x02]
         }
 
         try encodeInstruction(opcode)
     }
-    mutating func visitSimdLane(_ simdLane: Instruction.SimdLane, lane: UInt8) throws(VisitorError) {
+    public mutating func visitSimdLane(_ simdLane: Instruction.SimdLane, lane: UInt8) throws(VisitorError) {
         let opcode: [UInt8]
         switch simdLane {
         case .i8x16ExtractLaneS: opcode = [0xFD, 0x15]
@@ -897,7 +917,7 @@ extension BinaryInstructionEncoder {
         try encodeInstruction(opcode)
         try encodeImmediates(lane: lane)
     }
-    mutating func visitSimdMemLane(_ simdMemLane: Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws(VisitorError) {
+    public mutating func visitSimdMemLane(_ simdMemLane: Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws(VisitorError) {
         let opcode: [UInt8]
         switch simdMemLane {
         case .v128Load8Lane: opcode = [0xFD, 0x54]

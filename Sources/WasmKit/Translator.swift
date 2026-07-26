@@ -2452,6 +2452,18 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             .i64x2ExtmulLowI32X4S, .i64x2ExtmulHighI32X4S, .i64x2ExtmulLowI32X4U, .i64x2ExtmulHighI32X4U,
             .i16x8Q15MulrSatS:
             try emitBinaryV128()
+
+        case .i32x4RelaxedTruncF32X4S, .i32x4RelaxedTruncF32X4U,
+            .i32x4RelaxedTruncF64X2SZero, .i32x4RelaxedTruncF64X2UZero:
+            try emitUnaryV128()
+        case .i8x16RelaxedSwizzle,
+            .f32x4RelaxedMin, .f32x4RelaxedMax, .f64x2RelaxedMin, .f64x2RelaxedMax,
+            .i16x8RelaxedQ15MulrS, .i16x8RelaxedDotI8X16I7X16S:
+            try emitBinaryV128()
+        case .i8x16RelaxedLaneselect, .i16x8RelaxedLaneselect, .i32x4RelaxedLaneselect, .i64x2RelaxedLaneselect,
+            .f32x4RelaxedMadd, .f32x4RelaxedNmadd, .f64x2RelaxedMadd, .f64x2RelaxedNmadd,
+            .i32x4RelaxedDotI8X16I7X16AddS:
+            try emitTernaryV128()
         }
     }
 

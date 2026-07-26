@@ -401,6 +401,26 @@ public enum Instruction: Equatable, Sendable {
         case i16x8ExtaddPairwiseI8X16U
         case i32x4ExtaddPairwiseI16X8S
         case i32x4ExtaddPairwiseI16X8U
+        case i8x16RelaxedSwizzle
+        case i32x4RelaxedTruncF32X4S
+        case i32x4RelaxedTruncF32X4U
+        case i32x4RelaxedTruncF64X2SZero
+        case i32x4RelaxedTruncF64X2UZero
+        case f32x4RelaxedMadd
+        case f32x4RelaxedNmadd
+        case f64x2RelaxedMadd
+        case f64x2RelaxedNmadd
+        case i8x16RelaxedLaneselect
+        case i16x8RelaxedLaneselect
+        case i32x4RelaxedLaneselect
+        case i64x2RelaxedLaneselect
+        case f32x4RelaxedMin
+        case f32x4RelaxedMax
+        case f64x2RelaxedMin
+        case f64x2RelaxedMax
+        case i16x8RelaxedQ15MulrS
+        case i16x8RelaxedDotI8X16I7X16S
+        case i32x4RelaxedDotI8X16I7X16AddS
     }
     public enum SimdLane: Equatable, Sendable {
         case i8x16ExtractLaneS

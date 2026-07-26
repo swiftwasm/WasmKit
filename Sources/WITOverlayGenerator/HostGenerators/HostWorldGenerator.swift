@@ -23,7 +23,7 @@ struct HostWorldGenerator: ASTVisitor {
                 struct \(ConvertCase.pascalCase(world.name)) {
                     let instance: WasmKit.Instance
 
-                    static func link(to imports: inout Imports, store: Store) {
+                    static func link(to imports: inout WasmKit.Imports, store: WasmKit.Store) {
                     }
                 """)
         // Enter world struct body

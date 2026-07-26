@@ -16,45 +16,25 @@
             return (1 << 32) + alignedGuardSize
         }
 
-        private(set) var baseAddress: UnsafeMutableRawPointer
+        private var vm: SystemVirtualMemory
         private(set) var committedSize: Int
-        let reservationSize: Int
+
+        var baseAddress: UnsafeMutableRawPointer { vm.base }
+        var reservationSize: Int { vm.reservationBytes }
 
         init(committedSize: Int, reservationSize: Int) throws {
             precondition(committedSize >= 0)
             precondition(reservationSize > 0)
-            self.committedSize = committedSize
-            self.reservationSize = reservationSize
 
             #if arch(x86_64) || arch(arm64)
-                #if os(Linux)
-                    let mapAnon = MAP_ANONYMOUS
-                #else
-                    let mapAnon = MAP_ANON
-                #endif
-                let mapped = mmap(
-                    nil,
-                    reservationSize,
-                    PROT_NONE,
-                    MAP_PRIVATE | mapAnon,
-                    -1,
-                    0
-                )
-                guard mapped != MAP_FAILED else {
+                guard let vm = SystemVirtualMemory(reservationBytes: reservationSize, commitBytes: committedSize) else {
                     throw Trap(.initialMemorySizeExceedsLimit(byteSize: committedSize))
                 }
-                baseAddress = mapped!
+                self.vm = vm
+                self.committedSize = committedSize
             #else
                 throw Trap(.initialMemorySizeExceedsLimit(byteSize: committedSize))
             #endif
-
-            if committedSize > 0 {
-                let rc = mprotect(baseAddress, committedSize, PROT_READ | PROT_WRITE)
-                if rc != 0 {
-                    munmap(baseAddress, reservationSize)
-                    throw Trap(.initialMemorySizeExceedsLimit(byteSize: committedSize))
-                }
-            }
         }
 
         mutating func grow(to newCommittedSize: Int) throws {
@@ -65,20 +45,18 @@
             let delta = newCommittedSize - committedSize
             guard delta > 0 else { return }
 
-            let start = baseAddress.advanced(by: committedSize)
-            let rc = mprotect(start, delta, PROT_READ | PROT_WRITE)
-            guard rc == 0 else {
+            guard vm.commit(offset: committedSize, byteCount: delta) else {
                 throw Trap(.memoryOutOfBounds)
             }
             committedSize = newCommittedSize
         }
 
         func makeBufferPointer() -> UnsafeBufferPointer<UInt8> {
-            UnsafeBufferPointer(start: baseAddress.assumingMemoryBound(to: UInt8.self), count: committedSize)
+            UnsafeBufferPointer(start: vm.base.assumingMemoryBound(to: UInt8.self), count: committedSize)
         }
 
         func deallocate() {
-            munmap(baseAddress, reservationSize)
+            vm.deallocate()
         }
     }
 

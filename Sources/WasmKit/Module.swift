@@ -1,6 +1,6 @@
 import WasmParser
 
-struct ModuleImports {
+struct ModuleImports: Sendable {
     let numberOfFunctions: Int
     let numberOfGlobals: Int
     let numberOfMemories: Int
@@ -53,7 +53,7 @@ struct ModuleImports {
 /// by calling either ``parseWasm(bytes:features:)`` or ``parseWasm(filePath:features:)``.
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#modules>
-public struct Module {
+public struct Module: Sendable {
     var functions: [GuestFunction]
     let elements: [ElementSegment]
     let data: [DataSegment]
@@ -203,6 +203,37 @@ public struct Module {
         // Step 12-13.
 
         // Steps 14-15.
+        try initializeActiveElementSegments(instance: instance, constEvalContext: constEvalContext)
+
+        // Step 16.
+        try initializeActiveDataSegments(instance: instance, constEvalContext: constEvalContext)
+
+        // Step 17.
+        if let startIndex = start {
+            let startFunction = try instance.functions[validating: Int(startIndex)]
+            _ = try startFunction.invoke([], store: store)
+        }
+
+        // Compile all functions eagerly if the engine is in eager compilation mode
+        if store.engine.configuration.compilationMode == .eager {
+            try instance.withValue {
+                try $0.compileAllFunctions(store: store)
+            }
+        }
+
+        return instance
+    }
+
+    /// Materialize lazily-computed elements in this module
+    @available(*, deprecated, message: "Module materialization is no longer supported. Instantiate the module explicitly instead.")
+    public mutating func materializeAll() throws {}
+
+    // MARK: - Segment Initialization Helpers
+
+    /// Initialize active element segments into instance tables.
+    private func initializeActiveElementSegments(
+        instance: InternalInstance, constEvalContext: ConstEvaluationContext
+    ) throws {
         for element in elements {
             guard case .active(let tableIndex, let offset) = element.mode else { continue }
             let table = try instance.tables[validating: Int(tableIndex)]
@@ -237,9 +268,13 @@ public struct Module {
                 )
             }
         }
+    }
 
-        // Step 16.
-        for case .active(let data) in data {
+    /// Initialize active data segments into instance memories.
+    private func initializeActiveDataSegments(
+        instance: InternalInstance, constEvalContext: ConstEvaluationContext
+    ) throws {
+        for case .active(let data) in self.data {
             let memory = try instance.memories[validating: Int(data.index), MemoryEntity.createOutOfBoundsError]
             let isMemory64 = memory.withValue { $0.limit.isMemory64 }
             let offsetValue = try data.offset.evaluate(
@@ -260,26 +295,7 @@ public struct Module {
                 try memory.write(offset: Int(offset), bytes: data.initializer)
             }
         }
-
-        // Step 17.
-        if let startIndex = start {
-            let startFunction = try instance.functions[validating: Int(startIndex)]
-            _ = try startFunction.invoke([], store: store)
-        }
-
-        // Compile all functions eagerly if the engine is in eager compilation mode
-        if store.engine.configuration.compilationMode == .eager {
-            try instance.withValue {
-                try $0.compileAllFunctions(store: store)
-            }
-        }
-
-        return instance
     }
-
-    /// Materialize lazily-computed elements in this module
-    @available(*, deprecated, message: "Module materialization is no longer supported. Instantiate the module explicitly instead.")
-    public mutating func materializeAll() throws {}
 }
 
 extension Module {
@@ -318,7 +334,7 @@ typealias LabelIndex = UInt32
 /// An executable function representation in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#functions>
-struct GuestFunction {
+struct GuestFunction: Sendable {
     let type: FunctionType
     let code: Code
 }

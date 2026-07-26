@@ -101,8 +101,9 @@ struct ExtractWIT: ParsableCommand {
         commandName: "extract-wit"
     )
 
-    @Option(name: .customLong("swift-api-digester"))
-    var digesterPath: String
+    struct ExtractWITError: Swift.Error, CustomStringConvertible {
+        let description: String
+    }
 
     @Option
     var moduleName: String
@@ -119,24 +120,33 @@ struct ExtractWIT: ParsableCommand {
     @Option
     var swiftOutputPath: String
 
-    @Argument(parsing: .captureForPassthrough)
-    var digesterArgs: [String] = []
+    /// `<Module>=<path>` pairs.
+    @Option(name: .customLong("dependency-source"))
+    var dependencySources: [String] = []
+
+    @Argument
+    var sourcePaths: [String]
 
     func run() throws {
         #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
             fatalError("WITExtractor does not support platforms where Foundation.Process is unavailable")
         #else
-            guard #available(macOS 11, *) else {
-                fatalError("ExtractWIT requires macOS 11+")
+            let sources = try sourcePaths.map { try String(contentsOfFile: $0, encoding: .utf8) }
+            var dependencySourcesByModule: [String: [String]] = [:]
+            for spec in dependencySources {
+                guard let separator = spec.firstIndex(of: "=") else {
+                    throw ExtractWITError(
+                        description: "Invalid --dependency-source '\(spec)', expected <Module>=<path>")
+                }
+                let module = String(spec[..<separator])
+                let path = String(spec[spec.index(after: separator)...])
+                dependencySourcesByModule[module, default: []].append(
+                    try String(contentsOfFile: path, encoding: .utf8))
             }
-
             let extractor = WITExtractor(
-                namespace: namespace,
-                packageName: packageName,
-                digesterPath: digesterPath,
-                extraDigesterArguments: digesterArgs
-            )
-            let output = try extractor.run(moduleName: moduleName)
+                namespace: namespace, packageName: packageName, sources: sources,
+                dependencySources: dependencySourcesByModule)
+            let output = extractor.run(moduleName: moduleName)
             try output.witContents.write(toFile: witOutputPath, atomically: true, encoding: .utf8)
 
             for diagnostic in extractor.diagnostics {
@@ -158,33 +168,30 @@ struct ExtractWIT: ParsableCommand {
                     context: context,
                     sourceFile: sourceFile,
                     interface: interface,
-                    sourceSummaryProvider: SwiftSourceSummaryProvider(
-                        summary: output.sourceSummary,
-                        typeMapping: output.typeMapping
-                    )
+                    sourceSummaryProvider: SwiftSourceSummaryProvider(summary: output.sourceSummary)
                 )
                 try swiftSource.write(toFile: swiftOutputPath, atomically: true, encoding: .utf8)
             }
         #endif
     }
-
-    private func writeFile(_ filePath: String, contents: String) throws {
-        try contents.write(toFile: filePath, atomically: true, encoding: .utf8)
-    }
 }
 
 struct SwiftSourceSummaryProvider: SourceSummaryProvider {
     let summary: SwiftSourceSummary
-    let typeMapping: (String) -> String?
 
     func enumCaseNames(byWITName witName: String) -> [String]? {
-        guard case .enumType(let enumType) = summary.lookupType(byWITName: witName) else {
-            return nil
-        }
-        return enumType.cases.map(\.name)
+        summary.enumCaseNames(byWITName: witName)
     }
 
-    public func qualifiedSwiftTypeName(byWITName witName: String) -> String? {
-        typeMapping(witName)
+    func recordFieldNames(byWITName witName: String) -> [String]? {
+        summary.recordFieldNames(byWITName: witName)
+    }
+
+    func qualifiedSwiftTypeName(byWITName witName: String) -> String? {
+        summary.qualifiedSwiftName(byWITName: witName)
+    }
+
+    func swiftArgumentLabels(byFunctionWITName witName: String) -> [String?]? {
+        summary.argumentLabels(byWITFunctionName: witName)
     }
 }

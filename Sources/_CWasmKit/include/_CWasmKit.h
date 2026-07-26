@@ -2,10 +2,9 @@
 #define WASMKIT__CWASMKIT_H
 
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 #include "Platform.h"
 
@@ -40,7 +39,7 @@ static inline CTYPE wasmkit_atomic_rmw_xor_##WIDTH(void *_Nonnull ptr, CTYPE val
 static inline CTYPE wasmkit_atomic_rmw_xchg_##WIDTH(void *_Nonnull ptr, CTYPE val) { \
     return __atomic_exchange_n((CTYPE *)ptr, val, __ATOMIC_SEQ_CST); \
 } \
-static inline _Bool wasmkit_atomic_cmpxchg_##WIDTH( \
+static inline bool wasmkit_atomic_cmpxchg_##WIDTH( \
     void *_Nonnull ptr, CTYPE *_Nonnull expected, CTYPE desired \
 ) { \
     return __atomic_compare_exchange_n( \
@@ -93,10 +92,6 @@ static inline void wasmkit_tc_start(
   exec(sp, pc, md, ms, state);
 }
 #endif
-
-static inline void wasmkit_fwrite_stderr(const char *_Nonnull str, size_t len) {
-  fwrite(str, 1, len, stderr);
-}
 
 int wasmkit_address_sanitizer_enabled(void);
 

@@ -474,7 +474,7 @@ enum WasmGen {
 
             /// An instruction encoder that is responsible for encoding opcodes and immediates
             /// in Wasm binary format.
-            protocol BinaryInstructionEncoder: InstructionVisitor {
+            public protocol BinaryInstructionEncoder: InstructionVisitor {
                 /// Encodes an instruction opcode.
                 mutating func encodeInstruction(_ opcode: [UInt8]) throws(VisitorError)
 
@@ -518,7 +518,7 @@ enum WasmGen {
             """
 
         for instruction in instructions.categorized {
-            code += "    mutating func \(instruction.visitMethodName)("
+            code += "    public mutating func \(instruction.visitMethodName)("
             code += instruction.associatedValues.map { i in
                 if i.argumentName == i.parameterName {
                     return "\(i.parameterName): \(i.type)"
@@ -603,7 +603,7 @@ enum WasmGen {
             var offset: Int { get }
 
             /// Claim the next byte to be decoded
-            @inlinable func claimNextByte() throws(WasmParserError) -> UInt8
+            @inlinable mutating func claimNextByte() throws(WasmParserError) -> UInt8
 
             /// Throw an error due to unknown opcode.
             func throwUnknown(_ opcode: [UInt8]) throws(WasmParserError) -> Never

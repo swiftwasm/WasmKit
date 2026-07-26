@@ -67,7 +67,7 @@ package struct ModuleInfo {
 /// Parses a WebAssembly binary and collects all sections into a `ModuleInfo`.
 /// Big sections (code, data, element) are captured as raw slices and parsed
 /// later during emit; small sections are sub-parsed eagerly.
-package func collectModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = .default) throws -> ModuleInfo {
+package func collectModule<Source: ByteStreamSource>(stream: Source, features: WasmFeatureSet = .default) throws -> ModuleInfo {
     var info = ModuleInfo()
     info.features = features
     var parser = WasmParser.Parser(stream: stream, features: features)
@@ -76,30 +76,30 @@ package func collectModule<Stream: ByteStream>(stream: Stream, features: WasmFea
         // forces an update here at compile time.
         switch section.kind {
         case .custom:
-            let sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
+            var sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
             let custom = try sub.parseCustomSection(size: UInt32(section.body.count))
             try assertFullyConsumed(sub, kind: .custom)
             if custom.name == "name" {
                 parseNameSection(custom.bytes, into: &info)
             }
         case .type:
-            let sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
+            var sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
             info.types = try sub.parseTypeSection()
             try assertFullyConsumed(sub, kind: .type)
         case .`import`:
-            let sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
+            var sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
             info.imports = try sub.parseImportSection()
             try assertFullyConsumed(sub, kind: .`import`)
         case .function:
-            let sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
+            var sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
             info.functionTypeIndices = try sub.parseFunctionSection()
             try assertFullyConsumed(sub, kind: .function)
         case .table:
-            let sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
+            var sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
             info.tables = try sub.parseTableSection()
             try assertFullyConsumed(sub, kind: .table)
         case .memory:
-            let sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
+            var sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
             info.memories = try sub.parseMemorySection()
             try assertFullyConsumed(sub, kind: .memory)
         case .global:
@@ -107,11 +107,11 @@ package func collectModule<Stream: ByteStream>(stream: Stream, features: WasmFea
             info.globals = try sub.parseGlobalSection()
             try assertFullyConsumed(sub, kind: .global)
         case .export:
-            let sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
+            var sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
             info.exports = try sub.parseExportSection()
             try assertFullyConsumed(sub, kind: .export)
         case .start:
-            let sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
+            var sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
             info.start = try sub.parseStartSection()
             try assertFullyConsumed(sub, kind: .start)
         case .element:
@@ -123,13 +123,13 @@ package func collectModule<Stream: ByteStream>(stream: Stream, features: WasmFea
         case .dataCount:
             // Body is a single u32 LEB128; inline rather than widen
             // `parseDataCountSection`.
-            let sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
+            var sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
             info.dataCount = try sub.parseUnsigned()
             try assertFullyConsumed(sub, kind: .dataCount)
         case .tag:
             // Gating on `.exceptionHandling` happens in `parseNextRawSection`,
             // so reaching this branch implies the feature is enabled.
-            let sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
+            var sub = WasmParser.Parser(sectionBodyBytes: section.body, features: features)
             info.tags = try sub.parseTagSection()
             try assertFullyConsumed(sub, kind: .tag)
         }
@@ -139,7 +139,7 @@ package func collectModule<Stream: ByteStream>(stream: Stream, features: WasmFea
 
 /// Verifies a sub-parser consumed exactly the section body it was handed.
 /// Throws a `sectionSizeMismatch`-shaped error if extra bytes remain.
-func assertFullyConsumed(_ sub: WasmParser.Parser<StaticByteStream>, kind: RawSection.Kind) throws(WasmParserError) {
+func assertFullyConsumed(_ sub: WasmParser.Parser<StaticByteStreamSource>, kind: RawSection.Kind) throws(WasmParserError) {
     guard try sub.hasReachedEnd() else {
         throw WasmParserError(
             "section \(kind) (id \(kind.rawValue)) declared size larger than parsed body"
@@ -154,8 +154,8 @@ func assertFullyConsumed(_ sub: WasmParser.Parser<StaticByteStream>, kind: RawSe
 /// the name section, as advisory: a malformed name section is silently
 /// ignored so the rest of the module still round-trips.
 private func parseNameSection(_ bytes: ArraySlice<UInt8>, into info: inout ModuleInfo) {
-    let stream = StaticByteStream(bytes: bytes)
-    let nameParser = NameSectionParser(stream: stream)
+    let stream = StaticByteStreamSource(bytes: bytes)
+    var nameParser = NameSectionParser(stream: stream)
     let parsedNames: [ParsedNames]
     do {
         parsedNames = try nameParser.parseAll()

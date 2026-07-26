@@ -4,8 +4,8 @@ import WasmParser
 
 /// Assembles WAT source into a binary stream for tests that drive the
 /// binary-side parsers (`collectModule`, sub-parsers, etc.).
-func binaryStream(forWat wat: String) throws -> StaticByteStream {
-    try StaticByteStream(bytes: wat2wasm(wat))
+func binaryStream(forWat wat: String) throws -> StaticByteStreamSource {
+    try StaticByteStreamSource(bytes: wat2wasm(wat))
 }
 
 enum TestSupport {

@@ -49,6 +49,7 @@
             case killRequestReceived
             case unknownHexEncodedArguments(String)
             case unknownWasmLocalArguments(String)
+            case unknownWasmGlobalArguments(String)
         }
 
         private let moduleFilePath: FilePath
@@ -336,6 +337,22 @@
                 responseKind = .hexEncodedBinary(
                     self.allocator.buffer(
                         integer: try self.debugger.getLocal(frameIndex: frameIndex, localIndex: localIndex),
+                        endianness: .little
+                    ).readableBytesView
+                )
+
+            case .wasmGlobal:
+                // Keep empty fields so a malformed `<frame>;` is rejected rather than read as `<frame>`.
+                let arguments = command.arguments.split(separator: ";", omittingEmptySubsequences: false)
+                guard arguments.count == 2,
+                    let globalIndex = UInt(arguments[1])
+                else {
+                    throw Error.unknownWasmGlobalArguments(command.arguments)
+                }
+
+                responseKind = .hexEncodedBinary(
+                    self.allocator.buffer(
+                        integer: try self.debugger.getGlobal(index: globalIndex),
                         endianness: .little
                     ).readableBytesView
                 )

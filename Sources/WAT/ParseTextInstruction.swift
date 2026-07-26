@@ -867,6 +867,26 @@ func parseTextInstruction<V: InstructionVisitor>(
     case "i16x8.extadd_pairwise_i8x16_u": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i16x8ExtaddPairwiseI8X16U) }
     case "i32x4.extadd_pairwise_i16x8_s": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i32x4ExtaddPairwiseI16X8S) }
     case "i32x4.extadd_pairwise_i16x8_u": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i32x4ExtaddPairwiseI16X8U) }
+    case "i8x16.relaxed_swizzle": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i8x16RelaxedSwizzle) }
+    case "i32x4.relaxed_trunc_f32x4_s": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i32x4RelaxedTruncF32X4S) }
+    case "i32x4.relaxed_trunc_f32x4_u": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i32x4RelaxedTruncF32X4U) }
+    case "i32x4.relaxed_trunc_f64x2_s_zero": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i32x4RelaxedTruncF64X2SZero) }
+    case "i32x4.relaxed_trunc_f64x2_u_zero": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i32x4RelaxedTruncF64X2UZero) }
+    case "f32x4.relaxed_madd": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.f32x4RelaxedMadd) }
+    case "f32x4.relaxed_nmadd": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.f32x4RelaxedNmadd) }
+    case "f64x2.relaxed_madd": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.f64x2RelaxedMadd) }
+    case "f64x2.relaxed_nmadd": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.f64x2RelaxedNmadd) }
+    case "i8x16.relaxed_laneselect": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i8x16RelaxedLaneselect) }
+    case "i16x8.relaxed_laneselect": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i16x8RelaxedLaneselect) }
+    case "i32x4.relaxed_laneselect": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i32x4RelaxedLaneselect) }
+    case "i64x2.relaxed_laneselect": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i64x2RelaxedLaneselect) }
+    case "f32x4.relaxed_min": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.f32x4RelaxedMin) }
+    case "f32x4.relaxed_max": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.f32x4RelaxedMax) }
+    case "f64x2.relaxed_min": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.f64x2RelaxedMin) }
+    case "f64x2.relaxed_max": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.f64x2RelaxedMax) }
+    case "i16x8.relaxed_q15mulr_s": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i16x8RelaxedQ15MulrS) }
+    case "i16x8.relaxed_dot_i8x16_i7x16_s": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i16x8RelaxedDotI8X16I7X16S) }
+    case "i32x4.relaxed_dot_i8x16_i7x16_add_s": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i32x4RelaxedDotI8X16I7X16AddS) }
     default: return nil
     }
 }

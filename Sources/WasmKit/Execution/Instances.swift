@@ -506,104 +506,227 @@ struct MemoryEntity: ~Copyable {
         }
     }
 
-    #if os(macOS) || os(Linux)
-        private enum Storage {
+    /// Backing storage for a linear memory; shared memories are the `.shared` case.
+    private enum Storage {
+        #if os(macOS) || os(Linux)
             case mprotect(MprotectLinearMemory)
-            case malloc(MallocStorage)
+            case shared(SharedMemoryStorage)
+        #endif
+        case malloc(MallocStorage)
 
-            init(byteSize: Int, isMemory64: Bool, engineConfiguration: EngineConfiguration) {
+        init(
+            initialBytes: Int,
+            maxBytes: Int,
+            isMemory64: Bool,
+            isShared: Bool,
+            engineConfiguration: EngineConfiguration
+        ) throws(Trap) {
+            if isShared {
+                #if os(macOS) || os(Linux)
+                    self = .shared(try SharedMemoryStorage(initialBytes: initialBytes, maxBytes: maxBytes, isMemory64: isMemory64, engineConfiguration: engineConfiguration))
+                    return
+                #else
+                    throw Trap(.sharedMemoryRequiresMprotect)
+                #endif
+            }
+
+            #if os(macOS) || os(Linux)
                 if !isMemory64, engineConfiguration.memoryBoundsChecking == .mprotect {
                     let reservationSize = MprotectLinearMemory.wasm32ReservationSize(offsetGuardSize: engineConfiguration.memoryOffsetGuardSize)
                     do {
-                        self = .mprotect(try MprotectLinearMemory(committedSize: byteSize, reservationSize: reservationSize))
+                        self = .mprotect(try MprotectLinearMemory(committedSize: initialBytes, reservationSize: reservationSize))
+                        return
                     } catch {
                         // Fall back to malloc if mprotect fails for some reasons (e.g. vm.max_map_count exhaustion on Linux)
-                        let storage = MallocStorage(byteSize: byteSize, isMemory64: isMemory64, engineConfiguration: engineConfiguration)
-                        self = .malloc(storage)
                     }
-                } else {
-                    let storage = MallocStorage(byteSize: byteSize, isMemory64: isMemory64, engineConfiguration: engineConfiguration)
-                    self = .malloc(storage)
                 }
-            }
+            #endif
+            self = .malloc(MallocStorage(byteSize: initialBytes, isMemory64: isMemory64, engineConfiguration: engineConfiguration))
+        }
 
-            var data: UnsafeBufferPointer<UInt8> {
-                switch self {
+        var data: UnsafeBufferPointer<UInt8> {
+            switch self {
+            #if os(macOS) || os(Linux)
                 case .mprotect(let memory):
                     return memory.makeBufferPointer()
-                case .malloc(let buffer):
-                    return buffer.data
-                }
-            }
-
-            var baseAddress: UnsafeMutableRawPointer? {
-                switch self {
-                case .mprotect(let memory):
-                    return memory.baseAddress
-                case .malloc(let buffer):
-                    return buffer.baseAddress
-                }
-            }
-
-            var byteCount: Int {
-                switch self {
-                case .mprotect(let memory):
-                    return memory.committedSize
-                case .malloc(let buffer):
-                    return buffer.byteCount
-                }
-            }
-
-            var trapGuardReservationSize: Int {
-                switch self {
-                case .mprotect(let memory):
-                    return memory.reservationSize
-                case .malloc(let buffer):
-                    return buffer.trapGuardReservationSize
-                }
-            }
-
-            mutating func grow(to newByteCount: Int) throws {
-                switch self {
-                case .mprotect(var memory):
-                    try memory.grow(to: newByteCount)
-                    self = .mprotect(memory)
-                case .malloc(var buffer):
-                    try buffer.grow(to: newByteCount)
-                    self = .malloc(buffer)
-                }
-            }
-
-            func deallocate() {
-                switch self {
-                case .mprotect(let memory):
-                    memory.deallocate()
-                case .malloc(let buffer):
-                    buffer.deallocate()
-                }
+            #endif
+            case .malloc(let buffer):
+                return buffer.data
+            #if os(macOS) || os(Linux)
+                case .shared(let shared):
+                    return UnsafeBufferPointer(
+                        start: shared.basePointer.assumingMemoryBound(to: UInt8.self),
+                        count: shared.currentByteCount.load(ordering: .acquiring)
+                    )
+            #endif
             }
         }
-    #else
-        private typealias Storage = MallocStorage
-    #endif
+
+        var baseAddress: UnsafeMutableRawPointer? {
+            switch self {
+            #if os(macOS) || os(Linux)
+                case .mprotect(let memory):
+                    return memory.baseAddress
+            #endif
+            case .malloc(let buffer):
+                return buffer.baseAddress
+            #if os(macOS) || os(Linux)
+                case .shared(let shared):
+                    return shared.basePointer
+            #endif
+            }
+        }
+
+        var byteCount: Int {
+            switch self {
+            #if os(macOS) || os(Linux)
+                case .mprotect(let memory):
+                    return memory.committedSize
+            #endif
+            case .malloc(let buffer):
+                return buffer.byteCount
+            #if os(macOS) || os(Linux)
+                case .shared(let shared):
+                    return shared.currentByteCount.load(ordering: .acquiring)
+            #endif
+            }
+        }
+
+        var trapGuardReservationSize: Int {
+            switch self {
+            #if os(macOS) || os(Linux)
+                case .mprotect(let memory):
+                    return memory.reservationSize
+            #endif
+            case .malloc(let buffer):
+                return buffer.trapGuardReservationSize
+            #if os(macOS) || os(Linux)
+                case .shared(let shared):
+                    return shared.reservationSize
+            #endif
+            }
+        }
+
+        /// The `Ms` bound for the fast-path software check. Equal to `byteCount` for
+        /// inline memories, but the (constant) guard-page reservation for shared memory,
+        /// whose real bound is enforced by the guard pages via the trap guard.
+        var boundsCheckLimit: Int {
+            switch self {
+            #if os(macOS) || os(Linux)
+                case .mprotect(let memory):
+                    return memory.committedSize
+            #endif
+            case .malloc(let buffer):
+                return buffer.byteCount
+            #if os(macOS) || os(Linux)
+                case .shared(let shared):
+                    return shared.reservationSize
+            #endif
+            }
+        }
+
+        /// Grows by `pageCount` pages and returns the old page count, or -1 if rejected
+        /// (over the maximum or the resource limit). Shared memory serializes its own
+        /// bounds/limiter/commit atomically; the single-threaded backings check then commit.
+        mutating func grow(by pageCount: Int, maxPageCount: UInt64, resourceLimiter: any ResourceLimiter) throws -> Int {
+            switch self {
+            #if os(macOS) || os(Linux)
+                case .mprotect(var memory):
+                    guard let target = try Self.checkGrow(currentBytes: memory.committedSize, by: pageCount, maxPageCount: maxPageCount, resourceLimiter: resourceLimiter) else { return -1 }
+                    try memory.grow(to: target.newByteCount)
+                    self = .mprotect(memory)
+                    return target.oldPages
+            #endif
+            case .malloc(var buffer):
+                guard let target = try Self.checkGrow(currentBytes: buffer.byteCount, by: pageCount, maxPageCount: maxPageCount, resourceLimiter: resourceLimiter) else { return -1 }
+                try buffer.grow(to: target.newByteCount)
+                self = .malloc(buffer)
+                return target.oldPages
+            #if os(macOS) || os(Linux)
+                case .shared(let shared):
+                    return try shared.grow(by: pageCount, resourceLimiter: resourceLimiter)
+            #endif
+            }
+        }
+
+        /// Bounds + resource-limit check shared by the single-threaded backings. Returns the
+        /// old page count and the target byte size, or `nil` if the grow is rejected.
+        private static func checkGrow(
+            currentBytes: Int, by pageCount: Int, maxPageCount: UInt64, resourceLimiter: any ResourceLimiter
+        ) throws -> (oldPages: Int, newByteCount: Int)? {
+            let oldPages = currentBytes / MemoryEntity.pageSize
+            let newPageCount = oldPages + pageCount
+            guard newPageCount <= maxPageCount else { return nil }
+            let newByteCount = newPageCount * MemoryEntity.pageSize
+            guard try resourceLimiter.limitMemoryGrowth(to: newByteCount) else { return nil }
+            return (oldPages, newByteCount)
+        }
+
+        func deallocate() {
+            switch self {
+            #if os(macOS) || os(Linux)
+                case .mprotect(let memory):
+                    memory.deallocate()
+            #endif
+            case .malloc(let buffer):
+                buffer.deallocate()
+            #if os(macOS) || os(Linux)
+                case .shared:
+                    // Ref-counted; ARC frees the backing when the last importer is released.
+                    break
+            #endif
+            }
+        }
+    }
     private var storage: Storage
     let maxPageCount: UInt64
     let limit: Limits
-    let sharedMutex: Mutex<Void>?
 
-    init(_ memoryType: MemoryType, engineConfiguration: EngineConfiguration, resourceLimiter: any ResourceLimiter) throws {
-        let byteSize = Int(memoryType.min) * Self.pageSize
-        guard try resourceLimiter.limitMemoryGrowth(to: byteSize) else {
-            throw Trap(.initialMemorySizeExceedsLimit(byteSize: byteSize))
-        }
-        self.storage = Storage(byteSize: byteSize, isMemory64: memoryType.isMemory64, engineConfiguration: engineConfiguration)
-        let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
-        maxPageCount = memoryType.max ?? defaultMaxPageCount
-        limit = memoryType
-        sharedMutex = memoryType.shared ? Mutex<Void>(()) : nil
+    /// The shared backing's `atomic.wait`/`notify` parking lot, or nil if not shared.
+    var sharedParkingLot: AtomicParkingLot? {
+        #if os(macOS) || os(Linux)
+            if case .shared(let shared) = storage { return shared.parkingLot }
+        #endif
+        return nil
     }
 
+    init(_ memoryType: MemoryType, engineConfiguration: EngineConfiguration, resourceLimiter: any ResourceLimiter) throws {
+        let initialBytes = Int(memoryType.min) * Self.pageSize
+        guard try resourceLimiter.limitMemoryGrowth(to: initialBytes) else {
+            throw Trap(.initialMemorySizeExceedsLimit(byteSize: initialBytes))
+        }
+
+        let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
+        let maxPages = memoryType.max ?? defaultMaxPageCount
+        // Clamp an overflowing maximum rather than failing; the real cap is enforced at grow.
+        let (product, overflow) = Int(clamping: maxPages).multipliedReportingOverflow(by: Self.pageSize)
+        let maxBytes = overflow ? (Int.max / Self.pageSize) * Self.pageSize : product
+
+        self.storage = try Storage(
+            initialBytes: initialBytes,
+            maxBytes: maxBytes,
+            isMemory64: memoryType.isMemory64,
+            isShared: memoryType.shared,
+            engineConfiguration: engineConfiguration
+        )
+
+        maxPageCount = maxPages
+        limit = memoryType
+    }
+
+    #if os(macOS) || os(Linux)
+        /// Creates a memory entity for a shared memory backed by pre-allocated `SharedMemoryStorage`.
+        init(_ memoryType: MemoryType, sharedStorage: SharedMemoryStorage) {
+            precondition(memoryType.shared)
+            self.storage = .shared(sharedStorage)
+            self.maxPageCount = memoryType.max ?? Self.maxPageCount(isMemory64: memoryType.isMemory64)
+            self.limit = memoryType
+        }
+    #endif
+
     deinit {
+        // Frees the inline `.mprotect`/`.malloc` backing. `.shared` is a no-op: ARC
+        // releases the ref-counted backing when `storage` is torn down.
         storage.deallocate()
     }
 
@@ -613,28 +736,18 @@ struct MemoryEntity: ~Copyable {
 
     var byteCount: Int { storage.byteCount }
 
-    var trapGuardReservationSize: Int {
-        storage.trapGuardReservationSize
-    }
+    var boundsCheckLimit: Int { storage.boundsCheckLimit }
+
+    var trapGuardReservationSize: Int { storage.trapGuardReservationSize }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#grow-mem>
     mutating func grow(by pageCount: Int, resourceLimiter: any ResourceLimiter) throws -> Value {
-        let currentByteCount = byteCount
-        let newPageCount = currentByteCount / Self.pageSize + pageCount
-
-        guard newPageCount <= maxPageCount else {
+        let oldPages = try storage.grow(by: pageCount, maxPageCount: maxPageCount, resourceLimiter: resourceLimiter)
+        guard oldPages >= 0 else {
             return limit.isMemory64 ? .i64((-1 as Int64).unsigned) : .i32((-1 as Int32).unsigned)
         }
-        guard try resourceLimiter.limitMemoryGrowth(to: newPageCount * Self.pageSize) else {
-            return limit.isMemory64 ? .i64((-1 as Int64).unsigned) : .i32((-1 as Int32).unsigned)
-        }
-
-        let result = Int32(currentByteCount / MemoryEntity.pageSize).unsigned
-        let newByteCount = newPageCount * MemoryEntity.pageSize
-        try storage.grow(to: newByteCount)
-
-        return limit.isMemory64 ? .i64(UInt64(result)) : .i32(result)
+        return limit.isMemory64 ? .i64(UInt64(oldPages)) : .i32(UInt32(oldPages))
     }
 
     mutating func copy(from source: UInt64, to destination: UInt64, count: UInt64) throws {
@@ -756,6 +869,17 @@ public struct Memory: Equatable {
             allocator: store.allocator
         )
     }
+
+    #if os(macOS) || os(Linux)
+        /// Wrap an existing `SharedMemoryStorage` in a new `Memory`, so one shared memory can
+        /// be imported into child `Store`s (the `wasi_thread_spawn` path).
+        init(store: Store, type: MemoryType, sharedStorage: SharedMemoryStorage) {
+            self.init(
+                handle: store.allocator.allocate(memoryType: type, sharedStorage: sharedStorage),
+                allocator: store.allocator
+            )
+        }
+    #endif
 
     /// Returns a copy of the memory data.
     @available(*, deprecated, message: "Use `withUnsafeBufferPointer(offset:count:_:)` or `withUnsafeMutableBufferPointer(offset:count:_:)` instead")
