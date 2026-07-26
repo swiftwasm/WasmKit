@@ -4,23 +4,13 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-#ifndef _Nullable
-#  ifndef __clang__
-#    define _Nullable
-#  endif
-#endif
-
-#ifndef _Nonnull
-#  ifndef __clang__
-#    define _Nonnull
-#  endif
-#endif
+#include "Platform.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef void (*wasmkit_trap_guard_fn)(void *_Nullable ctx);
+typedef void (*wasmkit_trap_guard_fn)(void *WASMKIT_NULLABLE ctx);
 
 /// Runs `fn(ctx)` while converting SIGSEGV/SIGBUS faults inside the current
 /// linear-memory reserved range into a non-local return.
@@ -28,13 +18,13 @@ typedef void (*wasmkit_trap_guard_fn)(void *_Nullable ctx);
 /// Return value:
 /// - false: completed normally
 /// - true: trapped due to out-of-bounds linear-memory access
-bool wasmkit_trap_guard_run(wasmkit_trap_guard_fn _Nonnull fn, void *_Nullable ctx);
+bool wasmkit_trap_guard_run(wasmkit_trap_guard_fn WASMKIT_NONNULL fn, void *WASMKIT_NULLABLE ctx);
 
 /// Updates the currently-active trap guard (if any) with the current memory base
 /// and linear-memory reservation size (in bytes).
 ///
 /// Passing `reservation_size == 0` disables handling of faults for the current thread.
-void wasmkit_trap_guard_set_current_memory(void *_Nullable md, size_t reservation_size);
+void wasmkit_trap_guard_set_current_memory(void *WASMKIT_NULLABLE md, size_t reservation_size);
 
 #ifdef __cplusplus
 }
