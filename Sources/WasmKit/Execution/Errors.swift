@@ -18,13 +18,13 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     public var description: String {
         symbols.enumerated().map { (index, symbol) in
             let name = symbol.name ?? "unknown"
-            return "    \(index): (\(symbol.address)) \(name)"
+            return "    \(index): (0x\(String(UInt(bitPattern: symbol.address), radix: 16))) \(name)"
         }.joined(separator: "\n")
     }
 }
 
 /// An error that occurs during execution of a WebAssembly module.
-public struct Trap: Error, CustomStringConvertible {
+public struct Trap: Error, CustomStringConvertible, Sendable {
     /// The reason for the trap.
     package private(set) var reason: TrapReason
 
@@ -70,7 +70,7 @@ public struct WasmKitException: Error, CustomStringConvertible {
     }
 
     public var description: String {
-        "wasm exception (payload: \(payload))"
+        "wasm exception (payload: [\(Value.descriptionList(payload))])"
     }
 
     /// Returns true if this exception's tag matches the given tag handle.
@@ -80,8 +80,8 @@ public struct WasmKitException: Error, CustomStringConvertible {
 }
 
 /// A reason for a trap that occurred during execution of a WebAssembly module.
-package enum TrapReason: Error, CustomStringConvertible {
-    package struct Message {
+package enum TrapReason: Error, CustomStringConvertible, Sendable {
+    package struct Message: Sendable {
         let text: String
 
         init(_ text: String) {
@@ -150,10 +150,10 @@ extension TrapReason.Message {
         Self("initial memory size exceeds the resource limit: \(byteSize) bytes")
     }
     static func parameterTypesMismatch(expected: [ValueType], got: [Value]) -> Self {
-        Self("parameter types don't match, expected \(expected), got \(got)")
+        Self("parameter types don't match, expected [\(ValueType.descriptionList(expected))], got [\(Value.descriptionList(got))]")
     }
     static func resultTypesMismatch(expected: [ValueType], got: [Value]) -> Self {
-        Self("result types don't match, expected \(expected), got \(got)")
+        Self("result types don't match, expected [\(ValueType.descriptionList(expected))], got [\(Value.descriptionList(got))]")
     }
     static var cannotAssignToImmutableGlobal: Self {
         Self("cannot assign to an immutable global")
@@ -168,10 +168,10 @@ extension TrapReason.Message {
         Self("`memory.atomic.wait` requires a shared memory")
     }
     static func noGlobalExportWithName(globalName: String, instance: Instance) -> Self {
-        Self("no global export with name \(globalName) in a module instance \(instance)")
+        Self("no global export with name \(globalName) in a module instance")
     }
     static func exportedFunctionNotFound(name: String, instance: Instance) -> Self {
-        Self("exported function \(name) not found in instance \(instance)")
+        Self("exported function \(name) not found in instance")
     }
     static func unimplemented(feature: String) -> Self {
         Self("\(feature) is not implemented yet")
