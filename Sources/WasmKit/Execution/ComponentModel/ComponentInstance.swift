@@ -33,6 +33,10 @@
     /// Type-safe handle to a component instance entity.
     typealias InternalComponentInstance = EntityHandle<ComponentInstanceEntity>
 
+    extension InternalComponentInstance {
+        var exports: [String: InternalComponentExternalValue] { withValue { $0.exports } }
+    }
+
     /// A stateful instance of a WebAssembly component.
     /// Created by instantiating a component with resolved imports.
     public struct ComponentInstance {
@@ -176,6 +180,13 @@
 
     /// Type-safe handle to a component function entity.
     typealias InternalComponentFunction = EntityHandle<ComponentFunctionEntity>
+
+    extension InternalComponentFunction {
+        var type: ComponentFuncType { withValue { $0.type } }
+        var coreFunction: InternalFunction { withValue { $0.coreFunction } }
+        var canonOptions: CanonOptions { withValue { $0.canonOptions } }
+        var resolveType: (ComponentTypeIndex) throws -> ComponentDefValType { withValue { $0.resolveType } }
+    }
 
     /// A component function that can be invoked with component-level values.
     /// Component functions lift core Wasm values to component values on return
