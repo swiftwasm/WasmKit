@@ -1,4 +1,3 @@
-import Synchronization
 import WasmParser
 
 /// A simple bump allocator for a single type.
@@ -169,17 +168,21 @@ struct Interned<T: Internable>: Equatable, Hashable, Sendable {
 
 /// A deduplicating interner for values of type `Item`.
 ///
-/// Thread-safe: all access is serialized by an internal `Mutex`.
+/// Thread-safe when the `MultiThread` trait is enabled: all access is
+/// serialized by the internal `PlatformMutex`.
 final class Interner<Item: Hashable & Internable & Sendable>: Sendable {
     private struct State {
         var itemByIntern: [Item]
         var internByItem: [Item: Interned<Item>]
     }
 
-    private let state: Mutex<State>
+    // `var` because the single-threaded PlatformMutex fallback mutates in
+    // place; the mutex itself guarantees exclusivity, which Sendable checking
+    // cannot see.
+    nonisolated(unsafe) private var state: PlatformMutex<State>
 
     init() {
-        state = Mutex(State(itemByIntern: [], internByItem: [:]))
+        state = PlatformMutex(State(itemByIntern: [], internByItem: [:]))
     }
 
     /// Interns the given `item` and returns an interned value.

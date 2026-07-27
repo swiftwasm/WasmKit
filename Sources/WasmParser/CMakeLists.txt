@@ -15,7 +15,7 @@ target_link_wasmkit_libraries(WasmParser PUBLIC
 
 if(WASMKIT_ENABLE_FILESYSTEM)
   target_compile_options(WasmParser PRIVATE
-    $<$<COMPILE_LANGUAGE:Swift>:-D;FileSystem>)
+    $<$<COMPILE_LANGUAGE:Swift>:-DFileSystem>)
   target_link_wasmkit_libraries(WasmParser PUBLIC
     SystemPackage)
 endif()
