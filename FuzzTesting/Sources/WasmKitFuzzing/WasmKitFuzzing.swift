@@ -3,7 +3,7 @@
 @_spi(Fuzzing) import WasmKit
 
 /// A resource limiter that restricts allocations to fuzzer limits.
-public struct FuzzerResourceLimiter: ResourceLimiter {
+public final class FuzzerResourceLimiter: ResourceLimiter {
     public init() {}
 
     public func limitMemoryGrowth(to desired: Int) throws -> Bool {
