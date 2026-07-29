@@ -297,6 +297,35 @@ jobs:
       - run: cmake --build ./build
       - run: ./build/bin/wasmkit --version
 
+  build-embedded:
+    runs-on: ubuntu-24.04
+    container:
+      image: swiftlang/swift:nightly-main-noble
+    steps:
+      - uses: actions/checkout@v6
+      - run: ./Utilities/build-embedded.sh
+
+  smoke-esp32:
+    runs-on: ubuntu-24.04
+    container:
+      image: espressif/idf:v5.5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Swift development snapshot
+        run: |
+          apt-get update && apt-get install -y libcurl4 libedit2 libxml2 libsqlite3-0 libz3-4 zlib1g libncurses6
+          dir=$(curl -sSL https://download.swift.org/development/ubuntu2204/latest-build.yml | sed -n 's/^dir: //p')
+          download=$(curl -sSL https://download.swift.org/development/ubuntu2204/latest-build.yml | sed -n 's/^download: //p')
+          mkdir -p /opt/swift
+          curl -sSL "https://download.swift.org/development/ubuntu2204/$dir/$download" \
+            | tar xz -C /opt/swift --strip-components 1
+      - name: Install QEMU
+        run: |
+          apt-get install -y libpixman-1-0 libglib2.0-0 libgcrypt20 libslirp0
+          python $IDF_PATH/tools/idf_tools.py install qemu-riscv32
+      - name: Run ESP32 smoke test in QEMU
+        run: SWIFT_TOOLCHAIN=/opt/swift ./Examples/embedded-esp32/smoke-test.sh --qemu
+
   build-wasi:
     runs-on: ubuntu-24.04
     container:

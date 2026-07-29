@@ -1,0 +1,2 @@
+dependencies:
+  espressif/idf_swift: "^1.0.0"
