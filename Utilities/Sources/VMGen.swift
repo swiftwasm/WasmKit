@@ -281,6 +281,22 @@ enum VMGen {
                 default: return nil
                 }
             }
+
+            /// Emits the immediate operand of this instruction, if any.
+            /// Dispatches without existentials so that Embedded Swift, which cannot
+            /// call default protocol methods on existentials, can use it.
+            func emitImmediate(to emit: @escaping (CodeSlot) -> Void) {
+                switch self {
+
+        """
+        for inst in instructions {
+            guard let immediate = inst.immediate else { continue }
+            output += "        case .\(inst.name)(let \(immediate.label)): \(immediate.label).emit(to: emit)\n"
+        }
+        output += """
+                default: return
+                }
+            }
         }
 
         """
@@ -612,8 +628,8 @@ enum VMGen {
                 extension Instruction {
                     /// The tail-calling execution handler for the instruction.
                     var handler: UInt {
-                        #if os(WASI)
-                        fatalError("Direct threading is not supported on WASI")
+                        #if os(WASI) || $Embedded
+                        fatalError("Direct threading is not supported on this platform")
                         #else
                         return withUnsafePointer(to: wasmkit_tc_exec_handlers) {
                             let count = MemoryLayout.size(ofValue: wasmkit_tc_exec_handlers) / MemoryLayout<wasmkit_tc_exec>.size

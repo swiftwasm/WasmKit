@@ -420,7 +420,7 @@ extension StoreAllocator {
         // Step 5.
         let constEvalContext = ConstEvaluationContext(
             functions: functions,
-            globals: importedGlobals.map(\.value),
+            globals: importedGlobals.map { $0.value },
             onFunctionReferenced: { function in
                 functionRefs.insert(function)
             }

@@ -262,14 +262,8 @@ extension Execution {
             //   timeout >= 0: expires after `timeout` nanoseconds
             let timeout = sp[waitOperand.timeout].i64
             let timeoutSigned = Int64(bitPattern: timeout)
-            let deadline: (() -> ContinuousClock.Instant)?
-            if timeoutSigned < 0 {
-                deadline = nil
-            } else {
-                let timeoutDuration = Duration.nanoseconds(timeoutSigned)
-                let deadlineInstant = ContinuousClock.now.advanced(by: timeoutDuration)
-                deadline = { deadlineInstant }
-            }
+            let deadline: ParkingDeadline? =
+                timeoutSigned < 0 ? nil : ParkingDeadline(afterNanoseconds: timeoutSigned)
 
             let result = parkingLot.parkConditionally(
                 address: UInt64(address),
@@ -324,14 +318,8 @@ extension Execution {
             //   timeout >= 0: expires after `timeout` nanoseconds
             let timeout = sp[waitOperand.timeout].i64
             let timeoutSigned = Int64(bitPattern: timeout)
-            let deadline: (() -> ContinuousClock.Instant)?
-            if timeoutSigned < 0 {
-                deadline = nil
-            } else {
-                let timeoutDuration = Duration.nanoseconds(timeoutSigned)
-                let deadlineInstant = ContinuousClock.now.advanced(by: timeoutDuration)
-                deadline = { deadlineInstant }
-            }
+            let deadline: ParkingDeadline? =
+                timeoutSigned < 0 ? nil : ParkingDeadline(afterNanoseconds: timeoutSigned)
 
             let result = parkingLot.parkConditionally(
                 address: UInt64(address),

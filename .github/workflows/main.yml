@@ -61,7 +61,7 @@ jobs:
           ./Vendor/checkout-dependency --category component-model
 
           swift --version
-          swift test --sanitize address --traits FileSystem,ComponentModel,WasmDebuggingSupport ${{ matrix.test-args }}
+          swift test --sanitize address --traits FileSystem,MultiThread,ComponentModel,WasmDebuggingSupport,Disassembler ${{ matrix.test-args }}
           swift build --package-path Benchmarks
 
   build-macos:
@@ -71,7 +71,7 @@ jobs:
           # Swift 6.3.2
           - os: macos-26
             xcode: Xcode_26.5
-            test-args: "--sanitize address --traits FileSystem,ComponentModel,WasmDebuggingSupport"
+            test-args: "--sanitize address --traits FileSystem,MultiThread,ComponentModel,WasmDebuggingSupport,Disassembler"
 
     runs-on: ${{ matrix.os }}
     name: "build-macos (${{ matrix.xcode }})"
@@ -143,15 +143,15 @@ jobs:
       matrix:
         include:
           - swift: "swift:6.3-noble"
-            test-args: "--traits FileSystem,ComponentModel,WasmDebuggingSupport --enable-code-coverage"
+            test-args: "--traits FileSystem,MultiThread,ComponentModel,WasmDebuggingSupport,Disassembler --enable-code-coverage"
             build-benchmarks: true
             run-benchmarks: true
             build-dev-dashboard: true
           - swift: "swiftlang/swift:nightly-6.4.x-noble"
-            test-args: "--traits FileSystem,ComponentModel,WasmDebuggingSupport"
+            test-args: "--traits FileSystem,MultiThread,ComponentModel,WasmDebuggingSupport,Disassembler"
             build-benchmarks: true
           - swift: "swiftlang/swift:nightly-main-noble"
-            test-args: "--traits FileSystem,ComponentModel,WasmDebuggingSupport"
+            test-args: "--traits FileSystem,MultiThread,ComponentModel,WasmDebuggingSupport,Disassembler"
             build-benchmarks: true
 
     runs-on: ubuntu-24.04
@@ -245,9 +245,9 @@ jobs:
         run: ./build-exec swift sdk install "${{ matrix.musl-swift-sdk-download }}" --checksum "${{ matrix.musl-swift-sdk-checksum }}"
 
       - name: Build (x86_64-swift-linux-musl)
-        run: ./build-exec swift build --swift-sdk x86_64-swift-linux-musl --traits FileSystem,ComponentModel,WasmDebuggingSupport --explicit-target-dependency-import-check error
+        run: ./build-exec swift build --swift-sdk x86_64-swift-linux-musl --traits FileSystem,MultiThread,ComponentModel,WasmDebuggingSupport,Disassembler --explicit-target-dependency-import-check error
       - name: Build (aarch64-swift-linux-musl)
-        run: ./build-exec swift build --swift-sdk aarch64-swift-linux-musl --traits FileSystem,ComponentModel,WasmDebuggingSupport --explicit-target-dependency-import-check error
+        run: ./build-exec swift build --swift-sdk aarch64-swift-linux-musl --traits FileSystem,MultiThread,ComponentModel,WasmDebuggingSupport,Disassembler --explicit-target-dependency-import-check error
 
   build-android:
     runs-on: ubuntu-24.04
@@ -308,7 +308,7 @@ jobs:
       - name: Install Swift SDK
         run: swift sdk install https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz --checksum cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
       - name: Build with the Swift SDK
-        run: swift build --swift-sdk "$(swiftc -print-target-info | jq -r '.swiftCompilerTag')_wasm" --traits FileSystem,ComponentModel --explicit-target-dependency-import-check error --product wasmkit-cli
+        run: swift build --swift-sdk "$(swiftc -print-target-info | jq -r '.swiftCompilerTag')_wasm" --traits FileSystem,ComponentModel,Disassembler --explicit-target-dependency-import-check error --product wasmkit-cli
       - name: Build & smoke-test embedded-wat example with Embedded Swift
         run: |
           sdk="$(swiftc -print-target-info | jq -r '.swiftCompilerTag')_wasm-embedded"

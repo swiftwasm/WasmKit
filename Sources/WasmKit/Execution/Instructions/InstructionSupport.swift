@@ -284,176 +284,178 @@ extension Instruction {
 
 // MARK: - Instruction printing support
 
-extension InstructionSequence {
-    func write<Target>(to target: inout Target, context: inout InstructionPrintingContext) where Target: TextOutputStream {
-        var hexOffsetWidth = String(instructions.count - 1, radix: 16).count
-        hexOffsetWidth = (hexOffsetWidth + 1) & ~1
+#if Disassembler
+    extension InstructionSequence {
+        func write<Target>(to target: inout Target, context: inout InstructionPrintingContext) where Target: TextOutputStream {
+            var hexOffsetWidth = String(instructions.count - 1, radix: 16).count
+            hexOffsetWidth = (hexOffsetWidth + 1) & ~1
 
-        guard let cursorStart = instructions.baseAddress else { return }
-        let cursorEnd = cursorStart.advanced(by: instructions.count)
+            guard let cursorStart = instructions.baseAddress else { return }
+            let cursorEnd = cursorStart.advanced(by: instructions.count)
 
-        var cursor = cursorStart
-        while cursor < cursorEnd {
-            let index = cursor - cursorStart
-            var hexOffset = String(index, radix: 16)
-            while hexOffset.count < hexOffsetWidth {
-                hexOffset = "0" + hexOffset
+            var cursor = cursorStart
+            while cursor < cursorEnd {
+                let index = cursor - cursorStart
+                var hexOffset = String(index, radix: 16)
+                while hexOffset.count < hexOffsetWidth {
+                    hexOffset = "0" + hexOffset
+                }
+                target.write("0x\(hexOffset): ")
+                let instruction = Instruction.load(from: &cursor)
+                context.print(
+                    instruction: instruction,
+                    instructionOffset: cursor - cursorStart,
+                    to: &target
+                )
+                target.write("\n")
             }
-            target.write("0x\(hexOffset): ")
-            let instruction = Instruction.load(from: &cursor)
-            context.print(
-                instruction: instruction,
-                instructionOffset: cursor - cursorStart,
-                to: &target
-            )
-            target.write("\n")
         }
     }
-}
 
-struct InstructionPrintingContext {
-    let shouldColor: Bool
-    let function: Function
-    var nameRegistry: NameRegistry
+    struct InstructionPrintingContext {
+        let shouldColor: Bool
+        let function: Function
+        var nameRegistry: NameRegistry
 
-    func reg<R: FixedWidthInteger>(_ reg: R) -> String {
-        let adjusted = R(FrameHeaderLayout.size(of: function.type)) + reg
-        if shouldColor {
-            let regColor = adjusted < 15 ? "\u{001B}[3\(adjusted + 1)m" : ""
-            return "\(regColor)reg:\(reg)\u{001B}[0m"
-        } else {
-            return "reg:\(reg)"
-        }
-    }
-    func reg<R: ShiftedVReg>(_ x: R) -> String { reg(Int(x.value) / MemoryLayout<StackSlot>.size) }
-
-    func offset(_ offset: UInt64) -> String {
-        "offset: \(offset)"
-    }
-
-    func branchTarget(_ instructionOffset: Int, _ offset: Int) -> String {
-        let iseqOffset = instructionOffset + offset
-        return "\(offset > 0 ? "+" : "")\(offset) ; 0x\(String(iseqOffset, radix: 16))"
-    }
-
-    mutating func callee(_ callee: InternalFunction) -> String {
-        return "'" + nameRegistry.symbolicate(callee) + "'"
-    }
-
-    func hex<T: BinaryInteger>(_ value: T) -> String {
-        let hex = String(value, radix: 16)
-        return "0x\(String(repeating: "0", count: 16 - hex.count) + hex)"
-    }
-
-    func global(_ global: InternalGlobal) -> String {
-        "global:\(hex(global.bitPattern))"
-    }
-
-    func value(_ value: UntypedValue) -> String {
-        "untyped:\(hex(value.storage))"
-    }
-
-    mutating func print<Target>(
-        instruction: Instruction,
-        instructionOffset: Int,
-        to target: inout Target
-    ) where Target: TextOutputStream {
-        func binop(_ name: String, _ op: Instruction.BinaryOperand) {
-            target.write("\(reg(op.result)) = \(name) \(reg(op.lhs)), \(reg(op.rhs))")
-        }
-        func unop(_ name: String, _ op: Instruction.UnaryOperand) {
-            target.write("\(reg(op.result)) = \(name) \(reg(op.input))")
-        }
-        func load(_ name: String, _ op: Instruction.LoadOperand) {
-            target.write("\(reg(op.result)) = \(name) \(reg(op.pointer)), \(offset(op.offset))")
-        }
-        func store(_ name: String, _ op: Instruction.StoreOperand) {
-            target.write("\(name) \(reg(op.pointer)) + \(offset(op.offset)), \(reg(op.value))")
-        }
-        switch instruction {
-        case .unreachable:
-            target.write("unreachable")
-        case .nop:
-            target.write("nop")
-        case .copyStack(let op):
-            target.write("\(reg(op.dest)) = copy \(reg(op.source))")
-        case .globalGet(let op):
-            target.write("\(reg(op.reg)) = global.get \(global(op.global))")
-        case .globalSet(let op):
-            target.write("global.set \(global(op.global)), \(reg(op.reg))")
-        case .const32(let op):
-            target.write("\(reg(op.result)) = \(hex(op.value))")
-        case .v128Const(let op):
-            target.write("\(reg(op.result)) = v128.const lo:\(hex(op.lo)) hi:\(hex(op.hi))")
-        case .call(let op):
-            target.write("call \(callee(op.callee)), sp: +\(op.spAddend)")
-        case .callIndirect(let op):
-            target.write("call_indirect \(reg(op.index)), \(op.tableIndex), (func_ty id:\(op.type.id)), sp: +\(op.spAddend)")
-        case .compilingCall(let op):
-            target.write("compiling_call \(callee(op.callee)), sp: +\(op.spAddend)")
-        case .returnCall(let op):
-            target.write("return_call \(callee(op.callee))")
-        case .i32Load(let op): load("i32.load", op)
-        case .i64Load(let op): load("i64.load", op)
-        case .f32Load(let op): load("f32.load", op)
-        case .f64Load(let op): load("f64.load", op)
-        case .i8x16Shuffle(let op):
-            let lanes = [
-                op.lane0, op.lane1, op.lane2, op.lane3,
-                op.lane4, op.lane5, op.lane6, op.lane7,
-                op.lane8, op.lane9, op.lane10, op.lane11,
-                op.lane12, op.lane13, op.lane14, op.lane15,
-            ]
-            target.write("\(reg(op.result)) = i8x16.shuffle \(reg(op.lhs)), \(reg(op.rhs)), \(lanes)")
-        case .simd(let op):
-            let name = SIMDOpcode(rawValue: op.opcode).map { "\($0)" } ?? "unknown(\(op.opcode))"
-            target.write("\(reg(op.result)) = simd.\(name) lane:\(op.lane) \(reg(op.input0)), \(reg(op.input1)), \(reg(op.input2)) offset:\(offset(op.offset))")
-        case .i32Add(let op): binop("i32.add", op)
-        case .i32Sub(let op): binop("i32.sub", op)
-        case .i32Mul(let op): binop("i32.mul", op)
-        case .i32DivS(let op): binop("i32.div_s", op)
-        case .i32RemS(let op): binop("i32.rem_s", op)
-        case .i32And(let op): binop("i32.and", op)
-        case .i32Or(let op): binop("i32.or", op)
-        case .i32Xor(let op): binop("i32.xor", op)
-        case .i32Shl(let op): binop("i32.shl", op)
-        case .i32ShrS(let op): binop("i32.shr_s", op)
-        case .i32ShrU(let op): binop("i32.shr_u", op)
-        case .i32Rotl(let op): binop("i32.rotl", op)
-        case .i32Rotr(let op): binop("i32.rotr", op)
-        case .i32LtU(let op): binop("i32.lt_u", op)
-        case .i32GeU(let op): binop("i32.ge_u", op)
-        case .i32Eq(let op): binop("i32.eq", op)
-        case .i32Eqz(let op): unop("i32.eqz", op)
-        case .i64Add(let op): binop("i64.add", op)
-        case .i64Sub(let op): binop("i64.sub", op)
-        case .i64Mul(let op): binop("i64.mul", op)
-        case .i64DivS(let op): binop("i64.div_s", op)
-        case .i64RemS(let op): binop("i64.rem_s", op)
-        case .i64And(let op): binop("i64.and", op)
-        case .i64Or(let op): binop("i64.or", op)
-        case .i64Xor(let op): binop("i64.xor", op)
-        case .i64Shl(let op): binop("i64.shl", op)
-        case .i64ShrS(let op): binop("i64.shr_s", op)
-        case .i64ShrU(let op): binop("i64.shr_u", op)
-        case .i64Eq(let op): binop("i64.eq", op)
-        case .i64Eqz(let op): unop("i64.eqz", op)
-        case .i32Store(let op): store("i32.store", op)
-        case .brIfNot(let op):
-            target.write("br_if_not \(reg(op.condition)), \(branchTarget(instructionOffset, Int(op.offset)))")
-        case .brIf(let op):
-            target.write("br_if \(reg(op.condition)), \(branchTarget(instructionOffset, Int(op.offset)))")
-        case .br(let offset):
-            target.write("br \(branchTarget(instructionOffset, Int(offset)))")
-        case .brTable(let table):
-            target.write("br_table \(reg(table.index)), \(table.count) cases")
-            for i in 0..<table.count {
-                target.write("\n  \(i): \(branchTarget(instructionOffset, Int(table.baseAddress[Int(i)].offset)) )")
+        func reg<R: FixedWidthInteger>(_ reg: R) -> String {
+            let adjusted = R(FrameHeaderLayout.size(of: function.type)) + reg
+            if shouldColor {
+                let regColor = adjusted < 15 ? "\u{001B}[3\(adjusted + 1)m" : ""
+                return "\(regColor)reg:\(reg)\u{001B}[0m"
+            } else {
+                return "reg:\(reg)"
             }
-        case ._return:
-            target.write("return")
-        default:
-            target.write(String(describing: instruction))
+        }
+        func reg<R: ShiftedVReg>(_ x: R) -> String { reg(Int(x.value) / MemoryLayout<StackSlot>.size) }
+
+        func offset(_ offset: UInt64) -> String {
+            "offset: \(offset)"
+        }
+
+        func branchTarget(_ instructionOffset: Int, _ offset: Int) -> String {
+            let iseqOffset = instructionOffset + offset
+            return "\(offset > 0 ? "+" : "")\(offset) ; 0x\(String(iseqOffset, radix: 16))"
+        }
+
+        mutating func callee(_ callee: InternalFunction) -> String {
+            return "'" + nameRegistry.symbolicate(callee) + "'"
+        }
+
+        func hex<T: BinaryInteger>(_ value: T) -> String {
+            let hex = String(value, radix: 16)
+            return "0x\(String(repeating: "0", count: 16 - hex.count) + hex)"
+        }
+
+        func global(_ global: InternalGlobal) -> String {
+            "global:\(hex(global.bitPattern))"
+        }
+
+        func value(_ value: UntypedValue) -> String {
+            "untyped:\(hex(value.storage))"
+        }
+
+        mutating func print<Target>(
+            instruction: Instruction,
+            instructionOffset: Int,
+            to target: inout Target
+        ) where Target: TextOutputStream {
+            func binop(_ name: String, _ op: Instruction.BinaryOperand) {
+                target.write("\(reg(op.result)) = \(name) \(reg(op.lhs)), \(reg(op.rhs))")
+            }
+            func unop(_ name: String, _ op: Instruction.UnaryOperand) {
+                target.write("\(reg(op.result)) = \(name) \(reg(op.input))")
+            }
+            func load(_ name: String, _ op: Instruction.LoadOperand) {
+                target.write("\(reg(op.result)) = \(name) \(reg(op.pointer)), \(offset(op.offset))")
+            }
+            func store(_ name: String, _ op: Instruction.StoreOperand) {
+                target.write("\(name) \(reg(op.pointer)) + \(offset(op.offset)), \(reg(op.value))")
+            }
+            switch instruction {
+            case .unreachable:
+                target.write("unreachable")
+            case .nop:
+                target.write("nop")
+            case .copyStack(let op):
+                target.write("\(reg(op.dest)) = copy \(reg(op.source))")
+            case .globalGet(let op):
+                target.write("\(reg(op.reg)) = global.get \(global(op.global))")
+            case .globalSet(let op):
+                target.write("global.set \(global(op.global)), \(reg(op.reg))")
+            case .const32(let op):
+                target.write("\(reg(op.result)) = \(hex(op.value))")
+            case .v128Const(let op):
+                target.write("\(reg(op.result)) = v128.const lo:\(hex(op.lo)) hi:\(hex(op.hi))")
+            case .call(let op):
+                target.write("call \(callee(op.callee)), sp: +\(op.spAddend)")
+            case .callIndirect(let op):
+                target.write("call_indirect \(reg(op.index)), \(op.tableIndex), (func_ty id:\(op.type.id)), sp: +\(op.spAddend)")
+            case .compilingCall(let op):
+                target.write("compiling_call \(callee(op.callee)), sp: +\(op.spAddend)")
+            case .returnCall(let op):
+                target.write("return_call \(callee(op.callee))")
+            case .i32Load(let op): load("i32.load", op)
+            case .i64Load(let op): load("i64.load", op)
+            case .f32Load(let op): load("f32.load", op)
+            case .f64Load(let op): load("f64.load", op)
+            case .i8x16Shuffle(let op):
+                let lanes = [
+                    op.lane0, op.lane1, op.lane2, op.lane3,
+                    op.lane4, op.lane5, op.lane6, op.lane7,
+                    op.lane8, op.lane9, op.lane10, op.lane11,
+                    op.lane12, op.lane13, op.lane14, op.lane15,
+                ]
+                target.write("\(reg(op.result)) = i8x16.shuffle \(reg(op.lhs)), \(reg(op.rhs)), \(lanes)")
+            case .simd(let op):
+                let name = SIMDOpcode(rawValue: op.opcode).map { "\($0)" } ?? "unknown(\(op.opcode))"
+                target.write("\(reg(op.result)) = simd.\(name) lane:\(op.lane) \(reg(op.input0)), \(reg(op.input1)), \(reg(op.input2)) offset:\(offset(op.offset))")
+            case .i32Add(let op): binop("i32.add", op)
+            case .i32Sub(let op): binop("i32.sub", op)
+            case .i32Mul(let op): binop("i32.mul", op)
+            case .i32DivS(let op): binop("i32.div_s", op)
+            case .i32RemS(let op): binop("i32.rem_s", op)
+            case .i32And(let op): binop("i32.and", op)
+            case .i32Or(let op): binop("i32.or", op)
+            case .i32Xor(let op): binop("i32.xor", op)
+            case .i32Shl(let op): binop("i32.shl", op)
+            case .i32ShrS(let op): binop("i32.shr_s", op)
+            case .i32ShrU(let op): binop("i32.shr_u", op)
+            case .i32Rotl(let op): binop("i32.rotl", op)
+            case .i32Rotr(let op): binop("i32.rotr", op)
+            case .i32LtU(let op): binop("i32.lt_u", op)
+            case .i32GeU(let op): binop("i32.ge_u", op)
+            case .i32Eq(let op): binop("i32.eq", op)
+            case .i32Eqz(let op): unop("i32.eqz", op)
+            case .i64Add(let op): binop("i64.add", op)
+            case .i64Sub(let op): binop("i64.sub", op)
+            case .i64Mul(let op): binop("i64.mul", op)
+            case .i64DivS(let op): binop("i64.div_s", op)
+            case .i64RemS(let op): binop("i64.rem_s", op)
+            case .i64And(let op): binop("i64.and", op)
+            case .i64Or(let op): binop("i64.or", op)
+            case .i64Xor(let op): binop("i64.xor", op)
+            case .i64Shl(let op): binop("i64.shl", op)
+            case .i64ShrS(let op): binop("i64.shr_s", op)
+            case .i64ShrU(let op): binop("i64.shr_u", op)
+            case .i64Eq(let op): binop("i64.eq", op)
+            case .i64Eqz(let op): unop("i64.eqz", op)
+            case .i32Store(let op): store("i32.store", op)
+            case .brIfNot(let op):
+                target.write("br_if_not \(reg(op.condition)), \(branchTarget(instructionOffset, Int(op.offset)))")
+            case .brIf(let op):
+                target.write("br_if \(reg(op.condition)), \(branchTarget(instructionOffset, Int(op.offset)))")
+            case .br(let offset):
+                target.write("br \(branchTarget(instructionOffset, Int(offset)))")
+            case .brTable(let table):
+                target.write("br_table \(reg(table.index)), \(table.count) cases")
+                for i in 0..<table.count {
+                    target.write("\n  \(i): \(branchTarget(instructionOffset, Int(table.baseAddress[Int(i)].offset)) )")
+                }
+            case ._return:
+                target.write("return")
+            default:
+                target.write(String(describing: instruction))
+            }
         }
     }
-}
+#endif  // Disassembler

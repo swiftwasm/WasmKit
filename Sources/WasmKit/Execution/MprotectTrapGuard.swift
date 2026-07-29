@@ -1,6 +1,8 @@
 @preconcurrency import _CWasmKit
 
-#if !os(WASI)
+// Direct-threaded execution (and thus this trap-guard trampoline) requires the
+// swifttailcc calling convention, which WASI and Embedded targets lack.
+#if !os(WASI) && !$Embedded
 
     struct WasmKitDirectThreadedTrapGuardContext {
         var exec: wasmkit_tc_exec
