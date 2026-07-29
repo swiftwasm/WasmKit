@@ -334,3 +334,11 @@ extension Reference {
         return .function(value.bitPattern)
     }
 }
+
+extension EntityHandle<WasmFunctionEntity> {
+    var type: InternedFuncType { withValue { $0.type } }
+    var instance: InternalInstance { withValue { $0.instance } }
+    var index: FunctionIndex { withValue { $0.index } }
+    var numberOfNonParameterLocalSlots: Int { withValue { $0.numberOfNonParameterLocalSlots } }
+    var code: CodeBody { withValue { $0.code } }
+}

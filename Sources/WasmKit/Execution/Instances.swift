@@ -39,7 +39,6 @@ import WasmParser
 ///
 /// This type is designed to eliminate ARC retain/release for entities
 /// known to be alive during a VM execution.
-@dynamicMemberLookup
 package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
     private let pointer: UnsafeMutablePointer<T>
 
@@ -50,10 +49,6 @@ package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
     init?(bitPattern: UInt) {
         guard let pointer = UnsafeMutablePointer<T>(bitPattern: bitPattern) else { return nil }
         self.pointer = pointer
-    }
-
-    package subscript<R>(dynamicMember keyPath: KeyPath<T, R>) -> R where T: Copyable {
-        withValue { $0[keyPath: keyPath] }
     }
 
     @inline(__always)
@@ -1163,4 +1158,66 @@ enum InternalExternalValue {
     case memory(InternalMemory)
     case global(InternalGlobal)
     case tag(InternalTag)
+}
+
+extension InternalInstance {
+    var instructionMapping: DebuggerInstructionMapping { withValue { $0.instructionMapping } }
+    var types: [FunctionType] { withValue { $0.types } }
+    var functions: ImmutableArray<InternalFunction> { withValue { $0.functions } }
+    var tables: ImmutableArray<InternalTable> { withValue { $0.tables } }
+    var memories: ImmutableArray<InternalMemory> { withValue { $0.memories } }
+    var globals: ImmutableArray<InternalGlobal> { withValue { $0.globals } }
+    var tags: ImmutableArray<InternalTag> { withValue { $0.tags } }
+    var elementSegments: ImmutableArray<InternalElementSegment> { withValue { $0.elementSegments } }
+    var dataSegments: ImmutableArray<InternalDataSegment> { withValue { $0.dataSegments } }
+    var exports: [String: InternalExternalValue] { withValue { $0.exports } }
+    var functionRefs: Set<InternalFunction> { withValue { $0.functionRefs } }
+    var features: WasmFeatureSet { withValue { $0.features } }
+    var isDebuggable: Bool { withValue { $0.isDebuggable } }
+}
+
+extension InternalTable {
+    var elements: [Reference] { withValue { $0.elements } }
+    var tableType: TableType { withValue { $0.tableType } }
+    var limits: Limits { withValue { $0.limits } }
+}
+
+extension InternalMemory {
+    var limit: Limits { withValue { $0.limit } }
+    var maxPageCount: UInt64 { withValue { $0.maxPageCount } }
+    var byteCount: Int { withValue { $0.byteCount } }
+    var data: UnsafeBufferPointer<UInt8> { withValue { $0.data } }
+    var baseAddress: UnsafeMutableRawPointer? { withValue { $0.baseAddress } }
+}
+
+extension InternalGlobal {
+    var value: Value { withValue { $0.value } }
+    var globalType: GlobalType { withValue { $0.globalType } }
+    var storage: GlobalEntity.Storage { withValue { $0.storage } }
+}
+
+extension InternalElementSegment {
+    var type: ReferenceType { withValue { $0.type } }
+    var references: [Reference] { withValue { $0.references } }
+}
+
+extension InternalDataSegment {
+    var data: ArraySlice<UInt8> { withValue { $0.data } }
+}
+
+extension EntityHandle<TagEntity> {
+    var type: InternedFuncType { withValue { $0.type } }
+}
+
+extension EntityHandle<HostFunctionEntity> {
+    var type: InternedFuncType { withValue { $0.type } }
+    var implementation: Function.Implementation { withValue { $0.implementation } }
+}
+
+extension InternalUncompiledCode {
+    var locals: [ValueType] { withValue { $0.locals } }
+    var expression: ArraySlice<UInt8> { withValue { $0.expression } }
+    #if WasmDebuggingSupport
+        var originalAddress: Int { withValue { $0.originalAddress } }
+    #endif
 }
