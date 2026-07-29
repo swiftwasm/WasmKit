@@ -55,7 +55,7 @@ public final class Runtime {
     /// Legacy compatibility method to register a module instance with a name.
     public func register(_ instance: Instance, as name: String) throws {
         guard availableExports[name] == nil else {
-            throw ImportError(.moduleInstanceAlreadyRegistered(name))
+            throw WasmKitError(message: .moduleInstanceAlreadyRegistered(name))
         }
 
         availableExports[name] = Dictionary(uniqueKeysWithValues: instance.exports.map { ($0, $1) })
@@ -64,7 +64,7 @@ public final class Runtime {
     /// Legacy compatibility method to register a host module with a name.
     public func register(_ hostModule: HostModule, as name: String) throws {
         guard availableExports[name] == nil else {
-            throw ImportError(.moduleInstanceAlreadyRegistered(name))
+            throw WasmKitError(message: .moduleInstanceAlreadyRegistered(name))
         }
 
         registerUniqueHostModule(hostModule, as: name, engine: engine)
@@ -101,7 +101,7 @@ public final class Runtime {
 
         for i in module.imports {
             guard let moduleExports = availableExports[i.module], let external = moduleExports[i.name] else {
-                throw ImportError(.missing(moduleName: i.module, externalName: i.name))
+                throw WasmKitError(message: .missing(moduleName: i.module, externalName: i.name))
             }
             result.define(i, external)
         }

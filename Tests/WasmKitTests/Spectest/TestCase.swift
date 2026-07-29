@@ -327,9 +327,9 @@ extension WastRunContext {
 
             do {
                 _ = try instantiate(module: module)
-            } catch let error as ImportError {
-                guard error.message.text.contains(message) else {
-                    return .failed("assertion mismatch: expected: \(message), actual: \(error.message.text)")
+            } catch let error as WasmKitError {
+                guard error.description.contains(message) else {
+                    return .failed("assertion mismatch: expected: \(message), actual: \(error.description)")
                 }
             } catch {
                 return .failed("\(error)")

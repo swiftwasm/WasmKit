@@ -178,23 +178,9 @@ extension TrapReason.Message {
     }
 }
 
-package struct ImportError: Error {
-    package struct Message {
-        package let text: String
-
-        init(_ text: String) {
-            self.text = text
-        }
-    }
-
-    package let message: Message
-
-    init(_ message: Message) {
-        self.message = message
-    }
-}
-
-extension ImportError.Message {
+// Import-resolution failures raised during instantiation and module
+// registration.
+extension WasmKitError.Message {
     static func missing(moduleName: String, externalName: String) -> Self {
         Self("unknown import \(moduleName).\(externalName)")
     }
