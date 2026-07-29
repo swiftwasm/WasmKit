@@ -119,7 +119,7 @@ public struct Module: Sendable {
         self.importedFunctionTypes = importedFunctionTypes
         self.memoryTypes = memoryTypes + memories
         self.tableTypes = tableTypes + tables
-        self.tagTypes = tagTypes + tags.map(\.type)
+        self.tagTypes = tagTypes + tags.map { $0.type }
     }
 
     static func resolveType(_ index: TypeIndex, typeSection: [FunctionType]) throws(WasmKitError) -> FunctionType {

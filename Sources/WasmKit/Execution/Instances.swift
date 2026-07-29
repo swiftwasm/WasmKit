@@ -210,42 +210,44 @@ public struct Instance {
         Exports(store: store, items: handle.exports)
     }
 
-    /// Dumps the textual representation of all functions in the instance.
-    ///
-    /// - Precondition: The instance must be compiled with the token threading model.
-    @_spi(OnlyForCLI)
-    public func dumpFunctions<Target>(to target: inout Target, module: Module) throws where Target: TextOutputStream {
-        for (offset, function) in self.handle.functions.enumerated() {
-            let index = offset
-            guard function.isWasm else { continue }
-            target.write("==== Function[\(index)]")
-            if let name = try? store.nameRegistry.lookup(function) {
-                target.write(" '\(name)'")
-            }
-            target.write(" ====\n")
-            guard case .uncompiled(let code) = function.wasm.code else {
-                fatalError("Already compiled!?")
-            }
-            try function.wasm.ensureCompiled(store: StoreRef(store))
-            let (iseq, _, _) = function.assumeCompiled()
+    #if Disassembler
+        /// Dumps the textual representation of all functions in the instance.
+        ///
+        /// - Precondition: The instance must be compiled with the token threading model.
+        @_spi(OnlyForCLI)
+        public func dumpFunctions<Target>(to target: inout Target, module: Module) throws where Target: TextOutputStream {
+            for (offset, function) in self.handle.functions.enumerated() {
+                let index = offset
+                guard function.isWasm else { continue }
+                target.write("==== Function[\(index)]")
+                if let name = try? store.nameRegistry.lookup(function) {
+                    target.write(" '\(name)'")
+                }
+                target.write(" ====\n")
+                guard case .uncompiled(let code) = function.wasm.code else {
+                    fatalError("Already compiled!?")
+                }
+                try function.wasm.ensureCompiled(store: StoreRef(store))
+                let (iseq, _, _) = function.assumeCompiled()
 
-            // Print slot space information
-            let localTypes = code.withValue { $0.locals }
-            let stackLayout = try StackLayout(
-                type: store.engine.funcTypeInterner.resolve(function.type),
-                locals: localTypes,
-                codeSize: code.expression.count
-            )
-            stackLayout.dump(to: &target, iseq: iseq)
+                // Print slot space information
+                let localTypes = code.withValue { $0.locals }
+                let stackLayout = try StackLayout(
+                    type: store.engine.funcTypeInterner.resolve(function.type),
+                    locals: localTypes,
+                    codeSize: code.expression.count
+                )
+                stackLayout.dump(to: &target, iseq: iseq)
 
-            var context = InstructionPrintingContext(
-                shouldColor: true,
-                function: Function(handle: function, store: store),
-                nameRegistry: store.nameRegistry
-            )
-            iseq.write(to: &target, context: &context)
+                var context = InstructionPrintingContext(
+                    shouldColor: true,
+                    function: Function(handle: function, store: store),
+                    nameRegistry: store.nameRegistry
+                )
+                iseq.write(to: &target, context: &context)
+            }
         }
-    }
+    #endif  // Disassembler
 }
 
 extension Instance {

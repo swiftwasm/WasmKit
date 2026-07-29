@@ -510,8 +510,8 @@ extension Execution {
     mutating func runDirectThreaded(
         sp: Sp, pc: Pc, md: Md, ms: Ms
     ) throws {
-        #if os(WASI)
-            fatalError("Direct threading is not supported on WASI")
+        #if os(WASI) || $Embedded
+            fatalError("Direct threading is not supported on this platform")
         #else
             var sp = sp
             var pc = pc

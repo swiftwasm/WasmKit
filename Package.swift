@@ -39,7 +39,7 @@ let package = Package(
         .library(name: "_CabiShims", targets: ["_CabiShims"]),
     ],
     traits: [
-        .default(enabledTraits: ["FileSystem", "MultiThread"]),
+        .default(enabledTraits: ["FileSystem", "MultiThread", "Disassembler"]),
         "FileSystem",
         "ComponentModel",
         "WasmDebuggingSupport",
@@ -50,6 +50,8 @@ let package = Package(
         // single-threaded environments (e.g. bare-metal Embedded Swift) where
         // the Synchronization module provides no Mutex.
         "MultiThread",
+        // Textual instruction dumping (`wasmkit explore`).
+        "Disassembler",
     ],
     targets: [
         cliCommandsTarget,

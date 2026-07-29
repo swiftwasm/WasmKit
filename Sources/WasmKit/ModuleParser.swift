@@ -46,9 +46,9 @@ func parseModule<Source: ByteStreamSource>(parser: consuming WasmParser.Parser<S
         case .functionSection(let types):
             typeIndices = types
         case .tableSection(let tableSection):
-            tables = tableSection.map(\.type)
+            tables = tableSection.map { $0.type }
         case .memorySection(let memorySection):
-            memories = memorySection.map(\.type)
+            memories = memorySection.map { $0.type }
         case .globalSection(let globalSection):
             globals = globalSection
         case .tagSection(let tagSection):

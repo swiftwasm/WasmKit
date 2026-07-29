@@ -289,47 +289,49 @@ struct StackLayout {
         return VReg(numberOfNonParameterLocalSlots + index)
     }
 
-    func dump<Target: TextOutputStream>(to target: inout Target, iseq: InstructionSequence) {
-        let frameHeaderSize = FrameHeaderLayout.size(of: frameHeader.type)
-        let slotMinIndex = VReg(-frameHeaderSize)
-        let slotMaxIndex = VReg(stackRegBase - 1)
-        let slotIndexWidth = max(String(slotMinIndex).count, String(slotMaxIndex).count)
-        func writeSlot(_ target: inout Target, _ index: VReg, _ description: String) {
-            var index = String(index)
-            index = String(repeating: " ", count: slotIndexWidth - index.count) + index
+    #if Disassembler
+        func dump<Target: TextOutputStream>(to target: inout Target, iseq: InstructionSequence) {
+            let frameHeaderSize = FrameHeaderLayout.size(of: frameHeader.type)
+            let slotMinIndex = VReg(-frameHeaderSize)
+            let slotMaxIndex = VReg(stackRegBase - 1)
+            let slotIndexWidth = max(String(slotMinIndex).count, String(slotMaxIndex).count)
+            func writeSlot(_ target: inout Target, _ index: VReg, _ description: String) {
+                var index = String(index)
+                index = String(repeating: " ", count: slotIndexWidth - index.count) + index
 
-            target.write(" [\(index)] \(description)\n")
-        }
-        func hex(_ value: UInt64) -> String {
-            let value = String(value, radix: 16)
-            return String(repeating: "0", count: 16 - value.count) + value
-        }
-
-        let savedItems: [String] = ["Instance", "Pc", "Sp"]
-        for i in 0..<frameHeaderSize - VReg(savedItems.count) {
-            var descriptions: [String] = []
-            if i < frameHeader.type.parameters.count {
-                descriptions.append("Param \(i)")
+                target.write(" [\(index)] \(description)\n")
             }
-            if i < frameHeader.type.results.count {
-                descriptions.append("Result \(i)")
+            func hex(_ value: UInt64) -> String {
+                let value = String(value, radix: 16)
+                return String(repeating: "0", count: 16 - value.count) + value
             }
-            writeSlot(&target, VReg(i - frameHeaderSize), descriptions.joined(separator: ", "))
-        }
 
-        for (i, name) in savedItems.enumerated() {
-            writeSlot(&target, VReg(i - savedItems.count), "Saved \(name)")
-        }
+            let savedItems: [String] = ["Instance", "Pc", "Sp"]
+            for i in 0..<frameHeaderSize - VReg(savedItems.count) {
+                var descriptions: [String] = []
+                if i < frameHeader.type.parameters.count {
+                    descriptions.append("Param \(i)")
+                }
+                if i < frameHeader.type.results.count {
+                    descriptions.append("Result \(i)")
+                }
+                writeSlot(&target, VReg(i - frameHeaderSize), descriptions.joined(separator: ", "))
+            }
 
-        var localSlot = 0
-        for (i, t) in localTypes.enumerated() {
-            writeSlot(&target, VReg(localSlot), "Local \(i) (\(t))")
-            localSlot += t.stackSlotCount
+            for (i, name) in savedItems.enumerated() {
+                writeSlot(&target, VReg(i - savedItems.count), "Saved \(name)")
+            }
+
+            var localSlot = 0
+            for (i, t) in localTypes.enumerated() {
+                writeSlot(&target, VReg(localSlot), "Local \(i) (\(t))")
+                localSlot += t.stackSlotCount
+            }
+            for i in 0..<iseq.constants.count {
+                writeSlot(&target, VReg(numberOfNonParameterLocalSlots + i), "Const \(i) = \(iseq.constants[i])")
+            }
         }
-        for i in 0..<iseq.constants.count {
-            writeSlot(&target, VReg(numberOfNonParameterLocalSlots + i), "Const \(i) = \(iseq.constants[i])")
-        }
-    }
+    #endif  // Disassembler
 
     private static func slotOffsets(of types: [WasmTypes.ValueType]) -> [Int] {
         var offsets: [Int] = []
@@ -704,14 +706,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             let headSlot = instruction.headSlot(threadingModel: engineConfiguration.threadingModel)
             trace("        [\(index)] = 0x\(String(headSlot, radix: 16))")
             self.instructions[index] = headSlot
-            if let immediate = instruction.rawImmediate {
-                var slots: [CodeSlot] = []
-                immediate.emit(to: { slots.append($0) })
-                for (i, slot) in slots.enumerated() {
-                    let slotIndex = index + 1 + i
-                    trace("        [\(slotIndex)] = 0x\(String(slot, radix: 16))")
-                    self.instructions[slotIndex] = slot
-                }
+            var slots: [CodeSlot] = []
+            instruction.emitImmediate(to: { slots.append($0) })
+            for (i, slot) in slots.enumerated() {
+                let slotIndex = index + 1 + i
+                trace("        [\(slotIndex)] = 0x\(String(slot, radix: 16))")
+                self.instructions[slotIndex] = slot
             }
         }
 
@@ -748,11 +748,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             self.lastEmission = LastEmission(position: insertingPC, resultRelink: resultRelink)
             trace("emitInstruction: \(instruction)")
             emitSlot(instruction.headSlot(threadingModel: engineConfiguration.threadingModel))
-            if let immediate = instruction.rawImmediate {
-                var slots: [CodeSlot] = []
-                immediate.emit(to: { slots.append($0) })
-                for slot in slots { emitSlot(slot) }
-            }
+            var slots: [CodeSlot] = []
+            instruction.emitImmediate(to: { slots.append($0) })
+            for slot in slots { emitSlot(slot) }
         }
 
         mutating func putLabel() -> LabelRef {
