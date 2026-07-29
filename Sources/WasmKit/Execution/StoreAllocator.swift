@@ -292,10 +292,10 @@ extension StoreAllocator {
         // local to to the module are added.
         for importEntry in module.imports {
             guard let (external, allocator) = imports.lookup(module: importEntry.module, name: importEntry.name) else {
-                throw ImportError(.missing(moduleName: importEntry.module, externalName: importEntry.name))
+                throw WasmKitError(message: .missing(moduleName: importEntry.module, externalName: importEntry.name))
             }
             guard allocator === self else {
-                throw ImportError(.importedEntityFromDifferentStore(importEntry))
+                throw WasmKitError(message: .importedEntityFromDifferentStore(importEntry))
             }
 
             switch (importEntry.descriptor, external) {
@@ -307,13 +307,13 @@ extension StoreAllocator {
                 let expected = module.types[Int(typeIndex)]
                 guard engine.internType(expected) == type else {
                     let actual = engine.resolveType(type)
-                    throw ImportError(.incompatibleFunctionType(importEntry, actual: actual, expected: expected))
+                    throw WasmKitError(message: .incompatibleFunctionType(importEntry, actual: actual, expected: expected))
                 }
                 importedFunctions.append(externalFunc)
 
             case (.table(let tableType), .table(let table)):
                 if let max = table.limits.max, max < tableType.limits.min {
-                    throw ImportError(.incompatibleTableType(importEntry, actual: tableType, expected: table.tableType))
+                    throw WasmKitError(message: .incompatibleTableType(importEntry, actual: tableType, expected: table.tableType))
                 }
                 importedTables.append(table)
 
@@ -322,29 +322,29 @@ extension StoreAllocator {
 
                 // Check shared flag matches
                 guard memoryType.shared == limit.shared else {
-                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
+                    throw WasmKitError(message: .incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
                 }
                 // Check memory64 flag matches
                 guard memoryType.isMemory64 == limit.isMemory64 else {
-                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
+                    throw WasmKitError(message: .incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
                 }
                 // Check limits compatibility: provided memory must satisfy imported memory type requirements.
                 // Note: The memory may have grown already, so compare against the current size.
                 let currentSizeInPages = UInt64(memory.withValue { $0.byteCount }) / UInt64(MemoryEntity.pageSize)
                 guard currentSizeInPages >= memoryType.min else {
-                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
+                    throw WasmKitError(message: .incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
                 }
                 // If the imported memory type has a max, the provided memory must have a max and be <= imported max.
                 if let importedMax = memoryType.max {
                     guard let providedMax = limit.max, providedMax <= importedMax else {
-                        throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
+                        throw WasmKitError(message: .incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
                     }
                 }
                 importedMemories.append(memory)
 
             case (.global(let globalType), .global(let global)):
                 guard globalType == global.globalType else {
-                    throw ImportError(.incompatibleGlobalType(importEntry, actual: global.globalType, expected: globalType))
+                    throw WasmKitError(message: .incompatibleGlobalType(importEntry, actual: global.globalType, expected: globalType))
                 }
                 importedGlobals.append(global)
 
@@ -354,12 +354,12 @@ extension StoreAllocator {
                 }
                 let expected = module.types[Int(typeIndex)]
                 guard engine.internType(expected) == tag.type else {
-                    throw ImportError(.incompatibleFunctionType(importEntry, actual: engine.resolveType(tag.type), expected: expected))
+                    throw WasmKitError(message: .incompatibleFunctionType(importEntry, actual: engine.resolveType(tag.type), expected: expected))
                 }
                 importedTags.append(tag)
 
             default:
-                throw ImportError(.incompatibleType(importEntry, entity: external))
+                throw WasmKitError(message: .incompatibleType(importEntry, entity: external))
             }
         }
 

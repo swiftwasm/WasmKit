@@ -1,5 +1,8 @@
 /// A protocol for limiting resource allocation.
-public protocol ResourceLimiter: Sendable {
+///
+/// Class-constrained so that `any ResourceLimiter` remains available under
+/// Embedded Swift, which supports only class-bound existentials.
+public protocol ResourceLimiter: AnyObject, Sendable {
     /// Limit the memory growth of the process to the specified number of bytes.
     ///
     /// - Parameter desired: The desired size of the memory in bytes.
@@ -26,4 +29,4 @@ extension ResourceLimiter {
 }
 
 /// A default resource limiter that doesn't limit resource growth.
-struct DefaultResourceLimiter: ResourceLimiter {}
+final class DefaultResourceLimiter: ResourceLimiter {}
