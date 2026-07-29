@@ -484,3 +484,34 @@ extension Instruction.Store {
         }
     }
 }
+
+extension Limits: CustomStringConvertible {
+    public var description: String {
+        var result = "min: \(min)"
+        if let max = max { result += ", max: \(max)" }
+        if shared { result += ", shared" }
+        if isMemory64 { result += ", memory64" }
+        return result
+    }
+}
+
+extension TableType: CustomStringConvertible {
+    public var description: String {
+        "\(elementType) (\(limits))"
+    }
+}
+
+extension Mutability: CustomStringConvertible {
+    public var description: String {
+        switch self {
+        case .constant: return "const"
+        case .variable: return "var"
+        }
+    }
+}
+
+extension GlobalType: CustomStringConvertible {
+    public var description: String {
+        "\(mutability) \(valueType)"
+    }
+}

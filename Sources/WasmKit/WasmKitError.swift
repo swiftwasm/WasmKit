@@ -16,6 +16,7 @@ public struct WasmKitError: Swift.Error {
     package enum Kind: Sendable {
         case message(Message)
         case parserError(WasmParserError)
+        case trap(Trap)
     }
 
     package let kind: Kind
@@ -49,6 +50,14 @@ extension WasmKitError {
 }
 
 extension WasmKitError {
+    @usableFromInline
+    package init(_ trap: Trap) {
+        self.init(kind: .trap(trap))
+    }
+
+}
+
+extension WasmKitError {
     /// Wrap a closure that throws WasmParserError into one that throws WasmKitError.
     @usableFromInline
     static func wrap<T>(_ body: () throws(WasmParserError) -> T) throws(WasmKitError) -> T {
@@ -58,6 +67,10 @@ extension WasmKitError {
             throw WasmKitError(error)
         }
     }
+}
+
+extension WasmKitError.Message: CustomStringConvertible {
+    public var description: String { text }
 }
 
 extension WasmKitError: CustomStringConvertible {
@@ -71,6 +84,8 @@ extension WasmKitError: CustomStringConvertible {
             }
         case .parserError(let error):
             return error.description
+        case .trap(let trap):
+            return trap.reason.description
         }
     }
 }
@@ -146,7 +161,7 @@ extension WasmKitError.Message {
         Self("data count section is required but not found")
     }
 
-    static func indexOutOfBounds<Index: Numeric, Max: Numeric>(_ entity: StaticString, _ index: Index, max: Max) -> Self {
+    static func indexOutOfBounds<Index: BinaryInteger, Max: BinaryInteger>(_ entity: StaticString, _ index: Index, max: Max) -> Self {
         Self("\(entity) index out of bounds: \(index) (max: \(max))")
     }
 
@@ -206,7 +221,7 @@ extension WasmKitError.Message {
     }
 
     static func expectedTypeOnStackButEmpty(expected: ValueType?) -> Self {
-        let typeHint = expected.map(String.init(describing:)) ?? "a value"
+        let typeHint = expected.map { $0.description } ?? "a value"
         return Self("expected \(typeHint) on the stack top but it's empty")
     }
 
@@ -250,7 +265,7 @@ extension WasmKitError.Message {
     }
 
     static func illegalConstExpressionInstruction(_ constInst: WasmParser.Instruction) -> Self {
-        Self("illegal const expression instruction: \(constInst)")
+        Self("illegal const expression instruction")
     }
 
     static func inconsistentFunctionAndCodeLength(functionCount: Int, codeCount: Int) -> Self {
