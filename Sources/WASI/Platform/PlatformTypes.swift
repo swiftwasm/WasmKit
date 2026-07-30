@@ -89,9 +89,12 @@ extension WASIAbi.Timestamp {
     }
 
     init(platformTimeSpec timespec: FileTime) {
+        // Clamp negative (pre-1970) times to 0 instead of trapping: WASI
+        // timestamps are unsigned, and platforms can legitimately report
+        // such values (e.g. zero-initialized FILETIME fields on Windows).
         self.init(
-            seconds: UInt64(timespec.seconds),
-            nanoseconds: UInt64(timespec.nanoseconds))
+            seconds: UInt64(Swift.max(0, timespec.seconds)),
+            nanoseconds: UInt64(Swift.max(0, timespec.nanoseconds)))
     }
 
     init(wallClockDuration duration: WallClock.Duration) {

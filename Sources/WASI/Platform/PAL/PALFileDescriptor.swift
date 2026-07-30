@@ -750,7 +750,12 @@ enum PlatformScheduler {
     extension FileTime {
         init(windowsFILETIME fileTime: FILETIME) {
             let intervals = (Int64(fileTime.dwHighDateTime) << 32) | Int64(fileTime.dwLowDateTime)
-            let unixNanoseconds = (intervals - _windowsUnixEpochIntervals) * 100
+            // Clamp times outside the representable Unix range instead of
+            // trapping: zero-initialized FILETIMEs (e.g. on pipe handles
+            // reported by GetFileInformationByHandle) predate the Unix epoch.
+            let clampedIntervals = Swift.max(0, intervals - _windowsUnixEpochIntervals)
+            let (nanoseconds, overflow) = clampedIntervals.multipliedReportingOverflow(by: 100)
+            let unixNanoseconds = overflow ? Int64.max : nanoseconds
             self.init(
                 seconds: Int(unixNanoseconds / 1_000_000_000),
                 nanoseconds: Int(unixNanoseconds % 1_000_000_000)
