@@ -100,7 +100,7 @@ package struct Wat2wasm: ParsableCommand {
 
         let outputHandle = try CLIFile.createWrite(outputPath)
         try withThrowing {
-            try outputHandle.write(contentsOf: wasm)
+            try outputHandle.writeAll(wasm)
         } defer: {
             try outputHandle.close()
         }

@@ -10,7 +10,7 @@ enum BridgeProbeError: Error, Equatable {
 @Suite struct WASIBridgeToHostTests {
     @Test func failedPreopenThrowsInsteadOfTrippingTheCloseCheck() throws {
         // `HostFileSystem.preopenDirectory` reports a bad path as `WASIError` everywhere except Windows,
-        // where `FileDescriptor.open` fails with a `PlatformError` first.
+        // where `FileDescriptor.open` fails with a translated WASI errno first.
         #if os(Windows)
             #expect(throws: (any Error).self) {
                 _ = try WASIBridgeToHost(

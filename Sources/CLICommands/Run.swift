@@ -199,12 +199,12 @@ package struct Run: AsyncParsableCommand {
             var magic: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0)
             let fileHandle = try CLIFile.openRead(path)
             let magicData = try withThrowing {
-                try fileHandle.read(upToCount: MemoryLayout.size(ofValue: magic)) ?? Data()
+                try fileHandle.read(upToCount: MemoryLayout.size(ofValue: magic))
             } defer: {
                 try fileHandle.close()
             }
-            _ = withUnsafeMutableBytes(of: &magic) { buffer in
-                magicData.copyBytes(to: buffer)
+            withUnsafeMutableBytes(of: &magic) { buffer in
+                buffer.copyBytes(from: magicData)
             }
 
             let fileType: WasmFileType
@@ -297,7 +297,7 @@ package struct Run: AsyncParsableCommand {
         if let outputPath = self.profileOutput {
             let fileHandle = try CLIFile.createWrite(outputPath)
             let profiler = GuestTimeProfiler { data in
-                fileHandle.write(Data(data.utf8))
+                try? fileHandle.writeAll(Array(data.utf8))
             }
             interceptors.append(profiler)
             finalizers.append {

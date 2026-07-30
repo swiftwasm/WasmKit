@@ -78,9 +78,9 @@ func valueOrErrno<I: FixedWidthInteger>(retryOnInterrupt: Bool = true, _ body: (
 }
 
 /// A platform file descriptor. On Windows this is a CRT file descriptor.
-struct FileDescriptor: Sendable, Hashable {
-    let rawValue: CInt
-    init(rawValue: CInt) { self.rawValue = rawValue }
+package struct FileDescriptor: Sendable, Hashable {
+    package let rawValue: CInt
+    package init(rawValue: CInt) { self.rawValue = rawValue }
 
     /// The platform's maximum path length, used to size symlink buffers.
     static var maximumPathLength: Int {
@@ -96,7 +96,7 @@ struct FileDescriptor: Sendable, Hashable {
     // MARK: Opening
 
     /// Opens the file at an absolute or current-directory-relative host path.
-    static func open(
+    package static func open(
         _ path: String, _ mode: AccessMode,
         options: OpenOptions = [],
         permissions: FilePermissions = []
@@ -140,7 +140,7 @@ struct FileDescriptor: Sendable, Hashable {
 
     // MARK: Core IO
 
-    func close() throws {
+    package func close() throws {
         #if os(Windows)
             try valueOrErrno(retryOnInterrupt: false) { _close(rawValue) }
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
@@ -150,7 +150,7 @@ struct FileDescriptor: Sendable, Hashable {
         #endif
     }
 
-    func read(into buffer: UnsafeMutableRawBufferPointer) throws -> Int {
+    package func read(into buffer: UnsafeMutableRawBufferPointer) throws -> Int {
         guard let base = buffer.baseAddress, buffer.count > 0 else { return 0 }
         #if os(Windows)
             return try Int(valueOrErrno { _read(rawValue, base, UInt32(min(buffer.count, Int(Int32.max)))) })
@@ -161,7 +161,7 @@ struct FileDescriptor: Sendable, Hashable {
         #endif
     }
 
-    func write(_ buffer: UnsafeRawBufferPointer) throws -> Int {
+    package func write(_ buffer: UnsafeRawBufferPointer) throws -> Int {
         guard let base = buffer.baseAddress, buffer.count > 0 else { return 0 }
         #if os(Windows)
             return try Int(valueOrErrno { _write(rawValue, base, UInt32(min(buffer.count, Int(Int32.max)))) })
@@ -214,7 +214,7 @@ struct FileDescriptor: Sendable, Hashable {
         #endif
     }
 
-    func seek(offset: Int64, from whence: SeekOrigin) throws -> Int64 {
+    package func seek(offset: Int64, from whence: SeekOrigin) throws -> Int64 {
         #if os(Windows)
             return try valueOrErrno(retryOnInterrupt: false) { _lseeki64(rawValue, offset, _seekWhence(whence)) }
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
