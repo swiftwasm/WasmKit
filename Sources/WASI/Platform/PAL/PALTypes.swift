@@ -91,7 +91,7 @@ extension FileDescriptor {
         let creationTime: FileTime
     }
 
-    package enum AccessMode: Sendable {
+    enum AccessMode: Sendable {
         case readOnly, writeOnly, readWrite
     }
 
@@ -99,34 +99,34 @@ extension FileDescriptor {
     /// platform's flag encoding inside `open`. Bits with no equivalent on
     /// the current platform are ignored on open and never reported by
     /// `status()`.
-    package struct OpenOptions: OptionSet, Sendable {
-        package var rawValue: UInt32
-        package init(rawValue: UInt32) { self.rawValue = rawValue }
+    struct OpenOptions: OptionSet, Sendable {
+        var rawValue: UInt32
+        init(rawValue: UInt32) { self.rawValue = rawValue }
 
-        package static let append = OpenOptions(rawValue: 1 << 0)
-        package static let nonBlocking = OpenOptions(rawValue: 1 << 1)
-        package static let noFollow = OpenOptions(rawValue: 1 << 2)
-        package static let directory = OpenOptions(rawValue: 1 << 3)
-        package static let create = OpenOptions(rawValue: 1 << 4)
-        package static let exclusiveCreate = OpenOptions(rawValue: 1 << 5)
-        package static let truncate = OpenOptions(rawValue: 1 << 6)
-        package static let dataSync = OpenOptions(rawValue: 1 << 7)
-        package static let fileSync = OpenOptions(rawValue: 1 << 8)
-        package static let readSync = OpenOptions(rawValue: 1 << 9)
+        static let append = OpenOptions(rawValue: 1 << 0)
+        static let nonBlocking = OpenOptions(rawValue: 1 << 1)
+        static let noFollow = OpenOptions(rawValue: 1 << 2)
+        static let directory = OpenOptions(rawValue: 1 << 3)
+        static let create = OpenOptions(rawValue: 1 << 4)
+        static let exclusiveCreate = OpenOptions(rawValue: 1 << 5)
+        static let truncate = OpenOptions(rawValue: 1 << 6)
+        static let dataSync = OpenOptions(rawValue: 1 << 7)
+        static let fileSync = OpenOptions(rawValue: 1 << 8)
+        static let readSync = OpenOptions(rawValue: 1 << 9)
     }
 
     /// Permission bits for newly created files, in POSIX octal form (which
     /// is already platform-neutral; non-POSIX platforms apply their nearest
     /// equivalent).
-    package struct FilePermissions: OptionSet, Sendable {
-        package var rawValue: CInt
-        package init(rawValue: CInt) { self.rawValue = rawValue }
+    struct FilePermissions: OptionSet, Sendable {
+        var rawValue: CInt
+        init(rawValue: CInt) { self.rawValue = rawValue }
 
-        package static var ownerReadWrite: FilePermissions { FilePermissions(rawValue: 0o600) }
-        package static var ownerReadWriteExecute: FilePermissions { FilePermissions(rawValue: 0o700) }
+        static var ownerReadWrite: FilePermissions { FilePermissions(rawValue: 0o600) }
+        static var ownerReadWriteExecute: FilePermissions { FilePermissions(rawValue: 0o700) }
     }
 
-    package enum SeekOrigin: Sendable {
+    enum SeekOrigin: Sendable {
         case start, current, end
     }
 
