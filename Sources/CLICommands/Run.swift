@@ -193,54 +193,43 @@ package struct Run: AsyncParsableCommand {
             let wat = try String(contentsOfFile: path, encoding: .utf8)
             module = try WasmKit.parseWasm(bytes: wat2wasm(wat))
         } else {
+            // Sniff the magic bytes to detect the file type (component vs
+            // module), then let the parser re-open the file by path.
+            var magic: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0)
             let fileHandle = try CLIFile.openRead(path)
-            #if ComponentModel
-                var parsedComponent: ParsedComponent?
-            #endif
-            let parsedModule: Module? = try withThrowing { () throws -> Module? in
-                var magic: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0)
-                let magicData = try fileHandle.read(upToCount: MemoryLayout.size(ofValue: magic)) ?? Data()
-                _ = withUnsafeMutableBytes(of: &magic) { buffer in
-                    magicData.copyBytes(to: buffer)
-                }
-
-                // Detect file type (component vs module)
-                let fileType: WasmFileType
-                if magicData.count == MemoryLayout.size(ofValue: magic) {
-                    fileType = detectWasmFileType(magic)
-                } else {
-                    fileType = .unknown
-                }
-
-                #if ComponentModel
-                    if fileType == .component {
-                        log("Detected component binary, parsing component...", verbose: true)
-                        try fileHandle.seek(toOffset: 0)
-                        parsedComponent = try parseComponent(fileHandle: fileHandle.fileDescriptor)
-                        return nil
-                    }
-                #endif
-
-                guard fileType == .coreModule else {
-                    fatalError("Unsupported WebAssembly file type: \(fileType)")
-                }
-
-                try fileHandle.seek(toOffset: 0)
-                let (parsedModule, parseTime) = try measure {
-                    try WasmKit.parseWasm(fileHandle: fileHandle.fileDescriptor)
-                }
-                log("Finished parsing module: \(parseTime)", verbose: true)
-                return parsedModule
+            let magicData = try withThrowing {
+                try fileHandle.read(upToCount: MemoryLayout.size(ofValue: magic)) ?? Data()
             } defer: {
                 try fileHandle.close()
             }
+            _ = withUnsafeMutableBytes(of: &magic) { buffer in
+                magicData.copyBytes(to: buffer)
+            }
+
+            let fileType: WasmFileType
+            if magicData.count == MemoryLayout.size(ofValue: magic) {
+                fileType = detectWasmFileType(magic)
+            } else {
+                fileType = .unknown
+            }
+
             #if ComponentModel
-                if let parsedComponent {
+                if fileType == .component {
+                    log("Detected component binary, parsing component...", verbose: true)
+                    let parsedComponent = try parseComponent(filePath: path)
                     try runComponent(component: parsedComponent)
                     return
                 }
             #endif
-            guard let parsedModule else { return }
+
+            guard fileType == .coreModule else {
+                fatalError("Unsupported WebAssembly file type: \(fileType)")
+            }
+
+            let (parsedModule, parseTime) = try measure {
+                try WasmKit.parseWasm(filePath: path)
+            }
+            log("Finished parsing module: \(parseTime)", verbose: true)
             module = parsedModule
         }
 
