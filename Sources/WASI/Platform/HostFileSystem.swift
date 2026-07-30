@@ -1,4 +1,3 @@
-
 import WasmTypes
 
 /// A file system implementation that directly accesses the host operating system's file system.

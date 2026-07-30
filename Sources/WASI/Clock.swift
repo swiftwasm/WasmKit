@@ -1,4 +1,3 @@
-
 /// WASI wall clock interface based on WASI Preview 2 `wall-clock` interface.
 ///
 /// See also https://github.com/WebAssembly/wasi-clocks/blob/v0.2.0/wit/wall-clock.wit

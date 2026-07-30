@@ -133,7 +133,8 @@ package func runWasmTools(
         .withStdio(
             stdin: 0,
             stdout: stdoutPipe.fileHandleForWriting.fileDescriptor,
-            stderr: stderrPipe.fileHandleForWriting.fileDescriptor)
+            stderr: stderrPipe.fileHandleForWriting.fileDescriptor
+        )
         .withPreopens([.init(guestPath: "/", hostPath: "/")])
 
     let wasi = try WASIBridgeToHost(

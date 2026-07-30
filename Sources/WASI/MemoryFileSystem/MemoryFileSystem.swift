@@ -1,4 +1,3 @@
-
 /// An in-memory file system implementation for WASI environments.
 ///
 /// This provides a complete file system that exists entirely in memory, useful for
@@ -182,8 +181,6 @@ public final class MemoryFileSystem: Sendable {
             throw WASIAbi.Errno.ENOENT
         }
     }
-
-
 
     // MARK: - File Operations
 

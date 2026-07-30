@@ -1,4 +1,3 @@
-
 extension FdWASIEntry {
     /// Returns the metadata for the fd entry
     func attributes() throws -> WASIAbi.Filestat {

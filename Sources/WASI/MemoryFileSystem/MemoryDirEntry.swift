@@ -1,4 +1,3 @@
-
 /// A WASIDir implementation backed by an in-memory directory node.
 struct MemoryDirEntry: WASIDir {
     struct ReadEntriesResult: WASIReaddirIterator {
