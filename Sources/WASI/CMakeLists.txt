@@ -8,7 +8,6 @@ add_wasmkit_library(WASI
   Platform/PAL/PALErrnoMapping.swift
   Platform/PAL/PALPoll.swift
   Platform/PAL/PALSystemClocks.swift
-  Platform/PAL/PALWindows.swift
   Platform/SandboxPrimitives/Open.swift
   Platform/SandboxPrimitives/Readlink.swift
   Platform/SandboxPrimitives/OpenParent.swift
