@@ -20,6 +20,19 @@
 
 // MARK: - Internal libc indirections
 
+#if canImport(Glibc) || canImport(Android)
+    // Glibc and Bionic define `UTIME_NOW`/`UTIME_OMIT` as complex macros that
+    // ClangImporter can't import; the values are identical across platforms.
+    private var UTIME_NOW: Int { (1 << 30) - 1 }
+    private var UTIME_OMIT: Int { (1 << 30) - 2 }
+#endif
+
+#if canImport(Android)
+    // Bionic defines `O_SYNC` as a complex macro (`__O_SYNC | O_DSYNC`) that
+    // ClangImporter can't import.
+    private var O_SYNC: CInt { 0o4010000 }
+#endif
+
 var _palErrno: CInt {
     #if os(Windows)
         var value: CInt = 0
@@ -660,11 +673,11 @@ enum PlatformScheduler {
                 }
                 let fileType: FileDescriptor.FileType
                 switch CInt(entry.pointee.d_type) {
-                case CInt(WASI_PLATFORM_DT_DIR.rawValue): fileType = .directory
-                case CInt(WASI_PLATFORM_DT_REG.rawValue): fileType = .regular
-                case CInt(WASI_PLATFORM_DT_LNK.rawValue): fileType = .symlink
-                case CInt(WASI_PLATFORM_DT_CHR.rawValue): fileType = .characterDevice
-                case CInt(WASI_PLATFORM_DT_BLK.rawValue): fileType = .blockDevice
+                case CInt(WASI_PLATFORM_DT_DIR): fileType = .directory
+                case CInt(WASI_PLATFORM_DT_REG): fileType = .regular
+                case CInt(WASI_PLATFORM_DT_LNK): fileType = .symlink
+                case CInt(WASI_PLATFORM_DT_CHR): fileType = .characterDevice
+                case CInt(WASI_PLATFORM_DT_BLK): fileType = .blockDevice
                 default: fileType = .unknown
                 }
             #else
