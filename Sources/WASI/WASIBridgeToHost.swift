@@ -1,4 +1,5 @@
 import Synchronization
+import SystemExtras
 import SystemPackage
 
 /// A bridge that connects WebAssembly System Interface (WASI) calls to the host system.
@@ -125,14 +126,13 @@ public final class WASIBridgeToHost: Sendable {
     ///
     /// - Parameter body: A closure that receives the bridge and returns a value.
     /// - Returns: The value returned by `body`.
+    /// - Throws: `body`'s error, or the error from closing when `body` succeeded. When both fail, the
+    ///   error carries both failures.
     public func runAndClose<R>(_ body: (WASIBridgeToHost) throws -> R) throws -> R {
-        do {
-            let result = try body(self)
+        try withThrowing {
+            try body(self)
+        } defer: {
             try close()
-            return result
-        } catch {
-            try close()
-            throw error
         }
     }
 
@@ -156,7 +156,8 @@ public final class WASIBridgeToHost: Sendable {
     ///   - wallClock: Clock for wall-clock time queries. Defaults to `SystemWallClock()`.
     ///   - monotonicClock: Clock for monotonic time queries. Defaults to `SystemMonotonicClock()`.
     ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
-    /// - Throws: An error if the file system or preopens cannot be initialized.
+    /// - Throws: An error if the file system or preopens cannot be initialized. When releasing the
+    ///   descriptors opened so far also fails, the error carries both failures.
     @available(*, deprecated, message: "Use the ordered `preopens: [WASIBridgeToHost.Preopen]` initializer instead.")
     @_disfavoredOverload
     public convenience init(
@@ -199,7 +200,8 @@ public final class WASIBridgeToHost: Sendable {
     ///   - wallClock: Clock for wall-clock time queries. Defaults to `SystemWallClock()`.
     ///   - monotonicClock: Clock for monotonic time queries. Defaults to `SystemMonotonicClock()`.
     ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
-    /// - Throws: An error if the file system or preopens cannot be initialized.
+    /// - Throws: An error if the file system or preopens cannot be initialized. When releasing the
+    ///   descriptors opened so far also fails, the error carries both failures.
     public convenience init(
         args: [String] = [],
         environment: [String: String] = [:],
@@ -240,9 +242,14 @@ public final class WASIBridgeToHost: Sendable {
             monotonicClock: monotonicClock,
             randomGenerator: randomGenerator
         )
-        try underlying.fdTable.withLock { table in
-            try fileSystemOptions.initializeStdio?(&table)
-            try fileSystemOptions.initializePreopens?(fileSystem, &table)
+        do {
+            try underlying.fdTable.withLock { table in
+                try fileSystemOptions.initializeStdio?(&table)
+                try fileSystemOptions.initializePreopens?(fileSystem, &table)
+            }
+        } catch {
+            // A throw here runs `deinit`, whose precondition requires `close()`, so release what was opened.
+            throw CleanupFailure.preserving(error, cleanup: close)
         }
     }
 
@@ -254,7 +261,8 @@ public final class WASIBridgeToHost: Sendable {
     ///   - wallClock: Clock for wall-clock time queries. Defaults to `SystemWallClock()`.
     ///   - monotonicClock: Clock for monotonic time queries. Defaults to `SystemMonotonicClock()`.
     ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
-    /// - Throws: An error if the file system or initialization fails.
+    /// - Throws: An error if the file system or initialization fails. When releasing the descriptors
+    ///   opened so far also fails, the error carries both failures.
     public convenience init(
         args: [String] = [],
         environment: [String: String] = [:],

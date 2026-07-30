@@ -24,6 +24,21 @@ let cliCommandsTarget = Target.target(
     swiftSettings: swiftSettings
 )
 
+let cliCommandsTestTarget = Target.testTarget(
+    name: "CLICommandsTests",
+    dependencies: [
+        "CLICommands",
+        "SystemExtras",
+        "WAT",
+        "WASI",
+        "WasmKit",
+        "WasmKitWASI",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .product(name: "SystemPackage", package: "swift-system"),
+    ],
+    exclude: ["Fixtures"]
+)
+
 let package = Package(
     name: "WasmKit",
     platforms: [.macOS(.v15), .iOS(.v18)],
@@ -61,6 +76,7 @@ let package = Package(
             exclude: ["CMakeLists.txt"],
             swiftSettings: swiftSettings
         ),
+        cliCommandsTestTarget,
         .target(
             name: "WasmKit",
             dependencies: [
@@ -155,7 +171,7 @@ let package = Package(
             exclude: ["CMakeLists.txt"],
             swiftSettings: swiftSettings
         ),
-        .testTarget(name: "WASITests", dependencies: ["WASI", "WasmKitWASI"], swiftSettings: swiftSettings),
+        .testTarget(name: "WASITests", dependencies: ["SystemExtras", "WASI", "WasmKitWASI"], swiftSettings: swiftSettings),
 
         .target(
             name: "SystemExtras",
@@ -168,6 +184,8 @@ let package = Package(
                 .define("SYSTEM_PACKAGE_DARWIN", .when(platforms: DarwinPlatforms))
             ]
         ),
+
+        .testTarget(name: "SystemExtrasTests", dependencies: ["SystemExtras"], swiftSettings: swiftSettings),
 
         .target(name: "CSystemExtras"),
 
@@ -351,8 +369,10 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "SystemPackage", package: "swift-system"),
+                "SystemExtras",
                 "WasmKit",
                 "WasmKitWASI",
+                "WASI",
                 "GDBRemoteProtocol",
             ],
             exclude: ["LICENSE.txt"],
@@ -364,6 +384,13 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         .product(name: "Logging", package: "swift-log", condition: .when(traits: ["WasmDebuggingSupport"])),
         .product(name: "NIOCore", package: "swift-nio", condition: .when(traits: ["WasmDebuggingSupport"])),
         .product(name: "NIOPosix", package: "swift-nio", condition: .when(traits: ["WasmDebuggingSupport"])),
+        .target(name: "GDBRemoteProtocol", condition: .when(traits: ["WasmDebuggingSupport"])),
+        .target(name: "WasmKitGDBHandler", condition: .when(traits: ["WasmDebuggingSupport"])),
+    ])
+
+    cliCommandsTestTarget.dependencies.append(contentsOf: [
+        .product(name: "Logging", package: "swift-log", condition: .when(traits: ["WasmDebuggingSupport"])),
+        .product(name: "NIOCore", package: "swift-nio", condition: .when(traits: ["WasmDebuggingSupport"])),
         .target(name: "GDBRemoteProtocol", condition: .when(traits: ["WasmDebuggingSupport"])),
         .target(name: "WasmKitGDBHandler", condition: .when(traits: ["WasmDebuggingSupport"])),
     ])

@@ -822,7 +822,8 @@ extension WASIImplementation {
             return WASIHostFunction(type: type) { caller, arguments in
                 do {
                     return try implementation(caller, arguments)
-                } catch let errno as WASIAbi.Errno {
+                } catch {
+                    guard let errno = WASIAbi.Errno.reportable(for: error) else { throw error }
                     return [.i32(.init(errno.rawValue))]
                 }
             }

@@ -164,6 +164,16 @@ extension WASIAbi.Errno {
         }
     }
 
+    /// Looks through a cleanup failure so a failing close still reports the operation's own errno
+    /// instead of trapping the guest.
+    static func reportable(for error: any Error) -> WASIAbi.Errno? {
+        switch error {
+        case let errno as WASIAbi.Errno: return errno
+        case let failure as CleanupFailure: return reportable(for: failure.underlying)
+        default: return nil
+        }
+    }
+
     init(platformErrno: CInt) throws {
         try self.init(platformErrno: SystemPackage.Errno(rawValue: platformErrno))
     }

@@ -10,52 +10,42 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Runs a cleanup closure (`deferred`) after a given `work` closure,
-/// making sure `deferred` is run also when `work` throws an error.
-/// - Parameters:
-///   - work: The work that should be performed. Will always be executed.
-///   - deferred: The cleanup that needs to be done in any case.
-/// - Throws: Any error thrown by `deferred` or `work` (in that order).
+/// Runs `deferred` after `work`, exactly once, also when `work` throws.
+/// - Throws: The error thrown by `work`, or by `deferred` when `work` succeeded. When both throw,
+///           a ``CleanupFailure`` carrying `work`'s error as ``CleanupFailure/underlying``.
 /// - Returns: The result of `work`.
-/// - Note: If `work` **and** `deferred` throw an error,
-///         the one thrown by `deferred` is thrown from this function.
 /// - SeeAlso: ``withAsyncThrowing(do:defer:)``
 @discardableResult
 package func withThrowing<T>(
     do work: () throws -> T,
     defer deferred: () throws -> Void
 ) throws -> T {
+    let result: T
     do {
-        let result = try work()
-        try deferred()
-        return result
+        result = try work()
     } catch {
-        try deferred()
-        throw error
+        throw CleanupFailure.preserving(error, cleanup: deferred)
     }
+    try deferred()
+    return result
 }
 
-/// Runs an async cleanup closure (`deferred`) after a given async `work` closure,
-/// making sure `deferred` is run also when `work` throws an error.
-/// - Parameters:
-///   - work: The work that should be performed. Will always be executed.
-///   - deferred: The cleanup that needs to be done in any case.
-/// - Throws: Any error thrown by `deferred` or `work` (in that order).
+/// Runs async `deferred` after async `work`, exactly once, also when `work` throws.
+/// - Throws: The error thrown by `work`, or by `deferred` when `work` succeeded. When both throw,
+///           a ``CleanupFailure`` carrying `work`'s error as ``CleanupFailure/underlying``.
 /// - Returns: The result of `work`.
-/// - Note: If `work` **and** `deferred` throw an error,
-///         the one thrown by `deferred` is thrown from this function.
 /// - SeeAlso: ``withThrowing(do:defer:)``
 @discardableResult
 package func withAsyncThrowing<T: Sendable>(
     do work: @Sendable () async throws -> T,
     defer deferred: @Sendable () async throws -> Void
 ) async throws -> T {
+    let result: T
     do {
-        let result = try await work()
-        try await deferred()
-        return result
+        result = try await work()
     } catch {
-        try await deferred()
-        throw error
+        throw await CleanupFailure.preserving(error, cleanup: deferred)
     }
+    try await deferred()
+    return result
 }

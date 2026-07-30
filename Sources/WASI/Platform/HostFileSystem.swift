@@ -1,3 +1,4 @@
+import SystemExtras
 import SystemPackage
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
@@ -41,8 +42,12 @@ final class HostFileSystem: FileSystemImplementation, Sendable {
             }
         #endif
 
-        guard try fd.attributes().fileType.isDirectory else {
-            throw WASIAbi.Errno.ENOTDIR
+        do {
+            guard try fd.attributes().fileType.isDirectory else {
+                throw WASIAbi.Errno.ENOTDIR
+            }
+        } catch {
+            throw CleanupFailure.preserving(error, cleanup: fd.close)
         }
 
         return DirEntry(preopenPath: guestPath, fd: fd)
