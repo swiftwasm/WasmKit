@@ -148,6 +148,10 @@ let benchmarks: @Sendable () -> () = {
         struct Setup {
             let hostToPlugin: FileHandle
             let pluginToHost: FileHandle
+            /// The guest-side pipe ends, retained so their descriptors stay
+            /// open: a `FileHandle` closes its descriptor when deallocated.
+            let guestStdin: FileHandle
+            let guestStdout: FileHandle
             let pump: Function
             let expandMessage: String
             let bridge: WASIBridgeToHost
@@ -173,6 +177,8 @@ let benchmarks: @Sendable () -> () = {
 
                     self.hostToPlugin = hostToPluginPipes.fileHandleForWriting
                     self.pluginToHost = pluginToHostPipes.fileHandleForReading
+                    self.guestStdin = hostToPluginPipes.fileHandleForReading
+                    self.guestStdout = pluginToHostPipes.fileHandleForWriting
                     self.pump = pump
                     self.expandMessage = expandMessage
                     self.bridge = bridge
