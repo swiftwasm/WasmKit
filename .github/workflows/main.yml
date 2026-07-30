@@ -278,8 +278,10 @@ jobs:
       - uses: actions/checkout@v6
       - run: python3 ./Vendor/checkout-dependency --category default
       # Run tests with SwiftPM
+      # TODO: Revert to plain `swift test` once the Windows crash is
+      # identified; serial execution pinpoints the crashing test in the log.
       - name: Run tests with SwiftPM
-        run: swift test
+        run: swift test --no-parallel
 
   build-cmake:
     runs-on: ubuntu-24.04
