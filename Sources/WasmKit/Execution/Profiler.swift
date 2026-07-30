@@ -1,7 +1,8 @@
 // The profiler writes its trace to a file, so it requires the FileSystem trait.
 #if FileSystem
-    import SystemExtras
-    import SystemPackage
+    #if canImport(Darwin)
+        import Darwin
+    #endif
 
     /// A simple time-profiler for guest process to emit `chrome://tracing` format
     /// This profiler works only when WasmKit is built with debug configuration (`swift build -c debug`)
@@ -25,10 +26,22 @@
         private var output: (_ line: String) -> Void
         private var hasFirstEvent: Bool = false
 
-        #if swift(>=5.7) && os(Windows)
-            // We can use ContinuousClock on platforms that doesn't ship stdlib as stable ABI
-            // Once we drop macOS 12.3, iOS 15.4, watchOS 8.5, and tvOS 15.4 support, we can remove
-            // this conditional compilation
+        #if canImport(Darwin)
+            // ContinuousClock requires a macOS 13+ deployment target, which builds
+            // outside SwiftPM (e.g. the CMake toolchain build) don't guarantee, so
+            // use the always-available raw-monotonic clock on Darwin.
+            private typealias Instant = UInt64
+
+            private static func getTimestamp() -> UInt64 {
+                clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW) / 1_000
+            }
+
+            private func getDurationSinceStart() -> Int {
+                Int(Self.getTimestamp() - startTime)
+            }
+
+        #else
+
             private typealias Instant = ContinuousClock.Instant
 
             private static func getTimestamp() -> Instant {
@@ -40,28 +53,6 @@
                 let (seconds, attoseconds) = duration.components
                 // Convert to microseconds
                 return Int(seconds * 1_000_000 + attoseconds / 1_000_000_000_000)
-            }
-
-        #else
-
-            private typealias Instant = UInt64
-
-            private static func getTimestamp() -> UInt64 {
-                let clock: SystemExtras.Clock
-                #if os(Linux) || os(Android)
-                    clock = .boottime
-                #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-                    clock = .rawMonotonic
-                #elseif os(OpenBSD) || os(FreeBSD) || os(WASI)
-                    clock = .monotonic
-                #else
-                    #error("Unsupported platform")
-                #endif
-                let timeSpec = try! clock.currentTime()
-                return UInt64(timeSpec.nanoseconds / 1_000 + timeSpec.seconds * 1_000_000)
-            }
-            private func getDurationSinceStart() -> Int {
-                Int(Self.getTimestamp() - startTime)
             }
         #endif
 

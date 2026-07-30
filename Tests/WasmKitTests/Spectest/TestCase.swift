@@ -1,5 +1,4 @@
 import Foundation
-import SystemPackage
 import WAT
 import WasmKit
 import WasmParser
@@ -27,9 +26,8 @@ package struct TestCase: CustomStringConvertible {
         let fileManager = FileManager.default
         var filePaths: [URL] = []
         for path in path {
-            let filePath = FilePath(path)
-            if isDirectory(filePath) {
-                filePaths += try self.computeTestSources(inDirectory: filePath, fileManager: fileManager).map {
+            if isDirectory(path) {
+                filePaths += try self.computeTestSources(inDirectory: path, fileManager: fileManager).map {
                     URL(fileURLWithPath: path).appendingPathComponent($0)
                 }
             } else if fileManager.isReadableFile(atPath: path) {
@@ -70,8 +68,8 @@ package struct TestCase: CustomStringConvertible {
     }
 
     /// Returns list of `.json` paths recursively found under `rootPath`. They are relative to `rootPath`.
-    static func computeTestSources(inDirectory rootPath: FilePath, fileManager: FileManager) throws -> [String] {
-        return try fileManager.contentsOfDirectory(atPath: rootPath.string).filter {
+    static func computeTestSources(inDirectory rootPath: String, fileManager: FileManager) throws -> [String] {
+        return try fileManager.contentsOfDirectory(atPath: rootPath).filter {
             $0.hasSuffix(".wast")
         }
     }
@@ -129,7 +127,7 @@ extension TestCase {
             return
         }
         var configuration = configuration
-        let rootPath = FilePath(path).removingLastComponent()
+        let rootPath = URL(fileURLWithPath: path).deletingLastPathComponent().path
         let features = WastRunContext.deriveFeatureSet(rootPath: rootPath)
         configuration.features = features
 
@@ -138,7 +136,7 @@ extension TestCase {
         let spectestInstance = try spectestModule.instantiate(store: store)
 
         var content = try parseWAST(String(data: data, encoding: .utf8)!, features: features)
-        let context = WastRunContext(store: store, rootPath: rootPath.string)
+        let context = WastRunContext(store: store, rootPath: rootPath)
         context.importsSpace.define(module: "spectest", spectestInstance.exports)
 
         // Add shared_memory export for threads proposal tests. Skip it where shared memory is
@@ -386,34 +384,32 @@ extension WastRunContext {
         return try function.invoke(args)
     }
 
-    static func deriveFeatureSet(rootPath: FilePath) -> WasmFeatureSet {
+    static func deriveFeatureSet(rootPath: String) -> WasmFeatureSet {
         var features = WasmFeatureSet.default
-        if rootPath.ends(with: "proposals/memory64") {
+        if rootPath.hasSuffix("proposals/memory64") {
             features.insert(.memory64)
         }
         features.insert(.simd)
-        if rootPath.ends(with: "proposals/threads") {
+        if rootPath.hasSuffix("proposals/threads") {
             // Threads proposal tests should not enable reference types by default
             // as they test core WebAssembly features without reference types
             features.remove(.referenceTypes)
             features.insert(.threads)
         }
-        if rootPath.ends(with: "proposals/exception-handling") {
+        if rootPath.hasSuffix("proposals/exception-handling") {
             features.insert(.exceptionHandling)
         }
         return features
     }
 
     private func parseModule(rootPath: String, filename: String) throws -> Module {
-        let rootPath = FilePath(rootPath)
-        let path = rootPath.appending(filename)
+        let path = URL(fileURLWithPath: rootPath).appendingPathComponent(filename).path
 
         let module = try parseWasm(filePath: path, features: Self.deriveFeatureSet(rootPath: rootPath))
         return module
     }
 
     private func parseModule(rootPath: String, moduleSource: ModuleSource) throws -> Module {
-        let rootPath = FilePath(rootPath)
         let binary: [UInt8]
         switch moduleSource {
         case .text(let watModule):
@@ -541,19 +537,8 @@ extension Swift.Error {
     }
 }
 
-#if os(Windows)
-    import WinSDK
-#endif
-internal func isDirectory(_ path: FilePath) -> Bool {
-    #if os(Windows)
-        return path.withPlatformString {
-            let result = GetFileAttributesW($0)
-            return result != INVALID_FILE_ATTRIBUTES && result & DWORD(FILE_ATTRIBUTE_DIRECTORY) != 0
-        }
-    #else
-        let fd = try? FileDescriptor.open(path, FileDescriptor.AccessMode.readOnly, options: .directory)
-        let isDirectory = fd != nil
-        try? fd?.close()
-        return isDirectory
-    #endif
+internal func isDirectory(_ path: String) -> Bool {
+    var isDirectory: ObjCBool = false
+    let exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+    return exists && isDirectory.boolValue
 }

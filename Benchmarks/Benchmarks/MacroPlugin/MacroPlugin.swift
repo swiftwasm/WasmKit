@@ -156,7 +156,7 @@ let benchmarks: @Sendable () -> () = {
             init(filePath: FilePath, expandMessage: String) throws {
                 let engine = Engine()
                 let store = Store(engine: engine)
-                let module = try parseWasm(filePath: filePath)
+                let module = try parseWasm(filePath: filePath.string)
 
                 let hostToPluginPipes = try FileDescriptor.pipe()
                 let pluginToHostPipes = try FileDescriptor.pipe()

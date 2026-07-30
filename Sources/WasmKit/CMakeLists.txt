@@ -64,4 +64,4 @@ target_compile_options(WasmKit PRIVATE
   $<$<COMPILE_LANGUAGE:Swift>:-DDisassembler>)
 
 target_link_wasmkit_libraries(WasmKit PUBLIC
-  _CWasmKit WasmParser SystemExtras WasmTypes SystemPackage)
+  _CWasmKit WasmParser WasmTypes)

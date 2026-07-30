@@ -197,7 +197,7 @@ package struct Run: AsyncParsableCommand {
                     if fileType == .component {
                         log("Detected component binary, parsing component...", verbose: true)
                         _ = try fileHandle.seek(offset: 0, from: .start)
-                        parsedComponent = try parseComponent(fileHandle: fileHandle)
+                        parsedComponent = try parseComponent(fileHandle: fileHandle.rawValue)
                         return nil
                     }
                 #endif
@@ -208,7 +208,7 @@ package struct Run: AsyncParsableCommand {
 
                 _ = try fileHandle.seek(offset: 0, from: .start)
                 let (parsedModule, parseTime) = try measure {
-                    try WasmKit.parseWasm(fileHandle: fileHandle)
+                    try WasmKit.parseWasm(fileHandle: fileHandle.rawValue)
                 }
                 log("Finished parsing module: \(parseTime)", verbose: true)
                 return parsedModule

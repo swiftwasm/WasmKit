@@ -1,4 +1,5 @@
 add_wasmkit_library(WasmParser
+  Platform/FileIO.swift
   Stream/ByteStream.swift
   Stream/FileHandleStream.swift
   BinaryInstructionDecoder.swift
@@ -16,7 +17,5 @@ target_link_wasmkit_libraries(WasmParser PUBLIC
 if(WASMKIT_ENABLE_FILESYSTEM)
   target_compile_options(WasmParser PRIVATE
     $<$<COMPILE_LANGUAGE:Swift>:-DFileSystem>)
-  target_link_wasmkit_libraries(WasmParser PUBLIC
-    SystemPackage)
 endif()
 
