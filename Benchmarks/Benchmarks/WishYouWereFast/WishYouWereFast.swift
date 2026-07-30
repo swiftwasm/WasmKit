@@ -2,7 +2,6 @@ import Benchmark
 import WasmKit
 import WasmKitWASI
 import Foundation
-import SystemPackage
 
 let benchmarks: @Sendable () -> () = {
     let wishYouWereFast = URL(fileURLWithPath: #filePath)
@@ -16,7 +15,7 @@ let benchmarks: @Sendable () -> () = {
         .appendingPathComponent("suites")
         .appendingPathComponent("libsodium")
 
-    let devNull = try! FileDescriptor.open("/dev/null", .readWrite)
+    let devNull = FileHandle(forUpdatingAtPath: "/dev/null")!.fileDescriptor
 
     for file in try! FileManager.default.contentsOfDirectory(
         atPath: wishYouWereFast.path

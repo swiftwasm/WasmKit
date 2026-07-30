@@ -1,5 +1,3 @@
-import SystemExtras
-import SystemPackage
 
 /// A WASIDir implementation backed by an in-memory directory node.
 struct MemoryDirEntry: WASIDir {

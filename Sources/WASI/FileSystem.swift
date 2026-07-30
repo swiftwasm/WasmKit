@@ -1,4 +1,3 @@
-import SystemPackage
 import WasmTypes
 
 struct FileAccessMode: OptionSet {
@@ -172,7 +171,9 @@ struct FdTable {
 /// Content of a file that can be retrieved from the file system.
 public enum FileContent: Sendable {
     case bytes([UInt8])
-    case handle(FileDescriptor)
+    /// A caller-owned platform file descriptor. The file system borrows it:
+    /// the caller is responsible for keeping it valid and closing it.
+    case handle(CInt)
 }
 
 /// Protocol for file system implementations used by WASI.

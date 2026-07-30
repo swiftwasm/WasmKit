@@ -556,7 +556,7 @@ struct WASITests {
 
     @Test
     func memoryFileSystemWithFileDescriptor() throws {
-        #if canImport(System) && !os(WASI)
+        #if !os(WASI)
             let tempDir = try TestSupport.TemporaryDirectory()
             try tempDir.createFile(at: "source.txt", contents: "File descriptor content")
 
@@ -567,7 +567,7 @@ struct WASITests {
 
             let fs = try MemoryFileSystem()
             try fs.ensureDirectory(at: "/")
-            try fs.addFile(at: "/mounted.txt", handle: fd)
+            try fs.addFile(at: "/mounted.txt", handle: fd.fileDescriptor)
 
             let bridge = try WASIBridgeToHost(
                 fileSystem: .memory(fs).withPreopens([
@@ -758,7 +758,7 @@ struct WASITests {
 
     @Test
     func memoryFileSystemWithFileDescriptorReadWrite() throws {
-        #if canImport(System) && !os(WASI) && !os(Windows)
+        #if !os(WASI) && !os(Windows)
             let tempDir = try TestSupport.TemporaryDirectory()
             try tempDir.createFile(at: "rw.txt", contents: "Initial")
 
@@ -769,7 +769,7 @@ struct WASITests {
 
             let fs = try MemoryFileSystem()
             try fs.ensureDirectory(at: "/")
-            try fs.addFile(at: "/handle.txt", handle: fd)
+            try fs.addFile(at: "/handle.txt", handle: fd.fileDescriptor)
 
             let content = try fs.getFile(at: "/handle.txt")
             guard case .handle(let retrievedFd) = content else {
@@ -777,7 +777,7 @@ struct WASITests {
                 return
             }
 
-            #expect(retrievedFd.rawValue == fd.rawValue)
+            #expect(retrievedFd == fd.fileDescriptor)
         #endif
     }
 
@@ -1168,7 +1168,7 @@ struct WASITests {
 
     @Test
     func memoryFileSystemWithFileDescriptorWrite() throws {
-        #if canImport(System) && !os(WASI) && !os(Windows)
+        #if !os(WASI) && !os(Windows)
             let tempDir = try TestSupport.TemporaryDirectory()
             try tempDir.createFile(at: "target.txt", contents: "")
 
@@ -1179,7 +1179,7 @@ struct WASITests {
 
             let fs = try MemoryFileSystem()
             try fs.ensureDirectory(at: "/")
-            try fs.addFile(at: "/handle.txt", handle: fd)
+            try fs.addFile(at: "/handle.txt", handle: fd.fileDescriptor)
 
             let bridge = try WASIBridgeToHost(
                 fileSystem: .memory(fs).withPreopens([

@@ -1,5 +1,4 @@
 import Foundation
-import SystemPackage
 import WASI
 import WasmKit
 import WasmKitWASI
@@ -120,18 +119,21 @@ package func runWasmTools(
         throw WasmToolsError.wasmToolsNotFound(path: wasmToolsPath)
     }
 
-    let stdoutPipes = try FileDescriptor.pipe()
-    let stderrPipes = try FileDescriptor.pipe()
+    let stdoutPipe = Pipe()
+    let stderrPipe = Pipe()
 
     defer {
-        try? stdoutPipes.readEnd.close()
-        try? stdoutPipes.writeEnd.close()
-        try? stderrPipes.readEnd.close()
-        try? stderrPipes.writeEnd.close()
+        try? stdoutPipe.fileHandleForReading.close()
+        try? stdoutPipe.fileHandleForWriting.close()
+        try? stderrPipe.fileHandleForReading.close()
+        try? stderrPipe.fileHandleForWriting.close()
     }
 
     let fileSystemOptions = WASIBridgeToHost.FileSystemOptions.memory(context.memoryFS)
-        .withStdio(stdin: .standardInput, stdout: stdoutPipes.writeEnd, stderr: stderrPipes.writeEnd)
+        .withStdio(
+            stdin: 0,
+            stdout: stdoutPipe.fileHandleForWriting.fileDescriptor,
+            stderr: stderrPipe.fileHandleForWriting.fileDescriptor)
         .withPreopens([.init(guestPath: "/", hostPath: "/")])
 
     let wasi = try WASIBridgeToHost(
@@ -151,28 +153,11 @@ package func runWasmTools(
         return try wasi.start(instance)
     }
 
-    try stdoutPipes.writeEnd.close()
-    try stderrPipes.writeEnd.close()
+    try stdoutPipe.fileHandleForWriting.close()
+    try stderrPipe.fileHandleForWriting.close()
 
-    var stdoutBytes = [UInt8]()
-    var stdoutBuffer = [UInt8](repeating: 0, count: 4096)
-    while true {
-        let bytesRead = try stdoutBuffer.withUnsafeMutableBytes {
-            try stdoutPipes.readEnd.read(into: $0)
-        }
-        if bytesRead == 0 { break }
-        stdoutBytes.append(contentsOf: stdoutBuffer.prefix(bytesRead))
-    }
-
-    var stderrBytes = [UInt8]()
-    var stderrBuffer = [UInt8](repeating: 0, count: 4096)
-    while true {
-        let bytesRead = try stderrBuffer.withUnsafeMutableBytes {
-            try stderrPipes.readEnd.read(into: $0)
-        }
-        if bytesRead == 0 { break }
-        stderrBytes.append(contentsOf: stderrBuffer.prefix(bytesRead))
-    }
+    let stdoutBytes = [UInt8](try stdoutPipe.fileHandleForReading.readToEnd() ?? Data())
+    let stderrBytes = [UInt8](try stderrPipe.fileHandleForReading.readToEnd() ?? Data())
 
     var outputFiles: [WasmToolsOutputFile] = []
     for path in outputPaths {

@@ -1,5 +1,5 @@
 import Foundation
-import SystemExtras
+import WasmTypes
 import Testing
 
 @testable import WASI
@@ -11,7 +11,7 @@ enum BridgeProbeError: Error, Equatable {
 @Suite struct WASIBridgeToHostTests {
     @Test func failedPreopenThrowsInsteadOfTrippingTheCloseCheck() throws {
         // `HostFileSystem.preopenDirectory` reports a bad path as `WASIError` everywhere except Windows,
-        // where `FileDescriptor.open` fails with a `SystemPackage.Errno` first.
+        // where `FileDescriptor.open` fails with a `PlatformErrno` first.
         #if os(Windows)
             #expect(throws: (any Error).self) {
                 _ = try WASIBridgeToHost(

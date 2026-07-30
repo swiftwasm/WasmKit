@@ -8,7 +8,6 @@ let package = Package(
     dependencies: [
         .package(name: "WasmKit", path: "../"),
         .package(url: "https://github.com/ordo-one/benchmark", .upToNextMajor(from: "1.4.0")),
-        .package(url: "https://github.com/apple/swift-system.git", from: "1.6.4"),
     ]
 )
 
@@ -67,7 +66,6 @@ package.targets += [
         name: "WasmParserBenchmark",
         dependencies: [
             .product(name: "Benchmark", package: "benchmark"),
-            .product(name: "SystemPackage", package: "swift-system"),
             .product(name: "WasmKit", package: "WasmKit"),
             .product(name: "WAT", package: "WasmKit"),
         ],

@@ -1,6 +1,4 @@
 import Synchronization
-import SystemExtras
-import SystemPackage
 import WasmTypes
 
 /// A `WASIFile` for regular files.

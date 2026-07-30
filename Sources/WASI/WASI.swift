@@ -1,6 +1,4 @@
 import Synchronization
-import SystemExtras
-import SystemPackage
 import WasmTypes
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)

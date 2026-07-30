@@ -1,7 +1,6 @@
 #if ComponentModel
     import ComponentModel
     import Foundation
-    import SystemPackage
     import Testing
     import WAT
     import WasmKit

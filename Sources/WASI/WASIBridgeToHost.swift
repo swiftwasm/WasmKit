@@ -1,6 +1,5 @@
 import Synchronization
-import SystemExtras
-import SystemPackage
+import WasmTypes
 
 /// A bridge that connects WebAssembly System Interface (WASI) calls to the host system.
 ///
@@ -67,20 +66,21 @@ public final class WASIBridgeToHost: Sendable {
         /// file descriptors than the system defaults.
         ///
         /// - Parameters:
-        ///   - stdin: The file descriptor to use for standard input. Defaults to `.standardInput`.
-        ///   - stdout: The file descriptor to use for standard output. Defaults to `.standardOutput`.
-        ///   - stderr: The file descriptor to use for standard error. Defaults to `.standardError`.
+        ///   - stdin: A caller-owned platform file descriptor for standard input.
+        ///     Defaults to `0`. Stdio descriptors are borrowed: WASI never closes them.
+        ///   - stdout: A caller-owned platform file descriptor for standard output. Defaults to `1`.
+        ///   - stderr: A caller-owned platform file descriptor for standard error. Defaults to `2`.
         /// - Returns: A new `FileSystemOptions` instance with the configured standard I/O streams.
         public func withStdio(
-            stdin: FileDescriptor = .standardInput,
-            stdout: FileDescriptor = .standardOutput,
-            stderr: FileDescriptor = .standardError
+            stdin: CInt = 0,
+            stdout: CInt = 1,
+            stderr: CInt = 2
         ) -> FileSystemOptions {
             var options = self
             options.initializeStdio = { fdTable in
-                fdTable[0] = .file(StdioFileEntry(fd: stdin, accessMode: .read))
-                fdTable[1] = .file(StdioFileEntry(fd: stdout, accessMode: .write))
-                fdTable[2] = .file(StdioFileEntry(fd: stderr, accessMode: .write))
+                fdTable[0] = .file(StdioFileEntry(fd: FileDescriptor(rawValue: stdin), accessMode: .read))
+                fdTable[1] = .file(StdioFileEntry(fd: FileDescriptor(rawValue: stdout), accessMode: .write))
+                fdTable[2] = .file(StdioFileEntry(fd: FileDescriptor(rawValue: stderr), accessMode: .write))
             }
             return options
         }
@@ -150,23 +150,23 @@ public final class WASIBridgeToHost: Sendable {
     ///   - args: Command-line arguments to pass to the WASI module. Defaults to an empty array.
     ///   - environment: Environment variables to expose to the WASI module. Defaults to an empty dictionary.
     ///   - preopens: Pre-opened directories mapping guest paths to host paths. Defaults to an empty dictionary.
-    ///   - stdin: File descriptor for standard input. Defaults to `.standardInput`.
-    ///   - stdout: File descriptor for standard output. Defaults to `.standardOutput`.
-    ///   - stderr: File descriptor for standard error. Defaults to `.standardError`.
+    ///   - stdin: Caller-owned platform file descriptor for standard input. Defaults to `0`.
+    ///     Stdio descriptors are borrowed: WASI never closes them.
+    ///   - stdout: Caller-owned platform file descriptor for standard output. Defaults to `1`.
+    ///   - stderr: Caller-owned platform file descriptor for standard error. Defaults to `2`.
     ///   - wallClock: Clock for wall-clock time queries. Defaults to `SystemWallClock()`.
     ///   - monotonicClock: Clock for monotonic time queries. Defaults to `SystemMonotonicClock()`.
     ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
-    /// - Throws: An error if the file system or preopens cannot be initialized. When releasing the
-    ///   descriptors opened so far also fails, the error carries both failures.
+    /// - Throws: An error if the file system or preopens cannot be initialized.
     @available(*, deprecated, message: "Use the ordered `preopens: [WASIBridgeToHost.Preopen]` initializer instead.")
     @_disfavoredOverload
     public convenience init(
         args: [String] = [],
         environment: [String: String] = [:],
         preopens: [String: String] = [:],
-        stdin: FileDescriptor = .standardInput,
-        stdout: FileDescriptor = .standardOutput,
-        stderr: FileDescriptor = .standardError,
+        stdin: CInt = 0,
+        stdout: CInt = 1,
+        stderr: CInt = 2,
         wallClock: WallClock = SystemWallClock(),
         monotonicClock: MonotonicClock = SystemMonotonicClock(),
         randomGenerator: RandomBufferGenerator = SystemRandomNumberGenerator()
@@ -194,21 +194,21 @@ public final class WASIBridgeToHost: Sendable {
     ///   - args: Command-line arguments to pass to the WASI module. Defaults to an empty array.
     ///   - environment: Environment variables to expose to the WASI module. Defaults to an empty dictionary.
     ///   - preopens: Pre-opened directories mapping guest paths to host paths. Defaults to an empty array.
-    ///   - stdin: File descriptor for standard input. Defaults to `.standardInput`.
-    ///   - stdout: File descriptor for standard output. Defaults to `.standardOutput`.
-    ///   - stderr: File descriptor for standard error. Defaults to `.standardError`.
+    ///   - stdin: Caller-owned platform file descriptor for standard input. Defaults to `0`.
+    ///     Stdio descriptors are borrowed: WASI never closes them.
+    ///   - stdout: Caller-owned platform file descriptor for standard output. Defaults to `1`.
+    ///   - stderr: Caller-owned platform file descriptor for standard error. Defaults to `2`.
     ///   - wallClock: Clock for wall-clock time queries. Defaults to `SystemWallClock()`.
     ///   - monotonicClock: Clock for monotonic time queries. Defaults to `SystemMonotonicClock()`.
     ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
-    /// - Throws: An error if the file system or preopens cannot be initialized. When releasing the
-    ///   descriptors opened so far also fails, the error carries both failures.
+    /// - Throws: An error if the file system or preopens cannot be initialized.
     public convenience init(
         args: [String] = [],
         environment: [String: String] = [:],
         preopens: [Preopen] = [],
-        stdin: FileDescriptor = .standardInput,
-        stdout: FileDescriptor = .standardOutput,
-        stderr: FileDescriptor = .standardError,
+        stdin: CInt = 0,
+        stdout: CInt = 1,
+        stderr: CInt = 2,
         wallClock: WallClock = SystemWallClock(),
         monotonicClock: MonotonicClock = SystemMonotonicClock(),
         randomGenerator: RandomBufferGenerator = SystemRandomNumberGenerator()
@@ -261,8 +261,7 @@ public final class WASIBridgeToHost: Sendable {
     ///   - wallClock: Clock for wall-clock time queries. Defaults to `SystemWallClock()`.
     ///   - monotonicClock: Clock for monotonic time queries. Defaults to `SystemMonotonicClock()`.
     ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
-    /// - Throws: An error if the file system or initialization fails. When releasing the descriptors
-    ///   opened so far also fails, the error carries both failures.
+    /// - Throws: An error if the file system or initialization fails.
     public convenience init(
         args: [String] = [],
         environment: [String: String] = [:],

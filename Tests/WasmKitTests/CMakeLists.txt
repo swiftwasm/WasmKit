@@ -9,6 +9,4 @@ target_link_wasmkit_libraries(WasmKitTests PUBLIC
   WasmKit
   WasmParser
   WasmTypes
-  SystemExtras
-  SystemPackage
 )

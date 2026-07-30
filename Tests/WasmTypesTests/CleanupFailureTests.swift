@@ -1,4 +1,4 @@
-import SystemExtras
+import WasmTypes
 import Testing
 
 @Suite struct CleanupFailureTests {

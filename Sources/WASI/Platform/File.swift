@@ -1,4 +1,3 @@
-import SystemPackage
 import WasmTypes
 
 protocol FdWASIEntry: WASIEntry {

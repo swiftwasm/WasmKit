@@ -1,20 +1,24 @@
-import struct SystemPackage.FileDescriptor
+import Foundation
 
-#if os(Windows)
-    import ucrt
-#endif
+/// Minimal file helpers for CLI commands, built on Foundation.
+enum CLIFile {
+    struct Error: Swift.Error, CustomStringConvertible {
+        let description: String
+    }
 
-enum Platform {
-    #if os(Windows)
-        // TODO: Upstream `O_BINARY` to `SystemPackage
-        static let readOnlyBinaryAccessMode = FileDescriptor.AccessMode(
-            rawValue: FileDescriptor.AccessMode.readOnly.rawValue | O_BINARY
-        )
-        static let readOnlyTextAccessMode = FileDescriptor.AccessMode(
-            rawValue: FileDescriptor.AccessMode.readOnly.rawValue | O_TEXT
-        )
-    #else
-        static let readOnlyBinaryAccessMode: FileDescriptor.AccessMode = .readOnly
-        static let readOnlyTextAccessMode: FileDescriptor.AccessMode = .readOnly
-    #endif
+    static func openRead(_ path: String) throws -> FileHandle {
+        guard let handle = FileHandle(forReadingAtPath: path) else {
+            throw Error(description: "Failed to open file: \(path)")
+        }
+        return handle
+    }
+
+    static func createWrite(_ path: String) throws -> FileHandle {
+        guard FileManager.default.createFile(atPath: path, contents: nil),
+            let handle = FileHandle(forWritingAtPath: path)
+        else {
+            throw Error(description: "Failed to create file: \(path)")
+        }
+        return handle
+    }
 }

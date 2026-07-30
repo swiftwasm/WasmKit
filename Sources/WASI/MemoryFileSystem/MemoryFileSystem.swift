@@ -1,4 +1,3 @@
-import SystemPackage
 
 /// An in-memory file system implementation for WASI environments.
 ///
@@ -149,12 +148,14 @@ public final class MemoryFileSystem: FileSystemImplementation, Sendable {
         try addFile(at: path, content: content.utf8)
     }
 
-    /// Adds a file to the file system backed by a file descriptor.
-    public func addFile(at path: String, handle: FileDescriptor) throws {
+    /// Adds a file to the file system backed by a caller-owned platform file
+    /// descriptor. The file system borrows the descriptor: the caller must
+    /// keep it open while the file system is in use and close it afterwards.
+    public func addFile(at path: String, handle: CInt) throws {
         let normalized = Self.normalizePath(path)
         let (parentPath, fileName) = try Self.splitPath(normalized)
         let parent = try Self.ensureDirectoryNode(from: root, at: parentPath)
-        parent.setChild(name: fileName, node: MemoryFileNode(handle: handle))
+        parent.setChild(name: fileName, node: MemoryFileNode(handle: FileDescriptor(rawValue: handle)))
     }
 
     /// Gets the content of a file at the specified path.

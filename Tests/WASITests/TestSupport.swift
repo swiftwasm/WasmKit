@@ -11,9 +11,6 @@ import Foundation
     import Musl
 #endif
 
-#if canImport(System)
-    import SystemPackage
-#endif
 enum TestSupport {
 
     #if os(macOS) || os(Linux)
@@ -217,10 +214,25 @@ enum TestSupport {
             )
         }
 
-        #if canImport(System)
-            func openFile(at relativePath: String, _ mode: FileDescriptor.AccessMode) throws -> FileDescriptor {
+        #if !os(WASI)
+            enum OpenMode {
+                case readOnly, writeOnly, readWrite
+            }
+
+            /// Opens a file and returns a Foundation `FileHandle`; use
+            /// `.fileDescriptor` to pass it to descriptor-based APIs.
+            func openFile(at relativePath: String, _ mode: OpenMode) throws -> FileHandle {
                 let fileURL = url.appendingPathComponent(relativePath)
-                return try FileDescriptor.open(fileURL.path, mode)
+                let handle: FileHandle?
+                switch mode {
+                case .readOnly: handle = FileHandle(forReadingAtPath: fileURL.path)
+                case .writeOnly: handle = FileHandle(forWritingAtPath: fileURL.path)
+                case .readWrite: handle = FileHandle(forUpdatingAtPath: fileURL.path)
+                }
+                guard let handle else {
+                    throw Error(description: "Failed to open \(fileURL.path)")
+                }
+                return handle
             }
         #endif
 

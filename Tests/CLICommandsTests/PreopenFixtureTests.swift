@@ -1,5 +1,5 @@
 import Foundation
-import SystemExtras
+import WasmTypes
 import Testing
 
 enum FixtureProbeError: Error, Equatable {

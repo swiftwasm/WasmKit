@@ -1,5 +1,4 @@
-import SystemExtras
-import SystemPackage
+import WasmTypes
 
 struct DirEntry {
     let preopenPath: String?
@@ -45,9 +44,9 @@ extension DirEntry: WASIDir, FdWASIEntry {
                 }
             }
 
-            // SystemPackage.FilePath implicitly normalizes the trailing "/", however
-            // it means the last component is expected to be a directory. Therefore
-            // check it here before converting path string to FilePath.
+            // A trailing "/" is dropped by guest path parsing, but it means the
+            // last component is expected to be a directory, so check it here
+            // before parsing the path string.
             if path.hasSuffix("/") {
                 options.insert(.directory)
             }
@@ -74,7 +73,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
 
             let newFd = try SandboxPrimitives.openAt(
                 start: self.fd,
-                path: FilePath(path), mode: mode, options: options,
+                path: GuestPath(path), mode: mode, options: options,
                 // Use 0o600 open mode as the minimum permission
                 permissions: .ownerReadWrite
             )
@@ -109,7 +108,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
         let result = try SandboxPrimitives.openParent(start: fd, path: path)
         try result.withFields { dir, basename in
             try WASIAbi.Errno.translatingPlatformErrno {
-                try dir.remove(at: FilePath(basename), options: [])
+                try dir.remove(at: basename, options: [])
             }
         }
     }
@@ -122,7 +121,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
             let result = try SandboxPrimitives.openParent(start: fd, path: path)
             try result.withFields { dir, basename in
                 try WASIAbi.Errno.translatingPlatformErrno {
-                    try dir.remove(at: FilePath(basename), options: .removeDirectory)
+                    try dir.remove(at: basename, options: .removeDirectory)
                 }
             }
         #endif
@@ -134,7 +133,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
         )
         try result.withFields { destDir, destBasename in
             try WASIAbi.Errno.translatingPlatformErrno {
-                try destDir.createSymlink(original: FilePath(sourcePath), link: FilePath(destBasename))
+                try destDir.createSymlink(original: sourcePath, link: destBasename)
             }
         }
     }
@@ -170,9 +169,9 @@ extension DirEntry: WASIDir, FdWASIEntry {
 
                     try WASIAbi.Errno.translatingPlatformErrno {
                         try sourceDir.rename(
-                            at: FilePath(finalSourceBasename),
+                            at: finalSourceBasename,
                             to: destDir,
-                            at: FilePath(finalDestBasename)
+                            at: finalDestBasename
                         )
                     }
                 }
@@ -210,7 +209,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
                 let stream: FileDescriptor.DirectoryStream
                 do {
                     stream = try newFd.contentsOfDirectory()
-                } catch let errno as Errno {
+                } catch let errno as PlatformErrno {
                     throw try WASIAbi.Errno(platformErrno: errno)
                 }
 
@@ -264,7 +263,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
         let result = try SandboxPrimitives.openParent(start: fd, path: path)
         try result.withFields { dir, basename in
             try WASIAbi.Errno.translatingPlatformErrno {
-                try dir.createDirectory(at: FilePath(basename), permissions: .ownerReadWriteExecute)
+                try dir.createDirectory(at: basename, permissions: .ownerReadWriteExecute)
             }
         }
     }
@@ -279,10 +278,8 @@ extension DirEntry: WASIDir, FdWASIEntry {
             }
             let result = try SandboxPrimitives.openParent(start: fd, path: path)
             return try result.withFields { dir, basename in
-                let attributes = try basename.withCString { cBasename in
-                    try WASIAbi.Errno.translatingPlatformErrno {
-                        try dir.attributes(at: cBasename, options: options)
-                    }
+                let attributes = try WASIAbi.Errno.translatingPlatformErrno {
+                    try dir.attributes(at: basename, options: options)
                 }
 
                 return WASIAbi.Filestat(stat: attributes)

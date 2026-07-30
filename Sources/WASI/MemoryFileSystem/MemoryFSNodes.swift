@@ -1,6 +1,4 @@
 import Synchronization
-import SystemExtras
-import SystemPackage
 import WasmTypes
 
 /// Base protocol for file system nodes.
@@ -151,7 +149,7 @@ final class MemoryFileNode: MemFSNode {
     }
 
     convenience init(handle: FileDescriptor) {
-        self.init(content: .handle(handle))
+        self.init(content: .handle(handle.rawValue))
     }
 
     /// A snapshot of the current content. `.bytes` copies the array; `.handle`
@@ -163,7 +161,7 @@ final class MemoryFileNode: MemFSNode {
     /// The host descriptor for a `.handle`-backed file, or nil for an in-memory file.
     var handle: FileDescriptor? {
         state.withLock {
-            if case .handle(let fd) = $0.content { return fd }
+            if case .handle(let fd) = $0.content { return FileDescriptor(rawValue: fd) }
             return nil
         }
     }
@@ -175,7 +173,7 @@ final class MemoryFileNode: MemFSNode {
             case .bytes(let bytes):
                 return bytes.count
             case .handle(let fd):
-                return Int(try fd.attributes().size)
+                return Int(try FileDescriptor(rawValue: fd).attributes().size)
             }
         }
     }
@@ -187,7 +185,7 @@ final class MemoryFileNode: MemFSNode {
             case .bytes:
                 return (snapshot.atim, snapshot.mtim, snapshot.ctim)
             case .handle(let fd):
-                let attrs = try fd.attributes()
+                let attrs = try FileDescriptor(rawValue: fd).attributes()
                 return (
                     WASIAbi.Timestamp(platformTimeSpec: attrs.accessTime),
                     WASIAbi.Timestamp(platformTimeSpec: attrs.modificationTime),
@@ -212,7 +210,7 @@ final class MemoryFileNode: MemFSNode {
     /// `.handle` file so the caller applies the change with a syscall outside the lock.
     func setTimesInMemory(atim: WASIAbi.Timestamp?, mtim: WASIAbi.Timestamp?) -> FileDescriptor? {
         state.withLock { s in
-            if case .handle(let fd) = s.content { return fd }
+            if case .handle(let fd) = s.content { return FileDescriptor(rawValue: fd) }
             if let atim { s.atim = atim }
             if let mtim { s.mtim = mtim }
             s.ctim = WASIAbi.Timestamp.currentWallClock()
@@ -238,7 +236,7 @@ final class MemoryFileNode: MemFSNode {
                 s.ctim = now
                 return nil
             case .handle(let fd):
-                return fd
+                return FileDescriptor(rawValue: fd)
             }
         }
         if let handle { try handle.truncate(size: Int64(size)) }
@@ -250,7 +248,7 @@ final class MemoryFileNode: MemFSNode {
         state.withLock { s in
             switch s.content {
             case .bytes(let bytes): return (bytes.count, nil)
-            case .handle(let fd): return (0, fd)
+            case .handle(let fd): return (0, FileDescriptor(rawValue: fd))
             }
         }
     }
@@ -279,7 +277,7 @@ final class MemoryFileNode: MemFSNode {
                 s.atim = WASIAbi.Timestamp.currentWallClock()
                 return (total, cur, nil)
             case .handle(let fd):
-                return (0, position, fd)
+                return (0, position, FileDescriptor(rawValue: fd))
             }
         }
         guard let handle else { return (count, newPosition) }
@@ -319,7 +317,7 @@ final class MemoryFileNode: MemFSNode {
                 s.atim = WASIAbi.Timestamp.currentWallClock()
                 return (total, nil)
             case .handle(let fd):
-                return (0, fd)
+                return (0, FileDescriptor(rawValue: fd))
             }
         }
         guard let handle else { return count }
@@ -361,7 +359,7 @@ final class MemoryFileNode: MemFSNode {
                 s.ctim = now
                 return (total, cur, nil)
             case .handle(let fd):
-                return (0, position, fd)
+                return (0, position, FileDescriptor(rawValue: fd))
             }
         }
         guard let handle else { return (count, newPosition) }
@@ -403,7 +401,7 @@ final class MemoryFileNode: MemFSNode {
                 s.ctim = now
                 return (total, nil)
             case .handle(let fd):
-                return (0, fd)
+                return (0, FileDescriptor(rawValue: fd))
             }
         }
         guard let handle else { return count }

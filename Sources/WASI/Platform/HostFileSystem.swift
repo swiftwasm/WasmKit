@@ -1,5 +1,3 @@
-import SystemExtras
-import SystemPackage
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
     import Darwin
@@ -17,6 +15,8 @@ import SystemPackage
     #error("Unsupported Platform")
 #endif
 
+import WasmTypes
+
 /// A file system implementation that directly accesses the host operating system's file system.
 ///
 /// This implementation provides access to actual files and directories on the host system.
@@ -30,7 +30,12 @@ final class HostFileSystem: FileSystemImplementation, Sendable {
 
     func preopenDirectory(guestPath: String, hostPath: String) throws -> any WASIDir {
         #if os(Windows) || os(WASI)
-            let fd = try FileDescriptor.open(FilePath(hostPath), .readWrite)
+            let fd: FileDescriptor
+            do {
+                fd = try FileDescriptor.open(hostPath, .readWrite)
+            } catch let error as PlatformErrno {
+                throw WASIError(description: "Failed to open preopen path '\(hostPath)': \(error)")
+            }
         #else
             let fd = try hostPath.withCString { cHostPath in
                 let fd = open(cHostPath, O_DIRECTORY)

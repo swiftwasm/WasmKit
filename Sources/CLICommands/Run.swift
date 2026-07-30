@@ -1,7 +1,7 @@
 import ArgumentParser
-import SystemExtras
-import SystemPackage
+import Foundation
 import WAT
+import WasmTypes
 import WasmKit
 import WasmKitWASI
 import WasmParser
@@ -175,7 +175,7 @@ package struct Run: AsyncParsableCommand {
                 let debuggerServer = DebuggerServer(
                     port: debuggerPort,
                     logLevel: self.verbose ? .trace : .info,
-                    wasmModulePath: FilePath(self.path),
+                    wasmModulePath: self.path,
                     engineConfiguration: self.deriveRuntimeConfiguration(),
                     wasiConfiguration: try self.deriveWASIConfiguration()
                 )
@@ -187,35 +187,26 @@ package struct Run: AsyncParsableCommand {
 
         log("Started parsing module", verbose: true)
 
-        let filePath = FilePath(path)
         let module: Module
 
-        if filePath.extension == "wat" {
-            let fileHandle: FileDescriptor = try FileDescriptor.open(filePath, Platform.readOnlyTextAccessMode)
-            module = try withThrowing {
-                let size = try fileHandle.seek(offset: 0, from: .end)
-                _ = try fileHandle.seek(offset: 0, from: .start)
-                let wat = try String(unsafeUninitializedCapacity: Int(size)) {
-                    try fileHandle.read(into: UnsafeMutableRawBufferPointer($0))
-                }
-                return try WasmKit.parseWasm(bytes: wat2wasm(wat))
-            } defer: {
-                try fileHandle.close()
-            }
+        if URL(fileURLWithPath: path).pathExtension == "wat" {
+            let wat = try String(contentsOfFile: path, encoding: .utf8)
+            module = try WasmKit.parseWasm(bytes: wat2wasm(wat))
         } else {
-            let fileHandle: FileDescriptor = try FileDescriptor.open(filePath, Platform.readOnlyBinaryAccessMode)
+            let fileHandle = try CLIFile.openRead(path)
             #if ComponentModel
                 var parsedComponent: ParsedComponent?
             #endif
             let parsedModule: Module? = try withThrowing { () throws -> Module? in
                 var magic: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0)
-                let bytesRead = try withUnsafeMutableBytes(of: &magic) { buffer in
-                    try fileHandle.read(into: buffer)
+                let magicData = try fileHandle.read(upToCount: MemoryLayout.size(ofValue: magic)) ?? Data()
+                _ = withUnsafeMutableBytes(of: &magic) { buffer in
+                    magicData.copyBytes(to: buffer)
                 }
 
                 // Detect file type (component vs module)
                 let fileType: WasmFileType
-                if bytesRead == MemoryLayout.size(ofValue: magic) {
+                if magicData.count == MemoryLayout.size(ofValue: magic) {
                     fileType = detectWasmFileType(magic)
                 } else {
                     fileType = .unknown
@@ -224,8 +215,8 @@ package struct Run: AsyncParsableCommand {
                 #if ComponentModel
                     if fileType == .component {
                         log("Detected component binary, parsing component...", verbose: true)
-                        _ = try fileHandle.seek(offset: 0, from: .start)
-                        parsedComponent = try parseComponent(fileHandle: fileHandle.rawValue)
+                        try fileHandle.seek(toOffset: 0)
+                        parsedComponent = try parseComponent(fileHandle: fileHandle.fileDescriptor)
                         return nil
                     }
                 #endif
@@ -234,9 +225,9 @@ package struct Run: AsyncParsableCommand {
                     fatalError("Unsupported WebAssembly file type: \(fileType)")
                 }
 
-                _ = try fileHandle.seek(offset: 0, from: .start)
+                try fileHandle.seek(toOffset: 0)
                 let (parsedModule, parseTime) = try measure {
-                    try WasmKit.parseWasm(fileHandle: fileHandle.rawValue)
+                    try WasmKit.parseWasm(fileHandle: fileHandle.fileDescriptor)
                 }
                 log("Finished parsing module: \(parseTime)", verbose: true)
                 return parsedModule
@@ -314,13 +305,9 @@ package struct Run: AsyncParsableCommand {
             }
         }
         if let outputPath = self.profileOutput {
-            let fileHandle = try FileDescriptor.open(
-                FilePath(outputPath), .writeOnly, options: .create,
-                permissions: [.ownerReadWrite, .groupRead, .otherRead]
-            )
+            let fileHandle = try CLIFile.createWrite(outputPath)
             let profiler = GuestTimeProfiler { data in
-                var data = data
-                _ = data.withUTF8 { try! fileHandle.writeAll($0) }
+                fileHandle.write(Data(data.utf8))
             }
             interceptors.append(profiler)
             finalizers.append {
@@ -451,7 +438,7 @@ package struct Run: AsyncParsableCommand {
 
     @Sendable func log(_ message: String, verbose: Bool = false) {
         if !verbose || self.verbose {
-            try! FileDescriptor.standardError.writeAll((message + "\n").utf8)
+            FileHandle.standardError.write(Data((message + "\n").utf8))
         }
     }
 }

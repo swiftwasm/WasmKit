@@ -1,4 +1,3 @@
-import SystemExtras
 
 /// WASI wall clock interface based on WASI Preview 2 `wall-clock` interface.
 ///
@@ -39,7 +38,6 @@ public protocol MonotonicClock: Sendable {
 #if os(Windows)
 
     import WinSDK
-    import SystemPackage
 
     // MARK: - Windows
 
@@ -52,7 +50,7 @@ public protocol MonotonicClock: Sendable {
         public func now() throws -> MonotonicClock.Instant {
             var counter = LARGE_INTEGER()
             guard QueryPerformanceCounter(&counter) else {
-                throw Errno(windowsError: GetLastError())
+                throw PlatformErrno(windowsError: GetLastError())
             }
             return UInt64(counter.QuadPart)
         }
@@ -60,7 +58,7 @@ public protocol MonotonicClock: Sendable {
         public func resolution() throws -> MonotonicClock.Duration {
             var frequency = LARGE_INTEGER()
             guard QueryPerformanceFrequency(&frequency) else {
-                throw Errno(windowsError: GetLastError())
+                throw PlatformErrno(windowsError: GetLastError())
             }
             // frequency is in counts per second
             return UInt64(1_000_000_000 / frequency.QuadPart)
@@ -103,7 +101,7 @@ public protocol MonotonicClock: Sendable {
 
     /// A monotonic clock that uses the system's monotonic clock.
     public struct SystemMonotonicClock: MonotonicClock {
-        private var underlying: SystemExtras.Clock {
+        private var underlying: PlatformClock {
             #if os(Linux) || os(Android) || os(WASI)
                 return .monotonic
             #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
@@ -134,7 +132,7 @@ public protocol MonotonicClock: Sendable {
 
     /// A wall clock that uses the system's wall clock.
     public struct SystemWallClock: WallClock {
-        private var underlying: SystemExtras.Clock {
+        private var underlying: PlatformClock {
             return .realtime
         }
 

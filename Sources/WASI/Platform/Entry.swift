@@ -1,4 +1,3 @@
-import SystemPackage
 
 extension FdWASIEntry {
     /// Returns the metadata for the fd entry
@@ -31,7 +30,7 @@ extension FdWASIEntry {
                 return
             }
             try WASIAbi.Errno.translatingPlatformErrno {
-                try self.fd.advise(offset: offset, length: length, advice: .willNeed)
+                try self.fd.adviseWillNeed(offset: offset, length: length)
             }
         #endif
     }

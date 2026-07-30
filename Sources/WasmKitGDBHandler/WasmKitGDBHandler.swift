@@ -16,7 +16,7 @@
     import Logging
     import NIOCore
     import NIOFileSystem
-    import SystemExtras
+    import WasmTypes
     import SystemPackage
     import WASI
     import WasmKit
