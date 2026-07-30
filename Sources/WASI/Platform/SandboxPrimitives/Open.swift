@@ -73,97 +73,85 @@ struct PathResolution {
     }
 
     mutating func regular(component: String) throws {
-        #if os(Windows)
-            // Directory-relative opens are unsupported on Windows; the caller
-            // paths that reach path resolution already fail with ENOSYS/ENOTSUP.
-            throw WASIAbi.Errno.ENOSYS
-        #else
-            var options: FileDescriptor.OpenOptions = []
-            // First, try without following symlinks as a fast path.
-            // If it's actually a symlink and options don't have O_NOFOLLOW,
-            // we'll try again with interpreting resolved symlink.
-            options.insert(.noFollow)
-            let mode: FileDescriptor.AccessMode
+        var options: FileDescriptor.OpenOptions = []
+        // First, try without following symlinks as a fast path.
+        // If it's actually a symlink and options don't have O_NOFOLLOW,
+        // we'll try again with interpreting resolved symlink.
+        options.insert(.noFollow)
+        let mode: FileDescriptor.AccessMode
 
-            if !self.components.isEmpty {
-                // When trying to open an intermediate directory,
-                // we can assume it's directory.
-                options.insert(.directory)
-                mode = .readOnly
-            } else {
-                options.formUnion(self.options)
-                mode = self.mode
-            }
+        if !self.components.isEmpty {
+            // When trying to open an intermediate directory,
+            // we can assume it's directory.
+            options.insert(.directory)
+            mode = .readOnly
+        } else {
+            options.formUnion(self.options)
+            mode = self.mode
+        }
 
-            try WASIAbi.Errno.translatingPlatformErrno {
-                do {
-                    let newFd = try self.baseFd.open(
-                        at: component,
-                        mode, options: options, permissions: permissions
-                    )
-                    self.openDirectories.append(self.baseFd)
-                    self.baseFd = newFd
-                    return
-                } catch let openErrno as PlatformErrno {
-                    if self.options.contains(.noFollow) {
-                        // If "open" failed with O_NOFOLLOW, no need to retry.
-                        throw openErrno
-                    }
-
-                    // If "open" failed and it might be a symlink, try again with interpreting resolved symlink.
-
-                    // Check if it's a symlink by fstatat(2).
-                    //
-                    // NOTE: `errno` has enough information to check if the component is a symlink,
-                    // but the value is platform-specific (e.g. ELOOP on POSIX standards, but EMLINK
-                    // on BSD family), so we conservatively check it by fstatat(2).
-                    let attrs = try self.baseFd.attributes(at: component, options: [.noFollow])
-                    guard attrs.fileType.isSymlink else {
-                        // openat(2) failed, fstatat(2) succeeded, and it said it's not a symlink.
-                        // If it's not a symlink, the error is not due to symlink following
-                        // but other reasons, so just throw the error.
-                        // e.g. open with O_DIRECTORY on a regular file.
-                        throw openErrno
-                    }
-
-                    #if os(WASI)
-                        throw PlatformErrno.notSupported
-                    #else
-                        try self.symlink(component: component)
-                    #endif
+        try WASIAbi.Errno.translatingPlatformErrno {
+            do {
+                let newFd = try self.baseFd.open(
+                    at: component,
+                    mode, options: options, permissions: permissions
+                )
+                self.openDirectories.append(self.baseFd)
+                self.baseFd = newFd
+                return
+            } catch let openErrno as PlatformErrno {
+                if self.options.contains(.noFollow) {
+                    // If "open" failed with O_NOFOLLOW, no need to retry.
+                    throw openErrno
                 }
+
+                // If "open" failed and it might be a symlink, try again with interpreting resolved symlink.
+
+                // Check if it's a symlink by fstatat(2).
+                //
+                // NOTE: `errno` has enough information to check if the component is a symlink,
+                // but the value is platform-specific (e.g. ELOOP on POSIX standards, but EMLINK
+                // on BSD family), so we conservatively check it by fstatat(2).
+                let attrs = try self.baseFd.attributes(at: component, options: [.noFollow])
+                guard attrs.fileType.isSymlink else {
+                    // openat(2) failed, fstatat(2) succeeded, and it said it's not a symlink.
+                    // If it's not a symlink, the error is not due to symlink following
+                    // but other reasons, so just throw the error.
+                    // e.g. open with O_DIRECTORY on a regular file.
+                    throw openErrno
+                }
+
+                try self.symlink(component: component)
             }
-        #endif
+        }
     }
 
-    #if !os(Windows) && !os(WASI)
-        mutating func symlink(component: String) throws {
-            guard resolvedSymlinks < Self.MAX_SYMLINKS else {
-                throw WASIAbi.Errno.ELOOP
-            }
-
-            // If it's a symlink, readlink(2) and check it doesn't escape sandbox.
-            var buffer = [UInt8](repeating: 0, count: FileDescriptor.maximumPathLength)
-            let length = try buffer.withUnsafeMutableBytes { rawBuffer in
-                try self.baseFd.readSymlink(at: component, into: rawBuffer)
-            }
-            // Symlink contents are interpreted with WASI guest path semantics
-            // ('/'-separated, UTF-8), which POSIX hosts share.
-            let linkPath = GuestPath(String(decoding: buffer[..<length], as: UTF8.self))
-
-            guard !linkPath.isAbsolute else {
-                // Ban absolute symlink to avoid sandbox-escaping.
-                throw WASIAbi.Errno.EPERM
-            }
-
-            // Increment the number of resolved symlinks to prevent infinite
-            // link loop.
-            resolvedSymlinks += 1
-
-            // Add resolved path to the worklist.
-            self.components.append(contentsOf: linkPath.components.reversed())
+    mutating func symlink(component: String) throws {
+        guard resolvedSymlinks < Self.MAX_SYMLINKS else {
+            throw WASIAbi.Errno.ELOOP
         }
-    #endif
+
+        // If it's a symlink, readlink(2) and check it doesn't escape sandbox.
+        var buffer = [UInt8](repeating: 0, count: FileDescriptor.maximumPathLength)
+        let length = try buffer.withUnsafeMutableBytes { rawBuffer in
+            try self.baseFd.readSymlink(at: component, into: rawBuffer)
+        }
+        // Symlink contents are interpreted with WASI guest path semantics
+        // ('/'-separated, UTF-8), which POSIX hosts share.
+        let linkPath = GuestPath(String(decoding: buffer[..<length], as: UTF8.self))
+
+        guard !linkPath.isAbsolute else {
+            // Ban absolute symlink to avoid sandbox-escaping.
+            throw WASIAbi.Errno.EPERM
+        }
+
+        // Increment the number of resolved symlinks to prevent infinite
+        // link loop.
+        resolvedSymlinks += 1
+
+        // Add resolved path to the worklist.
+        self.components.append(contentsOf: linkPath.components.reversed())
+    }
 
     mutating func resolve() throws -> FileDescriptor {
         var resultFd: FileDescriptor? = nil
@@ -188,13 +176,9 @@ struct PathResolution {
         // If the path resolved without opening any new fd (e.g. "."),
         // dup to avoid returning an aliased fd to the caller.
         if baseFd.rawValue == startFd.rawValue {
-            #if os(Windows)
-                throw WASIAbi.Errno.ENOSYS
-            #else
-                baseFd = try WASIAbi.Errno.translatingPlatformErrno {
-                    try startFd.open(at: ".", mode, options: options, permissions: permissions)
-                }
-            #endif
+            baseFd = try WASIAbi.Errno.translatingPlatformErrno {
+                try startFd.open(at: ".", mode, options: options, permissions: permissions)
+            }
         }
 
         resultFd = self.baseFd

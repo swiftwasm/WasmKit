@@ -3,131 +3,92 @@
 // `Clock.swift` are platform-independent and can be implemented by users on
 // platforms without system clocks.
 #if os(Windows)
-
     import WinSDK
+#endif
 
-    /// A monotonic clock that uses the system's monotonic clock.
-    public struct SystemMonotonicClock: MonotonicClock {
+/// A monotonic clock that uses the system's monotonic clock.
+public struct SystemMonotonicClock: MonotonicClock {
+    public init() {}
 
-        public init() {
-        }
-
-        public func now() throws -> MonotonicClock.Instant {
+    public func now() throws -> MonotonicClock.Instant {
+        #if os(Windows)
             var counter = LARGE_INTEGER()
             guard QueryPerformanceCounter(&counter) else {
                 throw PlatformErrno(windowsError: GetLastError())
             }
             return UInt64(counter.QuadPart)
-        }
+        #else
+            let timeSpec = try WASIAbi.Errno.translatingPlatformErrno {
+                try _preferredMonotonicClock.currentTime()
+            }
+            return WASIAbi.Timestamp(platformTimeSpec: timeSpec)
+        #endif
+    }
 
-        public func resolution() throws -> MonotonicClock.Duration {
+    public func resolution() throws -> MonotonicClock.Duration {
+        #if os(Windows)
             var frequency = LARGE_INTEGER()
             guard QueryPerformanceFrequency(&frequency) else {
                 throw PlatformErrno(windowsError: GetLastError())
             }
             // frequency is in counts per second
             return UInt64(1_000_000_000 / frequency.QuadPart)
-        }
+        #else
+            let timeSpec = try WASIAbi.Errno.translatingPlatformErrno {
+                try _preferredMonotonicClock.resolution()
+            }
+            return WASIAbi.Timestamp(platformTimeSpec: timeSpec)
+        #endif
     }
+}
 
-    /// A wall clock that uses the system's wall clock.
-    public struct SystemWallClock: WallClock {
-        public init() {}
+/// A wall clock that uses the system's wall clock.
+public struct SystemWallClock: WallClock {
+    public init() {}
 
-        public func now() throws -> WallClock.Duration {
+    public func now() throws -> WallClock.Duration {
+        #if os(Windows)
             var fileTime = FILETIME()
             // Use GetSystemTimePreciseAsFileTime for better precision
             // https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getsystemtimepreciseasfiletime
             GetSystemTimePreciseAsFileTime(&fileTime)
-            let unixNanoseconds = FileTime(rawValue: fileTime).unixNanoseconds
-            guard unixNanoseconds >= 0 else {
-                // Handle pre-1970 dates (return 0)
-                return (seconds: 0, nanoseconds: 0)
+            let time = FileTime(windowsFILETIME: fileTime)
+            return _clampedDuration(seconds: time.seconds, nanoseconds: time.nanoseconds)
+        #else
+            let timeSpec = try WASIAbi.Errno.translatingPlatformErrno {
+                try PlatformClock.realtime.currentTime()
             }
-            let totalNanoseconds = UInt64(unixNanoseconds)
-            return (seconds: totalNanoseconds / 1_000_000_000, nanoseconds: UInt32((totalNanoseconds % 1_000_000_000)))
-        }
+            return _clampedDuration(seconds: timeSpec.seconds, nanoseconds: timeSpec.nanoseconds)
+        #endif
+    }
 
-        public func resolution() throws -> WallClock.Duration {
+    public func resolution() throws -> WallClock.Duration {
+        #if os(Windows)
             return (seconds: 0, nanoseconds: 100)
-        }
-    }
-
-#elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
-
-    /// A monotonic clock that uses the system's monotonic clock.
-    public struct SystemMonotonicClock: MonotonicClock {
-        private var underlying: PlatformClock {
-            #if canImport(Darwin)
-                return .rawUptime
-            #elseif os(OpenBSD) || os(FreeBSD)
-                return .uptime
-            #else
-                return .monotonic
-            #endif
-        }
-
-        public init() {}
-
-        public func now() throws -> MonotonicClock.Instant {
+        #else
             let timeSpec = try WASIAbi.Errno.translatingPlatformErrno {
-                try underlying.currentTime()
+                try PlatformClock.realtime.resolution()
             }
-            return WASIAbi.Timestamp(platformTimeSpec: timeSpec)
-        }
-
-        public func resolution() throws -> MonotonicClock.Duration {
-            let timeSpec = try WASIAbi.Errno.translatingPlatformErrno {
-                try underlying.resolution()
-            }
-            return WASIAbi.Timestamp(platformTimeSpec: timeSpec)
-        }
+            return _clampedDuration(seconds: timeSpec.seconds, nanoseconds: timeSpec.nanoseconds)
+        #endif
     }
+}
 
-    /// A wall clock that uses the system's wall clock.
-    public struct SystemWallClock: WallClock {
-        private var underlying: PlatformClock {
-            return .realtime
-        }
+/// The monotonic clock variant historically used per platform.
+private var _preferredMonotonicClock: PlatformClock {
+    #if canImport(Darwin)
+        return .rawUptime
+    #elseif os(OpenBSD) || os(FreeBSD)
+        return .uptime
+    #else
+        return .monotonic
+    #endif
+}
 
-        public init() {}
-
-        public func now() throws -> WallClock.Duration {
-            let timeSpec = try WASIAbi.Errno.translatingPlatformErrno {
-                try underlying.currentTime()
-            }
-            // Handle potential negative tv_sec (pre-1970 dates)
-            let seconds = timeSpec.seconds >= 0 ? UInt64(timeSpec.seconds) : 0
-            let nanoseconds = timeSpec.nanoseconds >= 0 ? UInt32(timeSpec.nanoseconds) : 0
-            return (seconds: seconds, nanoseconds: nanoseconds)
-        }
-
-        public func resolution() throws -> WallClock.Duration {
-            let timeSpec = try WASIAbi.Errno.translatingPlatformErrno {
-                try underlying.resolution()
-            }
-            let seconds = timeSpec.seconds >= 0 ? UInt64(timeSpec.seconds) : 0
-            let nanoseconds = timeSpec.nanoseconds >= 0 ? UInt32(timeSpec.nanoseconds) : 0
-            return (seconds: seconds, nanoseconds: nanoseconds)
-        }
-    }
-
-#else
-
-    /// A monotonic clock stub for platforms without a known system clock.
-    /// Inject a custom `MonotonicClock` implementation instead.
-    public struct SystemMonotonicClock: MonotonicClock {
-        public init() {}
-        public func now() throws -> MonotonicClock.Instant { throw WASIAbi.Errno.ENOTSUP }
-        public func resolution() throws -> MonotonicClock.Duration { throw WASIAbi.Errno.ENOTSUP }
-    }
-
-    /// A wall clock stub for platforms without a known system clock.
-    /// Inject a custom `WallClock` implementation instead.
-    public struct SystemWallClock: WallClock {
-        public init() {}
-        public func now() throws -> WallClock.Duration { throw WASIAbi.Errno.ENOTSUP }
-        public func resolution() throws -> WallClock.Duration { throw WASIAbi.Errno.ENOTSUP }
-    }
-
-#endif
+/// Handles potential negative time values (pre-1970 dates) by clamping to 0.
+private func _clampedDuration(seconds: Int64, nanoseconds: Int64) -> WallClock.Duration {
+    (
+        seconds: seconds >= 0 ? UInt64(seconds) : 0,
+        nanoseconds: nanoseconds >= 0 ? UInt32(nanoseconds) : 0
+    )
+}

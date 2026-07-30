@@ -84,3 +84,63 @@
         }
     }
 #endif
+
+#if os(Windows)
+    // FILETIME <-> canonical FileTime conversions. FILETIME is 100ns
+    // intervals since 1601-01-01; the offset to the Unix epoch is
+    // 11_644_473_600 seconds.
+    private let _windowsUnixEpochIntervals: Int64 = 11_644_473_600 * 10_000_000
+
+    extension FileTime {
+        init(windowsFILETIME fileTime: FILETIME) {
+            let intervals = (Int64(fileTime.dwHighDateTime) << 32) | Int64(fileTime.dwLowDateTime)
+            let unixNanoseconds = (intervals - _windowsUnixEpochIntervals) * 100
+            self.init(
+                seconds: Int(unixNanoseconds / 1_000_000_000),
+                nanoseconds: Int(unixNanoseconds % 1_000_000_000)
+            )
+        }
+    }
+
+    /// Converts to a `FILETIME` for `SetFileTime`: nil for `omit`, the
+    /// current system time for `now`.
+    func _windowsFILETIME(from time: FileTime) -> FILETIME? {
+        switch time.representation {
+        case .omit:
+            return nil
+        case .now:
+            var now = FILETIME()
+            GetSystemTimeAsFileTime(&now)
+            return now
+        case .absolute(let seconds, let nanoseconds):
+            let intervals = (seconds * 1_000_000_000 + nanoseconds) / 100 + _windowsUnixEpochIntervals
+            return FILETIME(
+                dwLowDateTime: DWORD(UInt64(bitPattern: intervals) & 0xFFFF_FFFF),
+                dwHighDateTime: DWORD(UInt64(bitPattern: intervals) >> 32)
+            )
+        }
+    }
+
+    extension FileDescriptor.Attributes {
+        init(windowsFileInformation info: BY_HANDLE_FILE_INFORMATION) {
+            let fileType: FileDescriptor.FileType
+            if info.dwFileAttributes & DWORD(FILE_ATTRIBUTE_REPARSE_POINT) != 0 {
+                fileType = .symlink
+            } else if info.dwFileAttributes & DWORD(FILE_ATTRIBUTE_DIRECTORY) != 0 {
+                fileType = .directory
+            } else {
+                fileType = .regular
+            }
+            self.init(
+                device: UInt64(info.dwVolumeSerialNumber),
+                inode: UInt64(info.nFileIndexHigh) << 32 | UInt64(info.nFileIndexLow),
+                fileType: fileType,
+                linkCount: UInt64(info.nNumberOfLinks),
+                size: Int64(info.nFileSizeHigh) << 32 | Int64(info.nFileSizeLow),
+                accessTime: FileTime(windowsFILETIME: info.ftLastAccessTime),
+                modificationTime: FileTime(windowsFILETIME: info.ftLastWriteTime),
+                creationTime: FileTime(windowsFILETIME: info.ftCreationTime)
+            )
+        }
+    }
+#endif

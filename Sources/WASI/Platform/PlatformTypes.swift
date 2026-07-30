@@ -2,84 +2,36 @@ import WasmTypes
 
 extension WASIAbi.FileType {
     init(platformFileType: FileDescriptor.FileType) {
-        if platformFileType.isDirectory {
-            self = .DIRECTORY
-            return
+        switch platformFileType {
+        case .directory: self = .DIRECTORY
+        case .symlink: self = .SYMBOLIC_LINK
+        case .regular: self = .REGULAR_FILE
+        case .characterDevice: self = .CHARACTER_DEVICE
+        case .blockDevice: self = .BLOCK_DEVICE
+        case .socket: self = .SOCKET_STREAM
+        case .unknown: self = .UNKNOWN
         }
-        if platformFileType.isSymlink {
-            self = .SYMBOLIC_LINK
-            return
-        }
-        if platformFileType.isFile {
-            self = .REGULAR_FILE
-            return
-        }
-        if platformFileType.isCharacterDevice {
-            self = .CHARACTER_DEVICE
-            return
-        }
-        if platformFileType.isBlockDevice {
-            self = .BLOCK_DEVICE
-            return
-        }
-        if platformFileType.isSocket {
-            self = .SOCKET_STREAM
-            return
-        }
-        self = .UNKNOWN
     }
 }
 
 extension WASIAbi.Fdflags {
     init(platformOpenOptions: FileDescriptor.OpenOptions) {
         var fdFlags: WASIAbi.Fdflags = []
-        #if !os(Windows)
-            if platformOpenOptions.contains(.append) {
-                fdFlags.insert(.APPEND)
-            }
-            if platformOpenOptions.contains(.nonBlocking) {
-                fdFlags.insert(.NONBLOCK)
-            }
-            #if !os(WASI)
-                if platformOpenOptions.contains(.dataSync) {
-                    fdFlags.insert(.DSYNC)
-                }
-                if platformOpenOptions.contains(.fileSync) {
-                    fdFlags.insert(.SYNC)
-                }
-            #endif
-            #if os(Linux)
-                if platformOpenOptions.contains(.readSync) {
-                    fdFlags.insert(.RSYNC)
-                }
-            #endif
-        #endif
+        if platformOpenOptions.contains(.append) { fdFlags.insert(.APPEND) }
+        if platformOpenOptions.contains(.nonBlocking) { fdFlags.insert(.NONBLOCK) }
+        if platformOpenOptions.contains(.dataSync) { fdFlags.insert(.DSYNC) }
+        if platformOpenOptions.contains(.fileSync) { fdFlags.insert(.SYNC) }
+        if platformOpenOptions.contains(.readSync) { fdFlags.insert(.RSYNC) }
         self = fdFlags
     }
 
     var platformOpenOptions: FileDescriptor.OpenOptions {
         var flags: FileDescriptor.OpenOptions = []
-        if self.contains(.APPEND) {
-            flags.insert(.append)
-        }
-        #if !os(Windows)
-            if self.contains(.NONBLOCK) {
-                flags.insert(.nonBlocking)
-            }
-            #if !os(WASI)
-                if self.contains(.DSYNC) {
-                    flags.insert(.dataSync)
-                }
-                if self.contains(.SYNC) {
-                    flags.insert(.fileSync)
-                }
-            #endif
-            #if os(Linux)
-                if self.contains(.RSYNC) {
-                    flags.insert(.readSync)
-                }
-            #endif
-        #endif
+        if self.contains(.APPEND) { flags.insert(.append) }
+        if self.contains(.NONBLOCK) { flags.insert(.nonBlocking) }
+        if self.contains(.DSYNC) { flags.insert(.dataSync) }
+        if self.contains(.SYNC) { flags.insert(.fileSync) }
+        if self.contains(.RSYNC) { flags.insert(.readSync) }
         return flags
     }
 }

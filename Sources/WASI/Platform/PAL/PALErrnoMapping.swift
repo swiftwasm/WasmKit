@@ -18,6 +18,11 @@
 // Free function so unqualified errno constants resolve to the libc values
 // rather than being shadowed by `WASIAbi.Errno`'s own case names.
 func _mapPlatformErrno(_ errno: CInt) -> WASIAbi.Errno? {
+    // The notSupported sentinel maps to ENOTSUP on every platform, including
+    // ones with no errno vocabulary of their own.
+    if errno == PlatformErrno.notSupported.rawValue {
+        return .ENOTSUP
+    }
     #if !(os(Windows) || canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI))
         // Unknown platform: no libc errno constants to map.
         return nil

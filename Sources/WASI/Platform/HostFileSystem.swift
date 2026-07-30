@@ -39,39 +39,35 @@ final class HostFileSystem: FileSystemImplementation, Sendable {
         fdflags: WASIAbi.Fdflags,
         symlinkFollow: Bool
     ) throws -> FdEntry {
-        #if os(Windows)
-            throw WASIAbi.Errno.ENOTSUP
-        #else
-            var accessMode: FileAccessMode = []
-            if fsRightsBase.contains(.FD_READ) {
-                accessMode.insert(.read)
-            }
-            if fsRightsBase.contains(.FD_WRITE) {
-                accessMode.insert(.write)
-            }
+        var accessMode: FileAccessMode = []
+        if fsRightsBase.contains(.FD_READ) {
+            accessMode.insert(.read)
+        }
+        if fsRightsBase.contains(.FD_WRITE) {
+            accessMode.insert(.write)
+        }
 
-            guard let dirFd = dirFd as? DirEntry else {
-                throw WASIAbi.Errno.EBADF
-            }
-            let hostFd = try dirFd.openFile(
-                symlinkFollow: symlinkFollow,
-                path: path,
-                oflags: oflags,
-                accessMode: accessMode,
-                fdflags: fdflags
-            )
+        guard let dirFd = dirFd as? DirEntry else {
+            throw WASIAbi.Errno.EBADF
+        }
+        let hostFd = try dirFd.openFile(
+            symlinkFollow: symlinkFollow,
+            path: path,
+            oflags: oflags,
+            accessMode: accessMode,
+            fdflags: fdflags
+        )
 
-            let actualFileType = try hostFd.attributes().fileType
-            if oflags.contains(.DIRECTORY), !actualFileType.isDirectory {
-                throw WASIAbi.Errno.ENOTDIR
-            }
+        let actualFileType = try hostFd.attributes().fileType
+        if oflags.contains(.DIRECTORY), !actualFileType.isDirectory {
+            throw WASIAbi.Errno.ENOTDIR
+        }
 
-            if actualFileType.isDirectory {
-                return .directory(DirEntry(preopenPath: nil, fd: hostFd))
-            } else {
-                return .file(RegularFileEntry(fd: hostFd, accessMode: accessMode))
-            }
-        #endif
+        if actualFileType.isDirectory {
+            return .directory(DirEntry(preopenPath: nil, fd: hostFd))
+        } else {
+            return .file(RegularFileEntry(fd: hostFd, accessMode: accessMode))
+        }
     }
 
     func createStdioFile(fd: FileDescriptor, accessMode: FileAccessMode) -> any WASIFile {

@@ -22,16 +22,10 @@ extension SandboxPrimitives {
 
         let splitPath: SplitPath
         if !dirName.isEmpty {
-            let options: FileDescriptor.OpenOptions
-            #if os(Windows)
-                options = []
-            #else
-                options = .directory
-            #endif
             splitPath = try .init(
                 parentFd: openAt(
                     start: start, path: dirName,
-                    mode: .readOnly, options: options,
+                    mode: .readOnly, options: .directory,
                     permissions: []
                 ),
                 basename: basename.string,
