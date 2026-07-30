@@ -1,36 +1,20 @@
 #if FileSystem
     import WasmParser
-    import SystemExtras
-    import SystemPackage
-
-    #if os(Windows)
-        import ucrt
-    #endif
 
     /// Parse a given file as a WebAssembly binary format file
     /// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
-    public func parseWasm(filePath: FilePath, features: WasmFeatureSet = .default) throws -> Module {
-        #if os(Windows)
-            // TODO: Upstream `O_BINARY` to `SystemPackage
-            let accessMode = FileDescriptor.AccessMode(
-                rawValue: FileDescriptor.AccessMode.readOnly.rawValue | O_BINARY
-            )
-        #else
-            let accessMode: FileDescriptor.AccessMode = .readOnly
-        #endif
-        let fileHandle = try FileDescriptor.open(filePath, accessMode)
-        return try withThrowing {
-            try parseWasm(fileHandle: fileHandle, features: features)
-        } defer: {
-            try fileHandle.close()
-        }
+    public func parseWasm(filePath: String, features: WasmFeatureSet = .default) throws -> Module {
+        let parser = try WasmParser.Parser(filePath: filePath, features: features)
+        return try parseModule(parser: parser, features: features)
     }
 
-    /// Parse a WebAssembly binary file from a caller-owned file descriptor.
+    /// Parse a WebAssembly binary from a caller-owned platform file descriptor.
     ///
-    /// The descriptor is consumed from its current offset and is not closed by
-    /// this function.
-    public func parseWasm(fileHandle: FileDescriptor, features: WasmFeatureSet = .default) throws -> Module {
+    /// The descriptor must be opened for reading in binary mode. This function
+    /// *borrows* it: ownership stays with the caller, who must close it after
+    /// the call returns. Bytes are consumed starting from the descriptor's
+    /// current offset.
+    public func parseWasm(fileHandle: CInt, features: WasmFeatureSet = .default) throws -> Module {
         let parser = try WasmParser.Parser(fileHandle: fileHandle, features: features)
         let module = try parseModule(parser: parser, features: features)
         return module

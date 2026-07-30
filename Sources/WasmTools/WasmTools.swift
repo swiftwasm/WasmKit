@@ -146,7 +146,7 @@ package func runWasmTools(
         var imports = Imports()
         wasi.link(to: &imports, store: store)
 
-        let module = try parseWasm(filePath: FilePath(wasmToolsPath))
+        let module = try parseWasm(filePath: wasmToolsPath)
         let instance = try module.instantiate(store: store, imports: imports)
         return try wasi.start(instance)
     }

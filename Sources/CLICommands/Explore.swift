@@ -1,5 +1,4 @@
 import ArgumentParser
-import SystemPackage
 @_spi(OnlyForCLI) import WasmKit
 
 package struct Explore: ParsableCommand {
@@ -25,7 +24,7 @@ package struct Explore: ParsableCommand {
     package init() {}
 
     package func run() throws {
-        let module = try parseWasm(filePath: FilePath(path))
+        let module = try parseWasm(filePath: path)
         // Instruction dumping requires token threading model for now
         let configuration = EngineConfiguration(threadingModel: .token)
         let engine = Engine(configuration: configuration)

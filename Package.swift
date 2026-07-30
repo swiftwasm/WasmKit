@@ -67,8 +67,6 @@ let package = Package(
                 "_CWasmKit",
                 "WasmParser",
                 "WasmTypes",
-                "SystemExtras",
-                .product(name: "SystemPackage", package: "swift-system"),
                 .target(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
@@ -123,10 +121,6 @@ let package = Package(
             name: "WasmParser",
             dependencies: [
                 "WasmTypes",
-                .product(
-                    name: "SystemPackage", package: "swift-system",
-                    condition: .when(traits: ["FileSystem"])
-                ),
                 .target(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])

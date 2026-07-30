@@ -1,5 +1,4 @@
 import Foundation
-import SystemPackage
 import WAT
 import WasmKit
 
