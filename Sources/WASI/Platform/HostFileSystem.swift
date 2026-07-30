@@ -15,7 +15,7 @@ final class HostFileSystem: FileSystemImplementation, Sendable {
         let fd: FileDescriptor
         do {
             fd = try FileDescriptor.openPreopenDirectory(hostPath)
-        } catch let error as PlatformError {
+        } catch {
             throw WASIError(description: "Failed to open preopen path '\(hostPath)': \(error)")
         }
 

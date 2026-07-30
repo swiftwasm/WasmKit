@@ -36,14 +36,9 @@ func poll<M: GuestMemory>(
         }
     }
 
-    let readyStates: [PlatformPoll.ReadyState]?
-    do {
-        readyStates = try PlatformPoll.poll(
-            subscriptions: pollSubscriptions, timeoutMilliseconds: timeoutMilliseconds
-        )
-    } catch let error as PlatformError {
-        throw (try? WASIAbi.Errno(platformErrno: error)) ?? WASIAbi.Errno.ENOTSUP
-    }
+    let readyStates = try PlatformPoll.poll(
+        subscriptions: pollSubscriptions, timeoutMilliseconds: timeoutMilliseconds
+    )
     var updatedEvents: WASIAbi.Size = 0
     guard let readyStates else {
         // Timed out with no ready descriptor.

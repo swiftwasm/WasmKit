@@ -8,36 +8,19 @@
 // only:
 //
 // - inside implementation *bodies*, where the trailing `#else` arm reports
-//   `PlatformError.notSupported` (or is a documented no-op), and
+//   `WASIAbi.Errno.ENOTSUP` (or is a documented no-op), and
 // - around *private storage* or file-internal helpers that never appear in a
 //   signature (e.g. `PALWindows.swift`).
 //
 // This keeps the declared surface identical everywhere: code building
 // against the PAL compiles on any platform, including ones WasmKit has never
 // heard of, and no per-platform mirror of the API can drift.
-
-/// A raw platform error: the originating error namespace and its code.
-/// Each origin is translated into a WASI errno exactly once, in
-/// `PALErrnoMapping.swift` — never through another platform's vocabulary.
-enum PlatformError: Error, Equatable, CustomStringConvertible {
-    /// A POSIX/CRT errno value.
-    case errno(CInt)
-    /// A Win32 error code from `GetLastError()`.
-    case windows(UInt32)
-    /// The operation is not supported on this platform.
-    case notSupported
-
-    /// The current value of the C `errno` global.
-    static var currentErrno: PlatformError { .errno(_palErrno) }
-
-    var description: String {
-        switch self {
-        case .errno(let value): return _palStrerror(value)
-        case .windows(let code): return "Win32 error \(code)"
-        case .notSupported: return "operation not supported on this platform"
-        }
-    }
-}
+//
+// Errors: each platform implementation translates its native error
+// vocabulary (errno, Win32 codes) into `WASIAbi.Errno` at its own failing
+// call site, via the tables in `PALErrnoMapping.swift` — errors never travel
+// through another platform's vocabulary, and callers above the PAL receive
+// WASI errors directly.
 
 /// A point in time, in Unix epoch seconds/nanoseconds, or one of the
 /// `futimens`-style sentinels. Platform time representations (`timespec`,

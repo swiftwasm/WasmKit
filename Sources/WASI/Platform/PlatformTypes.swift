@@ -111,18 +111,4 @@ extension WASIAbi.Errno {
         }
     }
 
-    static func translatingPlatformError<R>(_ body: () throws -> R) throws -> R {
-        do {
-            return try body()
-        } catch let errno as PlatformError {
-            throw try WASIAbi.Errno(platformErrno: errno)
-        }
-    }
-
-    init(platformErrno: PlatformError) throws {
-        guard let error = _mapPlatformError(platformErrno) else {
-            throw WASIError(description: "Unknown underlying OS error: \(platformErrno)")
-        }
-        self = error
-    }
 }

@@ -18,12 +18,22 @@
 
 // Free function so unqualified errno constants resolve to the libc values
 // rather than being shadowed by `WASIAbi.Errno`'s own case names.
-func _mapPlatformError(_ error: PlatformError) -> WASIAbi.Errno? {
-    switch error {
-    case .notSupported: return .ENOTSUP
-    case .errno(let value): return _mapErrno(value)
-    case .windows(let code): return _mapWindowsError(code)
+/// Translates a C errno value into the error the PAL reports: the WASI
+/// errno, or a descriptive `WASIError` for values with no WASI equivalent.
+/// Each platform implementation calls this at its own failing syscall site.
+func _wasiError(fromErrno value: CInt) -> any Error {
+    if let mapped = _mapErrno(value) {
+        return mapped
     }
+    return WASIError(description: "Unknown underlying OS error: \(_palStrerror(value))")
+}
+
+/// Translates a Win32 `GetLastError()` code into the error the PAL reports.
+func _wasiError(fromWin32 code: UInt32) -> any Error {
+    if let mapped = _mapWindowsError(code) {
+        return mapped
+    }
+    return WASIError(description: "Unknown underlying OS error: Win32 error \(code)")
 }
 
 private func _mapErrno(_ errno: CInt) -> WASIAbi.Errno? {

@@ -42,12 +42,12 @@ enum PlatformPoll {
             let result = pollfds.withUnsafeMutableBufferPointer { buffer in
                 poll_syscall(buffer.baseAddress, .init(buffer.count), .init(timeoutMilliseconds))
             }
-            let err = PlatformError.currentErrno  // Preserve `errno` immediately after `poll`
+            let err = _palErrno  // Preserve `errno` immediately after `poll`
             if result == 0 {
                 return nil
             }
             guard result > 0 else {
-                throw err
+                throw _wasiError(fromErrno: err)
             }
             return pollfds.map { fd in
                 var state: ReadyState = []
@@ -58,7 +58,7 @@ enum PlatformPoll {
                 return state
             }
         #else
-            throw PlatformError.notSupported
+            throw WASIAbi.Errno.ENOTSUP
         #endif
     }
 }

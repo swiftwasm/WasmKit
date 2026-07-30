@@ -90,39 +90,37 @@ struct PathResolution {
             mode = self.mode
         }
 
-        try WASIAbi.Errno.translatingPlatformError {
-            do {
-                let newFd = try self.baseFd.open(
-                    at: component,
-                    mode, options: options, permissions: permissions
-                )
-                self.openDirectories.append(self.baseFd)
-                self.baseFd = newFd
-                return
-            } catch let openErrno as PlatformError {
-                if self.options.contains(.noFollow) {
-                    // If "open" failed with O_NOFOLLOW, no need to retry.
-                    throw openErrno
-                }
-
-                // If "open" failed and it might be a symlink, try again with interpreting resolved symlink.
-
-                // Check if it's a symlink by fstatat(2).
-                //
-                // NOTE: `errno` has enough information to check if the component is a symlink,
-                // but the value is platform-specific (e.g. ELOOP on POSIX standards, but EMLINK
-                // on BSD family), so we conservatively check it by fstatat(2).
-                let attrs = try self.baseFd.attributes(at: component, options: [.noFollow])
-                guard attrs.fileType.isSymlink else {
-                    // openat(2) failed, fstatat(2) succeeded, and it said it's not a symlink.
-                    // If it's not a symlink, the error is not due to symlink following
-                    // but other reasons, so just throw the error.
-                    // e.g. open with O_DIRECTORY on a regular file.
-                    throw openErrno
-                }
-
-                try self.symlink(component: component)
+        do {
+            let newFd = try self.baseFd.open(
+                at: component,
+                mode, options: options, permissions: permissions
+            )
+            self.openDirectories.append(self.baseFd)
+            self.baseFd = newFd
+            return
+        } catch let openErrno as WASIAbi.Errno {
+            if self.options.contains(.noFollow) {
+                // If "open" failed with O_NOFOLLOW, no need to retry.
+                throw openErrno
             }
+
+            // If "open" failed and it might be a symlink, try again with interpreting resolved symlink.
+
+            // Check if it's a symlink by fstatat(2).
+            //
+            // NOTE: `errno` has enough information to check if the component is a symlink,
+            // but the value is platform-specific (e.g. ELOOP on POSIX standards, but EMLINK
+            // on BSD family), so we conservatively check it by fstatat(2).
+            let attrs = try self.baseFd.attributes(at: component, options: [.noFollow])
+            guard attrs.fileType.isSymlink else {
+                // openat(2) failed, fstatat(2) succeeded, and it said it's not a symlink.
+                // If it's not a symlink, the error is not due to symlink following
+                // but other reasons, so just throw the error.
+                // e.g. open with O_DIRECTORY on a regular file.
+                throw openErrno
+            }
+
+            try self.symlink(component: component)
         }
     }
 
@@ -176,9 +174,7 @@ struct PathResolution {
         // If the path resolved without opening any new fd (e.g. "."),
         // dup to avoid returning an aliased fd to the caller.
         if baseFd.rawValue == startFd.rawValue {
-            baseFd = try WASIAbi.Errno.translatingPlatformError {
-                try startFd.open(at: ".", mode, options: options, permissions: permissions)
-            }
+            baseFd = try startFd.open(at: ".", mode, options: options, permissions: permissions)
         }
 
         resultFd = self.baseFd

@@ -87,22 +87,16 @@ extension DirEntry: WASIDir, FdWASIEntry {
             let (access, modification) = try WASIAbi.Timestamp.platformTimeSpec(
                 atim: atim, mtim: mtim, fstFlags: fstFlags
             )
-            try WASIAbi.Errno.translatingPlatformError {
-                try fd.setTimes(access: access, modification: modification)
-            }
+            try fd.setTimes(access: access, modification: modification)
         } defer: {
-            try WASIAbi.Errno.translatingPlatformError {
-                try fd.close()
-            }
+            try fd.close()
         }
     }
 
     func removeFile(atPath path: String) throws {
         let result = try SandboxPrimitives.openParent(start: fd, path: path)
         try result.withFields { dir, basename in
-            try WASIAbi.Errno.translatingPlatformError {
-                try dir.remove(at: basename, options: [])
-            }
+            try dir.remove(at: basename, options: [])
         }
     }
 
@@ -110,9 +104,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
         let path = SandboxPrimitives.stripDirSuffix(path)
         let result = try SandboxPrimitives.openParent(start: fd, path: path)
         try result.withFields { dir, basename in
-            try WASIAbi.Errno.translatingPlatformError {
-                try dir.remove(at: basename, options: .removeDirectory)
-            }
+            try dir.remove(at: basename, options: .removeDirectory)
         }
     }
 
@@ -121,9 +113,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
             start: fd, path: destPath
         )
         try result.withFields { destDir, destBasename in
-            try WASIAbi.Errno.translatingPlatformError {
-                try destDir.createSymlink(original: sourcePath, link: destBasename)
-            }
+            try destDir.createSymlink(original: sourcePath, link: destBasename)
         }
     }
 
@@ -153,13 +143,11 @@ extension DirEntry: WASIDir, FdWASIEntry {
                 let finalSourceBasename = oldHasTrailingSlash ? sourceBasename + "/" : sourceBasename
                 let finalDestBasename = newHasTrailingSlash ? destBasename + "/" : destBasename
 
-                try WASIAbi.Errno.translatingPlatformError {
-                    try sourceDir.rename(
-                        at: finalSourceBasename,
-                        to: destDir,
-                        at: finalDestBasename
-                    )
-                }
+                try sourceDir.rename(
+                    at: finalSourceBasename,
+                    to: destDir,
+                    at: finalDestBasename
+                )
             }
         }
     }
@@ -175,15 +163,8 @@ extension DirEntry: WASIDir, FdWASIEntry {
         ) throws {
             // Duplicate fd because readdir takes the ownership of
             // the given fd and closedir also close the underlying fd
-            let newFd = try WASIAbi.Errno.translatingPlatformError {
-                try fd.open(at: ".", .readOnly)
-            }
-            let stream: FileDescriptor.DirectoryStream
-            do {
-                stream = try newFd.contentsOfDirectory()
-            } catch let errno as PlatformError {
-                throw try WASIAbi.Errno(platformErrno: errno)
-            }
+            let newFd = try fd.open(at: ".", .readOnly)
+            let stream = try newFd.contentsOfDirectory()
 
             self.fd = fd
             self.entryIndex = 0
@@ -204,9 +185,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
             return Result(catching: { () -> ReaddirElement in
                 let entry = try entry.get()
                 let name = entry.name
-                let stat = try WASIAbi.Errno.translatingPlatformError {
-                    try fd.attributes(at: name, options: [.noFollow])
-                }
+                let stat = try fd.attributes(at: name, options: [.noFollow])
                 let dirent = WASIAbi.Dirent(
                     // We can't use telldir and seekdir because the location data
                     // is valid for only the same dirp but and there is no way to
@@ -233,9 +212,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
     func createDirectory(atPath path: String) throws {
         let result = try SandboxPrimitives.openParent(start: fd, path: path)
         try result.withFields { dir, basename in
-            try WASIAbi.Errno.translatingPlatformError {
-                try dir.createDirectory(at: basename, permissions: .ownerReadWriteExecute)
-            }
+            try dir.createDirectory(at: basename, permissions: .ownerReadWriteExecute)
         }
     }
 
@@ -246,9 +223,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
         }
         let result = try SandboxPrimitives.openParent(start: fd, path: path)
         return try result.withFields { dir, basename in
-            let attributes = try WASIAbi.Errno.translatingPlatformError {
-                try dir.attributes(at: basename, options: options)
-            }
+            let attributes = try dir.attributes(at: basename, options: options)
 
             return WASIAbi.Filestat(stat: attributes)
         }

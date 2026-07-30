@@ -9,9 +9,7 @@ extension SandboxPrimitives {
             while true {
                 var buffer = [UInt8](repeating: 0, count: capacity)
                 let count = try buffer.withUnsafeMutableBytes { rawBuffer in
-                    try WASIAbi.Errno.translatingPlatformError {
-                        try dir.readSymlink(at: basename, into: rawBuffer)
-                    }
+                    try dir.readSymlink(at: basename, into: rawBuffer)
                 }
 
                 if count < capacity || capacity == maxBufferCapacity {
