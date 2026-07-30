@@ -12,21 +12,16 @@
 
 #if WasmDebuggingSupport
 
-    import NIOCore
     import WasmKit
 
     package struct DebuggerMemoryView: ~Copyable {
         package static let executableCodeOffset = UInt64(0x4000_0000_0000_0000)
 
-        private let allocator: ByteBufferAllocator
-
         /// WebAssembly binary loaded into memory for execution
         /// and for disassembly by the debugger.
-        private let wasmBinary: ByteBuffer
+        private let wasmBinary: [UInt8]
 
-        package init(allocator: ByteBufferAllocator, wasmBinary: ByteBuffer) {
-            self.allocator = allocator
-
+        package init(wasmBinary: [UInt8]) {
             self.wasmBinary = wasmBinary
         }
 
@@ -34,20 +29,18 @@
             debugger: borrowing Debugger,
             addressInProtocolSpace: UInt64,
             length: UInt
-        ) throws(Debugger.Error) -> ByteBufferView {
+        ) throws(Debugger.Error) -> [UInt8] {
             if addressInProtocolSpace >= Self.executableCodeOffset {
                 var length = Int(length)
                 let codeAddress = Int(addressInProtocolSpace - Self.executableCodeOffset)
-                if codeAddress + length > wasmBinary.readableBytes {
-                    length = wasmBinary.readableBytes - codeAddress
+                if codeAddress + length > wasmBinary.count {
+                    length = wasmBinary.count - codeAddress
                 }
 
-                return wasmBinary.readableBytesView[codeAddress..<(codeAddress + length)]
+                return Array(wasmBinary[codeAddress..<(codeAddress + length)])
             } else {
                 return try debugger.readLinearMemory(address: UInt(addressInProtocolSpace), length: length) {
-                    var buffer = self.allocator.buffer(capacity: $0.count)
-                    buffer.writeBytes($0)
-                    return buffer.readableBytesView
+                    Array($0)
                 }
             }
         }

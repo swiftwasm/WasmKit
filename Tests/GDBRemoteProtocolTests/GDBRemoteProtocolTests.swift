@@ -11,46 +11,42 @@
 //===----------------------------------------------------------------------===//
 
 import GDBRemoteProtocol
-import Logging
-import NIOCore
 import Testing
 
 @Suite
 struct GDBRemoteProtocolTests {
     var decoder: GDBHostCommandDecoder {
-        var logger = Logger(label: "com.swiftwasm.WasmKit.tests")
-        logger.logLevel = .critical
-        return GDBHostCommandDecoder(logger: logger)
+        GDBHostCommandDecoder(logger: .disabled)
     }
 
     @Test
     func decodingUnknownCommand() throws {
         var decoder = self.decoder
         // "p0" is "read single register 0" — not supported by WasmKit
-        var buffer = ByteBuffer(string: "+$p0#a0")
-        let packet = try decoder.decode(buffer: &buffer)
+        decoder.feed(Array("+$p0#a0".utf8))
+        let packet = try decoder.next()
         #expect(packet?.payload.kind == .unsupported)
         #expect(packet?.payload.arguments == "p0")
     }
 
     @Test
     func decoding() throws {
-        var logger = Logger(label: "com.swiftwasm.WasmKit.tests")
-        logger.logLevel = .critical
-        var decoder = GDBHostCommandDecoder(logger: logger)
+        var decoder = GDBHostCommandDecoder(logger: .disabled)
 
-        var buffer = ByteBuffer(string: "+$g#67")
-        var packet = try decoder.decode(buffer: &buffer)
+        decoder.feed(Array("+$g#67".utf8))
+        var packet = try decoder.next()
         #expect(packet == GDBPacket(payload: GDBHostCommand(kind: .generalRegisters, arguments: ""), checksum: 103))
         #expect(decoder.accummulatedChecksum == 0)
 
-        buffer = ByteBuffer(
-            string: """
-                +$qSupported:xmlRegisters=i386,arm,mips,arc;multiprocess+;fork-events+;vfork-events+#2e
+        decoder.feed(
+            Array(
                 """
+                +$qSupported:xmlRegisters=i386,arm,mips,arc;multiprocess+;fork-events+;vfork-events+#2e
+                """.utf8
+            )
         )
 
-        packet = try decoder.decode(buffer: &buffer)
+        packet = try decoder.next()
         let expectedPacket = GDBPacket(
             payload: GDBHostCommand(
                 kind: .supportedFeatures,
@@ -65,8 +61,8 @@ struct GDBRemoteProtocolTests {
     @Test
     func decodingWasmGlobal() throws {
         var decoder = self.decoder
-        var buffer = ByteBuffer(string: "+$qWasmGlobal:0;1#30")
-        let packet = try decoder.decode(buffer: &buffer)
+        decoder.feed(Array("+$qWasmGlobal:0;1#30".utf8))
+        let packet = try decoder.next()
         #expect(packet?.payload.kind == .wasmGlobal)
         #expect(packet?.payload.arguments == "0;1")
     }
@@ -76,5 +72,24 @@ struct GDBRemoteProtocolTests {
         let command = GDBHostCommand(kind: .wasmGlobal, arguments: "0;1")
         #expect(command.kind == .wasmGlobal)
         #expect(command.arguments == "0;1")
+    }
+
+    @Test
+    func decodingSplitAcrossFeeds() throws {
+        var decoder = self.decoder
+        decoder.feed(Array("+$g".utf8))
+        #expect(try decoder.next() == nil)
+        decoder.feed(Array("#67".utf8))
+        let packet = try decoder.next()
+        #expect(packet == GDBPacket(payload: GDBHostCommand(kind: .generalRegisters, arguments: ""), checksum: 103))
+    }
+
+    @Test
+    func encodingRoundTrip() {
+        let encoder = GDBTargetResponseEncoder(logger: .disabled)
+        let ok = encoder.encode(data: .init(kind: .ok, isNoAckModeActive: false))
+        #expect(String(decoding: ok, as: UTF8.self) == "+$OK#9a")
+        let binary = encoder.encode(data: .init(kind: .hexEncodedBinary([0xDE, 0xAD]), isNoAckModeActive: false))
+        #expect(String(decoding: binary, as: UTF8.self) == "+$dead#8E")
     }
 }

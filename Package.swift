@@ -283,10 +283,6 @@ let package = Package(
 
         .target(
             name: "GDBRemoteProtocol",
-            dependencies: [
-                .product(name: "Logging", package: "swift-log"),
-                .product(name: "NIOCore", package: "swift-nio"),
-            ],
             exclude: ["LICENSE.txt"],
             swiftSettings: swiftSettings
         ),
@@ -296,23 +292,34 @@ let package = Package(
             exclude: ["LICENSE.txt"],
             swiftSettings: swiftSettings
         ),
+
+        .target(
+            name: "WasmKitGDBHandler",
+            dependencies: [
+                "WASI",
+                "WasmKit",
+                "WasmKitWASI",
+                "GDBRemoteProtocol",
+            ],
+            exclude: ["LICENSE.txt"],
+            swiftSettings: swiftSettings
+        ),
+        .testTarget(
+            name: "WasmKitGDBHandlerTests",
+            dependencies: ["WasmKitGDBHandler", "WAT"],
+            swiftSettings: swiftSettings
+        ),
     ]
 )
 
 if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
     package.dependencies += [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.1"),
-        .package(url: "https://github.com/apple/swift-system", from: "1.7.2"),
-        .package(url: "https://github.com/apple/swift-nio", from: "2.90.0"),
-        .package(url: "https://github.com/apple/swift-log", from: "1.7.1"),
         .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"604.0.0"),
     ]
 } else {
     package.dependencies += [
         .package(path: "../swift-argument-parser"),
-        .package(path: "../swift-system"),
-        .package(path: "../swift-nio"),
-        .package(path: "../swift-log"),
         .package(path: "../swift-syntax"),
     ]
 }
@@ -348,34 +355,15 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
             swiftSettings: swiftSettings
         ),
 
-        .target(
-            name: "WasmKitGDBHandler",
-            dependencies: [
-                .product(name: "_NIOFileSystem", package: "swift-nio"),
-                .product(name: "NIOCore", package: "swift-nio"),
-                .product(name: "SystemPackage", package: "swift-system"),
-                "WasmKit",
-                "WasmKitWASI",
-                "GDBRemoteProtocol",
-            ],
-            exclude: ["LICENSE.txt"],
-            swiftSettings: swiftSettings
-        ),
-    ])
-
-    cliCommandsTarget.dependencies.append(contentsOf: [
-        .product(name: "Logging", package: "swift-log", condition: .when(traits: ["WasmDebuggingSupport"])),
-        .product(name: "NIOCore", package: "swift-nio", condition: .when(traits: ["WasmDebuggingSupport"])),
-        .product(name: "NIOPosix", package: "swift-nio", condition: .when(traits: ["WasmDebuggingSupport"])),
-        .target(name: "GDBRemoteProtocol", condition: .when(traits: ["WasmDebuggingSupport"])),
-        .target(name: "WasmKitGDBHandler", condition: .when(traits: ["WasmDebuggingSupport"])),
     ])
 
     cliCommandsTestTarget.dependencies.append(contentsOf: [
-        .product(name: "SystemPackage", package: "swift-system", condition: .when(traits: ["WasmDebuggingSupport"])),
-        .product(name: "Logging", package: "swift-log", condition: .when(traits: ["WasmDebuggingSupport"])),
-        .product(name: "NIOCore", package: "swift-nio", condition: .when(traits: ["WasmDebuggingSupport"])),
         .target(name: "GDBRemoteProtocol", condition: .when(traits: ["WasmDebuggingSupport"])),
         .target(name: "WasmKitGDBHandler", condition: .when(traits: ["WasmDebuggingSupport"])),
     ])
 #endif
+
+cliCommandsTarget.dependencies.append(contentsOf: [
+    .target(name: "GDBRemoteProtocol", condition: .when(traits: ["WasmDebuggingSupport"])),
+    .target(name: "WasmKitGDBHandler", condition: .when(traits: ["WasmDebuggingSupport"])),
+])

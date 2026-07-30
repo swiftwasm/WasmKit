@@ -13,11 +13,6 @@
 #if WasmDebuggingSupport
 
     import GDBRemoteProtocol
-    import Logging
-    import NIOCore
-    import NIOFileSystem
-    import WasmTypes
-    import SystemPackage
     import WASI
     import WasmKit
     import WasmKitWASI
@@ -54,27 +49,27 @@
             case unknownWasmGlobalArguments(String)
         }
 
-        private let moduleFilePath: FilePath
-        private let logger: Logger
-        private let allocator: ByteBufferAllocator
+        private let moduleFilePath: String
+        private let logger: GDBLogger
         private var debugger: Debugger
 
         private var memoryView: DebuggerMemoryView
         private let wasi: WASIBridgeToHost
 
+        /// Creates a handler debugging the given WebAssembly binary.
+        ///
+        /// The handler is transport- and file-system-free: the caller supplies
+        /// the module bytes (read from disk, flash, or anywhere else) and
+        /// `moduleFilePath` is only reported to the debugger host for module
+        /// identification.
         package init(
-            moduleFilePath: FilePath,
-            engineConfiguration: EngineConfiguration,
+            wasmBinary: [UInt8],
+            moduleFilePath: String,
             wasiConfiguration: WASIConfiguration,
-            logger: Logger,
-            allocator: ByteBufferAllocator
-        ) async throws {
+            engineConfiguration: EngineConfiguration,
+            logger: GDBLogger
+        ) throws {
             self.logger = logger
-            self.allocator = allocator
-
-            let wasmBinary = try await FileSystem.shared.withFileHandle(forReadingAt: moduleFilePath) {
-                try await $0.readToEnd(maximumSizeAllowed: .unlimited)
-            }
 
             self.moduleFilePath = moduleFilePath
 
@@ -85,7 +80,7 @@
             self.wasi = wasi
 
             do {
-                self.debugger = try Debugger(module: parseWasm(bytes: .init(buffer: wasmBinary)), store: store, imports: imports)
+                self.debugger = try Debugger(module: parseWasm(bytes: wasmBinary), store: store, imports: imports)
                 try self.debugger.stopAtEntrypoint()
                 try self.debugger.run()
                 guard case .stoppedAtBreakpoint = self.debugger.state else {
@@ -95,17 +90,22 @@
                 throw CleanupFailure.preserving(error, cleanup: wasi.close)
             }
 
-            self.memoryView = DebuggerMemoryView(allocator: allocator, wasmBinary: wasmBinary)
+            self.memoryView = DebuggerMemoryView(wasmBinary: wasmBinary)
         }
 
         package func close() throws {
             try wasi.close()
         }
 
+        enum Endianness {
+            case big, little
+        }
+
         private func hexDump<I: FixedWidthInteger>(_ value: I, endianness: Endianness) -> String {
-            var buffer = self.allocator.buffer(capacity: MemoryLayout<I>.size)
-            buffer.writeInteger(value, endianness: endianness)
-            return buffer.hexDump(format: .compact)
+            switch endianness {
+            case .big: return HexEncoding.encode(value.bigEndianBytes)
+            case .little: return HexEncoding.encode(value.littleEndianBytes)
+            }
         }
 
         private func firstHexArgument<I: FixedWidthInteger>(argumentsString: String, separator: Character, endianness: Endianness) throws -> I {
@@ -113,9 +113,17 @@
                 throw Error.unknownHexEncodedArguments(argumentsString)
             }
 
-            var hexBuffer = try self.allocator.buffer(plainHexEncodedBytes: String(hexString))
+            guard let hexBytes = HexEncoding.decode(hexString), hexBytes.count >= MemoryLayout<I>.size else {
+                throw Error.unknownHexEncodedArguments(argumentsString)
+            }
 
-            guard let argument = hexBuffer.readInteger(endianness: endianness, as: I.self) else {
+            let prefix = hexBytes.prefix(MemoryLayout<I>.size)
+            let argument: I?
+            switch endianness {
+            case .big: argument = I(bigEndianBytes: prefix)
+            case .little: argument = I(littleEndianBytes: prefix)
+            }
+            guard let argument else {
                 throw Error.unknownHexEncodedArguments(argumentsString)
             }
 
@@ -161,7 +169,7 @@
 
         package func handle(command: GDBHostCommand) throws -> GDBTargetResponse {
             let responseKind: GDBTargetResponse.Kind
-            logger.trace("handling GDB host command", metadata: ["GDBHostCommand": .string(command.kind.rawValue)])
+            logger.trace("handling GDB host command: \(command.kind.rawValue)")
 
             var isNoAckModeActive = false
             switch command.kind {
@@ -234,7 +242,7 @@
                     responseKind = .string(
                         """
                         l<library-list>\
-                        <library name="\(self.moduleFilePath.string)">\
+                        <library name="\(self.moduleFilePath)">\
                         <section address="0x\(String(DebuggerMemoryView.executableCodeOffset, radix: 16))"/>\
                         </library>\
                         </library-list>
@@ -261,15 +269,16 @@
 
             case .wasmCallStack:
                 let callStack = self.debugger.currentCallStack
-                var buffer = self.allocator.buffer(capacity: callStack.count * 8)
+                var buffer = [UInt8]()
+                buffer.reserveCapacity(callStack.count * 8)
                 for pc in callStack {
-                    buffer.writeInteger(UInt64(pc) + DebuggerMemoryView.executableCodeOffset, endianness: .little)
+                    buffer.append(contentsOf: (UInt64(pc) + DebuggerMemoryView.executableCodeOffset).littleEndianBytes)
                 }
-                responseKind = .hexEncodedBinary(buffer.readableBytesView)
+                responseKind = .hexEncodedBinary(buffer)
 
             case .resumeThreads:
                 // TODO: support multiple threads each with its own action here.
-                let threadActions = command.arguments.components(separatedBy: ":")
+                let threadActions = command.arguments.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
                 guard threadActions.count == 2, let threadActionString = threadActions.first else {
                     throw Error.multipleThreadsNotSupported
                 }
@@ -337,10 +346,7 @@
                 }
 
                 responseKind = .hexEncodedBinary(
-                    self.allocator.buffer(
-                        integer: try self.debugger.getLocal(frameIndex: frameIndex, localIndex: localIndex),
-                        endianness: .little
-                    ).readableBytesView
+                    try self.debugger.getLocal(frameIndex: frameIndex, localIndex: localIndex).littleEndianBytes
                 )
 
             case .wasmGlobal:
@@ -353,10 +359,7 @@
                 }
 
                 responseKind = .hexEncodedBinary(
-                    self.allocator.buffer(
-                        integer: try self.debugger.getGlobal(index: globalIndex),
-                        endianness: .little
-                    ).readableBytesView
+                    try self.debugger.getGlobal(index: globalIndex).littleEndianBytes
                 )
 
             case .memoryRegionInfo:
@@ -366,14 +369,11 @@
                 responseKind = .empty
 
             case .unsupported:
-                logger.debug(
-                    "unsupported GDB host command",
-                    metadata: ["rawCommand": .string(command.arguments)]
-                )
+                logger.debug("unsupported GDB host command: \(command.arguments)")
                 responseKind = .empty
             }
 
-            logger.trace("handler produced a response", metadata: ["GDBTargetResponse": .string("\(responseKind)")])
+            logger.trace("handler produced a response: \(responseKind)")
 
             return .init(kind: responseKind, isNoAckModeActive: isNoAckModeActive)
         }

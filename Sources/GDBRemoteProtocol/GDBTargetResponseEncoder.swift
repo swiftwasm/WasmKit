@@ -10,59 +10,57 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Foundation
-import Logging
-import NIOCore
-
 extension String {
     /// Computes a GDB RP checksum of characters in a given string.
     fileprivate var appendedChecksum: String {
-        "\(self)#\(String(format:"%02X", self.utf8.reduce(0, { $0 + Int($1) }) % 256))"
+        "\(self)#\(HexEncoding.encodeByteUppercase(UInt8(self.utf8.reduce(0, { $0 + Int($1) }) % 256)))"
     }
 }
 
 /// Encoder of GDB RP target responses, that takes ``GDBTargetResponse`` as an input
 /// and encodes it per https://sourceware.org/gdb/current/onlinedocs/gdb.html/Overview.html#Overview
-/// format in a `ByteBuffer` value as output. This encoder is compatible with NIO channel pipelines,
-/// making it easy to integrate with different I/O configurations.
-package class GDBTargetResponseEncoder: MessageToByteEncoder {
+/// format into raw bytes as output. The encoder is transport-agnostic
+/// (sans-IO): write the returned bytes to any transport.
+package final class GDBTargetResponseEncoder {
     private var isNoAckModeActive = false
 
-    private let logger: Logger
+    private let logger: GDBLogger
 
-    package init(logger: Logger) {
+    package init(logger: GDBLogger) {
         self.logger = logger
     }
 
-    package func encode(data: GDBTargetResponse, out: inout ByteBuffer) {
+    package func encode(data: GDBTargetResponse) -> [UInt8] {
+        var out = [UInt8]()
         if !isNoAckModeActive {
-            out.writeInteger(UInt8(ascii: "+"))
+            out.append(UInt8(ascii: "+"))
         }
         if data.isNoAckModeActive {
             self.isNoAckModeActive = true
         }
-        out.writeInteger(UInt8(ascii: "$"))
+        out.append(UInt8(ascii: "$"))
 
         switch data.kind {
         case .ok:
-            out.writeString("OK#9a")
+            out.append(contentsOf: "OK#9a".utf8)
 
         case .keyValuePairs(let info):
-            out.writeString(info.map { (key, value) in "\(key):\(value);" }.joined().appendedChecksum)
+            out.append(contentsOf: info.map { (key, value) in "\(key):\(value);" }.joined().appendedChecksum.utf8)
 
         case .vContSupportedActions(let actions):
-            out.writeString("vCont;\(actions.map { "\($0.rawValue);" }.joined())".appendedChecksum)
+            out.append(contentsOf: "vCont;\(actions.map { "\($0.rawValue);" }.joined())".appendedChecksum.utf8)
 
         case .string(let str):
-            out.writeString(str.appendedChecksum)
+            out.append(contentsOf: str.appendedChecksum.utf8)
 
         case .hexEncodedBinary(let binary):
-            let hexDumpResponse = ByteBuffer(bytes: binary).hexDump(format: .compact).appendedChecksum
-            self.logger.trace("GDBTargetResponseEncoder encoded a response", metadata: ["RawResponse": .string(hexDumpResponse)])
-            out.writeString(hexDumpResponse)
+            let hexDumpResponse = HexEncoding.encode(binary).appendedChecksum
+            self.logger.trace("GDBTargetResponseEncoder encoded a response: \(hexDumpResponse)")
+            out.append(contentsOf: hexDumpResponse.utf8)
 
         case .empty:
-            out.writeString("".appendedChecksum)
+            out.append(contentsOf: "".appendedChecksum.utf8)
         }
+        return out
     }
 }

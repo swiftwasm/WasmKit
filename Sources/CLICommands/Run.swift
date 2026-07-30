@@ -170,7 +170,7 @@ package struct Run: AsyncParsableCommand {
     package init() {}
 
     package func run() async throws {
-        #if WasmDebuggingSupport
+        #if WasmDebuggingSupport && !os(Windows)
 
             if let debuggerPort {
                 let debuggerServer = DebuggerServer(

@@ -2,13 +2,10 @@
 
     import Foundation
     import GDBRemoteProtocol
-    import Logging
-    import NIOCore
-    import WASI
-    import SystemPackage
     import Testing
     import WAT
     import WasmKit
+    import WASI
     import WasmKitGDBHandler
     import WasmKitWASI
 
@@ -27,12 +24,12 @@
                     modulePath.path,
                     argv0, "/", "probe.txt", PreopenFixture.fixtureContents,
                 ])
-                let handler = try await WasmKitGDBHandler(
-                    moduleFilePath: FilePath(modulePath.path),
-                    engineConfiguration: EngineConfiguration(),
+                let handler = try WasmKitGDBHandler(
+                    wasmBinary: [UInt8](try Data(contentsOf: modulePath)),
+                    moduleFilePath: modulePath.path,
                     wasiConfiguration: try run.deriveWASIConfiguration(),
-                    logger: Logger(label: "org.swiftwasm.WasmKit.tests"),
-                    allocator: ByteBufferAllocator()
+                    engineConfiguration: EngineConfiguration(),
+                    logger: .disabled
                 )
                 try await withAsyncThrowing {
                     let response = try await handler.handle(
