@@ -4,7 +4,12 @@ package struct CleanupFailure: Error, CustomStringConvertible {
     package let cleanup: any Error
 
     package var description: String {
-        "\(underlying) (cleanup also failed: \(cleanup))"
+        // Embedded Swift cannot interpolate `any Error` values.
+        #if hasFeature(Embedded)
+            return "cleanup failed while unwinding from another error"
+        #else
+            return "\(underlying) (cleanup also failed: \(cleanup))"
+        #endif
     }
 
     package init(underlying: any Error, cleanup: any Error) {
@@ -21,15 +26,17 @@ package struct CleanupFailure: Error, CustomStringConvertible {
         }
     }
 
-    package static func preserving(
-        _ error: any Error,
-        cleanup: () async throws -> Void
-    ) async -> any Error {
-        do {
-            try await cleanup()
-            return error
-        } catch let cleanupError {
-            return CleanupFailure(underlying: error, cleanup: cleanupError)
+    #if !hasFeature(Embedded)
+        package static func preserving(
+            _ error: any Error,
+            cleanup: () async throws -> Void
+        ) async -> any Error {
+            do {
+                try await cleanup()
+                return error
+            } catch let cleanupError {
+                return CleanupFailure(underlying: error, cleanup: cleanupError)
+            }
         }
-    }
+    #endif
 }
