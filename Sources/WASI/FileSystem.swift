@@ -97,7 +97,7 @@ extension WASIEntry {
 }
 
 /// A file descriptor table entry: either a file or a directory resource.
-@_spi(WASIPlatform) public enum FdEntry {
+@_spi(WASIPlatform) public enum FdEntry: Sendable {
     case file(any WASIFile)
     case directory(any WASIDir)
 

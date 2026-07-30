@@ -16,6 +16,16 @@
 
 #if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
 
+    #if os(WASI)
+        // wasi-libc defines these as macros derived from WASI ABI constants, which
+        // ClangImporter can't import; the CWASIPlatform shim re-exposes their values.
+        private var DT_BLK: CInt { CInt(WASI_PLATFORM_DT_BLK) }
+        private var DT_CHR: CInt { CInt(WASI_PLATFORM_DT_CHR) }
+        private var DT_DIR: CInt { CInt(WASI_PLATFORM_DT_DIR) }
+        private var DT_LNK: CInt { CInt(WASI_PLATFORM_DT_LNK) }
+        private var DT_REG: CInt { CInt(WASI_PLATFORM_DT_REG) }
+    #endif
+
     extension FileDescriptor {
         struct AtOptions: OptionSet {
             var rawValue: CInt
@@ -197,6 +207,31 @@
 
     private func setErrno(_ value: CInt) {
         errno = value
+    }
+
+#elseif os(Windows)
+
+    // Windows has no `*at` syscalls; match the previous SystemExtras behavior
+    // by failing with a not-supported error, which the WASI layer translates.
+    extension FileDescriptor {
+        struct RemoveOptions: OptionSet {
+            var rawValue: CInt
+            init(rawValue: CInt) { self.rawValue = rawValue }
+
+            static var removeDirectory: RemoveOptions { RemoveOptions(rawValue: 1) }
+        }
+
+        func remove(at path: String, options: RemoveOptions = RemoveOptions(rawValue: 0)) throws {
+            throw PlatformErrno.notSupported
+        }
+
+        func createDirectory(at path: String, permissions: FilePermissions) throws {
+            throw PlatformErrno.notSupported
+        }
+
+        func createSymlink(original: String, link: String) throws {
+            throw PlatformErrno.notSupported
+        }
     }
 
 #endif
