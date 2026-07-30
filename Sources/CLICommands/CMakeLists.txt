@@ -6,7 +6,7 @@ add_wasmkit_library(CLICommands
 )
 
 target_link_wasmkit_libraries(CLICommands PUBLIC
-  WAT WasmKitWASI)
+  WAT WasmKitWASI WasmTypes)
 
 add_dependencies(
   CLICommands

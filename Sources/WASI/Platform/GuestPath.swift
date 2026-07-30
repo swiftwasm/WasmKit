@@ -38,11 +38,6 @@ struct GuestPath: Equatable {
         self.components = string.split(separator: "/").map(Component.init)
     }
 
-    private init(isAbsolute: Bool, components: [Component]) {
-        self.isAbsolute = isAbsolute
-        self.components = components
-    }
-
     /// Matches `FilePath.isEmpty`: no root and no components.
     var isEmpty: Bool { !isAbsolute && components.isEmpty }
 
@@ -52,10 +47,6 @@ struct GuestPath: Equatable {
 
     mutating func removeLastComponent() -> Component? {
         components.popLast()
-    }
-
-    func removingLastComponent() -> GuestPath {
-        GuestPath(isAbsolute: isAbsolute, components: Array(components.dropLast()))
     }
 }
 
@@ -76,18 +67,19 @@ internal func splitParent(path: String) -> (GuestPath, GuestPath.Component)? {
         return (GuestPath(path), .currentDirectory)
     }
 
-    var guestPath = GuestPath(path)
+    let originalPath = GuestPath(path)
+    var guestPath = originalPath
     if let c = guestPath.removeLastComponent() {
         switch c {
         case .regular, .currentDirectory:
             return (guestPath, c)
         case .parentDirectory:
             // Create a link to the parent directory itself
-            return (GuestPath(path), .currentDirectory)
+            return (originalPath, .currentDirectory)
         }
     } else {
-        // A non-empty path with no components is "/" (or all separators),
-        // which requires a directory and is handled above; but be defensive.
-        return (guestPath, .currentDirectory)
+        // A non-empty path with no components is all separators, which the
+        // trailing-slash check above already handled.
+        preconditionFailure("non-empty path should have at least one component")
     }
 }

@@ -7,11 +7,8 @@ struct DirEntry {
 
 extension DirEntry: WASIDir, FdWASIEntry {
     func readlink(atPath path: String) throws -> [UInt8] {
-        #if os(Windows) || os(WASI)
-            throw WASIAbi.Errno.ENOTSUP
-        #else
-            return try SandboxPrimitives.readlinkAt(start: fd, path: path)
-        #endif
+        // Capability checking is owned by `SandboxPrimitives.readlinkAt`.
+        try SandboxPrimitives.readlinkAt(start: fd, path: path)
     }
 
     func openFile(

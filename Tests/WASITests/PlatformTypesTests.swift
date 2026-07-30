@@ -1,7 +1,7 @@
-import WasmTypes
 import Testing
+import WasmTypes
 
-@testable import WASI
+@_spi(WASIPlatform) @testable import WASI
 
 @Suite struct PlatformTypesTests {
     @Test func plainErrnoIsReportedAsItself() {

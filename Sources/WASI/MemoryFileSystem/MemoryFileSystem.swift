@@ -12,7 +12,7 @@
 /// try fs.addFile(at: "/hello.txt", content: "Hello, world!")
 ///
 /// // Or add a file handle
-/// let fd = try FileDescriptor.open("/path/to/file", .readOnly)
+/// let fd = FileHandle(forReadingAtPath: "/path/to/file")!.fileDescriptor
 /// try fs.addFile(at: "/mounted.txt", handle: fd)
 /// ```
 public final class MemoryFileSystem: Sendable {

@@ -1,8 +1,8 @@
 import Foundation
-import WasmTypes
 import WASI
 import WAT
 import WasmKit
+import WasmTypes
 
 enum PreopenFixture {
     static let fixtureContents = "wasmkit-preopen-fixture"

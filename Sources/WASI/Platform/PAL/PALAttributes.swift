@@ -31,6 +31,9 @@
                 return (ntIntervals - Self.unixEpochIntervals) * 100
             }
 
+            var seconds: Int64 { unixNanoseconds / 1_000_000_000 }
+            var nanoseconds: Int64 { unixNanoseconds % 1_000_000_000 }
+
             private static var unixEpochIntervals: Int64 {
                 11_644_473_600 * 10_000_000
             }
@@ -91,11 +94,14 @@
                 init(rawValue: DWORD) { self.rawValue = rawValue }
 
                 var isDirectory: Bool { rawValue == DWORD(FILE_ATTRIBUTE_DIRECTORY) }
+                var isSymlink: Bool { rawValue & DWORD(FILE_ATTRIBUTE_REPARSE_POINT) != 0 }
+                var isFile: Bool { !isDirectory && !isSymlink }
+                var isCharacterDevice: Bool { false }
+                var isBlockDevice: Bool { false }
+                var isSocket: Bool { false }
             #else
                 let rawValue: mode_t
                 init(rawValue: mode_t) { self.rawValue = rawValue }
-
-                static var directory: FileType { FileType(rawValue: S_IFDIR) }
 
                 var isDirectory: Bool { rawValue == S_IFDIR }
                 var isFile: Bool { rawValue == S_IFREG }

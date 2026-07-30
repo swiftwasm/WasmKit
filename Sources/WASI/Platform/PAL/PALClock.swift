@@ -1,6 +1,6 @@
 // System clocks for the WASI platform layer, wrapping `clock_gettime`.
 // Windows clocks use QueryPerformanceCounter/GetSystemTimePreciseAsFileTime
-// directly in `Clock.swift` and don't go through this wrapper.
+// directly in `PALSystemClocks.swift` and don't go through this wrapper.
 #if canImport(Darwin)
     import Darwin
 #elseif canImport(Glibc)

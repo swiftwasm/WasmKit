@@ -1,29 +1,6 @@
 import Synchronization
 import WasmTypes
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-    import Darwin
-#elseif canImport(Glibc)
-    import Glibc
-#elseif canImport(Musl)
-    import Musl
-#elseif canImport(Android)
-    import Android
-#elseif os(Windows)
-    import ucrt
-#elseif os(WASI)
-    import WASILibc
-#else
-    #error("Unsupported Platform")
-#endif
-
-#if !os(Windows)
-    /// Free function wrapper to call the C sched_yield(2) without name collision.
-    @inline(__always) private func _platform_sched_yield() -> Int32 {
-        return sched_yield()
-    }
-#endif
-
 @_spi(WASIPlatform) public enum WASIAbi {
     public enum Errno: UInt16, Error, GuestPointee {
         /// No error occurred. System call completed successfully.
@@ -849,9 +826,7 @@ extension WASIImplementation {
                 count: length
             )
             return try pointer.withHostPointer(in: buffer) { hostBuffer in
-                guard let baseAddress = hostBuffer.baseAddress,
-                    memchr(baseAddress, 0x00, Int(pointer.count)) == nil
-                else {
+                guard !hostBuffer.contains(0x00) else {
                     // If byte sequence contains null byte in the middle, it's illegal string
                     // TODO: This restriction should be only applied to strings that can be interpreted as platform-string, which is expected to be null-terminated
                     throw WASIAbi.Errno.EILSEQ
@@ -2012,14 +1987,9 @@ final class WASIImplementation: Sendable {
 
     /// Temporarily yield execution of the calling thread.
     func sched_yield() throws {
-        #if os(Windows)
-            #warning("sched_yield is not implemented on Windows")
-        #else
-            let result = _platform_sched_yield()
-            guard result == 0 else {
-                throw try WASIAbi.Errno(platformErrno: errno)
-            }
-        #endif
+        try WASIAbi.Errno.translatingPlatformErrno {
+            try PlatformScheduler.yieldCurrentThread()
+        }
     }
 
     /// Write high-quality random data into a buffer.

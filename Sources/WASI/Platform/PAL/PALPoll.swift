@@ -32,9 +32,6 @@ enum PlatformPoll {
     /// Waits for readiness of the given descriptors, or for the timeout.
     /// Returns one `ReadyState` per subscription (empty when not ready), or
     /// nil when the call timed out with no ready descriptor.
-    ///
-    /// Failures are reported as `WASIAbi.Errno` because the mapping of poll
-    /// errors is part of the platform contract.
     static func poll(
         subscriptions: [Subscription], timeoutMilliseconds: UInt
     ) throws -> [ReadyState]? {
@@ -50,12 +47,7 @@ enum PlatformPoll {
                 return nil
             }
             guard result > 0 else {
-                switch err.rawValue {
-                case ENOMEM: throw WASIAbi.Errno.ENOMEM
-                case EINTR: throw WASIAbi.Errno.EINTR
-                case EINVAL: throw WASIAbi.Errno.EINVAL
-                default: throw WASIAbi.Errno.ENOTSUP
-                }
+                throw err
             }
             return pollfds.map { fd in
                 var state: ReadyState = []
@@ -66,7 +58,7 @@ enum PlatformPoll {
                 return state
             }
         #else
-            throw WASIAbi.Errno.ENOTSUP
+            throw PlatformErrno.notSupported
         #endif
     }
 }

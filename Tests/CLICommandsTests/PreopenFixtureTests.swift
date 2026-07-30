@@ -1,6 +1,6 @@
 import Foundation
-import WasmTypes
 import Testing
+import WasmTypes
 
 enum FixtureProbeError: Error, Equatable {
     case body

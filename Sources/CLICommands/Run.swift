@@ -1,10 +1,10 @@
 import ArgumentParser
 import Foundation
 import WAT
-import WasmTypes
 import WasmKit
 import WasmKitWASI
 import WasmParser
+import WasmTypes
 
 #if ComponentModel
     import ComponentModel

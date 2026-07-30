@@ -1,8 +1,8 @@
 import Foundation
-import WasmTypes
 import Testing
+import WasmTypes
 
-@testable import WASI
+@_spi(WASIPlatform) @testable import WASI
 
 enum BridgeProbeError: Error, Equatable {
     case body

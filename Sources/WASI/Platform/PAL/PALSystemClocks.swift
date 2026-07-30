@@ -39,19 +39,12 @@
             // Use GetSystemTimePreciseAsFileTime for better precision
             // https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getsystemtimepreciseasfiletime
             GetSystemTimePreciseAsFileTime(&fileTime)
-            // FILETIME is 100-nanosecond intervals since 1601-01-01
-            // https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime
-            let intervals = (UInt64(fileTime.dwHighDateTime) << 32) | UInt64(fileTime.dwLowDateTime)
-            // Convert from Windows epoch (1601) to Unix epoch (1970)
-            // Epoch offset: 11_644_473_600 seconds * 10_000_000 (100ns intervals per second) = 116_444_736_000_000_000
-            let unixEpochOffset: UInt64 = 116_444_736_000_000_000  // 100ns intervals between epochs
-            guard intervals >= unixEpochOffset else {
+            let unixNanoseconds = FileTime(rawValue: fileTime).unixNanoseconds
+            guard unixNanoseconds >= 0 else {
                 // Handle pre-1970 dates (return 0)
                 return (seconds: 0, nanoseconds: 0)
             }
-            let unixIntervals = intervals - unixEpochOffset
-            // Convert 100ns intervals to nanoseconds, then to seconds/nanoseconds
-            let totalNanoseconds = unixIntervals * 100
+            let totalNanoseconds = UInt64(unixNanoseconds)
             return (seconds: totalNanoseconds / 1_000_000_000, nanoseconds: UInt32((totalNanoseconds % 1_000_000_000)))
         }
 

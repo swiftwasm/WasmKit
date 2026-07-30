@@ -62,11 +62,11 @@ final class HostFileSystem: FileSystemImplementation, Sendable {
             )
 
             let actualFileType = try hostFd.attributes().fileType
-            if oflags.contains(.DIRECTORY), actualFileType != .directory {
+            if oflags.contains(.DIRECTORY), !actualFileType.isDirectory {
                 throw WASIAbi.Errno.ENOTDIR
             }
 
-            if actualFileType == .directory {
+            if actualFileType.isDirectory {
                 return .directory(DirEntry(preopenPath: nil, fd: hostFd))
             } else {
                 return .file(RegularFileEntry(fd: hostFd, accessMode: accessMode))

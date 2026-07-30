@@ -50,7 +50,5 @@ struct GuestPathTests {
         #expect(path.removeLastComponent() == .regular("a"))
         #expect(path.removeLastComponent() == nil)
 
-        #expect(GuestPath("/a/b").removingLastComponent() == GuestPath("/a"))
-        #expect(GuestPath("a").removingLastComponent() == GuestPath(""))
     }
 }

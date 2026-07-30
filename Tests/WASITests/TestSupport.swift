@@ -217,68 +217,31 @@ enum TestSupport {
         }
 
         #if !os(WASI)
-            enum OpenMode {
-                case readOnly, writeOnly, readWrite
-            }
-
             /// An opened host file exposing a raw platform file descriptor for
-            /// descriptor-based APIs. Foundation's `FileHandle.fileDescriptor`
-            /// is unavailable on Windows, so the CRT is used there instead.
+            /// descriptor-based APIs, opened through the WASI module's own
+            /// platform layer so tests share its cross-platform open path.
             struct OpenedFile {
-                let fileDescriptor: CInt
-                #if os(Windows)
-                    init(fileDescriptor: CInt) {
-                        self.fileDescriptor = fileDescriptor
-                    }
+                private let fd: WASI.FileDescriptor
+                var fileDescriptor: CInt { fd.rawValue }
 
-                    func close() throws {
-                        _ = _close(fileDescriptor)
-                    }
-                #else
-                    private let handle: FileHandle
+                init(fd: WASI.FileDescriptor) {
+                    self.fd = fd
+                }
 
-                    init(handle: FileHandle) {
-                        self.handle = handle
-                        self.fileDescriptor = handle.fileDescriptor
-                    }
-
-                    func close() throws {
-                        try handle.close()
-                    }
-                #endif
+                func close() throws {
+                    try fd.close()
+                }
             }
 
             /// Opens a file and returns an ``OpenedFile`` carrying a raw
             /// platform file descriptor.
-            func openFile(at relativePath: String, _ mode: OpenMode) throws -> OpenedFile {
+            func openFile(at relativePath: String, _ mode: WASI.FileDescriptor.AccessMode) throws -> OpenedFile {
                 let fileURL = url.appendingPathComponent(relativePath)
-                #if os(Windows)
-                    let oflag: CInt
-                    switch mode {
-                    case .readOnly: oflag = _O_RDONLY
-                    case .writeOnly: oflag = _O_WRONLY
-                    case .readWrite: oflag = _O_RDWR
-                    }
-                    var fd: CInt = -1
-                    let error = fileURL.path.withCString(encodedAs: UTF16.self) { widePath in
-                        _wsopen_s(&fd, widePath, oflag | _O_BINARY, _SH_DENYNO, _S_IREAD | _S_IWRITE)
-                    }
-                    guard error == 0 else {
-                        throw Error(description: "Failed to open \(fileURL.path)")
-                    }
-                    return OpenedFile(fileDescriptor: fd)
-                #else
-                    let handle: FileHandle?
-                    switch mode {
-                    case .readOnly: handle = FileHandle(forReadingAtPath: fileURL.path)
-                    case .writeOnly: handle = FileHandle(forWritingAtPath: fileURL.path)
-                    case .readWrite: handle = FileHandle(forUpdatingAtPath: fileURL.path)
-                    }
-                    guard let handle else {
-                        throw Error(description: "Failed to open \(fileURL.path)")
-                    }
-                    return OpenedFile(handle: handle)
-                #endif
+                do {
+                    return OpenedFile(fd: try WASI.FileDescriptor.open(fileURL.path, mode))
+                } catch {
+                    throw Error(description: "Failed to open \(fileURL.path): \(error)")
+                }
             }
         #endif
 

@@ -27,10 +27,6 @@
         let rawValue: CInt
         init(rawValue: CInt) { self.rawValue = rawValue }
 
-        static var standardInput: FileDescriptor { FileDescriptor(rawValue: 0) }
-        static var standardOutput: FileDescriptor { FileDescriptor(rawValue: 1) }
-        static var standardError: FileDescriptor { FileDescriptor(rawValue: 2) }
-
         enum AccessMode: Sendable {
             case readOnly, writeOnly, readWrite
         }
@@ -132,6 +128,7 @@
         func setTimes(access: FileTime = .omit, modification: FileTime = .omit) throws {
             throw PlatformErrno.notSupported
         }
+        func adviseWillNeedRead(offset: UInt64, length: UInt64) throws {}
 
         func open(
             at path: String, _ mode: AccessMode,
@@ -170,29 +167,26 @@
         func contentsOfDirectory() throws -> DirectoryStream { throw PlatformErrno.notSupported }
     }
 
-    /// A point in time. On this platform only in-memory timestamps are
-    /// representable; `now`/`omit` are sentinels consumed by the in-memory
-    /// file system paths.
+    /// A point in time. On this platform the only consumer is the stub
+    /// `setTimes`, which throws before inspecting the value, so `now`/`omit`
+    /// need no distinguishing representation.
     struct FileTime {
         var seconds: Int64
         var nanoseconds: Int64
-        var isNow: Bool = false
-        var isOmit: Bool = false
 
         init(seconds: Int, nanoseconds: Int) {
             self.seconds = Int64(seconds)
             self.nanoseconds = Int64(nanoseconds)
         }
 
-        static var now: FileTime {
-            var time = FileTime(seconds: 0, nanoseconds: 0)
-            time.isNow = true
-            return time
-        }
-        static var omit: FileTime {
-            var time = FileTime(seconds: 0, nanoseconds: 0)
-            time.isOmit = true
-            return time
+        static var now: FileTime { FileTime(seconds: 0, nanoseconds: 0) }
+        static var omit: FileTime { FileTime(seconds: 0, nanoseconds: 0) }
+    }
+
+    /// Thread scheduling primitives.
+    enum PlatformScheduler {
+        static func yieldCurrentThread() throws {
+            throw PlatformErrno.notSupported
         }
     }
 

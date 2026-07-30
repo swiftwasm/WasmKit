@@ -11,27 +11,9 @@ extension FdWASIEntry {
         offset: WASIAbi.FileSize, length: WASIAbi.FileSize,
         advice: WASIAbi.Advice
     ) throws {
-        #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-            guard let offset = Int64(exactly: offset),
-                let length = Int32(exactly: length)
-            else {
-                // no-op if offset or length is invalid
-                return
-            }
-            try WASIAbi.Errno.translatingPlatformErrno {
-                try self.fd.adviseRead(offset: offset, length: length)
-            }
-        #elseif os(Linux) || os(Android)
-            guard let offset = Int(exactly: offset),
-                let length = Int(exactly: length)
-            else {
-                // no-op if offset or length is invalid
-                return
-            }
-            try WASIAbi.Errno.translatingPlatformErrno {
-                try self.fd.adviseWillNeed(offset: offset, length: length)
-            }
-        #endif
+        try WASIAbi.Errno.translatingPlatformErrno {
+            try self.fd.adviseWillNeedRead(offset: offset, length: length)
+        }
     }
 
     /// Closes the file descriptor

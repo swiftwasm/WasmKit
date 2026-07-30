@@ -1,5 +1,5 @@
-import WasmTypes
 import Testing
+import WasmTypes
 
 @Suite struct CleanupFailureTests {
     @Test func successfulCleanupPreservesTheOriginalError() throws {

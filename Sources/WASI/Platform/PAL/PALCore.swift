@@ -323,20 +323,33 @@
             #endif
         }
 
-        #if canImport(Darwin)
-            /// Announces an intent to read the given region, via `F_RDADVISE`.
-            func adviseRead(offset: Int64, length: Int32) throws {
+        /// Announces an intent to read the given region ahead of time.
+        /// Best-effort: platforms without a read-advisory syscall treat this
+        /// as a no-op, as do offsets or lengths the platform call can't represent.
+        func adviseWillNeedRead(offset: UInt64, length: UInt64) throws {
+            #if canImport(Darwin)
+                guard let offset = Int64(exactly: offset), let length = Int32(exactly: length) else { return }
                 var advisory = radvisory(ra_offset: off_t(offset), ra_count: length)
                 try valueOrErrno(retryOnInterrupt: false) { fcntl(rawValue, F_RDADVISE, &advisory) }
-            }
-        #elseif os(Linux) || os(Android)
-            /// Announces an expected access pattern via `posix_fadvise(POSIX_FADV_WILLNEED)`.
-            func adviseWillNeed(offset: Int, length: Int) throws {
+            #elseif os(Linux) || os(Android)
+                guard let offset = Int(exactly: offset), let length = Int(exactly: length) else { return }
                 let result = posix_fadvise(rawValue, off_t(offset), off_t(length), CInt(POSIX_FADV_WILLNEED))
                 // posix_fadvise returns the error number directly instead of setting errno.
                 guard result == 0 else { throw PlatformErrno(rawValue: result) }
-            }
-        #endif
+            #endif
+        }
+    }
+
+    /// Thread scheduling primitives.
+    enum PlatformScheduler {
+        /// Yields execution of the calling thread; the C equivalent is `sched_yield`.
+        static func yieldCurrentThread() throws {
+            #if os(Windows)
+                // sched_yield is not available on Windows; treat as a no-op.
+            #else
+                try valueOrErrno(retryOnInterrupt: false) { sched_yield() }
+            #endif
+        }
     }
 
     #if !os(Windows)
