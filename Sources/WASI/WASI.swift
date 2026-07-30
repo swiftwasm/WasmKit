@@ -1987,7 +1987,7 @@ final class WASIImplementation: Sendable {
 
     /// Temporarily yield execution of the calling thread.
     func sched_yield() throws {
-        try WASIAbi.Errno.translatingPlatformErrno {
+        try WASIAbi.Errno.translatingPlatformError {
             try PlatformScheduler.yieldCurrentThread()
         }
     }

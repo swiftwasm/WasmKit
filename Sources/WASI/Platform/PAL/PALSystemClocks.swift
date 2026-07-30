@@ -14,11 +14,11 @@ public struct SystemMonotonicClock: MonotonicClock {
         #if os(Windows)
             var counter = LARGE_INTEGER()
             guard QueryPerformanceCounter(&counter) else {
-                throw PlatformErrno(windowsError: GetLastError())
+                throw PlatformError.windows(GetLastError())
             }
             return UInt64(counter.QuadPart)
         #else
-            let timeSpec = try WASIAbi.Errno.translatingPlatformErrno {
+            let timeSpec = try WASIAbi.Errno.translatingPlatformError {
                 try _preferredMonotonicClock.currentTime()
             }
             return WASIAbi.Timestamp(platformTimeSpec: timeSpec)
@@ -29,12 +29,12 @@ public struct SystemMonotonicClock: MonotonicClock {
         #if os(Windows)
             var frequency = LARGE_INTEGER()
             guard QueryPerformanceFrequency(&frequency) else {
-                throw PlatformErrno(windowsError: GetLastError())
+                throw PlatformError.windows(GetLastError())
             }
             // frequency is in counts per second
             return UInt64(1_000_000_000 / frequency.QuadPart)
         #else
-            let timeSpec = try WASIAbi.Errno.translatingPlatformErrno {
+            let timeSpec = try WASIAbi.Errno.translatingPlatformError {
                 try _preferredMonotonicClock.resolution()
             }
             return WASIAbi.Timestamp(platformTimeSpec: timeSpec)
@@ -55,7 +55,7 @@ public struct SystemWallClock: WallClock {
             let time = FileTime(windowsFILETIME: fileTime)
             return _clampedDuration(seconds: time.seconds, nanoseconds: time.nanoseconds)
         #else
-            let timeSpec = try WASIAbi.Errno.translatingPlatformErrno {
+            let timeSpec = try WASIAbi.Errno.translatingPlatformError {
                 try PlatformClock.realtime.currentTime()
             }
             return _clampedDuration(seconds: timeSpec.seconds, nanoseconds: timeSpec.nanoseconds)
@@ -66,7 +66,7 @@ public struct SystemWallClock: WallClock {
         #if os(Windows)
             return (seconds: 0, nanoseconds: 100)
         #else
-            let timeSpec = try WASIAbi.Errno.translatingPlatformErrno {
+            let timeSpec = try WASIAbi.Errno.translatingPlatformError {
                 try PlatformClock.realtime.resolution()
             }
             return _clampedDuration(seconds: timeSpec.seconds, nanoseconds: timeSpec.nanoseconds)

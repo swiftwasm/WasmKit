@@ -41,7 +41,7 @@ func poll<M: GuestMemory>(
         readyStates = try PlatformPoll.poll(
             subscriptions: pollSubscriptions, timeoutMilliseconds: timeoutMilliseconds
         )
-    } catch let error as PlatformErrno {
+    } catch let error as PlatformError {
         throw (try? WASIAbi.Errno(platformErrno: error)) ?? WASIAbi.Errno.ENOTSUP
     }
     var updatedEvents: WASIAbi.Size = 0

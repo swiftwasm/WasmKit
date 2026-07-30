@@ -34,7 +34,7 @@ enum PlatformClock {
             try valueOrErrno(retryOnInterrupt: false) { clock_gettime(_clockID(), &timeSpec) }
             return FileTime(seconds: Int(timeSpec.tv_sec), nanoseconds: Int(timeSpec.tv_nsec))
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -44,7 +44,7 @@ enum PlatformClock {
             try valueOrErrno(retryOnInterrupt: false) { clock_getres(_clockID(), &timeSpec) }
             return FileTime(seconds: Int(timeSpec.tv_sec), nanoseconds: Int(timeSpec.tv_nsec))
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 

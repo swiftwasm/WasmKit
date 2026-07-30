@@ -42,7 +42,7 @@ enum PlatformPoll {
             let result = pollfds.withUnsafeMutableBufferPointer { buffer in
                 poll_syscall(buffer.baseAddress, .init(buffer.count), .init(timeoutMilliseconds))
             }
-            let err = PlatformErrno.current  // Preserve `errno` immediately after `poll`
+            let err = PlatformError.currentErrno  // Preserve `errno` immediately after `poll`
             if result == 0 {
                 return nil
             }
@@ -58,7 +58,7 @@ enum PlatformPoll {
                 return state
             }
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 }

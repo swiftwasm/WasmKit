@@ -25,13 +25,13 @@ extension FdWASIFile {
     }
 
     func sync() throws {
-        try WASIAbi.Errno.translatingPlatformErrno {
+        try WASIAbi.Errno.translatingPlatformError {
             try fd.sync()
         }
     }
 
     func datasync() throws {
-        try WASIAbi.Errno.translatingPlatformErrno {
+        try WASIAbi.Errno.translatingPlatformError {
             try fd.datasync()
         }
     }
@@ -95,7 +95,7 @@ struct RegularFileEntry: FdWASIFile {
 
 extension FdWASIFile {
     func setFdStatFlags(_ flags: WASIAbi.Fdflags) throws {
-        try WASIAbi.Errno.translatingPlatformErrno {
+        try WASIAbi.Errno.translatingPlatformError {
             try fd.setStatus(flags.platformOpenOptions)
         }
     }

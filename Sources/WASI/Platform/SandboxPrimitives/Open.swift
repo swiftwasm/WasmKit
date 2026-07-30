@@ -90,7 +90,7 @@ struct PathResolution {
             mode = self.mode
         }
 
-        try WASIAbi.Errno.translatingPlatformErrno {
+        try WASIAbi.Errno.translatingPlatformError {
             do {
                 let newFd = try self.baseFd.open(
                     at: component,
@@ -99,7 +99,7 @@ struct PathResolution {
                 self.openDirectories.append(self.baseFd)
                 self.baseFd = newFd
                 return
-            } catch let openErrno as PlatformErrno {
+            } catch let openErrno as PlatformError {
                 if self.options.contains(.noFollow) {
                     // If "open" failed with O_NOFOLLOW, no need to retry.
                     throw openErrno
@@ -176,7 +176,7 @@ struct PathResolution {
         // If the path resolved without opening any new fd (e.g. "."),
         // dup to avoid returning an aliased fd to the caller.
         if baseFd.rawValue == startFd.rawValue {
-            baseFd = try WASIAbi.Errno.translatingPlatformErrno {
+            baseFd = try WASIAbi.Errno.translatingPlatformError {
                 try startFd.open(at: ".", mode, options: options, permissions: permissions)
             }
         }

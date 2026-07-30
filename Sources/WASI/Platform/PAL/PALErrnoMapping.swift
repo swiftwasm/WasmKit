@@ -17,12 +17,15 @@
 
 // Free function so unqualified errno constants resolve to the libc values
 // rather than being shadowed by `WASIAbi.Errno`'s own case names.
-func _mapPlatformErrno(_ errno: CInt) -> WASIAbi.Errno? {
-    // The notSupported sentinel maps to ENOTSUP on every platform, including
-    // ones with no errno vocabulary of their own.
-    if errno == PlatformErrno.notSupported.rawValue {
-        return .ENOTSUP
+func _mapPlatformError(_ error: PlatformError) -> WASIAbi.Errno? {
+    switch error {
+    case .notSupported: return .ENOTSUP
+    case .errno(let value): return _mapErrno(value)
+    case .windows(let code): return _mapWindowsError(code)
     }
+}
+
+private func _mapErrno(_ errno: CInt) -> WASIAbi.Errno? {
     #if !(os(Windows) || canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI))
         // Unknown platform: no libc errno constants to map.
         return nil
@@ -119,30 +122,20 @@ func _mapPlatformErrno(_ errno: CInt) -> WASIAbi.Errno? {
     #endif
 }
 
-// Windows error mapping, adapted from swift-system's vendored
-// WindowsSyscallAdapter (Apache License 2.0). Maps Win32 error codes from
-// `GetLastError()` onto CRT errno values so the rest of the platform layer
-// deals in errno alone.
-#if os(Windows)
-    import WinSDK
-    import ucrt
-
-    extension PlatformErrno {
-        init(windowsError: DWORD) {
-            self.init(rawValue: _mapWindowsErrorToErrno(windowsError))
-        }
-    }
-
-    private func _mapWindowsErrorToErrno(_ errorCode: DWORD) -> CInt {
-        switch Int32(errorCode) {
+// Win32 error mapping, adapted from swift-system's vendored
+// WindowsSyscallAdapter (Apache License 2.0), retargeted to produce WASI
+// errno codes directly instead of detouring through CRT errno.
+private func _mapWindowsError(_ code: UInt32) -> WASIAbi.Errno? {
+    #if os(Windows)
+        switch Int32(code) {
         case ERROR_SUCCESS:
-            return 0
+            return nil
         case ERROR_INVALID_FUNCTION,
             ERROR_INVALID_ACCESS,
             ERROR_INVALID_DATA,
             ERROR_INVALID_PARAMETER,
             ERROR_NEGATIVE_SEEK:
-            return EINVAL
+            return .EINVAL
         case ERROR_FILE_NOT_FOUND,
             ERROR_PATH_NOT_FOUND,
             ERROR_INVALID_DRIVE,
@@ -151,9 +144,9 @@ func _mapPlatformErrno(_ errno: CInt) -> WASIAbi.Errno? {
             ERROR_BAD_NET_NAME,
             ERROR_BAD_PATHNAME,
             ERROR_FILENAME_EXCED_RANGE:
-            return ENOENT
+            return .ENOENT
         case ERROR_TOO_MANY_OPEN_FILES:
-            return EMFILE
+            return .EMFILE
         case ERROR_ACCESS_DENIED,
             ERROR_CURRENT_DIRECTORY,
             ERROR_LOCK_VIOLATION,
@@ -165,43 +158,46 @@ func _mapPlatformErrno(_ errno: CInt) -> WASIAbi.Errno? {
             ERROR_NOT_LOCKED,
             ERROR_LOCK_FAILED,
             ERROR_WRITE_PROTECT...ERROR_SHARING_BUFFER_EXCEEDED:
-            return EACCES
+            return .EACCES
         case ERROR_INVALID_HANDLE,
             ERROR_INVALID_TARGET_HANDLE,
             ERROR_DIRECT_ACCESS_HANDLE:
-            return EBADF
+            return .EBADF
         case ERROR_ARENA_TRASHED,
             ERROR_NOT_ENOUGH_MEMORY,
             ERROR_INVALID_BLOCK,
             ERROR_NOT_ENOUGH_QUOTA:
-            return ENOMEM
+            return .ENOMEM
         case ERROR_BAD_ENVIRONMENT:
-            return E2BIG
+            return .E2BIG
         case ERROR_BAD_FORMAT,
             ERROR_INVALID_STARTING_CODESEG...ERROR_INFLOOP_IN_RELOC_CHAIN:
-            return ENOEXEC
+            return .ENOEXEC
         case ERROR_NOT_SAME_DEVICE:
-            return EXDEV
+            return .EXDEV
         case ERROR_FILE_EXISTS,
             ERROR_ALREADY_EXISTS:
-            return EEXIST
+            return .EEXIST
         case ERROR_NO_PROC_SLOTS,
             ERROR_MAX_THRDS_REACHED,
             ERROR_NESTING_NOT_ALLOWED:
-            return EAGAIN
+            return .EAGAIN
         case ERROR_BROKEN_PIPE:
-            return EPIPE
+            return .EPIPE
         case ERROR_DISK_FULL:
-            return ENOSPC
+            return .ENOSPC
         case ERROR_DIR_NOT_EMPTY:
-            return ENOTEMPTY
+            return .ENOTEMPTY
         case ERROR_WAIT_NO_CHILDREN,
             ERROR_CHILD_NOT_COMPLETE:
-            return ECHILD
+            return .ECHILD
         case ERROR_NO_UNICODE_TRANSLATION:
-            return EILSEQ
+            return .EILSEQ
         default:
-            return EINVAL
+            return .EINVAL
         }
-    }
-#endif
+    #else
+        // Win32 error codes originate only on Windows.
+        return nil
+    #endif
+}

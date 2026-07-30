@@ -1,7 +1,7 @@
 extension FdWASIEntry {
     /// Returns the metadata for the fd entry
     func attributes() throws -> WASIAbi.Filestat {
-        try WASIAbi.Errno.translatingPlatformErrno {
+        try WASIAbi.Errno.translatingPlatformError {
             try WASIAbi.Filestat(stat: self.fd.attributes())
         }
     }
@@ -11,19 +11,19 @@ extension FdWASIEntry {
         offset: WASIAbi.FileSize, length: WASIAbi.FileSize,
         advice: WASIAbi.Advice
     ) throws {
-        try WASIAbi.Errno.translatingPlatformErrno {
+        try WASIAbi.Errno.translatingPlatformError {
             try self.fd.adviseWillNeedRead(offset: offset, length: length)
         }
     }
 
     /// Closes the file descriptor
     func close() throws {
-        try WASIAbi.Errno.translatingPlatformErrno { try fd.close() }
+        try WASIAbi.Errno.translatingPlatformError { try fd.close() }
     }
 
     /// Truncates or extends the file
     func setFilestatSize(_ size: WASIAbi.FileSize) throws {
-        try WASIAbi.Errno.translatingPlatformErrno {
+        try WASIAbi.Errno.translatingPlatformError {
             try fd.truncate(size: Int64(size))
         }
     }
@@ -39,7 +39,7 @@ extension FdWASIEntry {
         case .END:
             platformWhence = .end
         }
-        let newOffset = try WASIAbi.Errno.translatingPlatformErrno {
+        let newOffset = try WASIAbi.Errno.translatingPlatformError {
             try fd.seek(offset: offset, from: platformWhence)
         }
         return WASIAbi.FileSize(newOffset)
@@ -48,7 +48,7 @@ extension FdWASIEntry {
     /// Returns the current reading/writing offset
     func tell() throws -> WASIAbi.FileSize {
         WASIAbi.FileSize(
-            try WASIAbi.Errno.translatingPlatformErrno {
+            try WASIAbi.Errno.translatingPlatformError {
                 try fd.seek(offset: 0, from: .current)
             })
     }
@@ -60,7 +60,7 @@ extension FdWASIEntry {
 
     /// Returns the current file descriptor status
     func status() throws -> WASIAbi.Fdflags {
-        return try WASIAbi.Errno.translatingPlatformErrno {
+        return try WASIAbi.Errno.translatingPlatformError {
             WASIAbi.Fdflags(platformOpenOptions: try self.fd.status())
         }
     }
@@ -73,7 +73,7 @@ extension FdWASIEntry {
         let (access, modification) = try WASIAbi.Timestamp.platformTimeSpec(
             atim: atim, mtim: mtim, fstFlags: fstFlags
         )
-        try WASIAbi.Errno.translatingPlatformErrno {
+        try WASIAbi.Errno.translatingPlatformError {
             try self.fd.setTimes(access: access, modification: modification)
         }
     }

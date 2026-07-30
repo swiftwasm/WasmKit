@@ -8,7 +8,7 @@
 // only:
 //
 // - inside implementation *bodies*, where the trailing `#else` arm reports
-//   `PlatformErrno.notSupported` (or is a documented no-op), and
+//   `PlatformError.notSupported` (or is a documented no-op), and
 // - around *private storage* or file-internal helpers that never appear in a
 //   signature (e.g. `PALWindows.swift`).
 //
@@ -16,25 +16,26 @@
 // against the PAL compiles on any platform, including ones WasmKit has never
 // heard of, and no per-platform mirror of the API can drift.
 
-/// A raw platform error, carrying an errno value.
-struct PlatformErrno: Error, Equatable, CustomStringConvertible {
-    let rawValue: CInt
-    init(rawValue: CInt) { self.rawValue = rawValue }
-
-    /// The errno value this platform uses for "operation not supported".
-    /// On platforms without an errno vocabulary a sentinel is used, which
-    /// the WASI errno mapping still translates to `ENOTSUP`.
-    static var notSupported: PlatformErrno {
-        PlatformErrno(rawValue: _palENOTSUP)
-    }
+/// A raw platform error: the originating error namespace and its code.
+/// Each origin is translated into a WASI errno exactly once, in
+/// `PALErrnoMapping.swift` — never through another platform's vocabulary.
+enum PlatformError: Error, Equatable, CustomStringConvertible {
+    /// A POSIX/CRT errno value.
+    case errno(CInt)
+    /// A Win32 error code from `GetLastError()`.
+    case windows(UInt32)
+    /// The operation is not supported on this platform.
+    case notSupported
 
     /// The current value of the C `errno` global.
-    static var current: PlatformErrno {
-        PlatformErrno(rawValue: _palErrno)
-    }
+    static var currentErrno: PlatformError { .errno(_palErrno) }
 
     var description: String {
-        _palStrerror(rawValue)
+        switch self {
+        case .errno(let value): return _palStrerror(value)
+        case .windows(let code): return "Win32 error \(code)"
+        case .notSupported: return "operation not supported on this platform"
+        }
     }
 }
 

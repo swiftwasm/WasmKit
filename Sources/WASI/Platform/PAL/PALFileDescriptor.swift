@@ -1,7 +1,7 @@
 // File descriptor operations for the WASI platform layer. See PALTypes.swift
 // for the PAL design rule: declarations here are unconditional; platform
 // switches live only inside bodies, with the `#else` arm reporting
-// `PlatformErrno.notSupported`.
+// `PlatformError.notSupported`.
 #if canImport(Darwin)
     import Darwin
 #elseif canImport(Glibc)
@@ -63,17 +63,17 @@ func _palStrerror(_ error: CInt) -> String {
 }
 
 /// Runs `body` until it returns a non-negative value, retrying on `EINTR`,
-/// and throws `PlatformErrno` on failure.
+/// and throws `PlatformError` on failure.
 @discardableResult
 func valueOrErrno<I: FixedWidthInteger>(retryOnInterrupt: Bool = true, _ body: () -> I) throws -> I {
     while true {
         let result = body()
         if result >= 0 { return result }
-        let error = PlatformErrno.current
+        let errnoValue = _palErrno
         #if os(Windows) || canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
-            if retryOnInterrupt && error.rawValue == EINTR { continue }
+            if retryOnInterrupt && errnoValue == EINTR { continue }
         #endif
-        throw error
+        throw PlatformError.errno(errnoValue)
     }
 }
 
@@ -111,7 +111,7 @@ struct FileDescriptor: Sendable, Hashable {
             let err = path.withCString(encodedAs: UTF16.self) { widePath in
                 _wsopen_s(&fd, widePath, flags, _SH_DENYNO, _S_IREAD | _S_IWRITE)
             }
-            guard err == 0 else { throw PlatformErrno(rawValue: err) }
+            guard err == 0 else { throw PlatformError.errno(err) }
             return FileDescriptor(rawValue: fd)
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             let flags = _posixAccessFlags(mode) | _posixOpenFlags(options)
@@ -120,7 +120,7 @@ struct FileDescriptor: Sendable, Hashable {
             }
             return FileDescriptor(rawValue: fd)
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -134,7 +134,7 @@ struct FileDescriptor: Sendable, Hashable {
             }
             return FileDescriptor(rawValue: fd)
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -146,7 +146,7 @@ struct FileDescriptor: Sendable, Hashable {
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             try valueOrErrno(retryOnInterrupt: false) { _pal_close(rawValue) }
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -157,7 +157,7 @@ struct FileDescriptor: Sendable, Hashable {
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             return try valueOrErrno { _pal_read(rawValue, base, buffer.count) }
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -168,7 +168,7 @@ struct FileDescriptor: Sendable, Hashable {
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             return try valueOrErrno { _pal_write(rawValue, base, buffer.count) }
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -182,7 +182,7 @@ struct FileDescriptor: Sendable, Hashable {
             guard let base = buffer.baseAddress, buffer.count > 0 else { return 0 }
             return try valueOrErrno { pread(rawValue, base, buffer.count, off_t(offset)) }
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -210,7 +210,7 @@ struct FileDescriptor: Sendable, Hashable {
             }
             return written
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -220,7 +220,7 @@ struct FileDescriptor: Sendable, Hashable {
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             return try Int64(valueOrErrno(retryOnInterrupt: false) { lseek(rawValue, off_t(offset), _seekWhence(whence)) })
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -230,12 +230,12 @@ struct FileDescriptor: Sendable, Hashable {
             info.EndOfFile.QuadPart = size
             let handle = HANDLE(bitPattern: _get_osfhandle(rawValue))
             guard SetFileInformationByHandle(handle, FileEndOfFileInfo, &info, DWORD(MemoryLayout.size(ofValue: info))) else {
-                throw PlatformErrno(windowsError: GetLastError())
+                throw PlatformError.windows(GetLastError())
             }
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             try valueOrErrno { ftruncate(rawValue, off_t(size)) }
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -243,14 +243,14 @@ struct FileDescriptor: Sendable, Hashable {
         #if os(Windows)
             let handle = HANDLE(bitPattern: _get_osfhandle(rawValue))
             guard FlushFileBuffers(handle) else {
-                throw PlatformErrno(windowsError: GetLastError())
+                throw PlatformError.windows(GetLastError())
             }
         #elseif canImport(Darwin)
             try valueOrErrno(retryOnInterrupt: false) { fcntl(rawValue, F_FULLFSYNC) }
         #elseif canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             try valueOrErrno(retryOnInterrupt: false) { fsync(rawValue) }
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -264,7 +264,7 @@ struct FileDescriptor: Sendable, Hashable {
         #elseif os(WASI)
             try valueOrErrno(retryOnInterrupt: false) { fsync(rawValue) }
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -277,12 +277,12 @@ struct FileDescriptor: Sendable, Hashable {
             // The CRT offers no F_GETFL equivalent; report no flags.
             return []
         #elseif os(WASI)
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android)
             let flags = try valueOrErrno(retryOnInterrupt: false) { fcntl(rawValue, F_GETFL) }
             return _neutralOpenOptions(posixFlags: flags)
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -290,11 +290,11 @@ struct FileDescriptor: Sendable, Hashable {
         #if os(Windows)
             // The CRT offers no F_SETFL equivalent; accept and ignore.
         #elseif os(WASI)
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android)
             try valueOrErrno(retryOnInterrupt: false) { fcntl(rawValue, F_SETFL, _posixOpenFlags(options)) }
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -304,7 +304,7 @@ struct FileDescriptor: Sendable, Hashable {
             var info = BY_HANDLE_FILE_INFORMATION()
             let handle = HANDLE(bitPattern: _get_osfhandle(rawValue))
             guard GetFileInformationByHandle(handle, &info) else {
-                throw PlatformErrno(windowsError: GetLastError())
+                throw PlatformError.windows(GetLastError())
             }
             return Attributes(windowsFileInformation: info)
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
@@ -312,7 +312,7 @@ struct FileDescriptor: Sendable, Hashable {
             try valueOrErrno(retryOnInterrupt: false) { fstat(rawValue, &statBuffer) }
             return Attributes(stat: statBuffer)
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -328,14 +328,14 @@ struct FileDescriptor: Sendable, Hashable {
                     SetFileTime(handle, nil, atimePtr, mtimePtr)
                 }
             }
-            guard ok else { throw PlatformErrno(windowsError: GetLastError()) }
+            guard ok else { throw PlatformError.windows(GetLastError()) }
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             let times = ContiguousArray([_posixTimespec(access), _posixTimespec(modification)])
             _ = try times.withUnsafeBufferPointer { timesPtr in
                 try valueOrErrno(retryOnInterrupt: false) { futimens(rawValue, timesPtr.baseAddress!) }
             }
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -351,7 +351,7 @@ struct FileDescriptor: Sendable, Hashable {
             guard let offset = Int(exactly: offset), let length = Int(exactly: length) else { return }
             let result = posix_fadvise(rawValue, off_t(offset), off_t(length), CInt(POSIX_FADV_WILLNEED))
             // posix_fadvise returns the error number directly instead of setting errno.
-            guard result == 0 else { throw PlatformErrno(rawValue: result) }
+            guard result == 0 else { throw PlatformError.errno(result) }
         #endif
     }
 
@@ -371,7 +371,7 @@ struct FileDescriptor: Sendable, Hashable {
             }
             return FileDescriptor(rawValue: fd)
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -385,7 +385,7 @@ struct FileDescriptor: Sendable, Hashable {
             }
             return Attributes(stat: statBuffer)
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -397,7 +397,7 @@ struct FileDescriptor: Sendable, Hashable {
                 path.withCString { unlinkat(rawValue, $0, options.contains(.removeDirectory) ? AT_REMOVEDIR : 0) }
             }
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -409,7 +409,7 @@ struct FileDescriptor: Sendable, Hashable {
                 path.withCString { mkdirat(rawValue, $0, _palMode(permissions)) }
             }
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -425,7 +425,7 @@ struct FileDescriptor: Sendable, Hashable {
                 }
             }
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -441,7 +441,7 @@ struct FileDescriptor: Sendable, Hashable {
                 }
             }
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -452,16 +452,16 @@ struct FileDescriptor: Sendable, Hashable {
         #if os(WASI)
             // wasi-libc has readlinkat, but symlink reading has never been
             // exercised for WASI hosts; keep it unsupported until it is.
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android)
-            guard let base = buffer.baseAddress else { throw PlatformErrno(rawValue: EINVAL) }
+            guard let base = buffer.baseAddress else { throw PlatformError.errno(EINVAL) }
             return try valueOrErrno(retryOnInterrupt: false) {
                 path.withCString {
                     readlinkat(rawValue, $0, base.assumingMemoryBound(to: CChar.self), buffer.count)
                 }
             }
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 
@@ -481,7 +481,7 @@ struct FileDescriptor: Sendable, Hashable {
             #endif
         }
 
-        func next() -> Result<DirectoryEntry, PlatformErrno>? {
+        func next() -> Result<DirectoryEntry, PlatformError>? {
             #if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
                 // readdir returns NULL both at end-of-stream and on error;
                 // reset errno first to tell the two apart.
@@ -489,9 +489,9 @@ struct FileDescriptor: Sendable, Hashable {
                 if let entry = readdir(dirp) {
                     return .success(DirectoryEntry(dirent: entry))
                 }
-                let current = PlatformErrno.current
-                if current.rawValue == 0 { return nil }
-                return .failure(current)
+                let errnoValue = _palErrno
+                if errnoValue == 0 { return nil }
+                return .failure(.errno(errnoValue))
             #else
                 return nil
             #endif
@@ -504,11 +504,11 @@ struct FileDescriptor: Sendable, Hashable {
     func contentsOfDirectory() throws -> DirectoryStream {
         #if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             guard let dirp = fdopendir(rawValue) else {
-                throw PlatformErrno.current
+                throw PlatformError.currentErrno
             }
             return DirectoryStream(dirp: dirp)
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 }
@@ -522,7 +522,7 @@ enum PlatformScheduler {
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             try valueOrErrno(retryOnInterrupt: false) { sched_yield() }
         #else
-            throw PlatformErrno.notSupported
+            throw PlatformError.notSupported
         #endif
     }
 }
