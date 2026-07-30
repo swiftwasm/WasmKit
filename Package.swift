@@ -13,6 +13,7 @@ let swiftSettings: [SwiftSetting] = [
 let cliCommandsTarget = Target.target(
     name: "CLICommands",
     dependencies: [
+        "WASI",
         "WAT",
         "WasmKit",
         "WasmKitWASI",
@@ -155,7 +156,6 @@ let package = Package(
         ),
 
         .target(name: "WasmTypes", exclude: ["CMakeLists.txt"], swiftSettings: swiftSettings),
-        .testTarget(name: "WasmTypesTests", dependencies: ["WasmTypes"], swiftSettings: swiftSettings),
 
         .target(
             name: "WasmKitWASI",

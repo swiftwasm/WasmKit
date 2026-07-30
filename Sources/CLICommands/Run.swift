@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import WASI
 import WAT
 import WasmKit
 import WasmKitWASI

@@ -1,6 +1,5 @@
 import Foundation
 import Testing
-import WasmTypes
 
 @_spi(WASIPlatform) @testable import WASI
 

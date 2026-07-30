@@ -1,4 +1,6 @@
 add_wasmkit_library(WASI
+  CleanupFailure.swift
+  ThrowingDefer.swift
   Platform/GuestPath.swift
   Platform/PAL/PALAttributes.swift
   Platform/PAL/PALClock.swift
