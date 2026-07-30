@@ -13,9 +13,9 @@
 #elseif os(WASI)
     import CWASIPlatform
     import WASILibc
-#else
-    #error("Unsupported Platform")
 #endif
+
+#if os(Windows) || canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
 
 #if os(Windows)
     /// A point in time for `setTimes`, expressed as a Windows `FILETIME`.
@@ -210,3 +210,5 @@ extension FileDescriptor {
         return body(nil)
     }
 #endif
+
+#endif  // known platforms

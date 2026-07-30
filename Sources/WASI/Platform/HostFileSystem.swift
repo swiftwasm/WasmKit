@@ -1,20 +1,4 @@
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-    import Darwin
-#elseif canImport(Glibc)
-    import Glibc
-#elseif canImport(Musl)
-    import Musl
-#elseif canImport(Android)
-    import Android
-#elseif os(Windows)
-    import ucrt
-#elseif os(WASI)
-    import WASILibc
-#else
-    #error("Unsupported Platform")
-#endif
-
 import WasmTypes
 
 /// A file system implementation that directly accesses the host operating system's file system.
@@ -29,23 +13,12 @@ final class HostFileSystem: FileSystemImplementation, Sendable {
     // MARK: - FileSystemImplementation (WASI API)
 
     func preopenDirectory(guestPath: String, hostPath: String) throws -> any WASIDir {
-        #if os(Windows) || os(WASI)
-            let fd: FileDescriptor
-            do {
-                fd = try FileDescriptor.open(hostPath, .readWrite)
-            } catch let error as PlatformErrno {
-                throw WASIError(description: "Failed to open preopen path '\(hostPath)': \(error)")
-            }
-        #else
-            let fd = try hostPath.withCString { cHostPath in
-                let fd = open(cHostPath, O_DIRECTORY)
-                if fd < 0 {
-                    let errno = errno
-                    throw WASIError(description: "Failed to open preopen path '\(hostPath)': \(String(cString: strerror(errno)))")
-                }
-                return FileDescriptor(rawValue: fd)
-            }
-        #endif
+        let fd: FileDescriptor
+        do {
+            fd = try FileDescriptor.openPreopenDirectory(hostPath)
+        } catch let error as PlatformErrno {
+            throw WASIError(description: "Failed to open preopen path '\(hostPath)': \(error)")
+        }
 
         do {
             guard try fd.attributes().fileType.isDirectory else {
@@ -78,6 +51,9 @@ final class HostFileSystem: FileSystemImplementation, Sendable {
                 accessMode.insert(.write)
             }
 
+            guard let dirFd = dirFd as? DirEntry else {
+                throw WASIAbi.Errno.EBADF
+            }
             let hostFd = try dirFd.openFile(
                 symlinkFollow: symlinkFollow,
                 path: path,

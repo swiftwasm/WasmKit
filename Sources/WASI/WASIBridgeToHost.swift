@@ -60,6 +60,19 @@ public final class WASIBridgeToHost: Sendable {
             return FileSystemOptions(factory: { fileSystem })
         }
 
+        /// Creates file system options backed by a custom ``FileSystemImplementation``.
+        ///
+        /// Use this to run WASI guests on platforms where the built-in host
+        /// file system is unavailable (e.g. embedded systems), by providing
+        /// your own implementation of the platform-independent
+        /// ``FileSystemImplementation`` protocol.
+        ///
+        /// - Parameter factory: A closure creating the file system implementation.
+        /// - Returns: A configured `FileSystemOptions` instance using the custom file system.
+        @_spi(WASIPlatform) public static func custom(_ factory: @escaping () throws -> any FileSystemImplementation) -> FileSystemOptions {
+            return FileSystemOptions(factory: factory)
+        }
+
         /// Configures the file system options with custom standard I/O streams.
         ///
         /// This method allows you to redirect stdin, stdout, and stderr to different
@@ -81,6 +94,33 @@ public final class WASIBridgeToHost: Sendable {
                 fdTable[0] = .file(StdioFileEntry(fd: FileDescriptor(rawValue: stdin), accessMode: .read))
                 fdTable[1] = .file(StdioFileEntry(fd: FileDescriptor(rawValue: stdout), accessMode: .write))
                 fdTable[2] = .file(StdioFileEntry(fd: FileDescriptor(rawValue: stderr), accessMode: .write))
+            }
+            return options
+        }
+
+        /// Configures the file system options with custom standard I/O resources.
+        ///
+        /// Unlike the file-descriptor-based overload, this accepts arbitrary
+        /// ``WASIFile`` implementations, so standard I/O can be routed to
+        /// anything (e.g. a UART on an embedded system). The entries are
+        /// treated as borrowed and are not closed by WASI unless their
+        /// `isBorrowed` returns `false`.
+        ///
+        /// - Parameters:
+        ///   - stdin: The resource serving file descriptor 0.
+        ///   - stdout: The resource serving file descriptor 1.
+        ///   - stderr: The resource serving file descriptor 2.
+        /// - Returns: A new `FileSystemOptions` instance with the configured standard I/O streams.
+        @_spi(WASIPlatform) public func withStdio(
+            stdin: any WASIFile,
+            stdout: any WASIFile,
+            stderr: any WASIFile
+        ) -> FileSystemOptions {
+            var options = self
+            options.initializeStdio = { fdTable in
+                fdTable[0] = .file(stdin)
+                fdTable[1] = .file(stdout)
+                fdTable[2] = .file(stderr)
             }
             return options
         }

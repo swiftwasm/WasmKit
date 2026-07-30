@@ -3,6 +3,9 @@ add_wasmkit_library(WASI
   Platform/PAL/PALAttributes.swift
   Platform/PAL/PALClock.swift
   Platform/PAL/PALCore.swift
+  Platform/PAL/PALPoll.swift
+  Platform/PAL/PALSystemClocks.swift
+  Platform/PAL/PALUnsupported.swift
   Platform/PAL/PALFileAtOperations.swift
   Platform/PAL/PALWindows.swift
   Platform/PAL/ThrowingDefer.swift

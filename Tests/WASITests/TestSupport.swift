@@ -1,6 +1,6 @@
 import Foundation
 
-@testable import WASI
+@_spi(WASIPlatform) @testable import WASI
 @testable import WasmKit
 
 #if canImport(Darwin)

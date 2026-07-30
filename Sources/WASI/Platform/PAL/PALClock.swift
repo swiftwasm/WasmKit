@@ -14,7 +14,7 @@
     import WASILibc
 #endif
 
-#if !os(Windows)
+#if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
 
     /// A system clock identifier for `clock_gettime`/`clock_getres`.
     struct PlatformClock {

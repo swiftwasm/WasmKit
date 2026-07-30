@@ -18,9 +18,9 @@
 #elseif os(WASI)
     import CWASIPlatform
     import WASILibc
-#else
-    #error("Unsupported Platform")
 #endif
+
+#if os(Windows) || canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
 
 /// A raw platform error, carrying an errno value.
 struct PlatformErrno: Error, Equatable, CustomStringConvertible {
@@ -150,6 +150,27 @@ struct FileDescriptor: Sendable, Hashable {
                 path.withCString { open_syscall($0, mode.rawValue | options.rawValue, mode_t(permissions.rawValue)) }
             }
             return FileDescriptor(rawValue: fd)
+        #endif
+    }
+
+    /// Opens a host directory for use as a WASI preopen.
+    static func openPreopenDirectory(_ path: String) throws -> FileDescriptor {
+        #if os(Windows) || os(WASI)
+            return try open(path, .readWrite)
+        #else
+            let fd = try valueOrErrno {
+                path.withCString { open_syscall($0, O_DIRECTORY, 0) }
+            }
+            return FileDescriptor(rawValue: fd)
+        #endif
+    }
+
+    /// The platform's maximum path length, used to size symlink buffers.
+    static var maximumPathLength: Int {
+        #if os(Windows)
+            return 4096
+        #else
+            return Int(PATH_MAX)
         #endif
     }
 
@@ -316,3 +337,5 @@ struct FileDescriptor: Sendable, Hashable {
         close(fd)
     }
 #endif
+
+#endif  // known platforms

@@ -1,19 +1,3 @@
-#if canImport(Darwin)
-    import Darwin
-#elseif canImport(Glibc)
-    import Glibc
-#elseif canImport(Musl)
-    import Musl
-#elseif canImport(Android)
-    import Android
-#elseif os(Windows)
-    import ucrt
-#elseif os(WASI)
-    import WASILibc
-#else
-    #error("Unsupported Platform")
-#endif
-
 struct PathResolution {
     private let mode: FileDescriptor.AccessMode
     private let options: FileDescriptor.OpenOptions
@@ -159,7 +143,7 @@ struct PathResolution {
             }
 
             // If it's a symlink, readlink(2) and check it doesn't escape sandbox.
-            var buffer = [UInt8](repeating: 0, count: Int(PATH_MAX))
+            var buffer = [UInt8](repeating: 0, count: FileDescriptor.maximumPathLength)
             let length = try buffer.withUnsafeMutableBytes { rawBuffer in
                 try self.baseFd.readSymlink(at: component, into: rawBuffer)
             }

@@ -9,17 +9,12 @@
     import Musl
 #elseif canImport(Android)
     import Android
-#elseif os(Windows)
-    import ucrt
-    import WinSDK
 #elseif os(WASI)
     import CWASIPlatform
     import WASILibc
-#else
-    #error("Unsupported Platform")
 #endif
 
-#if !os(Windows)
+#if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
 
     extension FileDescriptor {
         struct AtOptions: OptionSet {

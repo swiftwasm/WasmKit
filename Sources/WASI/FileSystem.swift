@@ -1,12 +1,22 @@
 import WasmTypes
 
-struct FileAccessMode: OptionSet {
-    let rawValue: UInt32
-    static let read = FileAccessMode(rawValue: 1)
-    static let write = FileAccessMode(rawValue: 1 << 1)
+/// The requested access mode for an opened file.
+@_spi(WASIPlatform) public struct FileAccessMode: OptionSet, Sendable {
+    public let rawValue: UInt32
+    public init(rawValue: UInt32) { self.rawValue = rawValue }
+    public static let read = FileAccessMode(rawValue: 1)
+    public static let write = FileAccessMode(rawValue: 1 << 1)
 }
 
-protocol WASIEntry: Sendable {
+/// A resource installed in the WASI file descriptor table.
+///
+/// This protocol (and its refinements ``WASIFile``/``WASIDir``) is the
+/// platform-independent boundary of the WASI host implementation: all
+/// requirements are expressed in `WASIAbi` types, so implementations can be
+/// backed by anything from host file descriptors to in-memory data or
+/// device drivers on embedded systems. Implementations report failures by
+/// throwing `WASIAbi.Errno`.
+@_spi(WASIPlatform) public protocol WASIEntry: Sendable {
     /// Whether this entry wraps a borrowed file descriptor that should not be
     /// closed when the WASI instance is torn down (e.g. process stdio).
     var isBorrowed: Bool { get }
@@ -24,10 +34,12 @@ protocol WASIEntry: Sendable {
 }
 
 extension WASIEntry {
-    var isBorrowed: Bool { false }
+    @_spi(WASIPlatform) public var isBorrowed: Bool { false }
 }
 
-protocol WASIFile: WASIEntry {
+/// A file-like resource (regular file, stdio stream, device, ...) exposed
+/// to WASI guests.
+@_spi(WASIPlatform) public protocol WASIFile: WASIEntry {
     func fdStat() throws -> WASIAbi.FdStat
     func setFdStatFlags(_ flags: WASIAbi.Fdflags) throws
     func setFilestatSize(_ size: WASIAbi.FileSize) throws
@@ -51,21 +63,14 @@ protocol WASIFile: WASIEntry {
     ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec
 }
 
-protocol WASIDir: WASIEntry {
+/// A directory-like resource exposed to WASI guests.
+@_spi(WASIPlatform) public protocol WASIDir: WASIEntry {
     typealias ReaddirElement = (dirent: WASIAbi.Dirent, name: String)
     associatedtype ReadEntriesResult: WASIReaddirIterator where ReadEntriesResult.Element == ReaddirElement
 
     var preopenPath: String? { get }
 
     func readlink(atPath path: String) throws -> [UInt8]
-
-    func openFile(
-        symlinkFollow: Bool,
-        path: String,
-        oflags: WASIAbi.Oflags,
-        accessMode: FileAccessMode,
-        fdflags: WASIAbi.Fdflags
-    ) throws -> FileDescriptor
 
     func createDirectory(atPath path: String) throws
     func removeDirectory(atPath path: String) throws
@@ -81,7 +86,8 @@ protocol WASIDir: WASIEntry {
     ) throws
 }
 
-protocol WASIReaddirIterator {
+/// An iterator over directory entries produced by ``WASIDir/readEntries(cookie:)``.
+@_spi(WASIPlatform) public protocol WASIReaddirIterator {
     associatedtype Element
     mutating func next() -> Result<Element, any Error>?
     /// Closes the iterator and releases any owned resources.
@@ -90,7 +96,8 @@ protocol WASIReaddirIterator {
     mutating func close()
 }
 
-enum FdEntry {
+/// A file descriptor table entry: either a file or a directory resource.
+@_spi(WASIPlatform) public enum FdEntry {
     case file(any WASIFile)
     case directory(any WASIDir)
 
@@ -178,8 +185,13 @@ public enum FileContent: Sendable {
 
 /// Protocol for file system implementations used by WASI.
 ///
-/// This protocol contains WASI-specific implementation details.
-protocol FileSystemImplementation: ~Copyable, Sendable {
+/// The built-in implementations are ``MemoryFileSystem`` and the host file
+/// system used by `FileSystemOptions.host()`. Custom implementations can be
+/// injected with `FileSystemOptions.custom(_:)` to run WASI guests on
+/// platforms without a usable host file system (e.g. embedded targets).
+/// All requirements are expressed in `WASIAbi` and standard Swift types;
+/// implementations report failures by throwing `WASIAbi.Errno`.
+@_spi(WASIPlatform) public protocol FileSystemImplementation: ~Copyable, Sendable {
     /// Preopens a directory and returns a WASIDir implementation.
     func preopenDirectory(guestPath: String, hostPath: String) throws -> any WASIDir
 

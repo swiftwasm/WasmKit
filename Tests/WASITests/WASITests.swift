@@ -3,7 +3,7 @@ import Testing
 import WasmKit
 import WasmTypes
 
-@testable import WASI
+@_spi(WASIPlatform) @testable import WASI
 
 #if os(macOS)
     import Darwin

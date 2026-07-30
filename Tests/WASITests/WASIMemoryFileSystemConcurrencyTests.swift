@@ -1,6 +1,6 @@
 import Testing
 
-@testable import WASI
+@_spi(WASIPlatform) @testable import WASI
 
 @Suite struct MemoryFileSystemConcurrencyTests {
     @Test func concurrentAddAndRead() async throws {

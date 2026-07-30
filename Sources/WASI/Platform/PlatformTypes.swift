@@ -1,3 +1,5 @@
+import WasmTypes
+
 #if canImport(Darwin)
     import Darwin
 #elseif canImport(Glibc)
@@ -10,9 +12,6 @@
     import ucrt
 #elseif os(WASI)
     import WASILibc
-import WasmTypes
-#else
-    #error("Unsupported Platform")
 #endif
 
 extension WASIAbi.FileType {
@@ -170,14 +169,6 @@ extension WASIAbi.Timestamp {
 
 extension WASIAbi.Errno {
 
-    static func translatingPlatformErrno<R>(_ body: () throws -> R) throws -> R {
-        do {
-            return try body()
-        } catch let errno as PlatformErrno {
-            throw try WASIAbi.Errno(platformErrno: errno)
-        }
-    }
-
     /// Looks through a cleanup failure so a failing close still reports the operation's own errno
     /// instead of trapping the guest.
     static func reportable(for error: any Error) -> WASIAbi.Errno? {
@@ -185,6 +176,14 @@ extension WASIAbi.Errno {
         case let errno as WASIAbi.Errno: return errno
         case let failure as CleanupFailure: return reportable(for: failure.underlying)
         default: return nil
+        }
+    }
+
+    static func translatingPlatformErrno<R>(_ body: () throws -> R) throws -> R {
+        do {
+            return try body()
+        } catch let errno as PlatformErrno {
+            throw try WASIAbi.Errno(platformErrno: errno)
         }
     }
 
@@ -208,7 +207,11 @@ extension WASIAbi.Errno {
 // Free function so unqualified errno constants resolve to the libc values
 // rather than being shadowed by `WASIAbi.Errno`'s own case names.
 private func _mapPlatformErrno(_ errno: CInt) -> WASIAbi.Errno? {
-    switch errno {
+    #if !(os(Windows) || canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI))
+        // Unknown platform: no libc errno constants to map.
+        return nil
+    #else
+        switch errno {
         case 0: return nil
         case EPERM: return .EPERM
         case ENOENT: return .ENOENT
@@ -296,5 +299,6 @@ private func _mapPlatformErrno(_ errno: CInt) -> WASIAbi.Errno? {
             case EOWNERDEAD: return .EOWNERDEAD
         #endif
         default: return nil
-    }
+        }
+    #endif
 }

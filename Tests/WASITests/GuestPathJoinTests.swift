@@ -1,5 +1,5 @@
 import Testing
-import WASI
+@_spi(WASIPlatform) import WASI
 
 @Test func joinGuestPathContract() {
     #expect(MemoryFileSystem.joinGuestPath("/", "f.txt") == "/f.txt")  // root base
