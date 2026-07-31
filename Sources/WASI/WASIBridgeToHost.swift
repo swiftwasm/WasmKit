@@ -147,7 +147,23 @@ public final class WASIBridgeToHost: Sendable {
     /// This property provides access to the underlying host module implementations,
     /// which can be used to register with a WebAssembly runtime.
     public func wasiHostModules<M: GuestMemory & SendableMetatype>(_: M.Type = M.self) -> [String: WASIHostModule<M>] {
-        underlying.hostModules(M.self)
+        [
+            "wasi_snapshot_preview1": WASIHostModule(
+                functions: hostFunctions(capabilities: WASICapability<M>.all)
+            )
+        ]
+    }
+
+    /// The `wasi_snapshot_preview1` functions provided by `capabilities`.
+    ///
+    /// - Parameter stubUnlinked: When true (the default), preview1 functions no
+    ///   linked capability provides are defined as stubs returning `ENOSYS`, so
+    ///   a guest that merely imports them still instantiates.
+    public func hostFunctions<M: GuestMemory & SendableMetatype>(
+        capabilities: [WASICapability<M>],
+        stubUnlinked: Bool = true
+    ) -> [String: WASIHostFunction<M>] {
+        underlying.functions(for: capabilities, stubUnlinked: stubUnlinked)
     }
 
     /// Closes all owned file descriptors (preopened directories and any
