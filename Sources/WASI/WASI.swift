@@ -1,4 +1,3 @@
-import Synchronization
 import WasmTypes
 
 @_spi(WASIPlatform) public enum WASIAbi {
@@ -1385,8 +1384,11 @@ final class WASIImplementation: Sendable {
     private let environment: [String: String]
     private let wallClock: WallClock
     private let monotonicClock: MonotonicClock
-    private let randomGenerator: Mutex<any RandomBufferGenerator>
-    internal let fdTable: Mutex<FdTable>
+    // `var` because the single-threaded PlatformMutex fallback mutates in
+    // place; `nonisolated(unsafe)` because the lock, not the compiler, is what
+    // makes the access safe.
+    nonisolated(unsafe) private var randomGenerator: PlatformMutex<any RandomBufferGenerator>
+    nonisolated(unsafe) internal var fdTable: PlatformMutex<FdTable>
     internal let fileSystem: FileSystemImplementation
 
     init(
@@ -1401,10 +1403,10 @@ final class WASIImplementation: Sendable {
         self.environment = environment
         self.fileSystem = fileSystem
 
-        self.fdTable = Mutex(FdTable())
+        self.fdTable = PlatformMutex(FdTable())
         self.wallClock = wallClock
         self.monotonicClock = monotonicClock
-        self.randomGenerator = Mutex(randomGenerator)
+        self.randomGenerator = PlatformMutex(randomGenerator)
     }
 
     /// Closes all owned file descriptors (skipping borrowed ones like stdio).

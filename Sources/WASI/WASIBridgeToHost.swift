@@ -1,4 +1,3 @@
-import Synchronization
 import WasmTypes
 
 /// A bridge that connects WebAssembly System Interface (WASI) calls to the host system.
@@ -21,7 +20,8 @@ import WasmTypes
 /// ```
 public final class WASIBridgeToHost: Sendable {
     internal let underlying: WASIImplementation
-    private let isClosed = Mutex(false)
+    // See `WASIImplementation.fdTable` for why this is a `nonisolated(unsafe) var`.
+    nonisolated(unsafe) private var isClosed = PlatformMutex(false)
 
     /// A preopened directory mapping from a guest path to a host path.
     ///

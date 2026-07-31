@@ -1,4 +1,3 @@
-import Synchronization
 import WasmTypes
 
 /// Base protocol for file system nodes.
@@ -30,11 +29,12 @@ package final class MemoryDirectoryNode: MemFSNode {
         var ctim: WASIAbi.Timestamp
     }
 
-    private let state: Mutex<State>
+    // See `WASIImplementation.fdTable` for why this is a `nonisolated(unsafe) var`.
+    nonisolated(unsafe) private var state: PlatformMutex<State>
 
     init() {
         let now = WASIAbi.Timestamp.currentWallClock()
-        self.state = Mutex(State(atim: now, mtim: now, ctim: now))
+        self.state = PlatformMutex(State(atim: now, mtim: now, ctim: now))
     }
 
     var timestamps: (atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp, ctim: WASIAbi.Timestamp) {
@@ -137,11 +137,12 @@ final class MemoryFileNode: MemFSNode {
         var ctim: WASIAbi.Timestamp
     }
 
-    private let state: Mutex<State>
+    // See `WASIImplementation.fdTable` for why this is a `nonisolated(unsafe) var`.
+    nonisolated(unsafe) private var state: PlatformMutex<State>
 
     init(content: FileContent) {
         let now = WASIAbi.Timestamp.currentWallClock()
-        self.state = Mutex(State(content: content, atim: now, mtim: now, ctim: now))
+        self.state = PlatformMutex(State(content: content, atim: now, mtim: now, ctim: now))
     }
 
     convenience init(bytes: some Sequence<UInt8>) {
