@@ -10,29 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Logging
-import NIOCore
-
-extension ByteBuffer {
-    /// Returns `true` if byte to be read immediately is a GDB RP checksum
-    /// delimiter. Returns `false` otherwise.
-    var isChecksumDelimiterAtReader: Bool {
-        self.peekInteger(as: UInt8.self) == UInt8(ascii: "#")
-    }
-
-    /// Returns `true` if byte to be read immediately is a GDB RP command arguments
-    /// delimiter. Returns `false` otherwise.
-    var isArgumentsDelimiterAtReader: Bool {
-        self.peekInteger(as: UInt8.self) == UInt8(ascii: ":")
-    }
-}
-
-/// Decoder of GDB RP host commands, that takes raw `ByteBuffer` as an input encoded
+/// Decoder of GDB RP host commands, that takes raw bytes as an input encoded
 /// per https://sourceware.org/gdb/current/onlinedocs/gdb.html/Overview.html#Overview
-/// and produces a `GDBPacket<GDBHostCommand>` value as output. This decoder is
-/// compatible with NIO channel pipelines, making it easy to integrate with different
-/// I/O configurations.
-package struct GDBHostCommandDecoder: ByteToMessageDecoder {
+/// and produces `GDBPacket<GDBHostCommand>` values as output.
+///
+/// The decoder is transport-agnostic (sans-IO): feed it bytes from any source
+/// with ``feed(_:)`` and drain decoded packets with ``next()``.
+package struct GDBHostCommandDecoder {
     /// Errors that can be thrown during host command decoding.
     package enum Error: Swift.Error {
         /// Expected `+` acknowledgement character to be included in the packet, when
@@ -50,27 +34,23 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
 
         /// Unexpected arguments value supplied for a given command.
         case unexpectedArgumentsValue
-
     }
 
-    /// Type of the output value produced by this decoder.
-    package typealias InboundOut = GDBPacket<GDBHostCommand>
-
-    private var accumulatedDelimiter: UInt8?
-
-    private var accummulatedKind = [UInt8]()
-    private var accummulatedArguments = [UInt8]()
+    /// Bytes received but not consumed yet.
+    private var buffer = [UInt8]()
+    /// Index of the next unconsumed byte in `buffer`.
+    private var readerIndex = 0
 
     /// Logger instance used by this decoder.
-    private let logger: Logger
+    private let logger: GDBLogger
 
     /// Initializes a new decoder.
     /// - Parameter logger: logger instance that consumes messages from the newly
     /// initialized decoder.
-    package init(logger: Logger) { self.logger = logger }
+    package init(logger: GDBLogger) { self.logger = logger }
 
-    /// Sum of the raw character values consumed in the current command so far,
-    /// used in checksum computation.
+    /// Sum of the raw character values consumed in the last command,
+    /// used in checksum computation. Reset to zero once a packet completes.
     private var accummulatedSum = 0
 
     /// Computed checksum for the values consumed in the current command so far.
@@ -90,35 +70,59 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
     /// See https://sourceware.org/gdb/current/onlinedocs/gdb.html/Packet-Acknowledgment.html#Packet-Acknowledgment
     private var isNoAckModeActive = false
 
-    package mutating func decode(
-        buffer: inout ByteBuffer
-    ) throws(Error) -> GDBPacket<GDBHostCommand>? {
-        guard var startDelimiter = self.accumulatedDelimiter ?? buffer.readInteger(as: UInt8.self) else {
+    /// Appends newly received bytes to the decoder's internal buffer.
+    package mutating func feed(_ bytes: some Sequence<UInt8>) {
+        // Compact consumed bytes before growing the buffer.
+        if readerIndex > 0 {
+            buffer.removeFirst(readerIndex)
+            readerIndex = 0
+        }
+        buffer.append(contentsOf: bytes)
+    }
+
+    /// Decodes the next host command from the accumulated bytes.
+    ///
+    /// Bytes are consumed only when a complete packet is available, so input
+    /// may be split at arbitrary boundaries across ``feed(_:)`` calls.
+    ///
+    /// - Returns: The next decoded packet, or nil when more bytes are needed;
+    ///   feed more input with ``feed(_:)`` and call again.
+    package mutating func next() throws(Error) -> GDBPacket<GDBHostCommand>? {
+        // Scan without consuming; `index` becomes the new `readerIndex` only
+        // once a whole packet has been decoded.
+        var index = readerIndex
+
+        func peek() -> UInt8? {
+            index < buffer.count ? buffer[index] : nil
+        }
+        func read() -> UInt8? {
+            guard index < buffer.count else { return nil }
+            defer { index += 1 }
+            return buffer[index]
+        }
+
+        guard var startDelimiter = read() else {
             // Not enough data to parse.
             return nil
         }
 
+        // Whether decoding this packet completes activation of no-ack mode:
+        // the packet following `QStartNoAckMode` still carries the host's
+        // final `+` (acknowledging our response); later ones don't.
+        var activatesNoAckMode = false
         if !self.isNoAckModeActive {
-            let firstStartDelimiter = startDelimiter
-
-            guard firstStartDelimiter == UInt8(ascii: "+") else {
+            guard startDelimiter == UInt8(ascii: "+") else {
                 logger.error("unexpected ack character: \(Character(UnicodeScalar(startDelimiter)))")
                 throw Error.expectedAck
             }
 
-            guard let secondStartDelimiter = buffer.readInteger(as: UInt8.self) else {
-                // Preserve what we already read.
-                self.accumulatedDelimiter = firstStartDelimiter
-
+            guard let secondStartDelimiter = read() else {
                 // Not enough data to parse.
                 return nil
             }
 
             startDelimiter = secondStartDelimiter
-
-            if self.isNoAckModeRequested {
-                self.isNoAckModeActive = true
-            }
+            activatesNoAckMode = self.isNoAckModeRequested
         }
 
         // Command start delimiters.
@@ -127,84 +131,69 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
             throw Error.expectedCommandStart
         }
 
-        // Byte offset for command start.
-        while !buffer.isChecksumDelimiterAtReader && !buffer.isArgumentsDelimiterAtReader,
-            let char = buffer.readInteger(as: UInt8.self)
-        {
-            self.accummulatedSum += Int(char)
-            self.accummulatedKind.append(char)
+        var sum = 0
+        var kind = [UInt8]()
+        var arguments = [UInt8]()
+
+        // Command kind, up to the arguments or checksum delimiter.
+        while let char = peek(), char != UInt8(ascii: "#"), char != UInt8(ascii: ":") {
+            index += 1
+            sum += Int(char)
+            kind.append(char)
         }
 
-        if buffer.isArgumentsDelimiterAtReader,
-            let argumentsDelimiter = buffer.readInteger(as: UInt8.self)
-        {
-            self.accummulatedSum += Int(argumentsDelimiter)
+        if peek() == UInt8(ascii: ":") {
+            let argumentsDelimiter = read()!
+            sum += Int(argumentsDelimiter)
 
-            while !buffer.isChecksumDelimiterAtReader, let char = buffer.readInteger(as: UInt8.self) {
-                self.accummulatedSum += Int(char)
-                self.accummulatedArguments.append(char)
+            while let char = peek(), char != UInt8(ascii: "#") {
+                index += 1
+                sum += Int(char)
+                arguments.append(char)
             }
         }
 
-        // Command checksum delimiter.
-        if !buffer.isChecksumDelimiterAtReader {
-            // If delimiter not available yet, return `nil` to indicate that the caller needs to top up the buffer.
+        // Command checksum delimiter followed by two checksum digits.
+        guard peek() == UInt8(ascii: "#") else {
+            // Not enough data to parse; the caller needs to top up the buffer.
             return nil
         }
+        index += 1
 
-        defer {
-            self.accumulatedDelimiter = nil
-            self.accummulatedKind = []
-            self.accummulatedArguments = []
-            self.accummulatedSum = 0
+        guard let firstChecksumByte = read(), let secondChecksumByte = read() else {
+            // Not enough data to parse.
+            return nil
         }
-
-        buffer.moveReaderIndex(forwardBy: 1)
-
-        guard let checksumString = buffer.readString(length: 2),
-            let first = checksumString.first?.hexDigitValue,
-            let last = checksumString.last?.hexDigitValue
+        guard let first = Character(UnicodeScalar(firstChecksumByte)).hexDigitValue,
+            let last = Character(UnicodeScalar(secondChecksumByte)).hexDigitValue
         else {
             throw Error.expectedChecksum
         }
 
         let expectedChecksum = (first * 16) + last
+        let receivedChecksum = UInt8(sum % 256)
 
-        guard expectedChecksum == self.accummulatedChecksum else {
+        guard expectedChecksum == receivedChecksum else {
             throw Error.checksumIncorrect(
                 expectedChecksum: expectedChecksum,
-                receivedChecksum: self.accummulatedChecksum
+                receivedChecksum: receivedChecksum
             )
         }
 
         let payload = GDBHostCommand(
-            kindString: String(decoding: self.accummulatedKind, as: UTF8.self),
-            arguments: String(decoding: self.accummulatedArguments, as: UTF8.self)
+            kindString: String(decoding: kind, as: UTF8.self),
+            arguments: String(decoding: arguments, as: UTF8.self)
         )
 
         if payload.kind == .startNoAckMode {
             self.isNoAckModeRequested = true
         }
-
-        return .init(payload: payload, checksum: accummulatedChecksum)
-    }
-
-    mutating package func decode(
-        context: ChannelHandlerContext,
-        buffer: inout ByteBuffer
-    ) throws(Error) -> DecodingState {
-        logger.trace(
-            "GDBHostCommandDecoder.\(#function) received data",
-            metadata: ["readableBytes": .init(stringLiteral: buffer.peekString(length: buffer.readableBytes)!)]
-        )
-
-        guard let command = try self.decode(buffer: &buffer) else {
-            logger.trace("Not enough data in GDBHostCommandDecoder to decode a host command")
-            return .needMoreData
+        if activatesNoAckMode {
+            self.isNoAckModeActive = true
         }
 
-        // Shift by checksum bytes
-        context.fireChannelRead(wrapInboundOut(command))
-        return .continue
+        // The packet is complete: consume it.
+        readerIndex = index
+        return .init(payload: payload, checksum: receivedChecksum)
     }
 }

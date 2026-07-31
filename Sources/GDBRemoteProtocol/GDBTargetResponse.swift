@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import NIOCore
-
 /// Actions supported in the `vCont` host command.
 package enum VContActions: String {
     case `continue` = "c"
@@ -43,7 +41,7 @@ package struct GDBTargetResponse {
         case string(String)
 
         /// Binary buffer hex-encoded in the response.
-        case hexEncodedBinary(ByteBufferView)
+        case hexEncodedBinary([UInt8])
 
         /// Standard empty response (no content is sent).
         case empty
