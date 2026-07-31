@@ -1,6 +1,5 @@
 import Benchmark
 import Foundation
-import SystemPackage
 import WAT
 import WasmKit
 
@@ -20,21 +19,22 @@ let benchmarks: @Sendable () -> () = {
             }
         }
     }, setup: {
-        let packagePath = FilePath(#filePath)
-            .removingLastComponent()
-            .removingLastComponent()
-            .removingLastComponent()
-            .removingLastComponent()
+        let packagePath = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
 
         let spectestsPath = packagePath
-            .appending(["Vendor", "testsuite"])
+            .appendingPathComponent("Vendor")
+            .appendingPathComponent("testsuite")
 
-        let wastOutputPath = packagePath.appending(".build")
+        let wastOutputPath = packagePath.appendingPathComponent(".build")
 
         var wasm = [(path: String, location: Location, bytes: [UInt8])]()
-        for var path in try FileManager.default.contentsOfDirectory(atPath: spectestsPath.string) {
-            path = spectestsPath.appending(path).string
-            guard FilePath(path).extension == "wast" else { continue }
+        for var path in try FileManager.default.contentsOfDirectory(atPath: spectestsPath.path) {
+            path = spectestsPath.appendingPathComponent(path).path
+            guard path.hasSuffix(".wast") else { continue }
 
             do {
                 var wast = try parseWAST(.init(contentsOf: URL(filePath: path)), features: .all)

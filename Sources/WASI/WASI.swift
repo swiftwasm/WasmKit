@@ -1,33 +1,8 @@
 import Synchronization
-import SystemExtras
-import SystemPackage
 import WasmTypes
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-    import Darwin
-#elseif canImport(Glibc)
-    import Glibc
-#elseif canImport(Musl)
-    import Musl
-#elseif canImport(Android)
-    import Android
-#elseif os(Windows)
-    import ucrt
-#elseif os(WASI)
-    import WASILibc
-#else
-    #error("Unsupported Platform")
-#endif
-
-#if !os(Windows)
-    /// Free function wrapper to call the C sched_yield(2) without name collision.
-    @inline(__always) private func _platform_sched_yield() -> Int32 {
-        return sched_yield()
-    }
-#endif
-
-enum WASIAbi {
-    enum Errno: UInt16, Error, GuestPointee {
+@_spi(WASIPlatform) public enum WASIAbi {
+    public enum Errno: UInt16, Error, GuestPointee {
         /// No error occurred. System call completed successfully.
         case SUCCESS = 0
         /// Argument list too long.
@@ -184,49 +159,49 @@ enum WASIAbi {
         case ENOTCAPABLE = 76
     }
 
-    typealias Size = UInt32
+    public typealias Size = UInt32
 
     /// Non-negative file size or length of a region within a file.
-    typealias FileSize = UInt64
+    public typealias FileSize = UInt64
 
     typealias Fd = UInt32
 
-    struct IOVec: GuestPointee {
-        let buffer: UnsafeGuestRawPointer
-        let length: WASIAbi.Size
+    public struct IOVec: GuestPointee {
+        public let buffer: UnsafeGuestRawPointer
+        public let length: WASIAbi.Size
 
-        func withHostBufferPointer<M: GuestMemory, R>(in memory: M, _ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R {
+        public func withHostBufferPointer<M: GuestMemory, R>(in memory: M, _ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R {
             try buffer.withHostPointer(in: memory, count: Int(length)) { hostPointer in
                 try body(hostPointer)
             }
         }
 
-        static var sizeInGuest: UInt32 {
+        public static var sizeInGuest: UInt32 {
             return UnsafeGuestRawPointer.sizeInGuest + WASIAbi.Size.sizeInGuest
         }
 
-        static var alignInGuest: UInt32 {
+        public static var alignInGuest: UInt32 {
             max(UnsafeGuestRawPointer.alignInGuest, WASIAbi.Size.alignInGuest)
         }
 
-        static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> IOVec {
+        public static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> IOVec {
             return IOVec(
                 buffer: .readFromGuest(pointer, in: memory),
                 length: .readFromGuest(pointer.advanced(by: UnsafeGuestRawPointer.sizeInGuest), in: memory)
             )
         }
 
-        static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: IOVec) {
+        public static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: IOVec) {
             UnsafeGuestRawPointer.writeToGuest(at: pointer, in: memory, value: value.buffer)
             WASIAbi.Size.writeToGuest(at: pointer.advanced(by: UnsafeGuestRawPointer.sizeInGuest), in: memory, value: value.length)
         }
     }
 
     /// Relative offset within a file.
-    typealias FileDelta = Int64
+    public typealias FileDelta = Int64
 
     /// The position relative to which to set the offset of the file descriptor.
-    enum Whence: UInt8 {
+    public enum Whence: UInt8 {
         /// Seek relative to start-of-file.
         case SET = 0
         /// Seek relative to current position.
@@ -236,21 +211,23 @@ enum WASIAbi {
     }
 
     struct Clock: Equatable, GuestPointee {
-        struct Flags: OptionSet, GuestPointee {
-            let rawValue: UInt16
+        public struct Flags: OptionSet, GuestPointee, Sendable {
+            public let rawValue: UInt16
 
-            static let isAbsoluteTime = Self(rawValue: 1)
+            public init(rawValue: UInt16) { self.rawValue = rawValue }
+
+            public static let isAbsoluteTime = Self(rawValue: 1)
         }
 
-        let id: ClockId
-        let timeout: Timestamp
-        let precision: Timestamp
-        let flags: Flags
+        public let id: ClockId
+        public let timeout: Timestamp
+        public let precision: Timestamp
+        public let flags: Flags
 
-        static let sizeInGuest: UInt32 = 32
-        static let alignInGuest: UInt32 = max(ClockId.alignInGuest, Timestamp.alignInGuest, Flags.alignInGuest)
+        public static let sizeInGuest: UInt32 = 32
+        public static let alignInGuest: UInt32 = max(ClockId.alignInGuest, Timestamp.alignInGuest, Flags.alignInGuest)
 
-        static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> Self {
+        public static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> Self {
             var pointer = pointer
             return .init(
                 id: .readFromGuest(&pointer, in: memory),
@@ -260,7 +237,7 @@ enum WASIAbi {
             )
         }
 
-        static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: Self) {
+        public static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: Self) {
             var pointer = pointer
             ClockId.writeToGuest(at: &pointer, in: memory, value: value.id)
             Timestamp.writeToGuest(at: &pointer, in: memory, value: value.timeout)
@@ -278,15 +255,15 @@ enum WASIAbi {
     typealias UserData = UInt64
 
     struct Subscription: Equatable, GuestPointee {
-        enum Union: Equatable, GuestPointee {
+        public enum Union: Equatable, GuestPointee {
             case clock(Clock)
             case fdRead(Fd)
             case fdWrite(Fd)
 
-            static let sizeInGuest: UInt32 = 40
-            static let alignInGuest: UInt32 = max(Clock.alignInGuest, Fd.alignInGuest)
+            public static let sizeInGuest: UInt32 = 40
+            public static let alignInGuest: UInt32 = max(Clock.alignInGuest, Fd.alignInGuest)
 
-            static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> Self {
+            public static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> Self {
                 var pointer = pointer
                 let tag = UInt8.readFromGuest(&pointer, in: memory)
                 // Align to variant content area (max alignment of all variant payloads)
@@ -308,7 +285,7 @@ enum WASIAbi {
                 }
             }
 
-            static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: Self) {
+            public static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: Self) {
                 var pointer = pointer
                 switch value {
                 case .clock(let clock):
@@ -327,17 +304,17 @@ enum WASIAbi {
             }
         }
 
-        let userData: UserData
-        let union: Union
-        static let sizeInGuest: UInt32 = 48
-        static let alignInGuest: UInt32 = max(UserData.alignInGuest, Union.alignInGuest)
+        public let userData: UserData
+        public let union: Union
+        public static let sizeInGuest: UInt32 = 48
+        public static let alignInGuest: UInt32 = max(UserData.alignInGuest, Union.alignInGuest)
 
-        static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> Self {
+        public static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> Self {
             var pointer = pointer
             return .init(userData: .readFromGuest(&pointer, in: memory), union: .readFromGuest(&pointer, in: memory))
         }
 
-        static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: Self) {
+        public static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: Self) {
             var pointer = pointer
             UserData.writeToGuest(at: &pointer, in: memory, value: value.userData)
             Union.writeToGuest(at: &pointer, in: memory, value: value.union)
@@ -345,35 +322,37 @@ enum WASIAbi {
     }
 
     struct Event: Equatable, GuestPointee {
-        struct FdReadWrite: Equatable, GuestPointee {
-            struct Flags: OptionSet, GuestPointee {
-                let rawValue: UInt16
-                static let hangup = Self(rawValue: 1)
-            }
-            let nBytes: FileSize
-            let flags: Flags
-            static let sizeInGuest: UInt32 = 16
-            static let alignInGuest: UInt32 = 8
+        public struct FdReadWrite: Equatable, GuestPointee {
+            public struct Flags: OptionSet, GuestPointee, Sendable {
+                public let rawValue: UInt16
 
-            static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> Self {
+                public init(rawValue: UInt16) { self.rawValue = rawValue }
+                public static let hangup = Self(rawValue: 1)
+            }
+            public let nBytes: FileSize
+            public let flags: Flags
+            public static let sizeInGuest: UInt32 = 16
+            public static let alignInGuest: UInt32 = 8
+
+            public static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> Self {
                 var pointer = pointer
                 return .init(nBytes: FileSize.readFromGuest(&pointer, in: memory), flags: Flags.readFromGuest(&pointer, in: memory))
             }
-            static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: Self) {
+            public static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: Self) {
                 var pointer = pointer
                 FileSize.writeToGuest(at: &pointer, in: memory, value: value.nBytes)
                 Flags.writeToGuest(at: &pointer, in: memory, value: value.flags)
             }
         }
 
-        let userData: UserData
-        let error: Errno
-        let eventType: EventType
-        let fdReadWrite: FdReadWrite
-        static let sizeInGuest: UInt32 = 32
-        static let alignInGuest: UInt32 = 8
+        public let userData: UserData
+        public let error: Errno
+        public let eventType: EventType
+        public let fdReadWrite: FdReadWrite
+        public static let sizeInGuest: UInt32 = 32
+        public static let alignInGuest: UInt32 = 8
 
-        static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> Self {
+        public static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> Self {
             var pointer = pointer
             return .init(
                 userData: .readFromGuest(&pointer, in: memory),
@@ -382,7 +361,7 @@ enum WASIAbi {
                 fdReadWrite: .readFromGuest(&pointer, in: memory)
             )
         }
-        static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: Self) {
+        public static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: Self) {
             var pointer = pointer
             UserData.writeToGuest(at: &pointer, in: memory, value: value.userData)
             Errno.writeToGuest(at: &pointer, in: memory, value: value.error)
@@ -391,117 +370,123 @@ enum WASIAbi {
         }
     }
 
-    struct ClockId: Equatable, RawRepresentable, GuestPointee {
-        let rawValue: UInt32
+    struct ClockId: Equatable, RawRepresentable, GuestPointee, Sendable {
+        public let rawValue: UInt32
+
+        public init(rawValue: UInt32) { self.rawValue = rawValue }
         /// The clock measuring real time. Time value zero corresponds with
         /// 1970-01-01T00:00:00Z.
-        static let REALTIME = Self(rawValue: 0)
+        public static let REALTIME = Self(rawValue: 0)
         /// The store-wide monotonic clock, which is defined as a clock measuring
         /// real time, whose value cannot be adjusted and which cannot have negative
         /// clock jumps. The epoch of this clock is undefined. The absolute time
         /// value of this clock therefore has no meaning.
-        static let MONOTONIC = Self(rawValue: 1)
+        public static let MONOTONIC = Self(rawValue: 1)
         /// The CPU-time clock associated with the current process.
-        static let PROCESS_CPUTIME_ID = Self(rawValue: 2)
+        public static let PROCESS_CPUTIME_ID = Self(rawValue: 2)
         /// The CPU-time clock associated with the current thread.
-        static let THREAD_CPUTIME_ID = Self(rawValue: 3)
+        public static let THREAD_CPUTIME_ID = Self(rawValue: 3)
     }
 
-    typealias Timestamp = UInt64
+    public typealias Timestamp = UInt64
 
-    struct Fdflags: OptionSet, GuestPrimitivePointee {
-        var rawValue: UInt16
+    public struct Fdflags: OptionSet, GuestPrimitivePointee, Sendable {
+        public var rawValue: UInt16
+
+        public init(rawValue: UInt16) { self.rawValue = rawValue }
         /// Append mode: Data written to the file is always appended to the file's end.
-        static let APPEND = Fdflags(rawValue: 1 << 0)
+        public static let APPEND = Fdflags(rawValue: 1 << 0)
         /// Write according to synchronized I/O data integrity completion. Only the data stored in the file is synchronized.
-        static let DSYNC = Fdflags(rawValue: 1 << 1)
+        public static let DSYNC = Fdflags(rawValue: 1 << 1)
         /// Non-blocking mode.
-        static let NONBLOCK = Fdflags(rawValue: 1 << 2)
+        public static let NONBLOCK = Fdflags(rawValue: 1 << 2)
         /// Synchronized read I/O operations.
-        static let RSYNC = Fdflags(rawValue: 1 << 3)
+        public static let RSYNC = Fdflags(rawValue: 1 << 3)
         /// Write according to synchronized I/O file integrity completion. In
         /// addition to synchronizing the data stored in the file, the implementation
         /// may also synchronously update the file's metadata.
-        static let SYNC = Fdflags(rawValue: 1 << 4)
+        public static let SYNC = Fdflags(rawValue: 1 << 4)
     }
 
-    struct Rights: OptionSet, GuestPrimitivePointee {
-        let rawValue: UInt64
+    public struct Rights: OptionSet, GuestPrimitivePointee, Sendable {
+        public let rawValue: UInt64
+
+        public init(rawValue: UInt64) { self.rawValue = rawValue }
 
         /// The right to invoke `fd_datasync`.
         /// If `path_open` is set, includes the right to invoke
         /// `path_open` with `fdflags::dsync`.
-        static let FD_DATASYNC = Rights(rawValue: 1 << 0)
+        public static let FD_DATASYNC = Rights(rawValue: 1 << 0)
         /// The right to invoke `fd_read` and `sock_recv`.
         /// If `rights::fd_seek` is set, includes the right to invoke `fd_pread`.
-        static let FD_READ = Rights(rawValue: 1 << 1)
+        public static let FD_READ = Rights(rawValue: 1 << 1)
         /// The right to invoke `fd_seek`. This flag implies `rights::fd_tell`.
-        static let FD_SEEK = Rights(rawValue: 1 << 2)
+        public static let FD_SEEK = Rights(rawValue: 1 << 2)
         /// The right to invoke `fd_fdstat_set_flags`.
-        static let FD_FDSTAT_SET_FLAGS = Rights(rawValue: 1 << 3)
+        public static let FD_FDSTAT_SET_FLAGS = Rights(rawValue: 1 << 3)
         /// The right to invoke `fd_sync`.
         /// If `path_open` is set, includes the right to invoke
         /// `path_open` with `fdflags::rsync` and `fdflags::dsync`.
-        static let FD_SYNC = Rights(rawValue: 1 << 4)
+        public static let FD_SYNC = Rights(rawValue: 1 << 4)
         /// The right to invoke `fd_seek` in such a way that the file offset
         /// remains unaltered (i.e., `whence::cur` with offset zero), or to
         /// invoke `fd_tell`.
-        static let FD_TELL = Rights(rawValue: 1 << 5)
+        public static let FD_TELL = Rights(rawValue: 1 << 5)
         /// The right to invoke `fd_write` and `sock_send`.
         /// If `rights::fd_seek` is set, includes the right to invoke `fd_pwrite`.
-        static let FD_WRITE = Rights(rawValue: 1 << 6)
+        public static let FD_WRITE = Rights(rawValue: 1 << 6)
         /// The right to invoke `fd_advise`.
-        static let FD_ADVISE = Rights(rawValue: 1 << 7)
+        public static let FD_ADVISE = Rights(rawValue: 1 << 7)
         /// The right to invoke `fd_allocate`.
-        static let FD_ALLOCATE = Rights(rawValue: 1 << 8)
+        public static let FD_ALLOCATE = Rights(rawValue: 1 << 8)
         /// The right to invoke `path_create_directory`.
-        static let PATH_CREATE_DIRECTORY = Rights(rawValue: 1 << 9)
+        public static let PATH_CREATE_DIRECTORY = Rights(rawValue: 1 << 9)
         /// If `path_open` is set, the right to invoke `path_open` with `oflags::creat`.
-        static let PATH_CREATE_FILE = Rights(rawValue: 1 << 10)
+        public static let PATH_CREATE_FILE = Rights(rawValue: 1 << 10)
         /// The right to invoke `path_link` with the file descriptor as the
         /// source directory.
-        static let PATH_LINK_SOURCE = Rights(rawValue: 1 << 11)
+        public static let PATH_LINK_SOURCE = Rights(rawValue: 1 << 11)
         /// The right to invoke `path_link` with the file descriptor as the
         /// target directory.
-        static let PATH_LINK_TARGET = Rights(rawValue: 1 << 12)
+        public static let PATH_LINK_TARGET = Rights(rawValue: 1 << 12)
         /// The right to invoke `path_open`.
-        static let PATH_OPEN = Rights(rawValue: 1 << 13)
+        public static let PATH_OPEN = Rights(rawValue: 1 << 13)
         /// The right to invoke `fd_readdir`.
-        static let FD_READDIR = Rights(rawValue: 1 << 14)
+        public static let FD_READDIR = Rights(rawValue: 1 << 14)
         /// The right to invoke `path_readlink`.
-        static let PATH_READLINK = Rights(rawValue: 1 << 15)
+        public static let PATH_READLINK = Rights(rawValue: 1 << 15)
         /// The right to invoke `path_rename` with the file descriptor as the source directory.
-        static let PATH_RENAME_SOURCE = Rights(rawValue: 1 << 16)
+        public static let PATH_RENAME_SOURCE = Rights(rawValue: 1 << 16)
         /// The right to invoke `path_rename` with the file descriptor as the target directory.
-        static let PATH_RENAME_TARGET = Rights(rawValue: 1 << 17)
+        public static let PATH_RENAME_TARGET = Rights(rawValue: 1 << 17)
         /// The right to invoke `path_filestat_get`.
-        static let PATH_FILESTAT_GET = Rights(rawValue: 1 << 18)
+        public static let PATH_FILESTAT_GET = Rights(rawValue: 1 << 18)
         /// The right to change a file's size (there is no `path_filestat_set_size`).
         /// If `path_open` is set, includes the right to invoke `path_open` with `oflags::trunc`.
-        static let PATH_FILESTAT_SET_SIZE = Rights(rawValue: 1 << 19)
+        public static let PATH_FILESTAT_SET_SIZE = Rights(rawValue: 1 << 19)
         /// The right to invoke `path_filestat_set_times`.
-        static let PATH_FILESTAT_SET_TIMES = Rights(rawValue: 1 << 20)
+        public static let PATH_FILESTAT_SET_TIMES = Rights(rawValue: 1 << 20)
         /// The right to invoke `fd_filestat_get`.
-        static let FD_FILESTAT_GET = Rights(rawValue: 1 << 21)
+        public static let FD_FILESTAT_GET = Rights(rawValue: 1 << 21)
         /// The right to invoke `fd_filestat_set_size`.
-        static let FD_FILESTAT_SET_SIZE = Rights(rawValue: 1 << 22)
+        public static let FD_FILESTAT_SET_SIZE = Rights(rawValue: 1 << 22)
         /// The right to invoke `fd_filestat_set_times`.
-        static let FD_FILESTAT_SET_TIMES = Rights(rawValue: 1 << 23)
+        public static let FD_FILESTAT_SET_TIMES = Rights(rawValue: 1 << 23)
         /// The right to invoke `path_symlink`.
-        static let PATH_SYMLINK = Rights(rawValue: 1 << 24)
+        public static let PATH_SYMLINK = Rights(rawValue: 1 << 24)
         /// The right to invoke `path_remove_directory`.
-        static let PATH_REMOVE_DIRECTORY = Rights(rawValue: 1 << 25)
+        public static let PATH_REMOVE_DIRECTORY = Rights(rawValue: 1 << 25)
         /// The right to invoke `path_unlink_file`.
-        static let PATH_UNLINK_FILE = Rights(rawValue: 1 << 26)
+        public static let PATH_UNLINK_FILE = Rights(rawValue: 1 << 26)
         /// If `rights::fd_read` is set, includes the right to invoke `poll_oneoff` to subscribe to `eventtype::fd_read`.
         /// If `rights::fd_write` is set, includes the right to invoke `poll_oneoff` to subscribe to `eventtype::fd_write`.
-        static let POLL_FD_READWRITE = Rights(rawValue: 1 << 27)
+        public static let POLL_FD_READWRITE = Rights(rawValue: 1 << 27)
         /// The right to invoke `sock_shutdown`.
-        static let SOCK_SHUTDOWN = Rights(rawValue: 1 << 28)
+        public static let SOCK_SHUTDOWN = Rights(rawValue: 1 << 28)
         /// The right to invoke `sock_accept`.
-        static let SOCK_ACCEPT = Rights(rawValue: 1 << 29)
+        public static let SOCK_ACCEPT = Rights(rawValue: 1 << 29)
 
-        static let DIRECTORY_BASE_RIGHTS: Rights = [
+        public static let DIRECTORY_BASE_RIGHTS: Rights = [
             .PATH_CREATE_DIRECTORY,
             .PATH_CREATE_FILE,
             .PATH_LINK_SOURCE,
@@ -520,7 +505,7 @@ enum WASIAbi {
             .FD_FILESTAT_SET_TIMES,
         ]
 
-        static let DIRECTORY_INHERITING_RIGHTS: Rights = DIRECTORY_BASE_RIGHTS.union([
+        public static let DIRECTORY_INHERITING_RIGHTS: Rights = DIRECTORY_BASE_RIGHTS.union([
             .FD_DATASYNC,
             .FD_READ,
             .FD_SEEK,
@@ -539,15 +524,15 @@ enum WASIAbi {
 
     /// A reference to the offset of a directory entry.
     /// The value 0 signifies the start of the directory.
-    typealias DirCookie = UInt64
+    public typealias DirCookie = UInt64
     /// The type for the `dirent::d_namlen` field of `dirent` struct.
-    typealias DirNameLen = UInt32
+    public typealias DirNameLen = UInt32
 
     /// File serial number that is unique within its file system.
-    typealias Inode = UInt64
+    public typealias Inode = UInt64
 
     /// The type of a file descriptor or file.
-    enum FileType: UInt8, GuestPrimitivePointee {
+    public enum FileType: UInt8, GuestPrimitivePointee {
         /// The type of the file descriptor or file is unknown or is different from any of the other types specified.
         case UNKNOWN = 0
         /// The file descriptor or file refers to a block device inode.
@@ -567,23 +552,30 @@ enum WASIAbi {
     }
 
     /// A directory entry.
-    struct Dirent {
+    public struct Dirent {
         /// The offset of the next directory entry stored in this directory.
-        let dNext: DirCookie
+        public let dNext: DirCookie
         /// The serial number of the file referred to by this directory entry.
-        let dIno: Inode
+        public let dIno: Inode
         /// The length of the name of the directory entry.
-        let dirNameLen: DirNameLen
+        public let dirNameLen: DirNameLen
         /// The type of the file referred to by this directory entry.
-        let dType: FileType
+        public let dType: FileType
 
-        static var sizeInGuest: UInt32 {
+        public init(dNext: DirCookie, dIno: Inode, dirNameLen: DirNameLen, dType: FileType) {
+            self.dNext = dNext
+            self.dIno = dIno
+            self.dirNameLen = dirNameLen
+            self.dType = dType
+        }
+
+        public static var sizeInGuest: UInt32 {
             // Hard coded because WIT aligns up at last when calculating struct size, but Swift doesn't
             // https://github.com/WebAssembly/WASI/blob/4712d490fd7662f689af6faa5d718e042f014931/legacy/tools/witx/src/layout.rs#L117C24-L117C24
             24
         }
 
-        static func writeToGuest<M: GuestMemory>(unalignedAt pointer: UnsafeGuestRawPointer, end: UnsafeGuestRawPointer, in memory: M, value: Dirent) {
+        public static func writeToGuest<M: GuestMemory>(unalignedAt pointer: UnsafeGuestRawPointer, end: UnsafeGuestRawPointer, in memory: M, value: Dirent) {
             var pointer = pointer
             guard pointer < end else { return }
             DirCookie.writeToGuest(at: pointer, in: memory, value: value.dNext)
@@ -603,7 +595,7 @@ enum WASIAbi {
         }
     }
 
-    enum Advice: UInt8 {
+    public enum Advice: UInt8 {
         /// The application has no advice to give on its behavior with respect to the specified data.
         case NORMAL = 0
         /// The application expects to access the specified data sequentially from lower offsets to higher offsets.
@@ -618,17 +610,24 @@ enum WASIAbi {
         case NOREUSE = 5
     }
 
-    struct FdStat: GuestPrimitivePointee {
-        let fsFileType: FileType
-        let fsFlags: Fdflags
-        let fsRightsBase: Rights
-        let fsRightsInheriting: Rights
+    public struct FdStat: GuestPrimitivePointee {
+        public let fsFileType: FileType
+        public let fsFlags: Fdflags
+        public let fsRightsBase: Rights
+        public let fsRightsInheriting: Rights
 
-        static var sizeInGuest: UInt32 {
+        public init(fsFileType: FileType, fsFlags: Fdflags, fsRightsBase: Rights, fsRightsInheriting: Rights) {
+            self.fsFileType = fsFileType
+            self.fsFlags = fsFlags
+            self.fsRightsBase = fsRightsBase
+            self.fsRightsInheriting = fsRightsInheriting
+        }
+
+        public static var sizeInGuest: UInt32 {
             FileType.sizeInGuest + Fdflags.sizeInGuest + Rights.sizeInGuest * 2
         }
 
-        static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> FdStat {
+        public static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> FdStat {
             var pointer = pointer
             return FdStat(
                 fsFileType: .readFromGuest(&pointer, in: memory),
@@ -638,7 +637,7 @@ enum WASIAbi {
             )
         }
 
-        static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: FdStat) {
+        public static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: FdStat) {
             var pointer = pointer
             FileType.writeToGuest(at: &pointer, in: memory, value: value.fsFileType)
             Fdflags.writeToGuest(at: &pointer, in: memory, value: value.fsFlags)
@@ -649,64 +648,84 @@ enum WASIAbi {
 
     /// Identifier for a device containing a file system. Can be used in combination
     /// with `inode` to uniquely identify a file or directory in the filesystem.
-    typealias Device = UInt64
+    public typealias Device = UInt64
 
     /// Which file time attributes to adjust.
-    struct FstFlags: OptionSet, GuestPrimitivePointee {
-        let rawValue: UInt16
+    public struct FstFlags: OptionSet, GuestPrimitivePointee, Sendable {
+        public let rawValue: UInt16
 
-        static let ATIM = FstFlags(rawValue: 1 << 0)
+        public init(rawValue: UInt16) { self.rawValue = rawValue }
+
+        public static let ATIM = FstFlags(rawValue: 1 << 0)
         /// Adjust the last data access timestamp to the time of clock `clockid::realtime`.
-        static let ATIM_NOW = FstFlags(rawValue: 1 << 1)
+        public static let ATIM_NOW = FstFlags(rawValue: 1 << 1)
         /// Adjust the last data modification timestamp to the value stored in `filestat::mtim`.
-        static let MTIM = FstFlags(rawValue: 1 << 2)
+        public static let MTIM = FstFlags(rawValue: 1 << 2)
         /// Adjust the last data modification timestamp to the time of clock `clockid::realtime`.
-        static let MTIM_NOW = FstFlags(rawValue: 1 << 3)
+        public static let MTIM_NOW = FstFlags(rawValue: 1 << 3)
     }
 
-    struct LookupFlags: OptionSet, GuestPrimitivePointee {
-        let rawValue: UInt32
+    struct LookupFlags: OptionSet, GuestPrimitivePointee, Sendable {
+        public let rawValue: UInt32
+
+        public init(rawValue: UInt32) { self.rawValue = rawValue }
 
         /// As long as the resolved path corresponds to a symbolic link, it is expanded.
-        static let SYMLINK_FOLLOW = LookupFlags(rawValue: 1 << 0)
+        public static let SYMLINK_FOLLOW = LookupFlags(rawValue: 1 << 0)
     }
 
-    struct Oflags: OptionSet, GuestPrimitivePointee {
-        let rawValue: UInt32
+    public struct Oflags: OptionSet, GuestPrimitivePointee, Sendable {
+        public let rawValue: UInt32
+
+        public init(rawValue: UInt32) { self.rawValue = rawValue }
 
         /// Create file if it does not exist.
-        static let CREAT = Oflags(rawValue: 1 << 0)
+        public static let CREAT = Oflags(rawValue: 1 << 0)
         /// Fail if not a directory.
-        static let DIRECTORY = Oflags(rawValue: 1 << 1)
+        public static let DIRECTORY = Oflags(rawValue: 1 << 1)
         /// Fail if file already exists.
-        static let EXCL = Oflags(rawValue: 1 << 2)
+        public static let EXCL = Oflags(rawValue: 1 << 2)
         /// Truncate file to size 0.
-        static let TRUNC = Oflags(rawValue: 1 << 3)
+        public static let TRUNC = Oflags(rawValue: 1 << 3)
     }
 
     /// Number of hard links to an inode.
-    typealias LinkCount = UInt64
+    public typealias LinkCount = UInt64
 
     /// File attributes.
-    struct Filestat: GuestPrimitivePointee {
+    public struct Filestat: GuestPrimitivePointee {
         /// Device ID of device containing the file.
-        let dev: Device
+        public let dev: Device
         /// File serial number.
-        let ino: Inode
+        public let ino: Inode
         /// File type.
-        let filetype: FileType
+        public let filetype: FileType
         /// Number of hard links to the file.
-        let nlink: LinkCount
+        public let nlink: LinkCount
         /// For regular files, the file size in bytes. For symbolic links, the length in bytes of the pathname contained in the symbolic link.
-        let size: FileSize
+        public let size: FileSize
         /// Last data access timestamp.
-        let atim: Timestamp
+        public let atim: Timestamp
         /// Last data modification timestamp.
-        let mtim: Timestamp
+        public let mtim: Timestamp
         /// Last file status change timestamp.
-        let ctim: Timestamp
+        public let ctim: Timestamp
 
-        static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> WASIAbi.Filestat {
+        public init(
+            dev: Device, ino: Inode, filetype: FileType, nlink: LinkCount,
+            size: FileSize, atim: Timestamp, mtim: Timestamp, ctim: Timestamp
+        ) {
+            self.dev = dev
+            self.ino = ino
+            self.filetype = filetype
+            self.nlink = nlink
+            self.size = size
+            self.atim = atim
+            self.mtim = mtim
+            self.ctim = ctim
+        }
+
+        public static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> WASIAbi.Filestat {
             var pointer = pointer
             return Filestat(
                 dev: .readFromGuest(&pointer, in: memory), ino: .readFromGuest(&pointer, in: memory),
@@ -716,7 +735,7 @@ enum WASIAbi {
             )
         }
 
-        static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: WASIAbi.Filestat) {
+        public static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: WASIAbi.Filestat) {
             var pointer = pointer
             Device.writeToGuest(at: &pointer, in: memory, value: value.dev)
             Inode.writeToGuest(at: &pointer, in: memory, value: value.ino)
@@ -733,10 +752,10 @@ enum WASIAbi {
 
     enum Prestat: GuestPointee {
         case dir(PrestatDir)
-        static var sizeInGuest: UInt32 { 8 }
-        static var alignInGuest: UInt32 { 4 }
+        public static var sizeInGuest: UInt32 { 8 }
+        public static var alignInGuest: UInt32 { 4 }
 
-        static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> WASIAbi.Prestat {
+        public static func readFromGuest<M: GuestMemory>(_ pointer: UnsafeGuestRawPointer, in memory: M) -> WASIAbi.Prestat {
             var pointer = pointer
             switch UInt8.readFromGuest(&pointer, in: memory) {
             case 0:
@@ -745,7 +764,7 @@ enum WASIAbi {
             }
         }
 
-        static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: WASIAbi.Prestat) {
+        public static func writeToGuest<M: GuestMemory>(at pointer: UnsafeGuestRawPointer, in memory: M, value: WASIAbi.Prestat) {
             var pointer = pointer
             switch value {
             case .dir(let dir):
@@ -807,9 +826,7 @@ extension WASIImplementation {
                 count: length
             )
             return try pointer.withHostPointer(in: buffer) { hostBuffer in
-                guard let baseAddress = hostBuffer.baseAddress,
-                    memchr(baseAddress, 0x00, Int(pointer.count)) == nil
-                else {
+                guard !hostBuffer.contains(0x00) else {
                     // If byte sequence contains null byte in the middle, it's illegal string
                     // TODO: This restriction should be only applied to strings that can be interpreted as platform-string, which is expected to be null-terminated
                     throw WASIAbi.Errno.EILSEQ
@@ -1970,14 +1987,7 @@ final class WASIImplementation: Sendable {
 
     /// Temporarily yield execution of the calling thread.
     func sched_yield() throws {
-        #if os(Windows)
-            #warning("sched_yield is not implemented on Windows")
-        #else
-            let result = _platform_sched_yield()
-            guard result == 0 else {
-                throw try WASIAbi.Errno(platformErrno: errno)
-            }
-        #endif
+        try PlatformScheduler.yieldCurrentThread()
     }
 
     /// Write high-quality random data into a buffer.

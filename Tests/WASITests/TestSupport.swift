@@ -1,6 +1,6 @@
 import Foundation
 
-@testable import WASI
+@_spi(WASIPlatform) @testable import WASI
 @testable import WasmKit
 
 #if canImport(Darwin)
@@ -9,11 +9,10 @@ import Foundation
     import Glibc
 #elseif canImport(Musl)
     import Musl
+#elseif os(Windows)
+    import ucrt
 #endif
 
-#if canImport(System)
-    import SystemPackage
-#endif
 enum TestSupport {
 
     #if os(macOS) || os(Linux)
@@ -217,10 +216,32 @@ enum TestSupport {
             )
         }
 
-        #if canImport(System)
-            func openFile(at relativePath: String, _ mode: FileDescriptor.AccessMode) throws -> FileDescriptor {
+        #if !os(WASI)
+            /// An opened host file exposing a raw platform file descriptor for
+            /// descriptor-based APIs, opened through the WASI module's own
+            /// platform layer so tests share its cross-platform open path.
+            struct OpenedFile {
+                private let fd: WASI.FileDescriptor
+                var fileDescriptor: CInt { fd.rawValue }
+
+                init(fd: WASI.FileDescriptor) {
+                    self.fd = fd
+                }
+
+                func close() throws {
+                    try fd.close()
+                }
+            }
+
+            /// Opens a file and returns an ``OpenedFile`` carrying a raw
+            /// platform file descriptor.
+            func openFile(at relativePath: String, _ mode: WASI.FileDescriptor.AccessMode) throws -> OpenedFile {
                 let fileURL = url.appendingPathComponent(relativePath)
-                return try FileDescriptor.open(fileURL.path, mode)
+                do {
+                    return OpenedFile(fd: try WASI.FileDescriptor.open(fileURL.path, mode))
+                } catch {
+                    throw Error(description: "Failed to open \(fileURL.path): \(error)")
+                }
             }
         #endif
 

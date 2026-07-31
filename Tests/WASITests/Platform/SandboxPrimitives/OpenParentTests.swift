@@ -1,4 +1,3 @@
-import SystemPackage
 import Testing
 
 @testable import WASI
@@ -8,8 +7,8 @@ struct OpenParentTests {
     @Test
     func testSplitParent() {
         func check(
-            _ lhs: (FilePath, FilePath.Component)?,
-            _ rhs: (FilePath, FilePath.Component)?,
+            _ lhs: (GuestPath, GuestPath.Component)?,
+            _ rhs: (GuestPath, GuestPath.Component)?,
             sourceLocation: SourceLocation = #_sourceLocation
         ) {
             switch (lhs, rhs) {
@@ -24,17 +23,17 @@ struct OpenParentTests {
 
         check(splitParent(path: ""), nil)
 
-        check(splitParent(path: "/"), (FilePath("/"), FilePath.Component(".")))
-        check(splitParent(path: "/."), (FilePath("/."), FilePath.Component(".")))
-        check(splitParent(path: "/a"), (FilePath("/"), FilePath.Component("a")))
-        check(splitParent(path: "/a/"), (FilePath("/a"), FilePath.Component(".")))
-        check(splitParent(path: "/a/."), (FilePath("/a/."), FilePath.Component(".")))
-        check(splitParent(path: "/a/.."), (FilePath("/a/.."), FilePath.Component(".")))
+        check(splitParent(path: "/"), (GuestPath("/"), .currentDirectory))
+        check(splitParent(path: "/."), (GuestPath("/."), .currentDirectory))
+        check(splitParent(path: "/a"), (GuestPath("/"), .regular("a")))
+        check(splitParent(path: "/a/"), (GuestPath("/a"), .currentDirectory))
+        check(splitParent(path: "/a/."), (GuestPath("/a/."), .currentDirectory))
+        check(splitParent(path: "/a/.."), (GuestPath("/a/.."), .currentDirectory))
 
-        check(splitParent(path: "b"), (FilePath(""), FilePath.Component("b")))
-        check(splitParent(path: "b/."), (FilePath("b/."), FilePath.Component(".")))
-        check(splitParent(path: "b/.."), (FilePath("b/.."), FilePath.Component(".")))
+        check(splitParent(path: "b"), (GuestPath(""), .regular("b")))
+        check(splitParent(path: "b/."), (GuestPath("b/."), .currentDirectory))
+        check(splitParent(path: "b/.."), (GuestPath("b/.."), .currentDirectory))
 
-        check(splitParent(path: "../c"), (FilePath(".."), FilePath.Component("c")))
+        check(splitParent(path: "../c"), (GuestPath(".."), .regular("c")))
     }
 }

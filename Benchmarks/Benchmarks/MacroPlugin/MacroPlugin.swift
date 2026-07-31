@@ -1,16 +1,15 @@
 import Benchmark
 import WasmKit
-import SystemPackage
 import Foundation
 import WasmKitWASI
 
 let benchmarks: @Sendable () -> () = {
-    let macrosDir = FilePath(#filePath)
-        .removingLastComponent()
-        .removingLastComponent()
-        .removingLastComponent()
-        .removingLastComponent()
-        .pushing("Vendor/swift-stringify-macro.wasm/Sources")
+    let macrosDir = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appendingPathComponent("Vendor/swift-stringify-macro.wasm/Sources")
 
     let handshakeMessage = """
     {
@@ -142,28 +141,32 @@ let benchmarks: @Sendable () -> () = {
     ]
 
     for file in try! FileManager.default.contentsOfDirectory(
-        atPath: macrosDir.string
+        atPath: macrosDir.path
     ) {
         guard file.hasSuffix(".wasm") else { continue }
 
         struct Setup {
-            let hostToPlugin: FileDescriptor
-            let pluginToHost: FileDescriptor
+            let hostToPlugin: FileHandle
+            let pluginToHost: FileHandle
+            /// The guest-side pipe ends, retained so their descriptors stay
+            /// open: a `FileHandle` closes its descriptor when deallocated.
+            let guestStdin: FileHandle
+            let guestStdout: FileHandle
             let pump: Function
             let expandMessage: String
             let bridge: WASIBridgeToHost
 
-            init(filePath: FilePath, expandMessage: String) throws {
+            init(filePath: String, expandMessage: String) throws {
                 let engine = Engine()
                 let store = Store(engine: engine)
-                let module = try parseWasm(filePath: filePath.string)
+                let module = try parseWasm(filePath: filePath)
 
-                let hostToPluginPipes = try FileDescriptor.pipe()
-                let pluginToHostPipes = try FileDescriptor.pipe()
+                let hostToPluginPipes = Pipe()
+                let pluginToHostPipes = Pipe()
                 let bridge = try WASIBridgeToHost(
-                  stdin: hostToPluginPipes.readEnd,
-                  stdout: pluginToHostPipes.writeEnd,
-                  stderr: .standardError
+                  stdin: hostToPluginPipes.fileHandleForReading.fileDescriptor,
+                  stdout: pluginToHostPipes.fileHandleForWriting.fileDescriptor,
+                  stderr: 2
                 )
                 do {
                     var imports = Imports()
@@ -172,8 +175,10 @@ let benchmarks: @Sendable () -> () = {
                     try instance.exports[function: "_start"]!()
                     let pump = instance.exports[function: "swift_wasm_macro_v1_pump"]!
 
-                    self.hostToPlugin = hostToPluginPipes.writeEnd
-                    self.pluginToHost = pluginToHostPipes.readEnd
+                    self.hostToPlugin = hostToPluginPipes.fileHandleForWriting
+                    self.pluginToHost = pluginToHostPipes.fileHandleForReading
+                    self.guestStdin = hostToPluginPipes.fileHandleForReading
+                    self.guestStdout = pluginToHostPipes.fileHandleForWriting
                     self.pump = pump
                     self.expandMessage = expandMessage
                     self.bridge = bridge
@@ -184,26 +189,22 @@ let benchmarks: @Sendable () -> () = {
             }
 
             func writeMessage(_ message: String) throws {
-                let bytes = message.utf8
+                let bytes = Data(message.utf8)
                 try withUnsafeBytes(of: UInt64(bytes.count).littleEndian) {
-                  _ = try hostToPlugin.writeAll($0)
+                  try hostToPlugin.write(contentsOf: Data($0))
                 }
-                try hostToPlugin.writeAll(bytes)
+                try hostToPlugin.write(contentsOf: bytes)
             }
             func readMessage() throws -> [UInt8] {
-                let lengthRaw = try withUnsafeTemporaryAllocation(of: UInt8.self, capacity: 8) { buffer in
-                    let lengthCount = try pluginToHost.read(into: UnsafeMutableRawBufferPointer(buffer))
-                    guard lengthCount == 8 else { fatalError() }
-                    return buffer.withMemoryRebound(to: UInt64.self, \.baseAddress!.pointee)
+                guard let lengthData = try pluginToHost.read(upToCount: 8), lengthData.count == 8 else {
+                    fatalError()
                 }
+                let lengthRaw = lengthData.withUnsafeBytes { $0.loadUnaligned(as: UInt64.self) }
                 let length = Int(UInt64(littleEndian: lengthRaw))
-                return try [UInt8](unsafeUninitializedCapacity: length) { buffer, size in
-                    let received = try pluginToHost.read(into: UnsafeMutableRawBufferPointer(buffer))
-                    guard received == length else {
-                        fatalError()
-                    }
-                    size = received
+                guard let message = try pluginToHost.read(upToCount: length), message.count == length else {
+                    fatalError()
                 }
+                return [UInt8](message)
             }
 
             func tick() throws {
@@ -222,7 +223,7 @@ let benchmarks: @Sendable () -> () = {
         }
 
         Benchmark("Startup \(file)") { benchmark in
-            let setup = try Setup(filePath: macrosDir.appending(file), expandMessage: expandMessage)
+            let setup = try Setup(filePath: macrosDir.appendingPathComponent(file).path, expandMessage: expandMessage)
             try setup.writeMessage(handshakeMessage)
             try setup.tick()
             try setup.close()
@@ -233,7 +234,7 @@ let benchmarks: @Sendable () -> () = {
             try setup.close()
         } setup: { () -> Setup in
             let setup = try Setup(
-                filePath: macrosDir.appending(file),
+                filePath: macrosDir.appendingPathComponent(file).path,
                 expandMessage: expandMessage
             )
             try setup.writeMessage(handshakeMessage)

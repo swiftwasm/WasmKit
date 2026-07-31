@@ -1,4 +1,13 @@
 add_wasmkit_library(WASI
+  CleanupFailure.swift
+  ThrowingDefer.swift
+  Platform/GuestPath.swift
+  Platform/PAL/PALClock.swift
+  Platform/PAL/PALFileDescriptor.swift
+  Platform/PAL/PALTypes.swift
+  Platform/PAL/PALErrnoMapping.swift
+  Platform/PAL/PALPoll.swift
+  Platform/PAL/PALSystemClocks.swift
   Platform/SandboxPrimitives/Open.swift
   Platform/SandboxPrimitives/Readlink.swift
   Platform/SandboxPrimitives/OpenParent.swift
@@ -22,4 +31,4 @@ add_wasmkit_library(WASI
 )
 
 target_link_wasmkit_libraries(WASI PUBLIC
-  WasmTypes SystemExtras)
+  WasmTypes)

@@ -4,7 +4,7 @@
     import GDBRemoteProtocol
     import Logging
     import NIOCore
-    import SystemExtras
+    import WASI
     import SystemPackage
     import Testing
     import WAT

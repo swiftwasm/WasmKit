@@ -54,6 +54,17 @@
             try self.init(fileHandle: fileHandle, ownsHandle: false, bufferLength: bufferLength)
         }
 
+        /// Initialize a new stream source that opens the file at `filePath`
+        /// itself and closes it when the source is deallocated.
+        ///
+        /// - Parameters:
+        ///   - filePath: The path of the file to open for reading in binary mode
+        ///   - bufferLength: The size of the internal read buffer
+        public convenience init(filePath: String, bufferLength: Int = 1024 * 8) throws {
+            let fileHandle = try FileIO.openForReading(path: filePath)
+            try self.init(fileHandle: fileHandle, ownsHandle: true, bufferLength: bufferLength)
+        }
+
         init(fileHandle: CInt, ownsHandle: Bool, bufferLength: Int = 1024 * 8) throws {
             self.fileHandle = fileHandle
             self.ownsHandle = ownsHandle

@@ -1,5 +1,3 @@
-import SystemPackage
-
 /// An in-memory file system implementation for WASI environments.
 ///
 /// This provides a complete file system that exists entirely in memory, useful for
@@ -14,10 +12,10 @@ import SystemPackage
 /// try fs.addFile(at: "/hello.txt", content: "Hello, world!")
 ///
 /// // Or add a file handle
-/// let fd = try FileDescriptor.open("/path/to/file", .readOnly)
+/// let fd = FileHandle(forReadingAtPath: "/path/to/file")!.fileDescriptor
 /// try fs.addFile(at: "/mounted.txt", handle: fd)
 /// ```
-public final class MemoryFileSystem: FileSystemImplementation, Sendable {
+public final class MemoryFileSystem: Sendable {
     private static let rootPath = "/"
 
     /// The directory tree. Synchronization lives in the nodes, so the file system
@@ -149,12 +147,14 @@ public final class MemoryFileSystem: FileSystemImplementation, Sendable {
         try addFile(at: path, content: content.utf8)
     }
 
-    /// Adds a file to the file system backed by a file descriptor.
-    public func addFile(at path: String, handle: FileDescriptor) throws {
+    /// Adds a file to the file system backed by a caller-owned platform file
+    /// descriptor. The file system borrows the descriptor: the caller must
+    /// keep it open while the file system is in use and close it afterwards.
+    public func addFile(at path: String, handle: CInt) throws {
         let normalized = Self.normalizePath(path)
         let (parentPath, fileName) = try Self.splitPath(normalized)
         let parent = try Self.ensureDirectoryNode(from: root, at: parentPath)
-        parent.setChild(name: fileName, node: MemoryFileNode(handle: handle))
+        parent.setChild(name: fileName, node: MemoryFileNode(handle: FileDescriptor(rawValue: handle)))
     }
 
     /// Gets the content of a file at the specified path.
@@ -180,104 +180,6 @@ public final class MemoryFileSystem: FileSystemImplementation, Sendable {
         guard parent.removeChild(name: fileName) else {
             throw WASIAbi.Errno.ENOENT
         }
-    }
-
-    // MARK: - FileSystemImplementation (WASI API)
-
-    func preopenDirectory(guestPath: String, hostPath: String) throws -> any WASIDir {
-        let node = try ensureDirectory(at: guestPath)
-        return MemoryDirEntry(preopenPath: guestPath, dirNode: node, path: guestPath, fileSystem: self)
-    }
-
-    func openAt(
-        dirFd: any WASIDir,
-        path: String,
-        oflags: WASIAbi.Oflags,
-        fsRightsBase: WASIAbi.Rights,
-        fsRightsInheriting: WASIAbi.Rights,
-        fdflags: WASIAbi.Fdflags,
-        symlinkFollow: Bool
-    ) throws -> FdEntry {
-        guard let memoryDir = dirFd as? MemoryDirEntry else {
-            throw WASIAbi.Errno.EBADF
-        }
-
-        let dirPath = memoryDir.path
-        let fullPath = Self.joinGuestPath(dirPath, path)
-
-        guard let dirNode = Self.lookupNode(from: root, at: dirPath) as? MemoryDirectoryNode else {
-            throw WASIAbi.Errno.EBADF
-        }
-
-        var node = Self.resolveNode(root: root, from: dirNode, at: dirPath, path: path)
-
-        if node != nil {
-            if oflags.contains(.EXCL) && oflags.contains(.CREAT) {
-                throw WASIAbi.Errno.EEXIST
-            }
-        } else {
-            if oflags.contains(.CREAT) {
-                node = try Self.createFileNode(in: dirNode, at: path, oflags: oflags)
-            } else {
-                throw WASIAbi.Errno.ENOENT
-            }
-        }
-
-        guard let resolvedNode = node else {
-            throw WASIAbi.Errno.ENOENT
-        }
-
-        if oflags.contains(.DIRECTORY) {
-            guard resolvedNode.type == .directory else {
-                throw WASIAbi.Errno.ENOTDIR
-            }
-        }
-
-        if resolvedNode.type == .directory {
-            guard let dirNode = resolvedNode as? MemoryDirectoryNode else {
-                throw WASIAbi.Errno.ENOTDIR
-            }
-            return .directory(
-                MemoryDirEntry(preopenPath: nil, dirNode: dirNode, path: fullPath, fileSystem: self))
-        }
-
-        if resolvedNode.type == .file {
-            guard let fileNode = resolvedNode as? MemoryFileNode else {
-                throw WASIAbi.Errno.EBADF
-            }
-
-            if oflags.contains(.TRUNC) && fsRightsBase.contains(.FD_WRITE) {
-                fileNode.truncateToEmpty()
-            }
-
-            var accessMode: FileAccessMode = []
-            if fsRightsBase.contains(.FD_READ) {
-                accessMode.insert(.read)
-            }
-            if fsRightsBase.contains(.FD_WRITE) {
-                accessMode.insert(.write)
-            }
-
-            return .file(MemoryFileEntry(fileNode: fileNode, fileSystem: self, accessMode: accessMode, position: 0))
-        }
-
-        if resolvedNode.type == .characterDevice {
-            guard let deviceNode = resolvedNode as? MemoryCharacterDeviceNode else {
-                throw WASIAbi.Errno.EBADF
-            }
-
-            var accessMode: FileAccessMode = []
-            if fsRightsBase.contains(.FD_READ) {
-                accessMode.insert(.read)
-            }
-            if fsRightsBase.contains(.FD_WRITE) {
-                accessMode.insert(.write)
-            }
-
-            return .file(MemoryCharacterDeviceEntry(deviceNode: deviceNode, accessMode: accessMode))
-        }
-
-        throw WASIAbi.Errno.ENOTSUP
     }
 
     // MARK: - File Operations
@@ -441,5 +343,105 @@ public final class MemoryFileSystem: FileSystemImplementation, Sendable {
         let parentComponents = components.dropLast()
         let parentPath = Self.rootPath + parentComponents.joined(separator: "/")
         return (parentPath, fileName)
+    }
+}
+
+@_spi(WASIPlatform) extension MemoryFileSystem: FileSystemImplementation {
+    // MARK: - FileSystemImplementation (WASI API)
+
+    public func preopenDirectory(guestPath: String, hostPath: String) throws -> any WASIDir {
+        let node = try ensureDirectory(at: guestPath)
+        return MemoryDirEntry(preopenPath: guestPath, dirNode: node, path: guestPath, fileSystem: self)
+    }
+
+    public func openAt(
+        dirFd: any WASIDir,
+        path: String,
+        oflags: WASIAbi.Oflags,
+        fsRightsBase: WASIAbi.Rights,
+        fsRightsInheriting: WASIAbi.Rights,
+        fdflags: WASIAbi.Fdflags,
+        symlinkFollow: Bool
+    ) throws -> FdEntry {
+        guard let memoryDir = dirFd as? MemoryDirEntry else {
+            throw WASIAbi.Errno.EBADF
+        }
+
+        let dirPath = memoryDir.path
+        let fullPath = Self.joinGuestPath(dirPath, path)
+
+        guard let dirNode = Self.lookupNode(from: root, at: dirPath) as? MemoryDirectoryNode else {
+            throw WASIAbi.Errno.EBADF
+        }
+
+        var node = Self.resolveNode(root: root, from: dirNode, at: dirPath, path: path)
+
+        if node != nil {
+            if oflags.contains(.EXCL) && oflags.contains(.CREAT) {
+                throw WASIAbi.Errno.EEXIST
+            }
+        } else {
+            if oflags.contains(.CREAT) {
+                node = try Self.createFileNode(in: dirNode, at: path, oflags: oflags)
+            } else {
+                throw WASIAbi.Errno.ENOENT
+            }
+        }
+
+        guard let resolvedNode = node else {
+            throw WASIAbi.Errno.ENOENT
+        }
+
+        if oflags.contains(.DIRECTORY) {
+            guard resolvedNode.type == .directory else {
+                throw WASIAbi.Errno.ENOTDIR
+            }
+        }
+
+        if resolvedNode.type == .directory {
+            guard let dirNode = resolvedNode as? MemoryDirectoryNode else {
+                throw WASIAbi.Errno.ENOTDIR
+            }
+            return .directory(
+                MemoryDirEntry(preopenPath: nil, dirNode: dirNode, path: fullPath, fileSystem: self))
+        }
+
+        if resolvedNode.type == .file {
+            guard let fileNode = resolvedNode as? MemoryFileNode else {
+                throw WASIAbi.Errno.EBADF
+            }
+
+            if oflags.contains(.TRUNC) && fsRightsBase.contains(.FD_WRITE) {
+                fileNode.truncateToEmpty()
+            }
+
+            var accessMode: FileAccessMode = []
+            if fsRightsBase.contains(.FD_READ) {
+                accessMode.insert(.read)
+            }
+            if fsRightsBase.contains(.FD_WRITE) {
+                accessMode.insert(.write)
+            }
+
+            return .file(MemoryFileEntry(fileNode: fileNode, fileSystem: self, accessMode: accessMode, position: 0))
+        }
+
+        if resolvedNode.type == .characterDevice {
+            guard let deviceNode = resolvedNode as? MemoryCharacterDeviceNode else {
+                throw WASIAbi.Errno.EBADF
+            }
+
+            var accessMode: FileAccessMode = []
+            if fsRightsBase.contains(.FD_READ) {
+                accessMode.insert(.read)
+            }
+            if fsRightsBase.contains(.FD_WRITE) {
+                accessMode.insert(.write)
+            }
+
+            return .file(MemoryCharacterDeviceEntry(deviceNode: deviceNode, accessMode: accessMode))
+        }
+
+        throw WASIAbi.Errno.ENOTSUP
     }
 }

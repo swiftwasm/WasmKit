@@ -27,7 +27,7 @@
         var host = "127.0.0.1"
         var port: Int
         var logLevel = Logger.Level.info
-        let wasmModulePath: FilePath
+        let wasmModulePath: String
         let engineConfiguration: EngineConfiguration
         let wasiConfiguration: WASIConfiguration
 
@@ -71,7 +71,7 @@
                     }
                 }
                 let debuggerHandler = try await WasmKitGDBHandler(
-                    moduleFilePath: self.wasmModulePath,
+                    moduleFilePath: FilePath(self.wasmModulePath),
                     engineConfiguration: self.engineConfiguration,
                     wasiConfiguration: self.wasiConfiguration,
                     logger: logger,

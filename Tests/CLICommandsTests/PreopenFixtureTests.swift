@@ -1,6 +1,6 @@
 import Foundation
-import SystemExtras
 import Testing
+import WASI
 
 enum FixtureProbeError: Error, Equatable {
     case body

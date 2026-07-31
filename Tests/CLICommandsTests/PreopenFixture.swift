@@ -1,5 +1,4 @@
 import Foundation
-import SystemExtras
 import WASI
 import WAT
 import WasmKit

@@ -13,12 +13,11 @@ let swiftSettings: [SwiftSetting] = [
 let cliCommandsTarget = Target.target(
     name: "CLICommands",
     dependencies: [
-        "SystemExtras",
+        "WASI",
         "WAT",
         "WasmKit",
         "WasmKitWASI",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
-        .product(name: "SystemPackage", package: "swift-system"),
     ],
     exclude: ["CMakeLists.txt"],
     swiftSettings: swiftSettings
@@ -28,13 +27,12 @@ let cliCommandsTestTarget = Target.testTarget(
     name: "CLICommandsTests",
     dependencies: [
         "CLICommands",
-        "SystemExtras",
+        "WasmTypes",
         "WAT",
         "WASI",
         "WasmKit",
         "WasmKitWASI",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
-        .product(name: "SystemPackage", package: "swift-system"),
     ],
     exclude: ["Fixtures"]
 )
@@ -70,13 +68,13 @@ let package = Package(
     ],
     targets: [
         cliCommandsTarget,
+        cliCommandsTestTarget,
         .executableTarget(
             name: "CLI",
             dependencies: ["CLICommands"],
             exclude: ["CMakeLists.txt"],
             swiftSettings: swiftSettings
         ),
-        cliCommandsTestTarget,
         .target(
             name: "WasmKit",
             dependencies: [
@@ -167,27 +165,15 @@ let package = Package(
         ),
         .target(
             name: "WASI",
-            dependencies: ["WasmTypes", "SystemExtras"],
+            dependencies: [
+                "WasmTypes",
+                .target(name: "CWASIPlatform", condition: .when(platforms: [.wasi])),
+            ],
             exclude: ["CMakeLists.txt"],
             swiftSettings: swiftSettings
         ),
-        .testTarget(name: "WASITests", dependencies: ["SystemExtras", "WASI", "WasmKitWASI"], swiftSettings: swiftSettings),
-
-        .target(
-            name: "SystemExtras",
-            dependencies: [
-                .product(name: "SystemPackage", package: "swift-system"),
-                .target(name: "CSystemExtras", condition: .when(platforms: [.wasi])),
-            ],
-            exclude: ["CMakeLists.txt"],
-            swiftSettings: swiftSettings + [
-                .define("SYSTEM_PACKAGE_DARWIN", .when(platforms: DarwinPlatforms))
-            ]
-        ),
-
-        .testTarget(name: "SystemExtrasTests", dependencies: ["SystemExtras"], swiftSettings: swiftSettings),
-
-        .target(name: "CSystemExtras"),
+        .target(name: "CWASIPlatform"),
+        .testTarget(name: "WASITests", dependencies: ["WASI", "WasmKitWASI"], swiftSettings: swiftSettings),
 
         // Component Model (CM)
 
@@ -197,7 +183,6 @@ let package = Package(
             dependencies: [
                 "WasmKit",
                 "WasmKitWASI",
-                .product(name: "SystemPackage", package: "swift-system"),
             ],
             swiftSettings: swiftSettings
         ),
@@ -369,10 +354,8 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "SystemPackage", package: "swift-system"),
-                "SystemExtras",
                 "WasmKit",
                 "WasmKitWASI",
-                "WASI",
                 "GDBRemoteProtocol",
             ],
             exclude: ["LICENSE.txt"],
@@ -389,6 +372,7 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
     ])
 
     cliCommandsTestTarget.dependencies.append(contentsOf: [
+        .product(name: "SystemPackage", package: "swift-system", condition: .when(traits: ["WasmDebuggingSupport"])),
         .product(name: "Logging", package: "swift-log", condition: .when(traits: ["WasmDebuggingSupport"])),
         .product(name: "NIOCore", package: "swift-nio", condition: .when(traits: ["WasmDebuggingSupport"])),
         .target(name: "GDBRemoteProtocol", condition: .when(traits: ["WasmDebuggingSupport"])),

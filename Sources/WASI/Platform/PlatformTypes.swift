@@ -1,88 +1,37 @@
-import SystemExtras
-import SystemPackage
+import WasmTypes
 
 extension WASIAbi.FileType {
     init(platformFileType: FileDescriptor.FileType) {
-        if platformFileType.isDirectory {
-            self = .DIRECTORY
-            return
+        switch platformFileType {
+        case .directory: self = .DIRECTORY
+        case .symlink: self = .SYMBOLIC_LINK
+        case .regular: self = .REGULAR_FILE
+        case .characterDevice: self = .CHARACTER_DEVICE
+        case .blockDevice: self = .BLOCK_DEVICE
+        case .socket: self = .SOCKET_STREAM
+        case .unknown: self = .UNKNOWN
         }
-        #if !os(Windows)
-            if platformFileType.isSymlink {
-                self = .SYMBOLIC_LINK
-                return
-            }
-            if platformFileType.isFile {
-                self = .REGULAR_FILE
-                return
-            }
-            if platformFileType.isCharacterDevice {
-                self = .CHARACTER_DEVICE
-                return
-            }
-            if platformFileType.isBlockDevice {
-                self = .BLOCK_DEVICE
-                return
-            }
-            if platformFileType.isSocket {
-                self = .SOCKET_STREAM
-                return
-            }
-        #endif
-        self = .UNKNOWN
     }
 }
 
 extension WASIAbi.Fdflags {
     init(platformOpenOptions: FileDescriptor.OpenOptions) {
         var fdFlags: WASIAbi.Fdflags = []
-        #if !os(Windows)
-            if platformOpenOptions.contains(.append) {
-                fdFlags.insert(.APPEND)
-            }
-            if platformOpenOptions.contains(.nonBlocking) {
-                fdFlags.insert(.NONBLOCK)
-            }
-            #if !os(WASI)
-                if platformOpenOptions.contains(.dataSync) {
-                    fdFlags.insert(.DSYNC)
-                }
-                if platformOpenOptions.contains(.fileSync) {
-                    fdFlags.insert(.SYNC)
-                }
-            #endif
-            #if os(Linux)
-                if platformOpenOptions.contains(.readSync) {
-                    fdFlags.insert(.RSYNC)
-                }
-            #endif
-        #endif
+        if platformOpenOptions.contains(.append) { fdFlags.insert(.APPEND) }
+        if platformOpenOptions.contains(.nonBlocking) { fdFlags.insert(.NONBLOCK) }
+        if platformOpenOptions.contains(.dataSync) { fdFlags.insert(.DSYNC) }
+        if platformOpenOptions.contains(.fileSync) { fdFlags.insert(.SYNC) }
+        if platformOpenOptions.contains(.readSync) { fdFlags.insert(.RSYNC) }
         self = fdFlags
     }
 
     var platformOpenOptions: FileDescriptor.OpenOptions {
         var flags: FileDescriptor.OpenOptions = []
-        if self.contains(.APPEND) {
-            flags.insert(.append)
-        }
-        #if !os(Windows)
-            if self.contains(.NONBLOCK) {
-                flags.insert(.nonBlocking)
-            }
-            #if !os(WASI)
-                if self.contains(.DSYNC) {
-                    flags.insert(.dataSync)
-                }
-                if self.contains(.SYNC) {
-                    flags.insert(.fileSync)
-                }
-            #endif
-            #if os(Linux)
-                if self.contains(.RSYNC) {
-                    flags.insert(.readSync)
-                }
-            #endif
-        #endif
+        if self.contains(.APPEND) { flags.insert(.append) }
+        if self.contains(.NONBLOCK) { flags.insert(.nonBlocking) }
+        if self.contains(.DSYNC) { flags.insert(.dataSync) }
+        if self.contains(.SYNC) { flags.insert(.fileSync) }
+        if self.contains(.RSYNC) { flags.insert(.readSync) }
         return flags
     }
 }
@@ -140,13 +89,12 @@ extension WASIAbi.Timestamp {
     }
 
     init(platformTimeSpec timespec: FileTime) {
-        #if os(Windows)
-            self = UInt64(timespec.unixNanoseconds)
-        #else
-            self.init(
-                seconds: UInt64(timespec.rawValue.tv_sec),
-                nanoseconds: UInt64(timespec.rawValue.tv_nsec))
-        #endif
+        // Clamp negative (pre-1970) times to 0 instead of trapping: WASI
+        // timestamps are unsigned, and platforms can legitimately report
+        // such values (e.g. zero-initialized FILETIME fields on Windows).
+        self.init(
+            seconds: UInt64(Swift.max(0, timespec.seconds)),
+            nanoseconds: UInt64(Swift.max(0, timespec.nanoseconds)))
     }
 
     init(wallClockDuration duration: WallClock.Duration) {
@@ -155,14 +103,6 @@ extension WASIAbi.Timestamp {
 }
 
 extension WASIAbi.Errno {
-
-    static func translatingPlatformErrno<R>(_ body: () throws -> R) throws -> R {
-        do {
-            return try body()
-        } catch let errno as Errno {
-            throw try WASIAbi.Errno(platformErrno: errno)
-        }
-    }
 
     /// Looks through a cleanup failure so a failing close still reports the operation's own errno
     /// instead of trapping the guest.
@@ -174,104 +114,4 @@ extension WASIAbi.Errno {
         }
     }
 
-    init(platformErrno: CInt) throws {
-        try self.init(platformErrno: SystemPackage.Errno(rawValue: platformErrno))
-    }
-
-    init(platformErrno: Errno) throws {
-        guard let error = WASIAbi.Errno(_platformErrno: platformErrno) else {
-            throw WASIError(description: "Unknown underlying OS error: \(platformErrno)")
-        }
-        self = error
-    }
-
-    private init?(_platformErrno: SystemPackage.Errno) {
-        switch _platformErrno {
-        case .permissionDenied: self = .EPERM
-        case .notPermitted: self = .EPERM
-        case .noSuchFileOrDirectory: self = .ENOENT
-        case .noSuchProcess: self = .ESRCH
-        case .interrupted: self = .EINTR
-        case .ioError: self = .EIO
-        case .noSuchAddressOrDevice: self = .ENXIO
-        case .argListTooLong: self = .E2BIG
-        case .execFormatError: self = .ENOEXEC
-        case .badFileDescriptor: self = .EBADF
-        case .noChildProcess: self = .ECHILD
-        case .deadlock: self = .EDEADLK
-        case .noMemory: self = .ENOMEM
-        case .permissionDenied: self = .EACCES
-        case .badAddress: self = .EFAULT
-        case .resourceBusy: self = .EBUSY
-        case .fileExists: self = .EEXIST
-        case .improperLink: self = .EXDEV
-        case .operationNotSupportedByDevice: self = .ENODEV
-        case .notDirectory: self = .ENOTDIR
-        case .isDirectory: self = .EISDIR
-        case .invalidArgument: self = .EINVAL
-        case .tooManyOpenFilesInSystem: self = .ENFILE
-        case .tooManyOpenFiles: self = .EMFILE
-        #if !os(Windows)
-            case .inappropriateIOCTLForDevice: self = .ENOTTY
-            case .textFileBusy: self = .ETXTBSY
-        #endif
-        case .fileTooLarge: self = .EFBIG
-        case .noSpace: self = .ENOSPC
-        case .illegalSeek: self = .ESPIPE
-        case .readOnlyFileSystem: self = .EROFS
-        case .tooManyLinks: self = .EMLINK
-        case .brokenPipe: self = .EPIPE
-        case .outOfDomain: self = .EDOM
-        case .outOfRange: self = .ERANGE
-        case .resourceTemporarilyUnavailable: self = .EAGAIN
-        case .nowInProgress: self = .EINPROGRESS
-        case .alreadyInProcess: self = .EALREADY
-        case .notSocket: self = .ENOTSOCK
-        case .addressRequired: self = .EDESTADDRREQ
-        case .messageTooLong: self = .EMSGSIZE
-        case .protocolWrongTypeForSocket: self = .EPROTOTYPE
-        case .protocolNotAvailable: self = .ENOPROTOOPT
-        case .protocolNotSupported: self = .EPROTONOSUPPORT
-        case .notSupported: self = .ENOTSUP
-        case .addressFamilyNotSupported: self = .EAFNOSUPPORT
-        case .addressInUse: self = .EADDRINUSE
-        case .addressNotAvailable: self = .EADDRNOTAVAIL
-        case .networkDown: self = .ENETDOWN
-        case .networkUnreachable: self = .ENETUNREACH
-        case .networkReset: self = .ENETRESET
-        case .connectionAbort: self = .ECONNABORTED
-        case .connectionReset: self = .ECONNRESET
-        case .noBufferSpace: self = .ENOBUFS
-        case .socketIsConnected: self = .EISCONN
-        case .socketNotConnected: self = .ENOTCONN
-        case .timedOut: self = .ETIMEDOUT
-        case .connectionRefused: self = .ECONNREFUSED
-        case .tooManySymbolicLinkLevels: self = .ELOOP
-        case .fileNameTooLong: self = .ENAMETOOLONG
-        case .noRouteToHost: self = .EHOSTUNREACH
-        case .directoryNotEmpty: self = .ENOTEMPTY
-        case .diskQuotaExceeded: self = .EDQUOT
-        case .staleNFSFileHandle: self = .ESTALE
-        case .noLocks: self = .ENOLCK
-        case .noFunction: self = .ENOSYS
-        #if !os(Windows)
-            case .overflow: self = .EOVERFLOW
-        #endif
-        case .canceled: self = .ECANCELED
-        #if !os(Windows)
-            case .identifierRemoved: self = .EIDRM
-            case .noMessage: self = .ENOMSG
-        #endif
-        case .illegalByteSequence: self = .EILSEQ
-        #if !os(Windows)
-            case .badMessage: self = .EBADMSG
-            case .multiHop: self = .EMULTIHOP
-            case .noLink: self = .ENOLINK
-            case .protocolError: self = .EPROTO
-            case .notRecoverable: self = .ENOTRECOVERABLE
-            case .previousOwnerDied: self = .EOWNERDEAD
-        #endif
-        default: return nil
-        }
-    }
 }

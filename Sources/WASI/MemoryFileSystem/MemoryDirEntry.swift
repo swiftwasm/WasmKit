@@ -1,6 +1,3 @@
-import SystemExtras
-import SystemPackage
-
 /// A WASIDir implementation backed by an in-memory directory node.
 struct MemoryDirEntry: WASIDir {
     struct ReadEntriesResult: WASIReaddirIterator {
@@ -103,18 +100,6 @@ struct MemoryDirEntry: WASIDir {
 
     func close() throws {
         // No-op for memory filesystem - no resources to release
-    }
-
-    func openFile(
-        symlinkFollow: Bool,
-        path: String,
-        oflags: WASIAbi.Oflags,
-        accessMode: FileAccessMode,
-        fdflags: WASIAbi.Fdflags
-    ) throws -> FileDescriptor {
-        // Memory filesystem doesn't return real file descriptors for this method.
-        // File opening is handled through the WASI bridge's path_open implementation.
-        throw WASIAbi.Errno.ENOTSUP
     }
 
     func createDirectory(atPath path: String) throws {

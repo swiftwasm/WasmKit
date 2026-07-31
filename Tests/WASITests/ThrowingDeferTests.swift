@@ -1,5 +1,5 @@
-import SystemExtras
 import Testing
+import WASI
 
 @Suite struct ThrowingDeferTests {
     private actor Counter {

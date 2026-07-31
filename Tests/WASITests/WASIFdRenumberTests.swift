@@ -1,6 +1,6 @@
 import Testing
 
-@testable import WASI
+@_spi(WASIPlatform) @testable import WASI
 
 @Suite struct WASIFdRenumberTests {
     /// Helper: run `body` with a WASI implementation backed by a MemoryFileSystem

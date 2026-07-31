@@ -611,4 +611,16 @@
         let stream = try FileHandleStreamSource(fileHandle: fileHandle)
         return try parseComponent(stream: stream, features: features)
     }
+
+    /// Parse a component binary from a file path.
+    ///
+    /// The file is opened by the parser and closed when the underlying stream
+    /// source is deallocated.
+    public func parseComponent(
+        filePath: String,
+        features: WasmFeatureSet = .default
+    ) throws -> ParsedComponent {
+        let stream = try FileHandleStreamSource(filePath: filePath)
+        return try parseComponent(stream: stream, features: features)
+    }
 #endif

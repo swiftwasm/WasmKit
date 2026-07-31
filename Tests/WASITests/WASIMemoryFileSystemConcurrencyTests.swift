@@ -1,7 +1,6 @@
-import SystemExtras
 import Testing
 
-@testable import WASI
+@_spi(WASIPlatform) @testable import WASI
 
 @Suite struct MemoryFileSystemConcurrencyTests {
     @Test func concurrentAddAndRead() async throws {
@@ -250,5 +249,21 @@ import Testing
         } defer: {
             try bridge.close()
         }
+    }
+}
+
+/// Runs an async cleanup closure (`deferred`) after a given async `work`
+/// closure, making sure `deferred` also runs when `work` throws.
+private func withAsyncThrowing<T: Sendable>(
+    do work: @Sendable () async throws -> T,
+    defer deferred: @Sendable () async throws -> Void
+) async throws -> T {
+    do {
+        let result = try await work()
+        try await deferred()
+        return result
+    } catch {
+        try await deferred()
+        throw error
     }
 }

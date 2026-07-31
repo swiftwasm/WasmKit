@@ -1,5 +1,4 @@
 import Foundation
-import SystemPackage
 import Testing
 import WasmKit
 import WasmKitWASI
