@@ -17,6 +17,14 @@
     import WASILibc
 #endif
 
+// wasi-libc's `FILE` is an incomplete type, which Swift imports as an
+// opaque pointer rather than a pointee type.
+#if os(WASI)
+    private typealias CFILEPointer = OpaquePointer
+#else
+    private typealias CFILEPointer = UnsafeMutablePointer<FILE>
+#endif
+
 enum CLIFile {
     struct Error: Swift.Error, CustomStringConvertible {
         let description: String
@@ -26,7 +34,7 @@ enum CLIFile {
     /// descriptor-based APIs. The handle owns the stream; call ``close()``
     /// exactly once.
     struct Handle {
-        fileprivate let stream: UnsafeMutablePointer<FILE>
+        fileprivate let stream: CFILEPointer
 
         /// The raw platform descriptor, for APIs that borrow it. Callers
         /// must reposition via ``seekToStart()`` (not raw seeks) so the
@@ -88,7 +96,7 @@ enum CLIFile {
         try Handle(stream: _open(path, mode: "wb", what: "create"))
     }
 
-    private static func _open(_ path: String, mode: String, what: String) throws -> UnsafeMutablePointer<FILE> {
+    private static func _open(_ path: String, mode: String, what: String) throws -> CFILEPointer {
         #if os(Windows)
             // Use the wide-character variant so non-ASCII paths survive.
             let stream = path.withCString(encodedAs: UTF16.self) { widePath in
