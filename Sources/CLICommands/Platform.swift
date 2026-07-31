@@ -17,9 +17,9 @@
     import WASILibc
 #endif
 
-// wasi-libc's `FILE` is an incomplete type, which Swift imports as an
-// opaque pointer rather than a pointee type.
-#if os(WASI)
+// wasi-libc's and Bionic's `FILE` is an incomplete type, which Swift imports
+// as an opaque pointer rather than a pointee type.
+#if os(WASI) || os(Android)
     private typealias CFILEPointer = OpaquePointer
 #else
     private typealias CFILEPointer = UnsafeMutablePointer<FILE>
