@@ -496,7 +496,7 @@ public enum Instruction: Equatable, Sendable {
     case `unary`(Instruction.Unary)
     case `binary`(Instruction.Binary)
     case `conversion`(Instruction.Conversion)
-    case `memoryInit`(dataIndex: UInt32)
+    case `memoryInit`(dataIndex: UInt32, memory: UInt32)
     case `dataDrop`(dataIndex: UInt32)
     case `memoryCopy`(dstMem: UInt32, srcMem: UInt32)
     case `memoryFill`(memory: UInt32)
@@ -623,7 +623,7 @@ extension AnyInstructionVisitor {
     public mutating func visitUnary(_ unary: Instruction.Unary) throws(VisitorError) { return try self.visit(.unary(unary)) }
     public mutating func visitBinary(_ binary: Instruction.Binary) throws(VisitorError) { return try self.visit(.binary(binary)) }
     public mutating func visitConversion(_ conversion: Instruction.Conversion) throws(VisitorError) { return try self.visit(.conversion(conversion)) }
-    public mutating func visitMemoryInit(dataIndex: UInt32) throws(VisitorError) { return try self.visit(.memoryInit(dataIndex: dataIndex)) }
+    public mutating func visitMemoryInit(dataIndex: UInt32, memory: UInt32) throws(VisitorError) { return try self.visit(.memoryInit(dataIndex: dataIndex, memory: memory)) }
     public mutating func visitDataDrop(dataIndex: UInt32) throws(VisitorError) { return try self.visit(.dataDrop(dataIndex: dataIndex)) }
     public mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws(VisitorError) { return try self.visit(.memoryCopy(dstMem: dstMem, srcMem: srcMem)) }
     public mutating func visitMemoryFill(memory: UInt32) throws(VisitorError) { return try self.visit(.memoryFill(memory: memory)) }
@@ -802,7 +802,7 @@ public protocol InstructionVisitor: ~Copyable {
     /// Visiting `conversion` category instruction.
     mutating func visitConversion(_: Instruction.Conversion) throws(VisitorError)
     /// Visiting `memory.init` instruction.
-    mutating func visitMemoryInit(dataIndex: UInt32) throws(VisitorError)
+    mutating func visitMemoryInit(dataIndex: UInt32, memory: UInt32) throws(VisitorError)
     /// Visiting `data.drop` instruction.
     mutating func visitDataDrop(dataIndex: UInt32) throws(VisitorError)
     /// Visiting `memory.copy` instruction.
@@ -997,7 +997,7 @@ extension InstructionVisitor where Self: ~Copyable {
         case let .unary(unary): return try visitUnary(unary)
         case let .binary(binary): return try visitBinary(binary)
         case let .conversion(conversion): return try visitConversion(conversion)
-        case let .memoryInit(dataIndex): return try visitMemoryInit(dataIndex: dataIndex)
+        case let .memoryInit(dataIndex, memory): return try visitMemoryInit(dataIndex: dataIndex, memory: memory)
         case let .dataDrop(dataIndex): return try visitDataDrop(dataIndex: dataIndex)
         case let .memoryCopy(dstMem, srcMem): return try visitMemoryCopy(dstMem: dstMem, srcMem: srcMem)
         case let .memoryFill(memory): return try visitMemoryFill(memory: memory)
@@ -1121,7 +1121,7 @@ extension InstructionVisitor where Self: ~Copyable {
     public mutating func visitUnary(_ unary: Instruction.Unary) throws(VisitorError) {}
     public mutating func visitBinary(_ binary: Instruction.Binary) throws(VisitorError) {}
     public mutating func visitConversion(_ conversion: Instruction.Conversion) throws(VisitorError) {}
-    public mutating func visitMemoryInit(dataIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitMemoryInit(dataIndex: UInt32, memory: UInt32) throws(VisitorError) {}
     public mutating func visitDataDrop(dataIndex: UInt32) throws(VisitorError) {}
     public mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws(VisitorError) {}
     public mutating func visitMemoryFill(memory: UInt32) throws(VisitorError) {}

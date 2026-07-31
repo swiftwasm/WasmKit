@@ -313,8 +313,8 @@ func parseTextInstruction<V: InstructionVisitor>(
     case "i64.extend16_s": return { visitor throws(V.VisitorError) in return try visitor.visitUnary(.i64Extend16S) }
     case "i64.extend32_s": return { visitor throws(V.VisitorError) in return try visitor.visitUnary(.i64Extend32S) }
     case "memory.init":
-        let (dataIndex) = try expressionParser.visitMemoryInit(wat: &wat)
-        return { visitor throws(V.VisitorError) in return try visitor.visitMemoryInit(dataIndex: dataIndex) }
+        let (dataIndex, memory) = try expressionParser.visitMemoryInit(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitMemoryInit(dataIndex: dataIndex, memory: memory) }
     case "data.drop":
         let (dataIndex) = try expressionParser.visitDataDrop(wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitDataDrop(dataIndex: dataIndex) }

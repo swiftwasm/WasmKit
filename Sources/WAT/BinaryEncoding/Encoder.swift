@@ -503,12 +503,6 @@ struct ExpressionEncoder: BinaryInstructionEncoder {
     }
 
     // MARK: Special instructions
-    mutating func visitMemoryInit(dataIndex: UInt32) {
-        encodeInstruction([0xFC, 0x08])
-        encodeImmediates(dataIndex: dataIndex)
-        encodeByte(0x00)  // reserved value
-    }
-
     mutating func visitTypedSelect(type: ValueType) {
         encodeInstruction([0x1C])
         encodeByte(0x01)  // number of result types
@@ -531,6 +525,12 @@ struct ExpressionEncoder: BinaryInstructionEncoder {
     mutating func encodeImmediates(dataIndex: UInt32) {
         hasDataSegmentInstruction = true
         encodeUnsigned(dataIndex)
+    }
+    mutating func encodeImmediates(dataIndex: UInt32, memory: UInt32) {
+        // For memory 0, encoding the memory index yields the single 0x00 the pre-multi-memory reserved byte produced.
+        hasDataSegmentInstruction = true
+        encodeUnsigned(dataIndex)
+        encodeUnsigned(memory)
     }
     mutating func encodeImmediates(elemIndex: UInt32) { encodeUnsigned(elemIndex) }
     mutating func encodeImmediates(functionIndex: UInt32) { encodeUnsigned(functionIndex) }

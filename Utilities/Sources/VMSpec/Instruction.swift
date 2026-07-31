@@ -546,6 +546,7 @@ extension VMGen {
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "sourceOffset", type: .VReg)
             $0.field(name: "size", type: .VReg)
+            $0.field(name: "memory", type: .MemoryIndex)
         },
         Instruction(name: "memoryDataDrop", documentation: "WebAssembly Core Instruction `memory.drop`") {
             $0.field(name: "segmentIndex", type: .UInt32)
@@ -554,11 +555,14 @@ extension VMGen {
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "sourceOffset", type: .VReg)
             $0.field(name: "size", type: .LVReg)
+            $0.field(name: "destMemory", type: .MemoryIndex)
+            $0.field(name: "sourceMemory", type: .MemoryIndex)
         },
         Instruction(name: "memoryFill", documentation: "WebAssembly Core Instruction `memory.fill`", mayThrow: true) {
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "value", type: .VReg)
             $0.field(name: "size", type: .LVReg)
+            $0.field(name: "memory", type: .MemoryIndex)
         },
     ]
 

@@ -751,14 +751,15 @@ extension Instruction {
         var destOffset: VReg
         var sourceOffset: VReg
         var size: VReg
+        var memory: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             let (segmentIndex, destOffset, sourceOffset) = pc.read((UInt32, VReg, VReg).self)
-            let (size, _, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
-            return Self(segmentIndex: segmentIndex, destOffset: destOffset, sourceOffset: sourceOffset, size: size)
+            let (size, memory) = pc.read((VReg, UInt32).self)
+            return Self(segmentIndex: segmentIndex, destOffset: destOffset, sourceOffset: sourceOffset, size: size, memory: memory)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
             emitSlot { unsafeBitCast(($0.segmentIndex, $0.destOffset, $0.sourceOffset) as (UInt32, VReg, VReg), to: CodeSlot.self) }
-            emitSlot { unsafeBitCast(($0.size, 0, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.size, $0.memory) as (VReg, UInt32), to: CodeSlot.self) }
         }
     }
 
@@ -777,12 +778,16 @@ extension Instruction {
         var destOffset: VReg
         var sourceOffset: VReg
         var size: LVReg
+        var destMemory: UInt32
+        var sourceMemory: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             let (destOffset, sourceOffset, size) = pc.read((VReg, VReg, LVReg).self)
-            return Self(destOffset: destOffset, sourceOffset: sourceOffset, size: size)
+            let (destMemory, sourceMemory) = pc.read((UInt32, UInt32).self)
+            return Self(destOffset: destOffset, sourceOffset: sourceOffset, size: size, destMemory: destMemory, sourceMemory: sourceMemory)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
             emitSlot { unsafeBitCast(($0.destOffset, $0.sourceOffset, $0.size) as (VReg, VReg, LVReg), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.destMemory, $0.sourceMemory) as (UInt32, UInt32), to: CodeSlot.self) }
         }
     }
 
@@ -790,12 +795,15 @@ extension Instruction {
         var destOffset: VReg
         var value: VReg
         var size: LVReg
+        var memory: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             let (destOffset, value, size) = pc.read((VReg, VReg, LVReg).self)
-            return Self(destOffset: destOffset, value: value, size: size)
+            let (memory, _, _, _, _) = pc.read((UInt32, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(destOffset: destOffset, value: value, size: size, memory: memory)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
             emitSlot { unsafeBitCast(($0.destOffset, $0.value, $0.size) as (VReg, VReg, LVReg), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.memory, 0, 0, 0, 0) as (UInt32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
