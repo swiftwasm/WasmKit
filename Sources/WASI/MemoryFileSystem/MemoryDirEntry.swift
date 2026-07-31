@@ -1,6 +1,6 @@
 /// A WASIDir implementation backed by an in-memory directory node.
 struct MemoryDirEntry: WASIDir {
-    struct ReadEntriesResult: WASIReaddirIterator {
+    struct MemoryDirectoryIterator: WASIReaddirIterator {
         let children: [String]
         let fileSystem: MemoryFileSystem
         let basePath: String
@@ -130,13 +130,14 @@ struct MemoryDirEntry: WASIDir {
         )
     }
 
-    func readEntries(cookie: WASIAbi.DirCookie) throws -> ReadEntriesResult {
-        ReadEntriesResult(
-            children: dirNode.listChildren(),
-            fileSystem: fileSystem,
-            basePath: path,
-            nextIndex: Int(cookie)
-        )
+    func readEntries(cookie: WASIAbi.DirCookie) throws -> WASIReaddirEntries {
+        WASIReaddirEntries(
+            MemoryDirectoryIterator(
+                children: dirNode.listChildren(),
+                fileSystem: fileSystem,
+                basePath: path,
+                nextIndex: Int(cookie)
+            ))
     }
 
     func attributes(path: String, symlinkFollow: Bool) throws -> WASIAbi.Filestat {

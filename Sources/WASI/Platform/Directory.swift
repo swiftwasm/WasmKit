@@ -152,7 +152,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
         }
     }
 
-    struct ReadEntriesResult: WASIReaddirIterator {
+    struct HostDirectoryIterator: WASIReaddirIterator {
         let fd: FileDescriptor
         let stream: FileDescriptor.DirectoryStream
         var entryIndex: Int
@@ -205,8 +205,8 @@ extension DirEntry: WASIDir, FdWASIEntry {
     }
     func readEntries(
         cookie: WASIAbi.DirCookie
-    ) throws -> ReadEntriesResult {
-        return try ReadEntriesResult(fd: fd, cookie: cookie)
+    ) throws -> WASIReaddirEntries {
+        return WASIReaddirEntries(try HostDirectoryIterator(fd: fd, cookie: cookie))
     }
 
     func createDirectory(atPath path: String) throws {
