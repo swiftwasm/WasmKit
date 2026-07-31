@@ -96,11 +96,6 @@
                     kind: .insertSoftwareBreakpoint, arguments: "\(hostHex(wasmAddr)),1"))
         }
 
-        // NOTE: This test target was historically not wired into the package
-        // manifest, and the two `withKnownIssue` tests below document intended
-        // breakpoint-address behavior that the handler has never implemented
-        // (it reports the resolved address with a "trace" reason, and remove
-        // does not uninstall a breakpoint inserted at an elided address).
         @Test
         func breakpointStopReportsBreakpointReasonAtRequestedAddress() async throws {
             let (requested, resolved) = try divergentAddresses()
@@ -108,11 +103,9 @@
                 try await insert(h, at: requested)
                 let stop = try await h.handle(command: .init(kind: .continue, arguments: ""))
                 let kv = pairs(stop)
-                withKnownIssue {
-                    #expect(kv["reason"] == "breakpoint")
-                    #expect(kv["thread-pcs"] == hostHex(requested))
-                    #expect(kv["thread-pcs"] != hostHex(resolved))
-                }
+                #expect(kv["reason"] == "breakpoint")
+                #expect(kv["thread-pcs"] == hostHex(requested))
+                #expect(kv["thread-pcs"] != hostHex(resolved))
             }
         }
 
@@ -125,13 +118,11 @@
                     command: .init(
                         kind: .removeSoftwareBreakpoint, arguments: "\(hostHex(requested)),1"))
                 let resp = try await h.handle(command: .init(kind: .continue, arguments: ""))
-                withKnownIssue {
-                    // Run to completion yields a `W..` exit reply, not a key-value stop reply.
-                    if case .string(let s) = resp.kind {
-                        #expect(s.hasPrefix("W"))
-                    } else {
-                        Issue.record("expected exit reply after removing the only breakpoint, got \(resp.kind)")
-                    }
+                // Run to completion yields a `W..` exit reply, not a key-value stop reply.
+                if case .string(let s) = resp.kind {
+                    #expect(s.hasPrefix("W"))
+                } else {
+                    Issue.record("expected exit reply after removing the only breakpoint, got \(resp.kind)")
                 }
             }
         }

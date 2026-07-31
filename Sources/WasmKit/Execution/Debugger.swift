@@ -165,11 +165,11 @@
         /// See also ``Debugger/disableBreakpoint(address:)``.
         @discardableResult
         package mutating func enableBreakpoint(address: Int) throws -> Int {
-            guard self.breakpoints[address] == nil else {
-                return address
+            let (iseq, wasm) = try self.findIseq(forWasmAddress: address)
+            guard self.breakpoints[wasm] == nil else {
+                return wasm
             }
 
-            let (iseq, wasm) = try self.findIseq(forWasmAddress: address)
             self.breakpoints[wasm] = iseq.pointee
             iseq.pointee = Instruction.breakpoint.headSlot(threadingModel: self.threadingModel)
             return wasm
@@ -189,11 +189,12 @@
         /// instruction is restored from debugger state and replaces the breakpoint instruction.
         /// See also ``Debugger/enableBreakpoint(address:)``.
         package mutating func disableBreakpoint(address: Int) throws {
-            guard let oldCodeSlot = self.breakpoints[address] else {
+            // Resolve the same way enableBreakpoint does, so a breakpoint set
+            // at an elided address is found under its resolved key.
+            let (iseq, wasm) = try self.findIseq(forWasmAddress: address)
+            guard let oldCodeSlot = self.breakpoints[wasm] else {
                 return
             }
-
-            let (iseq, wasm) = try self.findIseq(forWasmAddress: address)
 
             self.breakpoints[wasm] = nil
             iseq.pointee = oldCodeSlot

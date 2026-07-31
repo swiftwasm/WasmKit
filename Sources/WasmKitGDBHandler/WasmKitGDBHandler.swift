@@ -54,6 +54,11 @@
         private var debugger: Debugger
 
         private var memoryView: DebuggerMemoryView
+        /// User-set breakpoints, keyed by the address the debugger host
+        /// requested, with the engine's resolved address as the value.
+        /// Stops at a resolved address are reported as breakpoint stops at
+        /// the requested address, which is the location the host knows.
+        private var userBreakpoints: [Int: Int] = [:]
         private let wasi: WASIBridgeToHost
 
         /// Creates a handler debugging the given WebAssembly binary.
@@ -139,10 +144,15 @@
                 switch self.debugger.state {
                 case .stoppedAtBreakpoint(let breakpoint):
                     let pc = breakpoint.wasmPc
-                    let pcInHostAddressSpace = UInt64(pc) + DebuggerMemoryView.executableCodeOffset
-                    result.append(("thread-pcs", self.hexDump(pcInHostAddressSpace, endianness: .big)))
-                    result.append(("00", self.hexDump(pcInHostAddressSpace, endianness: .little)))
-                    result.append(("reason", "trace"))
+                    let userBreakpoint = self.userBreakpoints.first(where: { $0.value == pc })?.key
+                    // Report user-breakpoint stops at the address the host
+                    // requested, so it can attribute the stop to its
+                    // breakpoint even when the engine resolved the address
+                    // to the next emitted instruction.
+                    let reportedPc = UInt64(userBreakpoint ?? pc) + DebuggerMemoryView.executableCodeOffset
+                    result.append(("thread-pcs", self.hexDump(reportedPc, endianness: .big)))
+                    result.append(("00", self.hexDump(reportedPc, endianness: .little)))
+                    result.append(("reason", userBreakpoint != nil ? "breakpoint" : "trace"))
                     return .keyValuePairs(result)
 
                 case .entrypointReturned(let values):
@@ -313,25 +323,24 @@
                 throw Error.killRequestReceived
 
             case .insertSoftwareBreakpoint:
-                try self.debugger.enableBreakpoint(
-                    address: Int(
-                        self.firstHexArgument(
-                            argumentsString: command.arguments,
-                            separator: ",",
-                            endianness: .big
-                        ) - DebuggerMemoryView.executableCodeOffset)
-                )
+                let requested = Int(
+                    try self.firstHexArgument(
+                        argumentsString: command.arguments,
+                        separator: ",",
+                        endianness: .big
+                    ) - DebuggerMemoryView.executableCodeOffset)
+                self.userBreakpoints[requested] = try self.debugger.enableBreakpoint(address: requested)
                 responseKind = .ok
 
             case .removeSoftwareBreakpoint:
-                try self.debugger.disableBreakpoint(
-                    address: Int(
-                        self.firstHexArgument(
-                            argumentsString: command.arguments,
-                            separator: ",",
-                            endianness: .big
-                        ) - DebuggerMemoryView.executableCodeOffset)
-                )
+                let requested = Int(
+                    try self.firstHexArgument(
+                        argumentsString: command.arguments,
+                        separator: ",",
+                        endianness: .big
+                    ) - DebuggerMemoryView.executableCodeOffset)
+                try self.debugger.disableBreakpoint(address: requested)
+                self.userBreakpoints[requested] = nil
                 responseKind = .ok
 
             case .wasmLocal:
