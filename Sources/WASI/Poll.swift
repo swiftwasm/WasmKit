@@ -2,11 +2,11 @@ import WasmTypes
 
 extension FdTable {
     fileprivate func hostFileDescriptor(fd: WASIAbi.Fd) throws -> CInt {
-        guard case .file(let entry) = self[fd], let fd = (entry as? FdWASIEntry)?.fd else {
+        guard case .file(let entry) = self[fd], let hostFd = entry.hostFileDescriptor else {
             throw WASIAbi.Errno.EBADF
         }
 
-        return fd.rawValue
+        return hostFd
     }
 }
 

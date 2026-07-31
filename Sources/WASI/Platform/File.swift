@@ -4,6 +4,10 @@ protocol FdWASIEntry: WASIEntry {
     var fd: FileDescriptor { get }
 }
 
+extension FdWASIEntry {
+    var hostFileDescriptor: CInt? { fd.rawValue }
+}
+
 protocol FdWASIFile: WASIFile, FdWASIEntry {
     var accessMode: FileAccessMode { get }
 }
@@ -33,52 +37,56 @@ extension FdWASIFile {
     }
 
     @inlinable
-    func write<M: GuestMemory, Buffer: Sequence>(vectored buffer: Buffer, memory: M) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func write(vectored buffers: GuestBuffers) throws -> WASIAbi.Size {
         guard accessMode.contains(.write) else {
             throw WASIAbi.Errno.EBADF
         }
         // TODO: Use `writev`
         var bytesWritten: UInt32 = 0
-        for iovec in buffer {
-            bytesWritten += try iovec.withHostBufferPointer(in: memory) {
-                UInt32(try fd.write(UnsafeRawBufferPointer($0)))
-            }
+        for index in 0..<buffers.count {
+            bytesWritten += UInt32(
+                try buffers.withHostBuffer(at: index) {
+                    try fd.write(UnsafeRawBufferPointer($0))
+                })
         }
         return bytesWritten
     }
 
     @inlinable
-    func pwrite<M: GuestMemory, Buffer: Sequence>(vectored buffer: Buffer, memory: M, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func pwrite(vectored buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size {
         // TODO: Use `pwritev`
         var currentOffset: Int64 = Int64(offset)
-        for iovec in buffer {
-            currentOffset += try iovec.withHostBufferPointer(in: memory) {
-                Int64(try fd.writeAll(toAbsoluteOffset: currentOffset, $0))
-            }
+        for index in 0..<buffers.count {
+            currentOffset += Int64(
+                try buffers.withHostBuffer(at: index) {
+                    try fd.writeAll(toAbsoluteOffset: currentOffset, $0)
+                })
         }
         let nwritten = WASIAbi.FileSize(currentOffset) - offset
         return WASIAbi.Size(nwritten)
     }
 
     @inlinable
-    func read<M: GuestMemory, Buffer: Sequence>(into buffer: Buffer, memory: M) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func read(into buffers: GuestBuffers) throws -> WASIAbi.Size {
         var nread: UInt32 = 0
-        for iovec in buffer {
-            nread += try iovec.withHostBufferPointer(in: memory) {
-                try UInt32(fd.read(into: $0))
-            }
+        for index in 0..<buffers.count {
+            nread += UInt32(
+                try buffers.withHostBuffer(at: index) {
+                    try fd.read(into: $0)
+                })
         }
         return nread
     }
 
     @inlinable
-    func pread<M: GuestMemory, Buffer: Sequence>(into buffer: Buffer, memory: M, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func pread(into buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size {
         // TODO: Use `preadv`
         var nread: UInt32 = 0
-        for iovec in buffer {
-            nread += try iovec.withHostBufferPointer(in: memory) {
-                try UInt32(fd.read(fromAbsoluteOffset: Int64(offset + UInt64(nread)), into: $0))
-            }
+        for index in 0..<buffers.count {
+            nread += UInt32(
+                try buffers.withHostBuffer(at: index) {
+                    try fd.read(fromAbsoluteOffset: Int64(offset + UInt64(nread)), into: $0)
+                })
         }
         return nread
     }

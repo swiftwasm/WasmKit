@@ -173,39 +173,39 @@ final class MemoryFileEntry: WASIFile {
         }
     }
 
-    func write<M: GuestMemory, Buffer: Sequence>(vectored buffer: Buffer, memory: M) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func write(vectored buffers: GuestBuffers) throws -> WASIAbi.Size {
         guard accessMode.contains(.write) else {
             throw WASIAbi.Errno.EBADF
         }
         return try position.withLock { pos in
-            let result = try fileNode.write(vectored: buffer, memory: memory, position: pos)
+            let result = try fileNode.write(vectored: buffers, position: pos)
             pos = result.newPosition
             return result.count
         }
     }
 
-    func pwrite<M: GuestMemory, Buffer: Sequence>(vectored buffer: Buffer, memory: M, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func pwrite(vectored buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size {
         guard accessMode.contains(.write) else {
             throw WASIAbi.Errno.EBADF
         }
-        return try fileNode.pwrite(vectored: buffer, memory: memory, offset: Int(offset))
+        return try fileNode.pwrite(vectored: buffers, offset: Int(offset))
     }
 
-    func read<M: GuestMemory, Buffer: Sequence>(into buffer: Buffer, memory: M) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func read(into buffers: GuestBuffers) throws -> WASIAbi.Size {
         guard accessMode.contains(.read) else {
             throw WASIAbi.Errno.EBADF
         }
         return try position.withLock { pos in
-            let result = try fileNode.read(into: buffer, memory: memory, position: pos)
+            let result = try fileNode.read(into: buffers, position: pos)
             pos = result.newPosition
             return result.count
         }
     }
 
-    func pread<M: GuestMemory, Buffer: Sequence>(into buffer: Buffer, memory: M, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func pread(into buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size {
         guard accessMode.contains(.read) else {
             throw WASIAbi.Errno.EBADF
         }
-        return try fileNode.pread(into: buffer, memory: memory, offset: Int(offset))
+        return try fileNode.pread(into: buffers, offset: Int(offset))
     }
 }

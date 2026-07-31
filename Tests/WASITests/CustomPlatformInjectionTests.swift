@@ -40,28 +40,20 @@ struct CustomPlatformInjectionTests {
         func seek(offset: WASIAbi.FileDelta, whence: WASIAbi.Whence) throws -> WASIAbi.FileSize {
             throw WASIAbi.Errno.ESPIPE
         }
-        func write<M: GuestMemory, Buffer: Sequence>(
-            vectored buffer: Buffer, memory: M
-        ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+        func write(vectored buffers: GuestBuffers) throws -> WASIAbi.Size {
             throw WASIAbi.Errno.EROFS
         }
-        func pwrite<M: GuestMemory, Buffer: Sequence>(
-            vectored buffer: Buffer, memory: M, offset: WASIAbi.FileSize
-        ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+        func pwrite(vectored buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size {
             throw WASIAbi.Errno.EROFS
         }
-        func read<M: GuestMemory, Buffer: Sequence>(
-            into buffer: Buffer, memory: M
-        ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
-            try pread(into: buffer, memory: memory, offset: 0)
+        func read(into buffers: GuestBuffers) throws -> WASIAbi.Size {
+            try pread(into: buffers, offset: 0)
         }
-        func pread<M: GuestMemory, Buffer: Sequence>(
-            into buffer: Buffer, memory: M, offset: WASIAbi.FileSize
-        ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+        func pread(into buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size {
             var cursor = Int(offset)
             var total: WASIAbi.Size = 0
-            for iovec in buffer {
-                let count: Int = iovec.withHostBufferPointer(in: memory) { destination in
+            for index in 0..<buffers.count {
+                let count: Int = try buffers.withHostBuffer(at: index) { destination in
                     let available = max(0, bytes.count - cursor)
                     let toRead = min(destination.count, available)
                     guard toRead > 0 else { return 0 }
@@ -104,31 +96,24 @@ struct CustomPlatformInjectionTests {
         func seek(offset: WASIAbi.FileDelta, whence: WASIAbi.Whence) throws -> WASIAbi.FileSize {
             throw WASIAbi.Errno.ESPIPE
         }
-        func write<M: GuestMemory, Buffer: Sequence>(
-            vectored buffer: Buffer, memory: M
-        ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+        func write(vectored buffers: GuestBuffers) throws -> WASIAbi.Size {
             var total: WASIAbi.Size = 0
-            for iovec in buffer {
-                iovec.withHostBufferPointer(in: memory) { source in
+            for index in 0..<buffers.count {
+                try buffers.withHostBuffer(at: index) { source in
                     captured.withLock { $0.append(contentsOf: source.bindMemory(to: UInt8.self)) }
                     total += WASIAbi.Size(source.count)
+                    return source.count
                 }
             }
             return total
         }
-        func pwrite<M: GuestMemory, Buffer: Sequence>(
-            vectored buffer: Buffer, memory: M, offset: WASIAbi.FileSize
-        ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+        func pwrite(vectored buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size {
             throw WASIAbi.Errno.ESPIPE
         }
-        func read<M: GuestMemory, Buffer: Sequence>(
-            into buffer: Buffer, memory: M
-        ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+        func read(into buffers: GuestBuffers) throws -> WASIAbi.Size {
             throw WASIAbi.Errno.EBADF
         }
-        func pread<M: GuestMemory, Buffer: Sequence>(
-            into buffer: Buffer, memory: M, offset: WASIAbi.FileSize
-        ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+        func pread(into buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size {
             throw WASIAbi.Errno.EBADF
         }
     }
