@@ -463,7 +463,10 @@ struct MemoryEntity: ~Copyable {
     static let pageSize = 64 * 1024
 
     static func maxPageCount(isMemory64: Bool) -> UInt64 {
-        isMemory64 ? UInt64.max : UInt64(1 << 32) / UInt64(pageSize)
+        // Shift in the UInt64 domain: `1 << 32` would be evaluated as `Int`,
+        // which is 32 bits wide on targets like riscv32, wrapping to zero and
+        // rejecting every guest that declares a memory.
+        isMemory64 ? UInt64.max : (UInt64(1) << 32) / UInt64(pageSize)
     }
 
     private struct MallocStorage {
