@@ -1,4 +1,6 @@
+@_spi(WASIPlatform) import WASI
 import WasmKit
+import WasmKitWASI
 
 // (module
 //   (import "host" "mul" (func $mul (param i32 i32) (result i32)))
@@ -30,6 +32,121 @@ let demoWasm: [UInt8] = [
 /// rethrow it with its identity intact.
 struct DemoHostError: Error {
     let code: UInt32
+}
+
+
+/// The WASI guest: writes a string to fd 1 via `fd_write`.
+///
+/// (module
+///   (import "wasi_snapshot_preview1" "fd_write" (func $fd_write (param i32 i32 i32 i32) (result i32)))
+///   (memory (export "memory") 1)
+///   (data (i32.const 64) "WASI guest says hello\n")
+///   (func (export "_start") ... ))
+let wasiGuestWasm: [UInt8] = [
+    0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00, 0x01, 0x0C, 0x02, 0x60,
+    0x04, 0x7F, 0x7F, 0x7F, 0x7F, 0x01, 0x7F, 0x60, 0x00, 0x00, 0x02, 0x23,
+    0x01, 0x16, 0x77, 0x61, 0x73, 0x69, 0x5F, 0x73, 0x6E, 0x61, 0x70, 0x73,
+    0x68, 0x6F, 0x74, 0x5F, 0x70, 0x72, 0x65, 0x76, 0x69, 0x65, 0x77, 0x31,
+    0x08, 0x66, 0x64, 0x5F, 0x77, 0x72, 0x69, 0x74, 0x65, 0x00, 0x00, 0x03,
+    0x02, 0x01, 0x01, 0x05, 0x03, 0x01, 0x00, 0x01, 0x07, 0x13, 0x02, 0x06,
+    0x6D, 0x65, 0x6D, 0x6F, 0x72, 0x79, 0x02, 0x00, 0x06, 0x5F, 0x73, 0x74,
+    0x61, 0x72, 0x74, 0x00, 0x01, 0x0A, 0x1E, 0x01, 0x1C, 0x00, 0x41, 0x00,
+    0x41, 0xC0, 0x00, 0x36, 0x02, 0x00, 0x41, 0x04, 0x41, 0x16, 0x36, 0x02,
+    0x00, 0x41, 0x01, 0x41, 0x00, 0x41, 0x01, 0x41, 0x08, 0x10, 0x00, 0x1A,
+    0x0B, 0x0B, 0x1D, 0x01, 0x00, 0x41, 0xC0, 0x00, 0x0B, 0x16, 0x57, 0x41,
+    0x53, 0x49, 0x20, 0x67, 0x75, 0x65, 0x73, 0x74, 0x20, 0x73, 0x61, 0x79,
+    0x73, 0x20, 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x0A, 0x00, 0x12, 0x04, 0x6E,
+    0x61, 0x6D, 0x65, 0x01, 0x0B, 0x01, 0x00, 0x08, 0x66, 0x64, 0x5F, 0x77,
+    0x72, 0x69, 0x74, 0x65,
+]
+
+/// Routes a WASI stream onto the ESP-IDF console.
+///
+/// Bare-metal targets have no host file descriptors, so stdio is injected as a
+/// `WASIFile` instead. This is the seam an embedded consumer uses to point WASI
+/// at a UART.
+struct ConsoleFile: WASIFile {
+    var isBorrowed: Bool { true }
+
+    func attributes() throws -> WASIAbi.Filestat {
+        WASIAbi.Filestat(
+            dev: 0, ino: 0, filetype: .CHARACTER_DEVICE,
+            nlink: 0, size: 0, atim: 0, mtim: 0, ctim: 0)
+    }
+    func fileType() throws -> WASIAbi.FileType { .CHARACTER_DEVICE }
+    func status() throws -> WASIAbi.Fdflags { [] }
+    func setTimes(atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp, fstFlags: WASIAbi.FstFlags) throws {}
+    func advise(offset: WASIAbi.FileSize, length: WASIAbi.FileSize, advice: WASIAbi.Advice) throws {}
+    func close() throws {}
+
+    func fdStat() throws -> WASIAbi.FdStat {
+        WASIAbi.FdStat(
+            fsFileType: .CHARACTER_DEVICE, fsFlags: [],
+            fsRightsBase: [.FD_WRITE], fsRightsInheriting: [])
+    }
+    func setFdStatFlags(_ flags: WASIAbi.Fdflags) throws {}
+    func setFilestatSize(_ size: WASIAbi.FileSize) throws {}
+    func sync() throws {}
+    func datasync() throws {}
+    func tell() throws -> WASIAbi.FileSize { 0 }
+    func seek(offset: WASIAbi.FileDelta, whence: WASIAbi.Whence) throws -> WASIAbi.FileSize {
+        throw WASIAbi.Errno.ESPIPE
+    }
+
+    func write(vectored buffers: GuestBuffers) throws -> WASIAbi.Size {
+        var total: WASIAbi.Size = 0
+        for index in 0..<buffers.count {
+            try buffers.withHostBuffer(at: index) { bytes in
+                var line = ""
+                for byte in bytes.bindMemory(to: UInt8.self) where byte != 0x0A {
+                    line.append(Character(UnicodeScalar(byte)))
+                }
+                print(line)
+                total += WASIAbi.Size(bytes.count)
+                return bytes.count
+            }
+        }
+        return total
+    }
+    func pwrite(vectored buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size {
+        throw WASIAbi.Errno.ESPIPE
+    }
+    func read(into buffers: GuestBuffers) throws -> WASIAbi.Size { 0 }
+    func pread(into buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size {
+        throw WASIAbi.Errno.ESPIPE
+    }
+}
+
+/// Runs the WASI guest, linking only the capabilities it needs.
+///
+/// Set WASMKIT_LINK_ALL_WASI to link the whole preview1 surface instead, which
+/// is how the size difference between the two is measured.
+func runWASIGuest() throws {
+    // A second engine runs alongside the demo one above, and the guest's linear
+    // memory costs another 64 KiB, so keep this VM stack small: the C3 has only
+    // a few hundred KiB of DRAM and a failed allocation faults rather than
+    // throwing.
+    var configuration = EngineConfiguration()
+    configuration.stackSize = 16 * 1024
+    let store = Store(engine: Engine(configuration: configuration))
+    let bridge = try WASIBridgeToHost(
+        fileSystem: .memory(MemoryFileSystem())
+            .withStdio(stdin: ConsoleFile(), stdout: ConsoleFile(), stderr: ConsoleFile()))
+
+    // runAndClose closes the bridge even when the body throws; the bridge
+    // traps in deinit if it was never closed.
+    try bridge.runAndClose { bridge in
+        var imports = Imports()
+        #if WASMKIT_LINK_ALL_WASI
+            bridge.link(to: &imports, store: store, capabilities: WasmKitWASI.WASICapability.all)
+        #else
+            bridge.link(to: &imports, store: store, capabilities: [.stdio, .process])
+        #endif
+
+        let module = try parseWasm(bytes: wasiGuestWasm)
+        let instance = try module.instantiate(store: store, imports: imports)
+        _ = try bridge.start(instance)
+    }
 }
 
 @_cdecl("app_main")
@@ -77,6 +194,19 @@ func app_main() {
             _ = try callBoom()
         } catch let error as DemoHostError {
             print("host error \(error.code)")
+        }
+
+        // WASI guest, linked with only the capabilities it uses.
+        do {
+            try runWASIGuest()
+        } catch let error as WASIAbi.Errno {
+            print("wasi errno \(error.rawValue)")
+        } catch let error as WASIError {
+            print("wasi host error: \(error.description)")
+        } catch let error as WasmKitError {
+            print("wasmkit error: \(error.description)")
+        } catch {
+            print("wasi error (unknown type)")
         }
     } catch {
         print("wasm error")

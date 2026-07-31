@@ -57,6 +57,27 @@ idf.py -B build.c6 -D SDKCONFIG=sdkconfig.c6 -p /dev/cu.usbmodem* flash monitor
   Unnamed capabilities stay unreferenced and are stripped. Functions the guest
   imports but no linked capability provides are registered as `ENOSYS` stubs,
   so the module still instantiates -- pass `stubUnlinked: false` to opt out.
+
+  Measured on this example (esp32c6, `-Osize`), linking `[.stdio, .process]`
+  against the whole surface:
+
+  | Firmware | `.bin` size |
+  | --- | --- |
+  | `[.stdio, .process]` | 672,528 B |
+  | `WASICapability.all` | 699,648 B |
+
+  27 KB smaller. The saving is real stripping, not accounting: the
+  `WASIImplementation.path_open` symbol is absent from the subset image
+  entirely, and only the `PATH_OPEN` rights constant remains. Rebuild the
+  comparison with:
+
+  ```sh
+  WASMKIT_EXAMPLE_SWIFT_FLAGS=-DWASMKIT_LINK_ALL_WASI ./smoke-test.sh
+  ```
+- The guest's linear memory and each engine's value stack are separate
+  allocations, and a failed allocation faults rather than throwing. Budget
+  them together: this example runs a second engine with a 16 KiB stack
+  alongside the 64 KiB one.
 - The QEMU run uses the ESP32-C3 machine because Espressif's QEMU has no
   ESP32-C6 model; both chips are RV32IMC-class cores running the same code
   paths.
