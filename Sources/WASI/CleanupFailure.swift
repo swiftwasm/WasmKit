@@ -20,16 +20,4 @@ package struct CleanupFailure: Error, CustomStringConvertible {
             return CleanupFailure(underlying: error, cleanup: cleanupError)
         }
     }
-
-    package static func preserving(
-        _ error: any Error,
-        cleanup: () async throws -> Void
-    ) async -> any Error {
-        do {
-            try await cleanup()
-            return error
-        } catch let cleanupError {
-            return CleanupFailure(underlying: error, cleanup: cleanupError)
-        }
-    }
 }
