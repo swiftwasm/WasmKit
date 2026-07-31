@@ -44,7 +44,19 @@ extension RandomBufferGenerator where Self: RandomNumberGenerator {
 extension SystemRandomNumberGenerator: RandomBufferGenerator {
     public mutating func fill(buffer: UnsafeMutableBufferPointer<UInt8>) {
         guard let baseAddress = buffer.baseAddress else { return }
-        // Directly call underlying C function of SystemRandomNumberGenerator
-        swift_stdlib_random(baseAddress, Int(buffer.count))
+        #if $Embedded
+            // Bare-metal targets have no `swift_stdlib_random`, and
+            // `SystemRandomNumberGenerator.next()` bottoms out in the same
+            // symbol, so there is nothing to fall back to. Refuse loudly rather
+            // than hand a guest predictable bytes it believes are random.
+            //
+            // This is only reached if a guest actually calls `random_get`
+            // without a generator having been injected; supply one backed by
+            // the SoC's hardware RNG via `WASIBridgeToHost.init`.
+            fatalError("WASI: no system entropy source on this platform; inject a RandomBufferGenerator")
+        #else
+            // Directly call underlying C function of SystemRandomNumberGenerator
+            swift_stdlib_random(baseAddress, Int(buffer.count))
+        #endif
     }
 }
