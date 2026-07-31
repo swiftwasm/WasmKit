@@ -36,5 +36,6 @@ compile_module() {
 compile_module WasmTypes
 compile_module WasmParser
 compile_module WasmKit -Xcc "-I$ROOT/Sources/_CWasmKit/include"
+compile_module GDBRemoteProtocol
 
 echo "OK: WasmKit compiles for $TARGET with Embedded Swift"
