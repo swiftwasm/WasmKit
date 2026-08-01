@@ -203,6 +203,62 @@ private func withThrowingGDB(_ handler: WasmKitGDBHandler, _ body: () throws -> 
     try handler.close()
 }
 
+// The C UART shim, declared directly rather than through the bridging header:
+// each ESP-IDF component contributes its own `-import-bridging-header` and the
+// last one on the command line wins, so main's header is not the effective one.
+@_silgen_name("gdb_uart_init")
+func gdbUARTInit()
+@_silgen_name("gdb_uart_read")
+func gdbUARTRead(_ buffer: UnsafeMutablePointer<UInt8>?, _ length: Int, _ timeoutMs: UInt32) -> Int32
+@_silgen_name("gdb_uart_write")
+func gdbUARTWrite(_ buffer: UnsafePointer<UInt8>?, _ length: Int) -> Int32
+
+/// Serves the GDB stub over UART1 so a real debugger can attach.
+///
+/// The stub is sans-IO, so the transport is ours to provide: read bytes, feed
+/// the decoder, write encoded responses back. UART0 is the console, so this
+/// uses UART1 -- which QEMU exposes as a socket, letting lldb connect with
+/// `gdb-remote`.
+func serveGDBOverUART() throws {
+    gdbUARTInit()
+
+    var configuration = EngineConfiguration()
+    configuration.stackSize = 16 * 1024
+
+    let wasi = try WASIBridgeToHost(
+        fileSystem: .memory(MemoryFileSystem())
+            .withStdio(stdin: ConsoleFile(), stdout: ConsoleFile(), stderr: ConsoleFile()))
+    let handler = try WasmKitGDBHandler(
+        wasmBinary: wasiGuestWasm,
+        moduleFilePath: "/demo.wasm",
+        wasi: wasi,
+        engineConfiguration: configuration,
+        logger: .disabled)
+
+    print("gdb: listening on UART1")
+
+    var decoder = GDBHostCommandDecoder(logger: .disabled)
+    let encoder = GDBTargetResponseEncoder(logger: .disabled)
+    var buffer = [UInt8](repeating: 0, count: 256)
+
+    try withThrowingGDB(handler) {
+        while true {
+            let count = buffer.withUnsafeMutableBufferPointer { raw in
+                Int(gdbUARTRead(raw.baseAddress, raw.count, 100))
+            }
+            guard count > 0 else { continue }
+            decoder.feed(Array(buffer[0..<count]))
+            while let packet = try decoder.next() {
+                let response = try handler.handle(command: packet.payload)
+                let bytes = encoder.encode(data: response)
+                _ = bytes.withUnsafeBufferPointer { raw in
+                    gdbUARTWrite(raw.baseAddress, raw.count)
+                }
+            }
+        }
+    }
+}
+
 @_cdecl("app_main")
 func app_main() {
     print("WasmKit on ESP32-C6")
@@ -255,7 +311,13 @@ func app_main() {
             try runWASIGuest()
             // GDB stub answering real protocol packets on-device.
             do {
-                try runGDBStub()
+                #if WASMKIT_GDB_UART
+                    // Serve a real debugger over UART1 instead of a canned
+                    // session; this does not return.
+                    try serveGDBOverUART()
+                #else
+                    try runGDBStub()
+                #endif
             } catch let error as WasmKitGDBHandler.Error {
                 switch error {
                 case .stoppingAtEntrypointFailed: print("gdb: stoppingAtEntrypointFailed")

@@ -31,8 +31,10 @@
                     engineConfiguration: EngineConfiguration(),
                     logger: .disabled
                 )
-                try await withAsyncThrowing {
-                    let response = try await handler.handle(
+                // The handler is a plain class, so its calls are synchronous
+                // and need no @Sendable closure.
+                try withThrowing {
+                    let response = try handler.handle(
                         command: GDBHostCommand(kind: .continue, arguments: "")
                     )
                     guard case .string(let payload) = response.kind else {
@@ -41,7 +43,7 @@
                     }
                     #expect(payload == "W00")
                 } defer: {
-                    try await handler.close()
+                    try handler.close()
                 }
             }
         }

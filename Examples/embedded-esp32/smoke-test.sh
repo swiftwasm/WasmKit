@@ -26,7 +26,12 @@ set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
 run_qemu=false
-[ "${1:-}" = "--qemu" ] && run_qemu=true
+run_lldb=false
+case "${1:-}" in
+    --qemu) run_qemu=true ;;
+    --lldb) run_qemu=true; run_lldb=true ;;
+esac
+gdb_port="${GDB_PORT:-4445}"
 
 log() { echo "==> $*"; }
 die() { echo "error: $*" >&2; exit 1; }
@@ -119,6 +124,9 @@ fi
 log "Using QEMU: $qemu_bin"
 
 log "Building for esp32c3 (QEMU)"
+# In --lldb mode the firmware serves the GDB stub over UART1 instead of running
+# a canned packet session, so a real debugger can attach.
+$run_lldb && export WASMKIT_EXAMPLE_SWIFT_FLAGS="${WASMKIT_EXAMPLE_SWIFT_FLAGS:-} -DWASMKIT_GDB_UART"
 idf.py -B build.c3 -D SDKCONFIG=sdkconfig.c3 set-target esp32c3 > build-c3.log 2>&1 \
     || { tail -30 build-c3.log; die "esp32c3 set-target failed (see build-c3.log)"; }
 idf.py -B build.c3 -D SDKCONFIG=sdkconfig.c3 build >> build-c3.log 2>&1 \
@@ -129,18 +137,56 @@ log "Merging flash image"
 
 log "Booting in QEMU (up to 60s)"
 qemu_out="$here/build.c3/qemu-out.txt"
+# The first -serial is UART0 (console); in --lldb mode the second is UART1,
+# exposed as a socket so lldb can speak the remote protocol to it.
+qemu_serial=(-serial file:"$qemu_out")
+$run_lldb && qemu_serial+=(-serial "tcp::${gdb_port},server,nowait")
 "$qemu_bin" -M esp32c3 -drive file="$here/build.c3/flash.bin,if=mtd,format=raw" \
-    -nographic -serial file:"$qemu_out" -monitor null > /dev/null 2>&1 &
+    -nographic "${qemu_serial[@]}" -monitor null > /dev/null 2>&1 &
 qemu_pid=$!
 trap 'kill $qemu_pid 2>/dev/null || true' EXIT
 
+# In --lldb mode the firmware blocks serving UART1, so wait for it to announce
+# readiness rather than for the canned session to finish.
+ready_marker='host error 42'
+$run_lldb && ready_marker='gdb: listening on UART1'
+
 result=1
 for _ in $(seq 1 60); do
-    if grep -q 'host error 42' "$qemu_out" 2>/dev/null; then result=0; break; fi
+    if grep -q "$ready_marker" "$qemu_out" 2>/dev/null; then result=0; break; fi
     if grep -qE 'Guru Meditation|abort\(\) was called' "$qemu_out" 2>/dev/null; then break; fi
     kill -0 $qemu_pid 2>/dev/null || break
     sleep 1
 done
+if $run_lldb; then
+    [ $result -eq 0 ] || { sed -n '/Calling app_main/,$p' "$qemu_out" | head -20; \
+        kill $qemu_pid 2>/dev/null; die "firmware never announced the GDB stub (see $qemu_out)"; }
+
+    lldb_bin="${LLDB:-$(command -v lldb || true)}"
+    [ -n "$lldb_bin" ] || { kill $qemu_pid 2>/dev/null; die "lldb not found; set LLDB"; }
+    log "Attaching $lldb_bin to localhost:$gdb_port"
+
+    lldb_out="$here/build.c3/lldb-out.txt"
+    "$lldb_bin" -b \
+        -o "settings set plugin.process.gdb-remote.packet-timeout 30" \
+        -o "gdb-remote localhost:$gdb_port" \
+        -o "process status" \
+        -o "continue" \
+        -o "quit" > "$lldb_out" 2>&1 || true
+
+    echo "--- lldb session ---"
+    cat "$lldb_out"
+    echo "--------------------"
+    kill $qemu_pid 2>/dev/null || true
+
+    grep -q 'stop reason' "$lldb_out" \
+        || die "LLDB FAILED: no stop reason from the on-device stub (see $lldb_out)"
+    grep -q 'Process 1 exited with status = 0' "$lldb_out" \
+        || die "LLDB FAILED: debuggee did not run to completion (see $lldb_out)"
+    log "LLDB TEST PASSED: a real debugger drove the stub on emulated ESP32"
+    exit 0
+fi
+
 kill $qemu_pid 2>/dev/null || true
 
 echo "--- serial output ---"

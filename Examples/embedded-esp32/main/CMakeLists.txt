@@ -4,9 +4,9 @@ else()
   set(devnull /dev/null)
 endif()
 idf_component_register(
-    SRCS ${devnull}
+    SRCS "gdb_uart.c"
     PRIV_INCLUDE_DIRS "."
-    PRIV_REQUIRES idf_swift wasmkit wasi wasmkitwasi gdbremoteprotocol wasmkitgdbhandler
+    PRIV_REQUIRES idf_swift wasmkit wasi wasmkitwasi gdbremoteprotocol wasmkitgdbhandler esp_driver_uart
 )
 
 idf_component_register_swift(

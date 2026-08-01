@@ -23,7 +23,25 @@ exported `add` function.
 ```sh
 ./smoke-test.sh          # build for esp32c6
 ./smoke-test.sh --qemu   # also boot an esp32c3 build in QEMU and check output
+./smoke-test.sh --lldb   # attach a real lldb to the on-device GDB stub
 ```
+
+`--lldb` builds the firmware to serve the GDB stub over UART1 instead of
+running a canned packet session. QEMU exposes UART1 as a socket, so `lldb`
+connects to it with `gdb-remote` and drives the debuggee running on the
+emulated chip:
+
+```
+(lldb) gdb-remote localhost:4445
+Process 1 stopped
+* thread #1, stop reason = trace
+       frame #0: 0x4000000000000063 demo.wasm`
+->  0x4000000000000063: i32.store 0
+(lldb) continue
+Process 1 exited with status = 0 (0x00000000)
+```
+
+Override the port with `GDB_PORT` and the debugger with `LLDB`.
 
 The script locates ESP-IDF (`$IDF_PATH` or `~/esp/esp-idf*`) and a Swift
 toolchain (`$SWIFT_TOOLCHAIN` or the newest snapshot in

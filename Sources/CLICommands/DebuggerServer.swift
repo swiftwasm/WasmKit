@@ -48,7 +48,7 @@
                     while let bytes = try connection.receive() {
                         decoder.feed(bytes)
                         while let packet = try decoder.next() {
-                            let response = try await debuggerHandler.handle(command: packet.payload)
+                            let response = try debuggerHandler.handle(command: packet.payload)
                             try connection.send(encoder.encode(data: response))
                         }
                     }
@@ -59,7 +59,7 @@
                     logger.error("Error in GDB remote protocol connection: \(error)")
                 }
             }
-            try await debuggerHandler.close()
+            try debuggerHandler.close()
         }
     }
 
