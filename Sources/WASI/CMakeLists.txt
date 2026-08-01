@@ -24,6 +24,7 @@ add_wasmkit_library(WASI
   MemoryFileSystem/MemoryFileEntry.swift
   FileSystem.swift
   GuestMemorySupport.swift
+  GuestBuffers.swift
   Clock.swift
   Poll.swift
   RandomBufferGenerator.swift

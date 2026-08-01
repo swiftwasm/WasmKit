@@ -31,10 +31,17 @@ import WasmTypes
         offset: WASIAbi.FileSize, length: WASIAbi.FileSize, advice: WASIAbi.Advice
     ) throws
     func close() throws
+
+    /// The host file descriptor backing this entry, if it has one.
+    ///
+    /// `poll_oneoff` can only wait on real descriptors; entries without one
+    /// (in-memory files, devices) report `nil`.
+    var hostFileDescriptor: CInt? { get }
 }
 
 extension WASIEntry {
     @_spi(WASIPlatform) public var isBorrowed: Bool { false }
+    @_spi(WASIPlatform) public var hostFileDescriptor: CInt? { nil }
 }
 
 /// A file-like resource (regular file, stdio stream, device, ...) exposed
@@ -49,18 +56,10 @@ extension WASIEntry {
     func tell() throws -> WASIAbi.FileSize
     func seek(offset: WASIAbi.FileDelta, whence: WASIAbi.Whence) throws -> WASIAbi.FileSize
 
-    func write<M: GuestMemory, Buffer: Sequence>(
-        vectored buffer: Buffer, memory: M
-    ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec
-    func pwrite<M: GuestMemory, Buffer: Sequence>(
-        vectored buffer: Buffer, memory: M, offset: WASIAbi.FileSize
-    ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec
-    func read<M: GuestMemory, Buffer: Sequence>(
-        into buffer: Buffer, memory: M
-    ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec
-    func pread<M: GuestMemory, Buffer: Sequence>(
-        into buffer: Buffer, memory: M, offset: WASIAbi.FileSize
-    ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec
+    func write(vectored buffers: GuestBuffers) throws -> WASIAbi.Size
+    func pwrite(vectored buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size
+    func read(into buffers: GuestBuffers) throws -> WASIAbi.Size
+    func pread(into buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size
 }
 
 /// A directory-like resource exposed to WASI guests.

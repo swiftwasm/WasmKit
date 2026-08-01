@@ -1648,7 +1648,7 @@ final class WASIImplementation: Sendable {
             }
             return fileEntry
         }
-        return try fileEntry.pread(into: (0..<iovs.count).map { iovs.read(at: $0, in: memory) }, memory: memory, offset: offset)
+        return try fileEntry.pread(into: GuestBuffers(iovs: iovs, memory: memory), offset: offset)
     }
 
     /// Return a description of the given preopened file descriptor.
@@ -1697,7 +1697,7 @@ final class WASIImplementation: Sendable {
             }
             return fileEntry
         }
-        return try fileEntry.pwrite(vectored: (0..<iovs.count).map { iovs.read(at: $0, in: memory) }, memory: memory, offset: offset)
+        return try fileEntry.pwrite(vectored: GuestBuffers(iovs: iovs, memory: memory), offset: offset)
     }
 
     /// Read from a file descriptor.
@@ -1712,7 +1712,7 @@ final class WASIImplementation: Sendable {
             }
             return fileEntry
         }
-        return try fileEntry.read(into: (0..<iovs.count).map { iovs.read(at: $0, in: memory) }, memory: memory)
+        return try fileEntry.read(into: GuestBuffers(iovs: iovs, memory: memory))
     }
 
     /// Read directory entries from a directory.
@@ -1843,7 +1843,7 @@ final class WASIImplementation: Sendable {
             }
             return entry
         }
-        return try entry.write(vectored: (0..<ioVectors.count).map { ioVectors.read(at: $0, in: memory) }, memory: memory)
+        return try entry.write(vectored: GuestBuffers(iovs: ioVectors, memory: memory))
     }
 
     /// Create a directory.
