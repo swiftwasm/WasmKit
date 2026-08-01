@@ -214,6 +214,24 @@ extension InternalFunction {
         }
     }
 
+    /// The compiled instruction sequence, or `nil` when there is none to point
+    /// at: a host function, or a wasm function that has not been compiled yet.
+    ///
+    /// `InternalFunction` is a tagged pointer, so reading `wasm` for a host
+    /// function reinterprets a `HostFunctionEntity` allocation as a
+    /// `WasmFunctionEntity`. Callers that cannot guarantee a compiled wasm
+    /// callee must use this instead of ``assumeCompiled()``.
+    func compiledIseq() -> InstructionSequence? {
+        guard isWasm else { return nil }
+        switch self.wasm.code {
+        case .compiled(let iseq), .debuggable(_, let iseq): return iseq
+        case .uncompiled: return nil
+        }
+    }
+
+    /// - Precondition: the callee is a wasm function and is already compiled.
+    ///   Only the engine's `internalCall` path guarantees this, because
+    ///   `compilingCall` rewrites itself to `internalCall` after compiling.
     func assumeCompiled() -> (
         InstructionSequence,
         locals: Int,
