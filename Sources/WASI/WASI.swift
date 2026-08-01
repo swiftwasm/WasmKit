@@ -786,17 +786,23 @@ public struct WASIExitCode: Error {
     public let code: UInt32
 }
 
-public struct WASIHostFunction: Sendable {
+/// A WASI host function, specialised for the guest memory type it will be
+/// called with.
+///
+/// The memory is a generic parameter rather than an `any GuestMemory` so that
+/// implementations can be specialised: Embedded Swift cannot specialise the
+/// generic guest-memory accessors through an existential.
+public struct WASIHostFunction<M: GuestMemory & SendableMetatype>: Sendable {
     public let type: FunctionType
-    public let implementation: @Sendable (GuestMemory, [Value]) throws -> [Value]
+    public let implementation: @Sendable (M, [Value]) throws -> [Value]
 }
 
-public struct WASIHostModule: Sendable {
-    public let functions: [String: WASIHostFunction]
+public struct WASIHostModule<M: GuestMemory & SendableMetatype>: Sendable {
+    public let functions: [String: WASIHostFunction<M>]
 }
 
 extension WASIImplementation {
-    var _hostModules: [String: WASIHostModule] {
+    func hostModules<M: GuestMemory & SendableMetatype>(_: M.Type = M.self) -> [String: WASIHostModule<M>] {
         let unimplementedFunctionTypes: [String: FunctionType] = [
             "proc_raise": .init(parameters: [.i32], results: [.i32]),
             "sock_accept": .init(parameters: [.i32, .i32, .i32], results: [.i32]),
@@ -804,7 +810,7 @@ extension WASIImplementation {
             "sock_send": .init(parameters: [.i32, .i32, .i32, .i32, .i32], results: [.i32]),
         ]
 
-        var preview1: [String: WASIHostFunction] = unimplementedFunctionTypes.reduce(into: [:]) { functions, entry in
+        var preview1: [String: WASIHostFunction<M>] = unimplementedFunctionTypes.reduce(into: [:]) { functions, entry in
             let (name, type) = entry
             functions[name] = WASIHostFunction(type: type) { _, _ in
                 print("\"\(name)\" not implemented yet")
@@ -813,13 +819,13 @@ extension WASIImplementation {
         }
 
         @Sendable func withMemoryBuffer<T>(
-            caller: GuestMemory,
-            body: (GuestMemory) throws -> T
+            caller: M,
+            body: (M) throws -> T
         ) throws -> T {
             return try body(caller)
         }
 
-        @Sendable func readString(pointer: UInt32, length: UInt32, buffer: GuestMemory) throws -> String {
+        @Sendable func readString(pointer: UInt32, length: UInt32, buffer: M) throws -> String {
             let pointer = UnsafeGuestBufferPointer<UInt8>(
                 baseAddress: UnsafeGuestPointer(offset: pointer),
                 count: length
@@ -834,7 +840,7 @@ extension WASIImplementation {
             }
         }
 
-        func wasiFunction(type: FunctionType, implementation: @Sendable @escaping (GuestMemory, [Value]) throws -> [Value]) -> WASIHostFunction {
+        func wasiFunction(type: FunctionType, implementation: @Sendable @escaping (M, [Value]) throws -> [Value]) -> WASIHostFunction<M> {
             return WASIHostFunction(type: type) { caller, arguments in
                 do {
                     return try implementation(caller, arguments)

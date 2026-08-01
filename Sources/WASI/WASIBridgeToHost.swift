@@ -146,7 +146,9 @@ public final class WASIBridgeToHost: Sendable {
     ///
     /// This property provides access to the underlying host module implementations,
     /// which can be used to register with a WebAssembly runtime.
-    public var wasiHostModules: [String: WASIHostModule] { underlying._hostModules }
+    public func wasiHostModules<M: GuestMemory & SendableMetatype>(_: M.Type = M.self) -> [String: WASIHostModule<M>] {
+        underlying.hostModules(M.self)
+    }
 
     /// Closes all owned file descriptors (preopened directories and any
     /// guest-opened files that were not closed by the WASI program).

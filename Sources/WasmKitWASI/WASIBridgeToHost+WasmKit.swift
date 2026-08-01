@@ -12,7 +12,7 @@ extension WASIBridgeToHost {
     ///   - imports: The imports scope to register the WASI implementation.
     ///   - store: The store to create the host functions.
     public func link(to imports: inout Imports, store: Store) {
-        for (moduleName, module) in wasiHostModules {
+        for (moduleName, module) in wasiHostModules(Memory.self) {
             for (name, function) in module.functions {
                 imports.define(
                     module: moduleName,
@@ -25,7 +25,7 @@ extension WASIBridgeToHost {
 
     @available(*, deprecated, renamed: "link(to:store:)", message: "Use `Engine`-based API instead")
     public var hostModules: [String: HostModule] {
-        wasiHostModules.mapValues { (module: WASIHostModule) -> HostModule in
+        wasiHostModules(Memory.self).mapValues { (module: WASIHostModule<Memory>) -> HostModule in
             HostModule(
                 functions: module.functions.mapValues { function -> HostFunction in
                     HostFunction(type: function.type, implementation: makeHostFunction(function))
@@ -33,7 +33,7 @@ extension WASIBridgeToHost {
         }
     }
 
-    private func makeHostFunction(_ function: WASIHostFunction) -> Function.Implementation {
+    private func makeHostFunction(_ function: WASIHostFunction<Memory>) -> Function.Implementation {
         { caller, values -> [Value] in
             guard case .memory(let memory) = caller.instance?.export("memory") else {
                 throw WASIError(description: "Missing required \"memory\" export")
