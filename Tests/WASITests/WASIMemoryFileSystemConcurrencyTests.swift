@@ -252,18 +252,35 @@ import Testing
     }
 }
 
-/// Runs an async cleanup closure (`deferred`) after a given async `work`
-/// closure, making sure `deferred` also runs when `work` throws.
+/// Async counterpart of ``withThrowing(do:defer:)`` for tests.
+///
+/// `WASI` itself has no async callers, so this deliberately lives in the test
+/// target rather than shipping as package API. It mirrors the synchronous
+/// helper's semantics: `deferred` runs exactly once, and when both closures
+/// throw the failure surfaces as a ``CleanupFailure`` rather than silently
+/// discarding the cleanup error.
 private func withAsyncThrowing<T: Sendable>(
     do work: @Sendable () async throws -> T,
     defer deferred: @Sendable () async throws -> Void
 ) async throws -> T {
+    let result: T
     do {
-        let result = try await work()
-        try await deferred()
-        return result
+        result = try await work()
     } catch {
-        try await deferred()
-        throw error
+        throw await preservingError(error, cleanup: deferred)
+    }
+    try await deferred()
+    return result
+}
+
+private func preservingError(
+    _ error: any Error,
+    cleanup: () async throws -> Void
+) async -> any Error {
+    do {
+        try await cleanup()
+        return error
+    } catch let cleanupError {
+        return CleanupFailure(underlying: error, cleanup: cleanupError)
     }
 }

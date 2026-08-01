@@ -15,18 +15,4 @@ import WASI
         #expect(combined.description.contains("body"))
         #expect(combined.description.contains("cleanup"))
     }
-
-    @Test func successfulAsyncCleanupPreservesTheOriginalError() async throws {
-        let cleanup: () async throws -> Void = {}
-        let result = await CleanupFailure.preserving(ProbeError.body, cleanup: cleanup)
-        #expect(result as? ProbeError == .body)
-    }
-
-    @Test func failedAsyncCleanupSurfacesBothErrors() async throws {
-        let cleanup: () async throws -> Void = { throw ProbeError.cleanup }
-        let result = await CleanupFailure.preserving(ProbeError.body, cleanup: cleanup)
-        let combined = try #require(result as? CleanupFailure)
-        #expect(combined.underlying as? ProbeError == .body)
-        #expect(combined.cleanup as? ProbeError == .cleanup)
-    }
 }
