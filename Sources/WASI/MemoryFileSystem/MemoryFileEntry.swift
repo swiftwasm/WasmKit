@@ -1,4 +1,3 @@
-import Synchronization
 import WasmTypes
 
 /// A `WASIFile` for regular files.
@@ -10,13 +9,14 @@ final class MemoryFileEntry: WASIFile {
     let fileNode: MemoryFileNode
     let fileSystem: MemoryFileSystem
     let accessMode: FileAccessMode
-    let position: Mutex<Int>
+    // See `WASIImplementation.fdTable` for why this is a `nonisolated(unsafe) var`.
+    nonisolated(unsafe) var position: PlatformMutex<Int>
 
     init(fileNode: MemoryFileNode, fileSystem: MemoryFileSystem, accessMode: FileAccessMode, position: Int = 0) {
         self.fileNode = fileNode
         self.fileSystem = fileSystem
         self.accessMode = accessMode
-        self.position = Mutex(position)
+        self.position = PlatformMutex(position)
     }
 
     // MARK: - WASIEntry

@@ -2,6 +2,7 @@ add_wasmkit_library(WASI
   CleanupFailure.swift
   ThrowingDefer.swift
   Platform/GuestPath.swift
+  Platform/PlatformMutex.swift
   Platform/PAL/PALClock.swift
   Platform/PAL/PALFileDescriptor.swift
   Platform/PAL/PALTypes.swift
