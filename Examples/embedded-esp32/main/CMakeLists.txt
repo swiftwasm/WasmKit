@@ -5,7 +5,7 @@ else()
 endif()
 idf_component_register(
     SRCS "gdb_uart.c"
-    PRIV_INCLUDE_DIRS "."
+    PRIV_INCLUDE_DIRS "." "include"
     PRIV_REQUIRES idf_swift wasmkit wasi wasmkitwasi gdbremoteprotocol wasmkitgdbhandler esp_driver_uart
 )
 
@@ -15,7 +15,7 @@ idf_component_register_swift(
     SRCS Main.swift
 )
 target_compile_options(${COMPONENT_LIB} PRIVATE
-    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-I ${CMAKE_BINARY_DIR}/swift-modules -Xfrontend -function-sections -DWasmDebuggingSupport -package-name wasmkit $ENV{WASMKIT_EXAMPLE_SWIFT_FLAGS}>")
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-I ${CMAKE_BINARY_DIR}/swift-modules -Xcc -I${CMAKE_CURRENT_LIST_DIR}/include -Xfrontend -function-sections -DWasmDebuggingSupport -package-name wasmkit $ENV{WASMKIT_EXAMPLE_SWIFT_FLAGS}>")
 add_dependencies(${COMPONENT_LIB} __idf_wasmkit __idf_wasi __idf_wasmkitwasi __idf_gdbremoteprotocol __idf_wasmkitgdbhandler)
 
 # String hashing/comparison in embedded Swift needs the Unicode data tables.

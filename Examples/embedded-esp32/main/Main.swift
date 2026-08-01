@@ -1,5 +1,6 @@
 @_spi(WASIPlatform) import WASI
 import GDBRemoteProtocol
+import GDBUARTShim
 import WasmKitGDBHandler
 import WasmKit
 import WasmKitWASI
@@ -203,16 +204,6 @@ private func withThrowingGDB(_ handler: WasmKitGDBHandler, _ body: () throws -> 
     try handler.close()
 }
 
-// The C UART shim, declared directly rather than through the bridging header:
-// each ESP-IDF component contributes its own `-import-bridging-header` and the
-// last one on the command line wins, so main's header is not the effective one.
-@_silgen_name("gdb_uart_init")
-func gdbUARTInit()
-@_silgen_name("gdb_uart_read")
-func gdbUARTRead(_ buffer: UnsafeMutablePointer<UInt8>?, _ length: Int, _ timeoutMs: UInt32) -> Int32
-@_silgen_name("gdb_uart_write")
-func gdbUARTWrite(_ buffer: UnsafePointer<UInt8>?, _ length: Int) -> Int32
-
 /// Serves the GDB stub over UART1 so a real debugger can attach.
 ///
 /// The stub is sans-IO, so the transport is ours to provide: read bytes, feed
@@ -220,7 +211,7 @@ func gdbUARTWrite(_ buffer: UnsafePointer<UInt8>?, _ length: Int) -> Int32
 /// uses UART1 -- which QEMU exposes as a socket, letting lldb connect with
 /// `gdb-remote`.
 func serveGDBOverUART() throws {
-    gdbUARTInit()
+    gdb_uart_init()
 
     var configuration = EngineConfiguration()
     configuration.stackSize = 16 * 1024
@@ -244,7 +235,7 @@ func serveGDBOverUART() throws {
     try withThrowingGDB(handler) {
         while true {
             let count = buffer.withUnsafeMutableBufferPointer { raw in
-                Int(gdbUARTRead(raw.baseAddress, raw.count, 100))
+                Int(gdb_uart_read(raw.baseAddress, raw.count, 100))
             }
             guard count > 0 else { continue }
             decoder.feed(Array(buffer[0..<count]))
@@ -252,7 +243,7 @@ func serveGDBOverUART() throws {
                 let response = try handler.handle(command: packet.payload)
                 let bytes = encoder.encode(data: response)
                 _ = bytes.withUnsafeBufferPointer { raw in
-                    gdbUARTWrite(raw.baseAddress, raw.count)
+                    gdb_uart_write(raw.baseAddress, raw.count)
                 }
             }
         }

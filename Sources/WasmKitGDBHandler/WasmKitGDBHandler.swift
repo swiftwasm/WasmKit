@@ -30,11 +30,6 @@
     }
 
     /// A sans-IO GDB remote-protocol target.
-    ///
-    /// A plain class rather than an actor: `handle(command:)` is synchronous
-    /// and a GDB stub serves one client at a time, so isolation bought nothing
-    /// -- and `actor` requires `_Concurrency`, which bare-metal Embedded Swift
-    /// targets do not have.
     package final class WasmKitGDBHandler {
         enum ResumeThreadsAction: String {
             case step = "s"
