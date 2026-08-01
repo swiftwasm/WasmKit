@@ -4,8 +4,9 @@
 # Builds this example for ESP32-C6 and, with --qemu, also builds it for
 # ESP32-C3 and boots it in Espressif's QEMU, checking that the guest wasm
 # module actually executes ("2 + 3 = 5" on the serial console) and that a WASI
-# guest reaches the console through fd_write ("WASI guest says hello"). QEMU has
-# no ESP32-C6 machine, hence the C3 run.
+# guest reaches the console through fd_write ("WASI guest says hello"), and that
+# the GDB stub answers a real remote-protocol packet on-device. QEMU has no
+# ESP32-C6 machine, hence the C3 run.
 #
 # Requirements:
 #   - ESP-IDF v5.5+ installed and its tools provisioned (`install.sh esp32c6`).
@@ -152,7 +153,11 @@ if [ $result -eq 0 ]; then
     # runtime failures that a compile-only check cannot see.
     grep -q 'WASI guest says hello' "$qemu_out" \
         || die "smoke test FAILED: WASI guest did not reach the console (see $qemu_out)"
-    log "SMOKE TEST PASSED: wasm, host functions and a WASI guest ran on emulated ESP32"
+    # The GDB stub decodes a real remote-protocol packet, runs the debuggee and
+    # replies with a correctly checksummed exit status.
+    grep -q 'gdb reply: +\$W00#B7' "$qemu_out" \
+        || die "smoke test FAILED: GDB stub did not answer on-device (see $qemu_out)"
+    log "SMOKE TEST PASSED: wasm, host functions, a WASI guest and the GDB stub ran on emulated ESP32"
 else
     die "smoke test FAILED: expected '2 + 3 = 5' in serial output (see $qemu_out)"
 fi

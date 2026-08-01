@@ -22,5 +22,5 @@ set_target_properties(${COMPONENT_LIB} PROPERTIES
 )
 # See the wasmtypes component for why -function-sections is required here.
 target_compile_options(${COMPONENT_LIB} PRIVATE
-    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-I ${CMAKE_BINARY_DIR}/swift-modules -Xfrontend -function-sections -package-name wasmkit>")
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-I ${CMAKE_BINARY_DIR}/swift-modules -Xfrontend -function-sections -DWasmDebuggingSupport -package-name wasmkit>")
 add_dependencies(${COMPONENT_LIB} __idf_wasmtypes)
