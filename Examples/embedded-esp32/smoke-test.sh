@@ -3,8 +3,9 @@
 #
 # Builds this example for ESP32-C6 and, with --qemu, also builds it for
 # ESP32-C3 and boots it in Espressif's QEMU, checking that the guest wasm
-# module actually executes ("2 + 3 = 5" on the serial console; QEMU has no
-# ESP32-C6 machine, hence the C3 run).
+# module actually executes ("2 + 3 = 5" on the serial console) and that a WASI
+# guest reaches the console through fd_write ("WASI guest says hello"). QEMU has
+# no ESP32-C6 machine, hence the C3 run.
 #
 # Requirements:
 #   - ESP-IDF v5.5+ installed and its tools provisioned (`install.sh esp32c6`).
@@ -147,7 +148,11 @@ echo "----------------------"
 if [ $result -eq 0 ]; then
     grep -q '2 + 3 = 5' "$qemu_out" && grep -q '7 \* 3 = 21' "$qemu_out" \
         || die "smoke test FAILED: incomplete output (see $qemu_out)"
-    log "SMOKE TEST PASSED: wasm + host functions executed on emulated ESP32"
+    # Compiling WASI is not the same as running it: this catches link-time and
+    # runtime failures that a compile-only check cannot see.
+    grep -q 'WASI guest says hello' "$qemu_out" \
+        || die "smoke test FAILED: WASI guest did not reach the console (see $qemu_out)"
+    log "SMOKE TEST PASSED: wasm, host functions and a WASI guest ran on emulated ESP32"
 else
     die "smoke test FAILED: expected '2 + 3 = 5' in serial output (see $qemu_out)"
 fi
