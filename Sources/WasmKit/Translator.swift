@@ -547,6 +547,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             return copies
         }
 
+        /// Whether the value at `index` already lives in its physical slot,
+        /// rather than being a reference to a local or a constant slot.
+        func isMaterialized(at index: Int) -> Bool {
+            guard case .stack = values[index] else { return false }
+            return true
+        }
+
         func peek(depth: Int) -> ValueSource {
             return makeValueSource(valueIndexFromTop: depth)
         }
@@ -1031,7 +1038,46 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         return copied
     }
 
-    private mutating func preserveOnStack(depth: Int) {
+    /// Check that materializing the top `depth` values does not reach into an
+    /// enclosing control frame.
+    ///
+    /// Materialization rewrites the value-stack entry to
+    /// ``MetaValueOnStack/stack(_:)`` for the rest of translation, but emits its
+    /// copy at the current position. That is only sound when the copy dominates
+    /// every later read, which holds within the innermost frame -- straight-line
+    /// code since the frame was entered -- but not for values belonging to an
+    /// enclosing frame: a path that skips this point would leave the slot
+    /// undefined while translation assumes it holds the value. Block-like
+    /// constructs therefore materialize their whole stack on entry, and this
+    /// check catches any site that reintroduces the hazard.
+    private func assertPreservationStaysInCurrentFrame(depth: Int, caller: StaticString = #function) {
+        #if DEBUG
+            guard let frame = try? controlStack.currentFrame() else { return }
+            for offset in 0..<Swift.min(depth, valueStack.valueHeight) {
+                let index = valueStack.valueHeight - 1 - offset
+                guard index < frame.valueStackHeight else { continue }
+                assert(
+                    valueStack.isMaterialized(at: index),
+                    "[\(caller)] value at stack index \(index) belongs to an enclosing"
+                        + " control frame (which starts at \(frame.valueStackHeight)); its"
+                        + " copy would not dominate all later reads of the slot"
+                )
+            }
+        #endif
+    }
+
+    /// Emit copy instructions to ensure local and constant values on the logical
+    /// stack are on the physical stack.
+    ///
+    /// > Important: This permanently rewrites the affected value-stack entries to
+    /// > ``MetaValueOnStack/stack(_:)``, so every later reference to them reads the
+    /// > physical slot. The copies emitted here must therefore dominate the rest of
+    /// > the block, which is why block-like constructs preserve the *whole* stack on
+    /// > entry rather than just their parameters: a branch nested inside the block
+    /// > would otherwise materialize an enclosing frame's value on its own path only,
+    /// > leaving the slot undefined on the paths that skip it.
+    private mutating func preserveOnStack(depth: Int, site: StaticString = #function) {
+        assertPreservationStaysInCurrentFrame(depth: depth, caller: site)
         preserveLocalsOnStack(depth: depth)
         for (source, dest, type) in valueStack.preserveConstsOnStack(depth: depth) {
             emitCopyValueSlots(type, from: source, to: dest)
@@ -1039,6 +1085,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     private mutating func preserveLocalsOnStack(_ localIndex: LocalIndex) {
+        assertPreservationStaysInCurrentFrame(depth: valueStack.valueHeight)
         for (copyTo, type) in valueStack.preserveLocalsOnStack(localIndex) {
             emitCopyValueSlots(type, from: localReg(localIndex), to: copyTo)
         }
@@ -1330,7 +1377,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     mutating func visitBlock(blockType: WasmParser.BlockType) throws(WasmKitError) -> Output {
         let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
-        self.preserveLocalsOnStack(depth: self.valueStack.valueHeight)
+        self.preserveOnStack(depth: self.valueStack.valueHeight)
         let stackHeight = try popPushValues(blockType.parameters)
         controlStack.pushFrame(
             ControlStack.ControlFrame(
@@ -1345,7 +1392,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
     mutating func visitLoop(blockType: WasmParser.BlockType) throws(WasmKitError) -> Output {
         let blockType = try module.resolveBlockType(blockType)
-        preserveOnStack(depth: blockType.parameters.count)
+        preserveOnStack(depth: self.valueStack.valueHeight)
         iseqBuilder.resetLastEmission()
         for param in blockType.parameters.reversed() {
             _ = try popOperand(param)
@@ -1370,8 +1417,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // Pop condition value
         let condition = try popVRegOperand(.i32)
         let blockType = try module.resolveBlockType(blockType)
-        self.preserveLocalsOnStack(depth: self.valueStack.valueHeight)
-        preserveOnStack(depth: blockType.parameters.count)
+        self.preserveOnStack(depth: self.valueStack.valueHeight)
         let endLabel = iseqBuilder.allocLabel()
         let elseLabel = iseqBuilder.allocLabel()
         for param in blockType.parameters.reversed() {
@@ -1879,7 +1925,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
 
-        self.preserveLocalsOnStack(depth: self.valueStack.valueHeight)
+        self.preserveOnStack(depth: self.valueStack.valueHeight)
         let stackHeight = try popPushValues(blockType.parameters)
 
         let catchCount = UInt16(tryCatch.catches.count)
