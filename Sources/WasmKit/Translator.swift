@@ -1031,6 +1031,16 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         return copied
     }
 
+    /// Emit copy instructions to ensure local and constant values on the logical
+    /// stack are on the physical stack.
+    ///
+    /// > Important: This permanently rewrites the affected value-stack entries to
+    /// > ``MetaValueOnStack/stack(_:)``, so every later reference to them reads the
+    /// > physical slot. The copies emitted here must therefore dominate the rest of
+    /// > the block, which is why block-like constructs preserve the *whole* stack on
+    /// > entry rather than just their parameters: a branch nested inside the block
+    /// > would otherwise materialize an enclosing frame's value on its own path only,
+    /// > leaving the slot undefined on the paths that skip it.
     private mutating func preserveOnStack(depth: Int) {
         preserveLocalsOnStack(depth: depth)
         for (source, dest, type) in valueStack.preserveConstsOnStack(depth: depth) {
@@ -1330,7 +1340,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     mutating func visitBlock(blockType: WasmParser.BlockType) throws(WasmKitError) -> Output {
         let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
-        self.preserveLocalsOnStack(depth: self.valueStack.valueHeight)
+        self.preserveOnStack(depth: self.valueStack.valueHeight)
         let stackHeight = try popPushValues(blockType.parameters)
         controlStack.pushFrame(
             ControlStack.ControlFrame(
@@ -1345,7 +1355,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
     mutating func visitLoop(blockType: WasmParser.BlockType) throws(WasmKitError) -> Output {
         let blockType = try module.resolveBlockType(blockType)
-        preserveOnStack(depth: blockType.parameters.count)
+        preserveOnStack(depth: self.valueStack.valueHeight)
         iseqBuilder.resetLastEmission()
         for param in blockType.parameters.reversed() {
             _ = try popOperand(param)
@@ -1370,8 +1380,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // Pop condition value
         let condition = try popVRegOperand(.i32)
         let blockType = try module.resolveBlockType(blockType)
-        self.preserveLocalsOnStack(depth: self.valueStack.valueHeight)
-        preserveOnStack(depth: blockType.parameters.count)
+        self.preserveOnStack(depth: self.valueStack.valueHeight)
         let endLabel = iseqBuilder.allocLabel()
         let elseLabel = iseqBuilder.allocLabel()
         for param in blockType.parameters.reversed() {
@@ -1879,7 +1888,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
 
-        self.preserveLocalsOnStack(depth: self.valueStack.valueHeight)
+        self.preserveOnStack(depth: self.valueStack.valueHeight)
         let stackHeight = try popPushValues(blockType.parameters)
 
         let catchCount = UInt16(tryCatch.catches.count)
