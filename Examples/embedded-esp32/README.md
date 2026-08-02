@@ -42,6 +42,21 @@ idf.py -B build.c6 -D SDKCONFIG=sdkconfig.c6 -p /dev/cu.usbmodem* flash monitor
 
 - The default 512 KiB WasmKit value stack does not fit in on-chip SRAM, so
   `Main.swift` sets `EngineConfiguration.stackSize` to 64 KiB.
+- Each component is compiled with `-Xfrontend -function-sections`. `swiftc`
+  otherwise emits a single `.text` section per module, and ESP-IDF's
+  `--gc-sections` can only strip whole sections -- so without the flag nothing
+  the firmware does not call can be dropped. Objects grow by roughly a quarter
+  before linking; the linker reclaims it.
+- WASI is available on this target. Link only the parts you use:
+
+  ```swift
+  var imports = Imports()
+  try bridge.link(to: &imports, store: store, capabilities: [.stdio, .clocks, .random])
+  ```
+
+  Unnamed capabilities stay unreferenced and are stripped. Functions the guest
+  imports but no linked capability provides are registered as `ENOSYS` stubs,
+  so the module still instantiates -- pass `stubUnlinked: false` to opt out.
 - The QEMU run uses the ESP32-C3 machine because Espressif's QEMU has no
   ESP32-C6 model; both chips are RV32IMC-class cores running the same code
   paths.

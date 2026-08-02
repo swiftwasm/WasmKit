@@ -22,6 +22,9 @@ set_target_properties(${COMPONENT_LIB} PROPERTIES
 )
 # -I for the WasmTypes/WasmParser swiftmodules; -Xcc -I so the Clang importer
 # finds _CWasmKit's module.modulemap.
+# `-Xfrontend -function-sections` puts each function in its own section so
+# ESP-IDF's `--gc-sections` can drop what the firmware never calls. Without it
+# swiftc emits one `.text` per module and none of it can be stripped.
 target_compile_options(${COMPONENT_LIB} PRIVATE
-    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-I ${CMAKE_BINARY_DIR}/swift-modules -Xcc -I${WASMKIT_ROOT}/Sources/_CWasmKit/include -package-name wasmkit>")
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-I ${CMAKE_BINARY_DIR}/swift-modules -Xcc -I${WASMKIT_ROOT}/Sources/_CWasmKit/include -Xfrontend -function-sections -package-name wasmkit>")
 add_dependencies(${COMPONENT_LIB} __idf_wasmtypes __idf_wasmparser)

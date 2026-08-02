@@ -13,10 +13,15 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD="${ROOT}/.build/embedded-check"
 mkdir -p "$BUILD"
 
+# `-function-sections` is what lets `--gc-sections` drop code the firmware
+# never calls: without it swiftc emits one monolithic `.text` per module and
+# stripping becomes all-or-nothing. Embedded consumers are expected to build
+# this way, so the check does too.
 common=(
     -target "$TARGET"
     -enable-experimental-feature Embedded
     -wmo -parse-as-library -Osize
+    -Xfrontend -function-sections
     -package-name wasmkit
     -I "$BUILD"
 )
@@ -36,6 +41,8 @@ compile_module() {
 compile_module WasmTypes
 compile_module WasmParser
 compile_module WasmKit -Xcc "-I$ROOT/Sources/_CWasmKit/include"
+compile_module WASI
+compile_module WasmKitWASI -Xcc "-I$ROOT/Sources/_CWasmKit/include"
 compile_module GDBRemoteProtocol
 
-echo "OK: WasmKit compiles for $TARGET with Embedded Swift"
+echo "OK: WasmKit and WASI compile for $TARGET with Embedded Swift"
