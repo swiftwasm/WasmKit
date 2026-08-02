@@ -4,6 +4,12 @@ import WasmKit
 public typealias WASIBridgeToHost = WASI.WASIBridgeToHost
 public typealias MemoryFileSystem = WASI.MemoryFileSystem
 
+/// A group of WASI functions that can be linked on its own.
+///
+/// Specialised for WasmKit's guest memory, which is what the engine hands to
+/// host functions.
+public typealias WASICapability = WASI.WASICapability<Memory>
+
 extension WASIBridgeToHost {
 
     /// Register the WASI implementation to the given `imports`.
@@ -12,14 +18,36 @@ extension WASIBridgeToHost {
     ///   - imports: The imports scope to register the WASI implementation.
     ///   - store: The store to create the host functions.
     public func link(to imports: inout Imports, store: Store) {
-        for (moduleName, module) in wasiHostModules(Memory.self) {
-            for (name, function) in module.functions {
-                imports.define(
-                    module: moduleName,
-                    name: name,
-                    Function(store: store, type: function.type, body: makeHostFunction(function))
-                )
-            }
+        link(to: &imports, store: store, capabilities: WASICapability.all)
+    }
+
+    /// Register only the selected parts of the WASI implementation.
+    ///
+    /// Linking a subset keeps the unselected implementations unreferenced, so a
+    /// linker running `--gc-sections` over code built with
+    /// `-Xfrontend -function-sections` can drop them. On a host build this is
+    /// only an import-surface question; on a constrained target it is the
+    /// difference between paying for all of WASI and paying for what you use.
+    ///
+    /// - Parameters:
+    ///   - capabilities: The groups to register.
+    ///   - stubUnlinked: When true (the default), preview1 functions that no
+    ///     linked capability provides are registered as stubs returning
+    ///     `ENOSYS`. Guests import a fixed list regardless of what they call,
+    ///     so turning this off risks instantiation failures on unused imports.
+    public func link(
+        to imports: inout Imports,
+        store: Store,
+        capabilities: [WASICapability],
+        stubUnlinked: Bool = true
+    ) {
+        let functions = hostFunctions(capabilities: capabilities, stubUnlinked: stubUnlinked)
+        for (name, function) in functions {
+            imports.define(
+                module: "wasi_snapshot_preview1",
+                name: name,
+                Function(store: store, type: function.type, body: makeHostFunction(function))
+            )
         }
     }
 

@@ -28,6 +28,7 @@ add_wasmkit_library(WASI
   Clock.swift
   Poll.swift
   RandomBufferGenerator.swift
+  WASICapability.swift
   WASI.swift
   WASIBridgeToHost.swift
 )
