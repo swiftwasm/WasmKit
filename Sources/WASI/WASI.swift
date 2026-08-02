@@ -1144,8 +1144,8 @@ final class WASIImplementation: Sendable {
         cookie: WASIAbi.DirCookie,
         memory: M
     ) throws -> WASIAbi.Size {
-        func readDirectoryEntries<D: WASIDir>(
-            from dirEntry: D
+        func readDirectoryEntries(
+            from dirEntry: any WASIDir
         ) throws -> WASIAbi.Size {
             var entries = try dirEntry.readEntries(cookie: cookie)
             defer { entries.close() }

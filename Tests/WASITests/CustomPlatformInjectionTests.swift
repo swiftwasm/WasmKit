@@ -147,7 +147,7 @@ struct CustomPlatformInjectionTests {
                 throw WASIAbi.Errno.EROFS
             }
 
-            struct ReadEntriesResult: WASIReaddirIterator {
+            struct FixedEntryIterator: WASIReaddirIterator {
                 var entries: [(WASIAbi.Dirent, String)]
                 var index = 0
                 mutating func next() -> Result<(dirent: WASIAbi.Dirent, name: String), any Error>? {
@@ -158,7 +158,7 @@ struct CustomPlatformInjectionTests {
                 mutating func close() {}
             }
 
-            func readEntries(cookie: WASIAbi.DirCookie) throws -> ReadEntriesResult {
+            func readEntries(cookie: WASIAbi.DirCookie) throws -> WASIReaddirEntries {
                 let entries = files.keys.sorted().enumerated().map { index, name in
                     (
                         WASIAbi.Dirent(
@@ -167,7 +167,7 @@ struct CustomPlatformInjectionTests {
                         name
                     )
                 }
-                return ReadEntriesResult(entries: Array(entries.dropFirst(Int(cookie))))
+                return WASIReaddirEntries(FixedEntryIterator(entries: Array(entries.dropFirst(Int(cookie)))))
             }
 
             func attributes(path: String, symlinkFollow: Bool) throws -> WASIAbi.Filestat {

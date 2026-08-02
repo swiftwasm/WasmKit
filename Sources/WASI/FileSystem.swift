@@ -64,8 +64,7 @@ extension WASIEntry {
 
 /// A directory-like resource exposed to WASI guests.
 @_spi(WASIPlatform) public protocol WASIDir: WASIEntry {
-    typealias ReaddirElement = (dirent: WASIAbi.Dirent, name: String)
-    associatedtype ReadEntriesResult: WASIReaddirIterator where ReadEntriesResult.Element == ReaddirElement
+    typealias ReaddirElement = WASIReaddirElement
 
     var preopenPath: String? { get }
 
@@ -76,13 +75,45 @@ extension WASIEntry {
     func removeFile(atPath path: String) throws
     func symlink(from sourcePath: String, to destPath: String) throws
     func rename(from sourcePath: String, toDir newDir: any WASIDir, to destPath: String) throws
-    func readEntries(cookie: WASIAbi.DirCookie) throws -> ReadEntriesResult
+    func readEntries(cookie: WASIAbi.DirCookie) throws -> WASIReaddirEntries
     func attributes(path: String, symlinkFollow: Bool) throws -> WASIAbi.Filestat
     func setFilestatTimes(
         path: String,
         atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags, symlinkFollow: Bool
     ) throws
+}
+
+/// A single directory entry.
+@_spi(WASIPlatform) public typealias WASIReaddirElement = (dirent: WASIAbi.Dirent, name: String)
+
+/// A type-erased iterator over directory entries.
+///
+/// Concrete rather than an associated type so that ``WASIDir`` carries no
+/// generic requirements. ``FdEntry`` stores directories as `any WASIDir`, and
+/// Embedded Swift cannot specialise a generic method reached through an
+/// existential.
+@_spi(WASIPlatform) public struct WASIReaddirEntries {
+    private final class Box<I: WASIReaddirIterator> where I.Element == WASIReaddirElement {
+        var iterator: I
+        init(_ iterator: I) { self.iterator = iterator }
+    }
+
+    private let nextEntry: () -> Result<WASIReaddirElement, any Error>?
+    private let closeIterator: () -> Void
+
+    public init<I: WASIReaddirIterator>(_ iterator: I) where I.Element == WASIReaddirElement {
+        let box = Box(iterator)
+        self.nextEntry = { box.iterator.next() }
+        self.closeIterator = { box.iterator.close() }
+    }
+
+    public mutating func next() -> Result<WASIReaddirElement, any Error>? { nextEntry() }
+
+    /// Closes the iterator and releases any owned resources.
+    ///
+    /// Callers must invoke this exactly once after iteration completes.
+    public mutating func close() { closeIterator() }
 }
 
 /// An iterator over directory entries produced by ``WASIDir/readEntries(cookie:)``.
