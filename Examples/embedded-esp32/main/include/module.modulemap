@@ -1,0 +1,4 @@
+module GDBUARTShim {
+  header "gdb_uart.h"
+  export *
+}

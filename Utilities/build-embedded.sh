@@ -22,6 +22,9 @@ common=(
     -enable-experimental-feature Embedded
     -wmo -parse-as-library -Osize
     -Xfrontend -function-sections
+    # Build the debugging-enabled configuration: it is a strict superset, and
+    # the GDB stub is only compiled when the trait is on.
+    -DWasmDebuggingSupport
     -package-name wasmkit
     -I "$BUILD"
 )
@@ -44,5 +47,6 @@ compile_module WasmKit -Xcc "-I$ROOT/Sources/_CWasmKit/include"
 compile_module WASI
 compile_module WasmKitWASI -Xcc "-I$ROOT/Sources/_CWasmKit/include"
 compile_module GDBRemoteProtocol
+compile_module WasmKitGDBHandler -Xcc "-I$ROOT/Sources/_CWasmKit/include"
 
-echo "OK: WasmKit and WASI compile for $TARGET with Embedded Swift"
+echo "OK: WasmKit, WASI and the GDB stub compile for $TARGET with Embedded Swift"

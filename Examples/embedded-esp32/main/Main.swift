@@ -1,4 +1,7 @@
 @_spi(WASIPlatform) import WASI
+import GDBRemoteProtocol
+import GDBUARTShim
+import WasmKitGDBHandler
 import WasmKit
 import WasmKitWASI
 
@@ -149,6 +152,104 @@ func runWASIGuest() throws {
     }
 }
 
+/// Drives the GDB stub with real remote-protocol packets.
+///
+/// The stub is sans-IO: it consumes decoded packets and produces responses, so
+/// a transport (UART, USB-CDC, TCP) is the consumer's to supply. This feeds a
+/// canned session through the same decoder/encoder a transport would use, which
+/// proves the stub links and answers correctly on the device. It does not prove
+/// a host `gdb` can attach -- that needs a real transport wired to a UART.
+func runGDBStub() throws {
+    var configuration = EngineConfiguration()
+    configuration.stackSize = 16 * 1024
+
+    // Inject the same console-backed stdio the WASI demo uses: the debuggee
+    // writes through fd_write while stopped under the stub, and the host file
+    // system the default initialiser would build is unavailable on bare metal.
+    let wasi = try WASIBridgeToHost(
+        fileSystem: .memory(MemoryFileSystem())
+            .withStdio(stdin: ConsoleFile(), stdout: ConsoleFile(), stderr: ConsoleFile()))
+
+    let handler = try WasmKitGDBHandler(
+        wasmBinary: wasiGuestWasm,
+        moduleFilePath: "/demo.wasm",
+        wasi: wasi,
+        engineConfiguration: configuration,
+        logger: .disabled)
+
+    // The handler owns a WASIBridgeToHost, which traps in deinit unless it is
+    // closed, so close on every path.
+    try withThrowingGDB(handler) {
+        var decoder = GDBHostCommandDecoder(logger: .disabled)
+        let encoder = GDBTargetResponseEncoder(logger: .disabled)
+
+        // "+$c#63" -- ack then continue. The debuggee runs to completion and the stub
+        // reports its exit status, the exchange a host debugger would see.
+        decoder.feed(Array("+$c#63".utf8))
+        while let packet = try decoder.next() {
+            let response = try handler.handle(command: packet.payload)
+            let bytes = encoder.encode(data: response)
+            print("gdb reply: \(String(decoding: bytes, as: UTF8.self))")
+        }
+    }
+}
+
+private func withThrowingGDB(_ handler: WasmKitGDBHandler, _ body: () throws -> Void) throws {
+    do {
+        try body()
+    } catch {
+        try? handler.close()
+        throw error
+    }
+    try handler.close()
+}
+
+/// Serves the GDB stub over UART1 so a real debugger can attach.
+///
+/// The stub is sans-IO, so the transport is ours to provide: read bytes, feed
+/// the decoder, write encoded responses back. UART0 is the console, so this
+/// uses UART1 -- which QEMU exposes as a socket, letting lldb connect with
+/// `gdb-remote`.
+func serveGDBOverUART() throws {
+    gdb_uart_init()
+
+    var configuration = EngineConfiguration()
+    configuration.stackSize = 16 * 1024
+
+    let wasi = try WASIBridgeToHost(
+        fileSystem: .memory(MemoryFileSystem())
+            .withStdio(stdin: ConsoleFile(), stdout: ConsoleFile(), stderr: ConsoleFile()))
+    let handler = try WasmKitGDBHandler(
+        wasmBinary: wasiGuestWasm,
+        moduleFilePath: "/demo.wasm",
+        wasi: wasi,
+        engineConfiguration: configuration,
+        logger: .disabled)
+
+    print("gdb: listening on UART1")
+
+    var decoder = GDBHostCommandDecoder(logger: .disabled)
+    let encoder = GDBTargetResponseEncoder(logger: .disabled)
+    var buffer = [UInt8](repeating: 0, count: 256)
+
+    try withThrowingGDB(handler) {
+        while true {
+            let count = buffer.withUnsafeMutableBufferPointer { raw in
+                Int(gdb_uart_read(raw.baseAddress, raw.count, 100))
+            }
+            guard count > 0 else { continue }
+            decoder.feed(Array(buffer[0..<count]))
+            while let packet = try decoder.next() {
+                let response = try handler.handle(command: packet.payload)
+                let bytes = encoder.encode(data: response)
+                _ = bytes.withUnsafeBufferPointer { raw in
+                    gdb_uart_write(raw.baseAddress, raw.count)
+                }
+            }
+        }
+    }
+}
+
 @_cdecl("app_main")
 func app_main() {
     print("WasmKit on ESP32-C6")
@@ -199,6 +300,31 @@ func app_main() {
         // WASI guest, linked with only the capabilities it uses.
         do {
             try runWASIGuest()
+            // GDB stub answering real protocol packets on-device.
+            do {
+                #if WASMKIT_GDB_UART
+                    // Serve a real debugger over UART1 instead of a canned
+                    // session; this does not return.
+                    try serveGDBOverUART()
+                #else
+                    try runGDBStub()
+                #endif
+            } catch let error as WasmKitGDBHandler.Error {
+                switch error {
+                case .stoppingAtEntrypointFailed: print("gdb: stoppingAtEntrypointFailed")
+                case .exitCodeUnknown: print("gdb: exitCodeUnknown")
+                case .killRequestReceived: print("gdb: killRequestReceived")
+                case .multipleThreadsNotSupported: print("gdb: multipleThreadsNotSupported")
+                case .unknownThreadAction(let a): print("gdb: unknownThreadAction \(a)")
+                default: print("gdb: other handler error")
+                }
+            } catch let error as WasmKitError {
+                print("gdb stub wasmkit error: \(error.description)")
+            } catch let error as WASIAbi.Errno {
+                print("gdb stub errno \(error.rawValue)")
+            } catch {
+                print("gdb stub error (unknown type)")
+            }
         } catch let error as WASIAbi.Errno {
             print("wasi errno \(error.rawValue)")
         } catch let error as WASIError {

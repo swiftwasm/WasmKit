@@ -29,7 +29,8 @@
         }
     }
 
-    package actor WasmKitGDBHandler {
+    /// A sans-IO GDB remote-protocol target.
+    package final class WasmKitGDBHandler {
         enum ResumeThreadsAction: String {
             case step = "s"
             case `continue` = "c"
@@ -67,10 +68,19 @@
         /// the module bytes (read from disk, flash, or anywhere else) and
         /// `moduleFilePath` is only reported to the debugger host for module
         /// identification.
+        /// Debugs a module against a caller-supplied WASI instance.
+        ///
+        /// The handler takes ownership: ``close()`` closes `wasi`, and the
+        /// initialiser closes it if setting the debuggee up fails.
+        ///
+        /// Bare-metal targets need this: the host file system is unavailable
+        /// there, so stdio has to be injected as `WASIFile`s pointing at a
+        /// UART. Building the bridge here rather than internally is what makes
+        /// the stub usable on a device.
         package init(
             wasmBinary: [UInt8],
             moduleFilePath: String,
-            wasiConfiguration: WASIConfiguration,
+            wasi: WASIBridgeToHost,
             engineConfiguration: EngineConfiguration,
             logger: GDBLogger
         ) throws {
@@ -80,7 +90,6 @@
 
             let store = Store(engine: Engine(configuration: engineConfiguration))
             var imports = Imports()
-            let wasi = try WASIBridgeToHost(configuration: wasiConfiguration)
             wasi.link(to: &imports, store: store)
             self.wasi = wasi
 
@@ -96,6 +105,23 @@
             }
 
             self.memoryView = DebuggerMemoryView(wasmBinary: wasmBinary)
+        }
+
+        /// Debugs a module against a host-backed WASI instance.
+        package convenience init(
+            wasmBinary: [UInt8],
+            moduleFilePath: String,
+            wasiConfiguration: WASIConfiguration,
+            engineConfiguration: EngineConfiguration,
+            logger: GDBLogger
+        ) throws {
+            try self.init(
+                wasmBinary: wasmBinary,
+                moduleFilePath: moduleFilePath,
+                wasi: WASIBridgeToHost(configuration: wasiConfiguration),
+                engineConfiguration: engineConfiguration,
+                logger: logger
+            )
         }
 
         package func close() throws {
