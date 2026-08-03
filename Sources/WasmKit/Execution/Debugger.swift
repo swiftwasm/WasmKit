@@ -480,19 +480,31 @@
             return (0..<Int(op.count)).map { pc.advanced(by: Int(op.baseAddress[$0].offset)) }
         }
 
+        /// Resolves the entry PC of a call target, compiling it if needed.
+        ///
+        /// Returns `nil` when there is nothing to step into: a host function, or
+        /// a callee whose compilation fails. `call` is emitted for host
+        /// functions and for wasm functions in another instance, so neither
+        /// "is wasm" nor "is compiled" can be assumed here.
+        private mutating func calleeEntryPc(_ callee: InternalFunction) -> Pc? {
+            guard callee.isWasm else { return nil }
+            _ = try? callee.wasm.ensureCompiled(store: StoreRef(self.store))
+            guard let iseq = callee.compiledIseq() else { return nil }
+            return iseq.instructions.baseAddress
+        }
+
         mutating func predictNext_call(operandPc: Pc, sp: Sp) -> [Pc] {
             var pc = operandPc
             let op = Instruction.CallOperand.load(from: &pc)
-            let (iseq, _, _) = op.callee.assumeCompiled()
-            return [iseq.instructions.baseAddress!]
+            guard let entry = calleeEntryPc(op.callee) else { return [] }
+            return [entry]
         }
 
         mutating func predictNext_compilingCall(operandPc: Pc, sp: Sp) -> [Pc] {
             var pc = operandPc
             let op = Instruction.CallOperand.load(from: &pc)
-            _ = try? op.callee.wasm.ensureCompiled(store: StoreRef(self.store))
-            let (iseq, _, _) = op.callee.assumeCompiled()
-            return [iseq.instructions.baseAddress!]
+            guard let entry = calleeEntryPc(op.callee) else { return [] }
+            return [entry]
         }
 
         mutating func predictNext_internalCall(operandPc: Pc, sp: Sp) -> [Pc] {
@@ -518,10 +530,7 @@
                 case .function(let rawBitPattern?) = table.elements[elementIndex]
             else { return nil }
             let function = InternalFunction(bitPattern: rawBitPattern)
-            guard function.isWasm else { return nil }
-            _ = try? function.wasm.ensureCompiled(store: StoreRef(self.store))
-            let (iseq, _, _) = function.assumeCompiled()
-            return iseq.instructions.baseAddress!
+            return calleeEntryPc(function)
         }
 
         mutating func predictNext_callIndirect(operandPc: Pc, sp: Sp) -> [Pc] {
@@ -537,10 +546,8 @@
             var pc = operandPc
             let op = Instruction.ReturnCallOperand.load(from: &pc)
             let callee = op.callee
-            guard callee.isWasm else { return [] }
-            _ = try? callee.wasm.ensureCompiled(store: StoreRef(self.store))
-            let (iseq, _, _) = callee.assumeCompiled()
-            return [iseq.instructions.baseAddress!]
+            guard let entry = calleeEntryPc(callee) else { return [] }
+            return [entry]
         }
 
         mutating func predictNext_returnCallIndirect(operandPc: Pc, sp: Sp) -> [Pc] {
