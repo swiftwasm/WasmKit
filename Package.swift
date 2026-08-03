@@ -102,7 +102,7 @@ let package = Package(
         ),
         .testTarget(
             name: "WasmKitTests",
-            dependencies: ["WasmKit", "WAT", "WasmKitFuzzing", "WasmKitWASI"],
+            dependencies: ["WasmKit", "WAT", "WasmKitFuzzing"],
             exclude: ["ExtraSuite", "CMakeLists.txt"],
             swiftSettings: swiftSettings
         ),
@@ -173,7 +173,7 @@ let package = Package(
             swiftSettings: swiftSettings
         ),
         .target(name: "CWASIPlatform"),
-        .testTarget(name: "WASITests", dependencies: ["WASI", "WasmKitWASI"], swiftSettings: swiftSettings),
+        .testTarget(name: "WASITests", dependencies: ["WASI", "WasmKitWASI", "WAT"], swiftSettings: swiftSettings),
 
         // Component Model (CM)
 
