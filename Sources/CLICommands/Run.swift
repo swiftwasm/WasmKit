@@ -48,8 +48,8 @@ package struct Run: AsyncParsableCommand {
         let key: String
         let value: String
         init?(argument: String) {
-            var parts = argument.split(separator: "=", maxSplits: 1).makeIterator()
-            guard let key = parts.next(), let value = parts.next() else { return nil }
+            var parts = argument.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false).makeIterator()
+            guard let key = parts.next(), !key.isEmpty, let value = parts.next() else { return nil }
             self.key = String(key)
             self.value = String(value)
         }

@@ -90,6 +90,18 @@ import WasmKitWASI
         let run = try Run.parse(["--env", "A=1", "--env", "A=2", "module.wasm"])
         #expect(run.deriveEnvironment() == ["A": "2"])
     }
+
+    @Test func environmentValueCanBeEmpty() throws {
+        let run = try Run.parse(["--env", "A=", "module.wasm"])
+        #expect(run.deriveEnvironment() == ["A": ""])
+    }
+
+    @Test func environmentKeyCannotBeEmpty() throws {
+        let error = #expect(throws: (any Error).self) {
+            _ = try Run.parse(["--env", "=value", "module.wasm"])
+        }
+        #expect(Run.exitCode(for: try #require(error)) == .validationFailure)
+    }
 }
 
 #if WasmDebuggingSupport
