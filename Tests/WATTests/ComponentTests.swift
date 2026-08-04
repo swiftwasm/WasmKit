@@ -79,7 +79,7 @@
             let wastContent = try String(contentsOf: wastFile, encoding: .utf8)
 
             // Try to run wast2json for encoding validation (may fail for files with component assert_return)
-            var moduleCommands: [Wast2JSONCommand] = []
+            var moduleCommands: [WAST2JSONCommand] = []
             var wasmFiles: [String: [UInt8]] = [:]
             do {
                 let (jsonOutput, files) = try wast2json(
@@ -245,7 +245,7 @@
 
         /// Execute an assert_trap directive and verify the trap occurs.
         private func executeAssertTrap(
-            execute: ComponentWastExecute,
+            execute: ComponentWASTExecute,
             expectedMessage: String,
             instance: ComponentInstance?,
             linker: ComponentLoader,
@@ -296,7 +296,7 @@
 
         /// Execute an assert_return directive and check results.
         private func executeAssertReturn(
-            execute: ComponentWastExecute,
+            execute: ComponentWASTExecute,
             expected: [ComponentValue],
             instance: ComponentInstance,
             location: Location

@@ -7,7 +7,7 @@ add_wasmkit_library(WAT
   ParseTextInstruction.swift
   Parser.swift
   Parser/ExpressionParser.swift
-  Parser/WastParser.swift
+  Parser/WASTParser.swift
   Parser/WatParser.swift
   WAT.swift
   WatParserError.swift

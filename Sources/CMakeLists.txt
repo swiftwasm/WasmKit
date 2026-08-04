@@ -7,6 +7,7 @@ add_subdirectory(WasmParser)
 add_subdirectory(WAT)
 
 if(WASMKIT_BUILD_CLI)
+  add_subdirectory(WASTRunner)
   add_subdirectory(CLI)
   add_subdirectory(CLICommands)
 endif()

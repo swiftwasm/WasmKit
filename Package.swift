@@ -14,6 +14,7 @@ let cliCommandsTarget = Target.target(
     name: "CLICommands",
     dependencies: [
         "WASI",
+        "WASTRunner",
         "WAT",
         "WasmKit",
         "WasmKitWASI",
@@ -100,10 +101,16 @@ let package = Package(
             path: "FuzzTesting/Sources/WasmKitFuzzing",
             swiftSettings: swiftSettings
         ),
+        .target(
+            name: "WASTRunner",
+            dependencies: ["WasmKit", "WAT", "WasmParser"],
+            exclude: ["CMakeLists.txt"],
+            swiftSettings: swiftSettings
+        ),
         .testTarget(
             name: "WasmKitTests",
-            dependencies: ["WasmKit", "WAT", "WasmKitFuzzing"],
-            exclude: ["ExtraSuite", "CMakeLists.txt"],
+            dependencies: ["WasmKit", "WAT", "WasmKitFuzzing", "WASTRunner"],
+            exclude: ["ExtraSuite"],
             swiftSettings: swiftSettings
         ),
 

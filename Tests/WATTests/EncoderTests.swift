@@ -69,7 +69,7 @@ struct EncoderTests {
             stats.failed.insert(wast.lastPathComponent)
         }
 
-        var parser = WastParser(
+        var parser = WASTParser(
             try String(contentsOf: wast, encoding: .utf8),
             features: Spectest.deriveFeatureSet(wast: wast)
         )

@@ -119,7 +119,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
 
     mutating func parseWastConstInstruction(
         visitor: inout Visitor
-    ) throws(WatParserError) -> Bool where Visitor: WastConstInstructionVisitor {
+    ) throws(WatParserError) -> Bool where Visitor: WASTConstInstructionVisitor {
         var wat = Wat.empty(features: features)
         // WAST allows extra const value instruction
         if try parser.takeParenBlockStart("ref.extern") {
@@ -142,9 +142,9 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
         return false
     }
 
-    mutating func parseWastExpectValue() throws(WatParserError) -> WastExpectValue? {
+    mutating func parseWastExpectValue() throws(WatParserError) -> WASTExpectValue? {
         let initialParser = parser
-        func takeNaNPattern(canonical: WastExpectValue, arithmetic: WastExpectValue) throws(WatParserError) -> WastExpectValue? {
+        func takeNaNPattern(canonical: WASTExpectValue, arithmetic: WASTExpectValue) throws(WatParserError) -> WASTExpectValue? {
             if try parser.takeKeyword("nan:canonical") {
                 try parser.expect(.rightParen)
                 return canonical
@@ -158,7 +158,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
 
         // Relaxed-SIMD `(either <result>…)`: a non-deterministic expectation matching any candidate.
         if try parser.takeParenBlockStart("either") {
-            var candidates: [WastExpectValue] = []
+            var candidates: [WASTExpectValue] = []
             while let candidate = try parseWastExpectValue() {
                 candidates.append(candidate)
             }

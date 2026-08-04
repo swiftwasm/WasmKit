@@ -1,13 +1,13 @@
 import WasmParser
 import WasmTypes
 
-protocol WastConstInstructionVisitor: InstructionVisitor {
+protocol WASTConstInstructionVisitor: InstructionVisitor {
     mutating func visitRefExtern(value: UInt32) throws(WatParserError)
 }
 
 /// A parser for WAST format.
 /// You can find its grammar definition in the [WebAssembly spec repository](https://github.com/WebAssembly/spec/blob/wg-1.0/interpreter/README.md#scripts)
-struct WastParser {
+struct WASTParser {
     var parser: Parser
     let features: WasmFeatureSet
 
@@ -16,11 +16,11 @@ struct WastParser {
         self.features = features
     }
 
-    mutating func nextDirective() throws(WatParserError) -> WastDirective? {
+    mutating func nextDirective() throws(WatParserError) -> WASTDirective? {
         var originalParser = parser
         guard (try parser.peek(.leftParen)) != nil else { return nil }
         try parser.consume()
-        guard try WastDirective.peek(wastParser: self) else {
+        guard try WASTDirective.peek(wastParser: self) else {
             if try peekModuleField() {
                 // Parse inline module, which doesn't include surrounding (module)
                 let location = originalParser.lexer.location()
@@ -31,7 +31,7 @@ struct WastParser {
             }
             throw WatParserError("unexpected wast directive token", location: parser.lexer.location())
         }
-        let directive = try WastDirective.parse(wastParser: &self)
+        let directive = try WASTDirective.parse(wastParser: &self)
         return directive
     }
 
@@ -47,15 +47,15 @@ struct WastParser {
         }
     }
 
-    mutating func parens<T>(_ body: (inout WastParser) throws(WatParserError) -> T) throws(WatParserError) -> T {
+    mutating func parens<T>(_ body: (inout WASTParser) throws(WatParserError) -> T) throws(WatParserError) -> T {
         try parser.expect(.leftParen)
         let result = try body(&self)
         return result
     }
 
-    struct ConstExpressionCollector: WastConstInstructionVisitor {
+    struct ConstExpressionCollector: WASTConstInstructionVisitor {
         var binaryOffset: Int = 0
-        let addValue: (WastConstValue) -> Void
+        let addValue: (WASTConstValue) -> Void
 
         mutating func visitI32Const(value: Int32) throws(WatParserError) { addValue(.i32(UInt32(bitPattern: value))) }
         mutating func visitI64Const(value: Int64) throws(WatParserError) { addValue(.i64(UInt64(bitPattern: value))) }
@@ -73,8 +73,8 @@ struct WastParser {
         }
     }
 
-    mutating func argumentValues() throws(WatParserError) -> [WastConstValue] {
-        var values: [WastConstValue] = []
+    mutating func argumentValues() throws(WatParserError) -> [WASTConstValue] {
+        var values: [WASTConstValue] = []
         var collector = ConstExpressionCollector(addValue: { values.append($0) })
         var exprParser = ExpressionParser<ConstExpressionCollector>(lexer: parser.lexer, features: features)
         while try exprParser.parseWastConstInstruction(visitor: &collector) {}
@@ -82,10 +82,10 @@ struct WastParser {
         return values
     }
 
-    mutating func expectationValues() throws(WatParserError) -> [WastExpectValue] {
-        var values: [WastExpectValue] = []
+    mutating func expectationValues() throws(WatParserError) -> [WASTExpectValue] {
+        var values: [WASTExpectValue] = []
         var collector = ConstExpressionCollector(addValue: {
-            let value: WastExpectValue
+            let value: WASTExpectValue
             switch $0 {
             case .i32(let v): value = .i32(v)
             case .i64(let v): value = .i64(v)
@@ -114,17 +114,17 @@ struct WastParser {
     }
 }
 
-public enum WastExecute {
-    case invoke(WastInvoke)
+public enum WASTExecute {
+    case invoke(WASTInvoke)
     case wat(Wat)
     case get(module: String?, globalName: String)
 
-    static func parse(wastParser: inout WastParser) throws(WatParserError) -> WastExecute {
+    static func parse(wastParser: inout WASTParser) throws(WatParserError) -> WASTExecute {
         let keyword = try wastParser.parser.peekKeyword()
-        let execute: WastExecute
+        let execute: WASTExecute
         switch keyword {
         case "invoke":
-            execute = .invoke(try WastInvoke.parse(wastParser: &wastParser))
+            execute = .invoke(try WASTInvoke.parse(wastParser: &wastParser))
         case "module":
             try wastParser.parser.consume()
             execute = .wat(try parseWAT(&wastParser.parser, features: wastParser.features))
@@ -147,7 +147,7 @@ public enum WastExecute {
     }
 }
 
-public enum WastConstValue {
+public enum WASTConstValue {
     case i32(UInt32)
     case i64(UInt64)
     case f32(UInt32)
@@ -158,18 +158,18 @@ public enum WastConstValue {
     case refExtern(value: UInt32)
 }
 
-public struct WastInvoke {
+public struct WASTInvoke {
     public let module: String?
     public let name: String
-    public let args: [WastConstValue]
+    public let args: [WASTConstValue]
 
-    static func parse(wastParser: inout WastParser) throws(WatParserError) -> WastInvoke {
+    static func parse(wastParser: inout WASTParser) throws(WatParserError) -> WASTInvoke {
         try wastParser.parser.expectKeyword("invoke")
         let module = try wastParser.parser.takeId()
         let name = try wastParser.parser.expectString()
         let args = try wastParser.argumentValues()
         try wastParser.parser.expect(.rightParen)
-        let invoke = WastInvoke(module: module?.value, name: name, args: args)
+        let invoke = WASTInvoke(module: module?.value, name: name, args: args)
         return invoke
     }
 }
@@ -193,7 +193,7 @@ public struct V128Expectation: Equatable {
     }
 }
 
-public enum WastExpectValue {
+public enum WASTExpectValue {
     case i32(UInt32)
     case i64(UInt64)
     case f32(UInt32)
@@ -224,30 +224,30 @@ public enum WastExpectValue {
     case f64ArithmeticNaN
     /// A relaxed-SIMD non-deterministic expectation: the result matches if it equals any candidate.
     /// Corresponds to `(either <result>…)` in WAST.
-    indirect case either([WastExpectValue])
+    indirect case either([WASTExpectValue])
 }
 
 /// A directive in a WAST script.
-public enum WastDirective {
+public enum WASTDirective {
     case module(ModuleDirective)
     case assertInvalid(module: ModuleDirective, message: String)
     case assertMalformed(module: ModuleDirective, message: String)
-    case assertReturn(execute: WastExecute, results: [WastExpectValue])
-    case assertTrap(execute: WastExecute, message: String)
-    case assertExhaustion(call: WastInvoke, message: String)
-    case assertException(execute: WastExecute)
+    case assertReturn(execute: WASTExecute, results: [WASTExpectValue])
+    case assertTrap(execute: WASTExecute, message: String)
+    case assertExhaustion(call: WASTInvoke, message: String)
+    case assertException(execute: WASTExecute)
     case assertUnlinkable(module: Wat, message: String)
     case register(name: String, moduleId: String?)
-    case invoke(WastInvoke)
+    case invoke(WASTInvoke)
 
-    static func peek(wastParser: WastParser) throws(WatParserError) -> Bool {
+    static func peek(wastParser: WASTParser) throws(WatParserError) -> Bool {
         guard let keyword = try wastParser.parser.peekKeyword() else { return false }
         return keyword.starts(with: "assert_") || keyword == "module" || keyword == "register" || keyword == "invoke"
     }
 
     /// Parse a directive in a WAST script from "keyword ...)" form.
     /// Leading left parenthesis is already consumed, and the trailing right parenthesis should be consumed by this function.
-    static func parse(wastParser: inout WastParser) throws(WatParserError) -> WastDirective {
+    static func parse(wastParser: inout WASTParser) throws(WatParserError) -> WASTDirective {
         let keyword = try wastParser.parser.peekKeyword()
         switch keyword {
         case "module":
@@ -266,25 +266,25 @@ public enum WastDirective {
             return .assertMalformed(module: module, message: message)
         case "assert_return":
             try wastParser.parser.consume()
-            let execute = try wastParser.parens { wastParser throws(WatParserError) in try WastExecute.parse(wastParser: &wastParser) }
+            let execute = try wastParser.parens { wastParser throws(WatParserError) in try WASTExecute.parse(wastParser: &wastParser) }
             let results = try wastParser.expectationValues()
             try wastParser.parser.expect(.rightParen)
             return .assertReturn(execute: execute, results: results)
         case "assert_trap":
             try wastParser.parser.consume()
-            let execute = try wastParser.parens { wastParser throws(WatParserError) in try WastExecute.parse(wastParser: &wastParser) }
+            let execute = try wastParser.parens { wastParser throws(WatParserError) in try WASTExecute.parse(wastParser: &wastParser) }
             let message = try wastParser.parser.expectString()
             try wastParser.parser.expect(.rightParen)
             return .assertTrap(execute: execute, message: message)
         case "assert_exhaustion":
             try wastParser.parser.consume()
-            let call = try wastParser.parens { wastParser throws(WatParserError) in try WastInvoke.parse(wastParser: &wastParser) }
+            let call = try wastParser.parens { wastParser throws(WatParserError) in try WASTInvoke.parse(wastParser: &wastParser) }
             let message = try wastParser.parser.expectString()
             try wastParser.parser.expect(.rightParen)
             return .assertExhaustion(call: call, message: message)
         case "assert_exception":
             try wastParser.parser.consume()
-            let execute = try wastParser.parens { wastParser throws(WatParserError) in try WastExecute.parse(wastParser: &wastParser) }
+            let execute = try wastParser.parens { wastParser throws(WatParserError) in try WASTExecute.parse(wastParser: &wastParser) }
             try wastParser.parser.expect(.rightParen)
             return .assertException(execute: execute)
         case "assert_unlinkable":
@@ -306,7 +306,7 @@ public enum WastDirective {
             try wastParser.parser.expect(.rightParen)
             return .register(name: name, moduleId: module?.value)
         case "invoke":
-            let invoke = try WastInvoke.parse(wastParser: &wastParser)
+            let invoke = try WASTInvoke.parse(wastParser: &wastParser)
             return .invoke(invoke)
         case let keyword?:
             throw WatParserError(
@@ -328,7 +328,7 @@ public struct ModuleDirective {
     /// The location of the module in the source
     public let location: Location
 
-    static func parse(wastParser: inout WastParser) throws(WatParserError) -> ModuleDirective {
+    static func parse(wastParser: inout WASTParser) throws(WatParserError) -> ModuleDirective {
         let location = wastParser.parser.lexer.location()
         try wastParser.parser.expectKeyword("module")
         let id = try wastParser.parser.takeId()
@@ -346,7 +346,7 @@ public enum ModuleSource {
     /// A binary form of WebAssembly module
     case binary([UInt8])
 
-    static func parse(wastParser: inout WastParser) throws(WatParserError) -> ModuleSource {
+    static func parse(wastParser: inout WASTParser) throws(WatParserError) -> ModuleSource {
         if let rawSource = try wastParser.parser.parseBinaryOrQuote() {
             switch rawSource {
             case .binary(let bytes): return .binary(bytes)
