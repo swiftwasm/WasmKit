@@ -33,7 +33,7 @@
 
             let listener = try TCPListener(host: self.host, port: self.port)
             defer { listener.close() }
-            logger.info("Debugger server listening on port \(port)")
+            logger.trace("Debugger server listening on port \(port)")
 
             // A GDB stub serves one client at a time: accept connections
             // sequentially until the client asks the target to shut down.
@@ -53,7 +53,7 @@
                         }
                     }
                 } catch WasmKitGDBHandler.Error.killRequestReceived {
-                    logger.info("Debugger shut down request received")
+                    logger.trace("Debugger shut down request received")
                     break serving
                 } catch {
                     logger.error("Error in GDB remote protocol connection: \(error)")
