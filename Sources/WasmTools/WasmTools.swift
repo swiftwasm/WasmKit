@@ -274,9 +274,9 @@ package enum WasmToolsError: Error, CustomStringConvertible {
 
 // MARK: - JSON Types for wast2json output
 
-package struct Wast2JSONOutput: Codable {
+package struct WAST2JSONOutput: Codable {
     package let sourceFilename: String
-    package let commands: [Wast2JSONCommand]
+    package let commands: [WAST2JSONCommand]
 
     enum CodingKeys: String, CodingKey {
         case sourceFilename = "source_filename"
@@ -285,7 +285,7 @@ package struct Wast2JSONOutput: Codable {
 }
 
 /// A command from the wast2json output
-package struct Wast2JSONCommand: Codable {
+package struct WAST2JSONCommand: Codable {
     package let type: String
     package let line: Int
     package let filename: String?
@@ -307,7 +307,7 @@ package func wast2json(
     wasmToolsPath: String = defaultWasmToolsPath,
     wastContent: [UInt8],
     wastFileName: String = "input.wast"
-) throws -> (json: Wast2JSONOutput, wasmFiles: [String: [UInt8]]) {
+) throws -> (json: WAST2JSONOutput, wasmFiles: [String: [UInt8]]) {
     let inputPath = "/input/\(wastFileName)"
     let outputDir = "/output"
 
@@ -326,7 +326,7 @@ package func wast2json(
         throw WasmToolsError.executionFailed(exitCode: result.exitCode, stderr: result.stderrString)
     }
 
-    let jsonOutput = try JSONDecoder().decode(Wast2JSONOutput.self, from: Data(result.stdout))
+    let jsonOutput = try JSONDecoder().decode(WAST2JSONOutput.self, from: Data(result.stdout))
 
     var wasmFiles: [String: [UInt8]] = [:]
     for command in jsonOutput.commands {

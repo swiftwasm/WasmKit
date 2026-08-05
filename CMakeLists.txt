@@ -69,5 +69,4 @@ if(WASMKIT_BUILD_CLI)
 endif()
 
 add_subdirectory(Sources)
-add_subdirectory(Tests)
 add_subdirectory(cmake/modules)

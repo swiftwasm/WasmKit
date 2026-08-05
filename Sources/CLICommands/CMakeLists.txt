@@ -2,11 +2,12 @@ add_wasmkit_library(CLICommands
     Explore.swift
     Platform.swift
     Run.swift
+    WAST.swift
     Wat2wasm.swift
 )
 
 target_link_wasmkit_libraries(CLICommands PUBLIC
-  WAT WasmKitWASI WASI)
+  WAT WasmKitWASI WASI WASTRunner)
 
 add_dependencies(
   CLICommands

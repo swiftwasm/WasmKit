@@ -6,9 +6,9 @@ import WasmParser
 
 @Suite
 struct ParserTests {
-    func parseWast(_ source: String, features: WasmFeatureSet = .default) throws -> [WastDirective] {
-        var parser = WastParser(source, features: features)
-        var directives: [WastDirective] = []
+    func parseWast(_ source: String, features: WasmFeatureSet = .default) throws -> [WASTDirective] {
+        var parser = WASTParser(source, features: features)
+        var directives: [WASTDirective] = []
         while let directive = try parser.nextDirective() {
             directives.append(directive)
         }
@@ -55,7 +55,7 @@ struct ParserTests {
 
     @Test
     func parseWastModule() throws {
-        var parser = WastParser(
+        var parser = WASTParser(
             #"""
             (module
               ;; comment here

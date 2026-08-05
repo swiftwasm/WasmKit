@@ -44,10 +44,8 @@ package struct TestCase: CustomStringConvertible {
 
         let matchesPattern: (URL) throws -> Bool = { filePath in
             let fileName = filePath.lastPathComponent
-            // FIXME: Skip names.wast until we have .wat/.wast parser
-            // "names.wast" contains BOM in some test cases and they are parsed
-            // as empty string in JSONDecoder because there is no way to express
-            // it in UTF-8.
+            // FIXME: skipped because two escaped export names decode to the same string here ("Å",
+            // spelled by only one export), so the module is rejected and later directives all fail.
             guard fileName != "names.wast" else { return false }
 
             let patternPredicate = { pattern in filePath.path.hasSuffix(pattern) }
@@ -99,7 +97,7 @@ package struct SpectestError: Error, CustomStringConvertible {
     }
 }
 
-class WastRunContext {
+class WASTRunContext {
     let store: Store
     var engine: Engine { store.engine }
     let rootPath: String
@@ -128,7 +126,7 @@ extension TestCase {
         }
         var configuration = configuration
         let rootPath = URL(fileURLWithPath: path).deletingLastPathComponent().path
-        let features = WastRunContext.deriveFeatureSet(rootPath: rootPath)
+        let features = WASTRunContext.deriveFeatureSet(rootPath: rootPath)
         configuration.features = features
 
         let engine = Engine(configuration: configuration)
@@ -136,7 +134,7 @@ extension TestCase {
         let spectestInstance = try spectestModule.instantiate(store: store)
 
         var content = try parseWAST(String(data: data, encoding: .utf8)!, features: features)
-        let context = WastRunContext(store: store, rootPath: rootPath)
+        let context = WASTRunContext(store: store, rootPath: rootPath)
         context.importsSpace.define(module: "spectest", spectestInstance.exports)
 
         // Add shared_memory export for threads proposal tests. Skip it where shared memory is
@@ -166,7 +164,7 @@ extension TestCase {
     }
 }
 
-extension WastRunContext {
+extension WASTRunContext {
     func instantiate(module: Module, name: String? = nil) throws -> Instance {
         let instance = try module.instantiate(store: store, imports: importsSpace)
         if let name {
@@ -186,7 +184,7 @@ extension WastRunContext {
         }
         return instance
     }
-    func deriveInstance(from execute: WastExecute) throws -> Instance? {
+    func deriveInstance(from execute: WASTExecute) throws -> Instance? {
         switch execute {
         case .invoke(let invoke):
             if let module = invoke.module {
@@ -207,7 +205,7 @@ extension WastRunContext {
         }
     }
 
-    func run(directive: WastDirective) throws -> Result? {
+    func run(directive: WASTDirective) throws -> Result? {
         switch directive {
         case .module(let moduleDirective):
             currentInstance = nil
@@ -340,7 +338,7 @@ extension WastRunContext {
         }
     }
 
-    private func wastExecute(execute: WastExecute) throws -> [Value] {
+    private func wastExecute(execute: WASTExecute) throws -> [Value] {
         switch execute {
         case .invoke(let invoke):
             return try wastInvoke(call: invoke)
@@ -357,7 +355,7 @@ extension WastRunContext {
         }
     }
 
-    private func wastInvoke(call: WastInvoke) throws -> [Value] {
+    private func wastInvoke(call: WASTInvoke) throws -> [Value] {
         let instance = try deriveInstance(by: call.module)
         guard let function = instance.exportedFunction(name: call.name) else {
             throw SpectestError("function \(call.name) not exported")
@@ -402,13 +400,6 @@ extension WastRunContext {
         return features
     }
 
-    private func parseModule(rootPath: String, filename: String) throws -> Module {
-        let path = URL(fileURLWithPath: rootPath).appendingPathComponent(filename).path
-
-        let module = try parseWasm(filePath: path, features: Self.deriveFeatureSet(rootPath: rootPath))
-        return module
-    }
-
     private func parseModule(rootPath: String, moduleSource: ModuleSource) throws -> Module {
         let binary: [UInt8]
         switch moduleSource {
@@ -426,7 +417,7 @@ extension WastRunContext {
 }
 
 extension Value {
-    func isTestEquivalent(to value: WastExpectValue) -> Bool {
+    func isTestEquivalent(to value: WASTExpectValue) -> Bool {
         switch (self, value) {
         case (.i32(let lhs), .i32(let rhs)):
             return lhs == rhs
@@ -510,7 +501,7 @@ extension Value {
 }
 
 extension Array where Element == Value {
-    func isTestEquivalent(to arrayOfValues: [WastExpectValue]) -> Bool {
+    func isTestEquivalent(to arrayOfValues: [WASTExpectValue]) -> Bool {
         guard count == arrayOfValues.count else {
             return false
         }

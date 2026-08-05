@@ -6,12 +6,12 @@ private func loadStringArrayFromEnvironment(_ key: String) -> [String] {
     ProcessInfo.processInfo.environment[key]?.split(separator: ",").map(String.init) ?? []
 }
 
-struct SpectestDiscovery {
+package struct SpectestDiscovery {
     let path: [String]
     let include: [String]
     let exclude: [String]
 
-    init(
+    package init(
         path: [String],
         include: [String] = loadStringArrayFromEnvironment("WASMKIT_SPECTEST_INCLUDE"),
         exclude: [String] = loadStringArrayFromEnvironment("WASMKIT_SPECTEST_EXCLUDE")
@@ -21,45 +21,29 @@ struct SpectestDiscovery {
         self.exclude = exclude
     }
 
-    func discover() throws -> [TestCase] {
+    package func discover() throws -> [TestCase] {
         return try TestCase.load(include: include, exclude: exclude, in: path)
     }
 }
 
-protocol SpectestProgressReporter {
+package protocol SpectestProgressReporter {
+    /// `verbose` marks a message that only a verbose reporter should surface.
     func log(_ message: String, verbose: Bool)
     func log(_ message: String, path: String, location: Location, verbose: Bool)
 }
 
-extension SpectestProgressReporter {
-    func log(_ message: String, verbose: Bool = false) {
-        log(message, verbose: verbose)
-    }
-    func log(_ message: String, path: String, location: Location, verbose: Bool = false) {
-        log(message, path: path, location: location, verbose: verbose)
-    }
+package struct NullSpectestProgressReporter: SpectestProgressReporter {
+    package init() {}
+
+    package func log(_ message: String, verbose: Bool) {}
+    package func log(_ message: String, path: String, location: Location, verbose: Bool) {}
 }
 
-struct NullSpectestProgressReporter: SpectestProgressReporter {
-    func log(_ message: String, verbose: Bool) {}
-    func log(_ message: String, path: String, location: Location, verbose: Bool) {}
-}
-
-struct StderrSpectestProgressReporter: SpectestProgressReporter {
-    func log(_ message: String, verbose: Bool) {
-        try! FileHandle.standardError.write(contentsOf: Data((message + "\n").utf8))
-    }
-    func log(_ message: String, path: String, location: Location, verbose: Bool) {
-        let (line, _) = location.computeLineAndColumn()
-        try! FileHandle.standardError.write(contentsOf: Data(("\(path):\(line): " + message + "\n").utf8))
-    }
-}
-
-struct SpectestRunner {
+package struct SpectestRunner {
     let hostModule: Module
     let configuration: EngineConfiguration
 
-    init(configuration: EngineConfiguration) throws {
+    package init(configuration: EngineConfiguration) throws {
         self.configuration = configuration
         // https://github.com/WebAssembly/spec/tree/8a352708cffeb71206ca49a0f743bdc57269fb1a/interpreter#spectest-host-module
         hostModule = try parseWasm(
@@ -102,35 +86,49 @@ struct SpectestRunner {
         }
     }
 
-    func run(test: TestCase, reporter: SpectestProgressReporter) throws {
+    package struct Outcome {
+        package var passed = 0
+        package var failed = 0
+        package var failures: [(Location, reason: String)] = []
+    }
+
+    /// A failing assertion lands in ``Outcome/failures``; only a script that cannot be parsed throws.
+    package func evaluate(test: TestCase, reporter: SpectestProgressReporter) throws -> Outcome {
+        var outcome = Outcome()
+        try test.run(spectestModule: hostModule, configuration: configuration) { test, location, result in
+            switch result {
+            case .failed(let reason):
+                reporter.log("\(result.banner) \(reason)", path: test.path, location: location, verbose: false)
+                outcome.failed += 1
+                outcome.failures.append((location, reason))
+            case .skipped(let reason):
+                reporter.log("\(result.banner) \(reason)", path: test.path, location: location, verbose: true)
+            case .passed:
+                reporter.log(result.banner, path: test.path, location: location, verbose: true)
+                outcome.passed += 1
+            }
+        }
+        return outcome
+    }
+
+    package func run(test: TestCase, reporter: SpectestProgressReporter) throws {
         let logDuration: () -> Void
         if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
             let start = ContinuousClock.now
             logDuration = {
                 let elapsed = ContinuousClock.now - start
-                reporter.log("Finished \(test.relativePath) in \(elapsed)")
+                reporter.log("Finished \(test.relativePath) in \(elapsed)", verbose: false)
             }
         } else {
             // Fallback on earlier versions
             logDuration = {}
         }
-        reporter.log("Testing  \(test.relativePath)")
-        var failures = [(Location, reason: String)]()
-        try test.run(spectestModule: hostModule, configuration: configuration) { test, location, result in
-            switch result {
-            case .failed(let reason):
-                reporter.log("\(result.banner) \(reason)", path: test.path, location: location)
-                failures.append((location, reason))
-            case .skipped(let reason):
-                reporter.log("\(result.banner) \(reason)", path: test.path, location: location, verbose: true)
-            case .passed:
-                reporter.log(result.banner, path: test.path, location: location, verbose: true)
-            }
-        }
+        reporter.log("Testing  \(test.relativePath)", verbose: false)
+        let outcome = try evaluate(test: test, reporter: reporter)
         logDuration()
 
-        if !failures.isEmpty {
-            throw Failures(test: test, failures: failures)
+        if !outcome.failures.isEmpty {
+            throw Failures(test: test, failures: outcome.failures)
         }
     }
 }

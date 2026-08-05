@@ -10,6 +10,7 @@ struct CLI: AsyncParsableCommand {
         subcommands: [
             Explore.self,
             Run.self,
+            WAST.self,
             Wat2wasm.self,
         ]
     )

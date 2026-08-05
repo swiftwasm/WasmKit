@@ -159,18 +159,18 @@ public func parseWAT(_ input: String, features: WasmFeatureSet = .default) throw
 }
 
 /// A WAST script representation.
-public struct Wast {
-    var parser: WastParser
+public struct WAST {
+    var parser: WASTParser
 
     init(_ input: String, features: WasmFeatureSet) {
-        self.parser = WastParser(input, features: features)
+        self.parser = WASTParser(input, features: features)
     }
 
     /// Parses the next directive in the WAST script.
     ///
     /// - Returns: A tuple containing the parsed directive and its location in the WAST script
     ///   or `nil` if there are no more directives to parse.
-    public mutating func nextDirective() throws(WatParserError) -> (directive: WastDirective, location: Location)? {
+    public mutating func nextDirective() throws(WatParserError) -> (directive: WASTDirective, location: Location)? {
         let location = try parser.parser.peek()?.location(in: parser.parser.lexer) ?? parser.parser.lexer.location()
         if let directive = try parser.nextDirective() {
             return (directive, location)
@@ -180,12 +180,12 @@ public struct Wast {
     }
 }
 
-/// Parses a WebAssembly script test format (WAST) string into a `Wast` instance.
+/// Parses a WebAssembly script test format (WAST) string into a `WAST` instance.
 ///
 /// - Parameter input: The WAST string to parse
-/// - Returns: The parsed `Wast` instance
+/// - Returns: The parsed `WAST` instance
 ///
-/// The returned `Wast` instance can be used to iterate over the directives in the WAST script.
+/// The returned `WAST` instance can be used to iterate over the directives in the WAST script.
 ///
 /// ```swift
 /// var wast = try parseWAST("""
@@ -203,8 +203,8 @@ public struct Wast {
 ///     print("\(location): \(directive)")
 /// }
 /// ```
-public func parseWAST(_ input: String, features: WasmFeatureSet = .default) throws(WatParserError) -> Wast {
-    return Wast(input, features: features)
+public func parseWAST(_ input: String, features: WasmFeatureSet = .default) throws(WatParserError) -> WAST {
+    return WAST(input, features: features)
 }
 
 // MARK: - Component WAST
@@ -212,18 +212,18 @@ public func parseWAST(_ input: String, features: WasmFeatureSet = .default) thro
 #if ComponentModel
 
     /// A Component WAST script representation.
-    public struct ComponentWast {
-        var parser: ComponentWastParser
+    public struct ComponentWAST {
+        var parser: ComponentWASTParser
 
         init(_ input: String, features: WasmFeatureSet) {
-            self.parser = ComponentWastParser(input, features: features)
+            self.parser = ComponentWASTParser(input, features: features)
         }
 
         /// Parses the next directive in the Component WAST script.
         ///
         /// - Returns: A tuple containing the parsed directive and its location in the script,
         ///   or `nil` if there are no more directives to parse.
-        public mutating func nextDirective() throws -> (directive: ComponentWastDirective, location: Location)? {
+        public mutating func nextDirective() throws -> (directive: ComponentWASTDirective, location: Location)? {
             let location = try parser.parser.peek()?.location(in: parser.parser.lexer) ?? parser.parser.lexer.location()
             if let directive = try parser.nextDirective() {
                 return (directive, location)
@@ -239,13 +239,13 @@ public func parseWAST(_ input: String, features: WasmFeatureSet = .default) thro
         }
     }
 
-    /// Parses a Component WAST string into a `ComponentWast` instance.
+    /// Parses a Component WAST string into a `ComponentWAST` instance.
     ///
     /// - Parameter input: The Component WAST string to parse
     /// - Parameter features: The feature set to use for parsing
-    /// - Returns: The parsed `ComponentWast` instance
+    /// - Returns: The parsed `ComponentWAST` instance
     ///
-    /// The returned `ComponentWast` instance can be used to iterate over the directives in the script.
+    /// The returned `ComponentWAST` instance can be used to iterate over the directives in the script.
     ///
     /// ```swift
     /// var wast = try parseComponentWAST("""
@@ -264,8 +264,8 @@ public func parseWAST(_ input: String, features: WasmFeatureSet = .default) thro
     public func parseComponentWAST(
         _ input: String,
         features: WasmFeatureSet = .default
-    ) throws(WatParserError) -> ComponentWast {
-        return ComponentWast(input, features: features)
+    ) throws(WatParserError) -> ComponentWAST {
+        return ComponentWAST(input, features: features)
     }
 
 #endif

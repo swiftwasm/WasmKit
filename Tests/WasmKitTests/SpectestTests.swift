@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import WASTRunner
 import WasmKit
 
 @Suite
