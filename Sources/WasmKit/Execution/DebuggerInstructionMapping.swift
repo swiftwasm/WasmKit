@@ -7,44 +7,48 @@ struct DebuggerInstructionMapping {
         /// Used for handling current call stack requests issued by a ``Debugger`` instance.
         private var iseqToWasm = [Pc: Int]()
 
+        /// Map from iseq Pc to the start of its instruction run.
+        private var iseqToCanonicalWasm = [Pc: Int]()
+
         /// Mapping from Wasm instruction addresses in the original binary to iseq instruction addresses.
         /// Used for handling breakpoint requests issued by a ``Debugger`` instance.
         private var wasmToIseq = [Int: Pc]()
 
-        /// Last iseq slot per wasm address. A call with args lowers to prep slots then the call, all
-        /// sharing one wasm address; `wasmToIseq` keeps the first (a prep slot), this keeps the call.
+        /// Last iseq slot emitted for a Wasm address when multiple instructions share an address.
         private var lastWasmToIseq = [Int: Pc]()
 
-        /// Wasm addresses sorted in ascending order for binary search when of the next closest mapped
-        /// instruction, when no key is found in `wasmToIseqMapping`.
+        /// Sorted emitting Wasm addresses for binary search when an address has no direct mapping.
         private var wasmMappings = [Int]()
 
-        mutating func add(wasm: Int, iseq: Pc) {
+        mutating func add(canonical: Int, emitting: Int, iseq: Pc) {
             // Don't override the existing mapping, only store a new pair if there's no mapping for a given key.
             if self.iseqToWasm[iseq] == nil {
-                self.iseqToWasm[iseq] = wasm
+                self.iseqToWasm[iseq] = emitting
             }
-            if self.wasmToIseq[wasm] == nil {
-                self.wasmToIseq[wasm] = iseq
+            if self.iseqToCanonicalWasm[iseq] == nil {
+                self.iseqToCanonicalWasm[iseq] = canonical
             }
-            self.lastWasmToIseq[wasm] = iseq
+            if self.wasmToIseq[emitting] == nil {
+                self.wasmToIseq[emitting] = iseq
+            }
+            self.lastWasmToIseq[emitting] = iseq
             // Insert in sorted order to maintain the binary search invariant.
             // With lazy compilation, functions may be compiled out of address order,
             // so simple append would break the sorted invariant.
-            if let last = self.wasmMappings.last, wasm > last {
+            if let last = self.wasmMappings.last, emitting > last {
                 // Fast path: appending in order (common within a single function)
-                self.wasmMappings.append(wasm)
-            } else if self.wasmMappings.last == wasm {
+                self.wasmMappings.append(emitting)
+            } else if self.wasmMappings.last == emitting {
                 // Duplicate of last entry, skip
             } else if self.wasmMappings.isEmpty {
-                self.wasmMappings.append(wasm)
+                self.wasmMappings.append(emitting)
             } else {
                 // Out-of-order insertion: find the sorted position
-                let insertionIndex = self.wasmMappings.firstIndex(where: { $0 >= wasm }) ?? self.wasmMappings.endIndex
-                if insertionIndex < self.wasmMappings.endIndex, self.wasmMappings[insertionIndex] == wasm {
+                let insertionIndex = self.wasmMappings.firstIndex(where: { $0 >= emitting }) ?? self.wasmMappings.endIndex
+                if insertionIndex < self.wasmMappings.endIndex, self.wasmMappings[insertionIndex] == emitting {
                     // Already present, skip
                 } else {
-                    self.wasmMappings.insert(wasm, at: insertionIndex)
+                    self.wasmMappings.insert(emitting, at: insertionIndex)
                 }
             }
         }
@@ -72,6 +76,11 @@ struct DebuggerInstructionMapping {
 
         func findWasm(forIseqAddress pc: Pc) -> Int? {
             self.iseqToWasm[pc]
+        }
+
+        /// Start of the Wasm instruction run sharing this slot.
+        func firstWasm(forIseqAddress pc: Pc) -> Int? {
+            self.iseqToCanonicalWasm[pc]
         }
 
         func lastIseq(forWasmAddress address: Int) -> Pc? {
@@ -113,5 +122,4 @@ struct DebuggerInstructionMapping {
             }
         }
     }
-
 #endif

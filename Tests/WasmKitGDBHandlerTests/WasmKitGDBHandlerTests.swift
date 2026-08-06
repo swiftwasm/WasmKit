@@ -76,6 +76,39 @@
                     kind: .insertSoftwareBreakpoint, arguments: "\(hostHex(wasmAddr)),1"))
         }
 
+        /// Frame addresses from a `qWasmCallStack` reply.
+        private func callStack(_ h: WasmKitGDBHandler) throws -> [Int] {
+            let reply = try h.handle(command: .init(kind: .wasmCallStack, arguments: ""))
+            guard case .hexEncodedBinary(let bytes) = reply.kind else {
+                Issue.record("expected a binary call stack reply, got \(reply.kind)")
+                return []
+            }
+            return stride(from: 0, to: bytes.count, by: 8).map { start in
+                let frame = bytes[start..<min(start + 8, bytes.count)]
+                return Int(frame.reversed().reduce(UInt64(0)) { ($0 << 8) | UInt64($1) } - offset)
+            }
+        }
+
+        /// Two requested addresses that resolve to the same bytecode slot. Both are raw byte offsets,
+        /// so the lower one is not necessarily the start of a Wasm instruction.
+        private func aliasingAddresses() throws -> (lower: Int, higher: Int) {
+            let bytes = try wat2wasm(Self.wat)
+            let module = try parseWasm(bytes: bytes)
+            let base = module.functions[1].code.originalAddress
+
+            var byResolved = [Int: [Int]]()
+            for delta in 0..<0x40 {
+                let requested = base + delta
+                guard let resolved = try? resolve(module: module, address: requested) else { continue }
+                byResolved[resolved, default: []].append(requested)
+            }
+            let group = try #require(
+                byResolved.values.filter({ $0.count > 1 }).min(by: { $0[0] < $1[0] }),
+                "no two addresses in the fixture resolve to one bytecode slot")
+            let sorted = group.sorted()
+            return (sorted[0], sorted[1])
+        }
+
         @Test
         func breakpointStopReportsBreakpointReasonAtRequestedAddress() throws {
             let (requested, resolved) = try divergentAddresses()
@@ -86,6 +119,77 @@
                 #expect(kv["reason"] == "breakpoint")
                 #expect(kv["thread-pcs"] == hostHex(requested))
                 #expect(kv["thread-pcs"] != hostHex(resolved))
+            }
+        }
+
+        @Test
+        func aliasedBreakpointsReportTheLowestRequestedAddress() throws {
+            let (lower, higher) = try aliasingAddresses()
+            try withHandler(debugging: Self.wat) { h in
+                try insert(h, at: lower)
+                try insert(h, at: higher)
+                let kv = pairs(try h.handle(command: .init(kind: .continue, arguments: "")))
+                #expect(kv["reason"] == "breakpoint")
+                #expect(kv["thread-pcs"] == hostHex(lower))
+            }
+        }
+
+        @Test
+        func stopReplyAndCallStackAgreeOnTheInnermostFrame() throws {
+            let (requested, _) = try divergentAddresses()
+            try withHandler(debugging: Self.wat) { h in
+                try insert(h, at: requested)
+                let kv = pairs(try h.handle(command: .init(kind: .continue, arguments: "")))
+                let frames = try callStack(h)
+                #expect(frames.first.map(hostHex) == kv["thread-pcs"])
+            }
+
+            let (lower, higher) = try aliasingAddresses()
+            try withHandler(debugging: Self.wat) { h in
+                try insert(h, at: lower)
+                try insert(h, at: higher)
+                let kv = pairs(try h.handle(command: .init(kind: .continue, arguments: "")))
+                let frames = try callStack(h)
+                #expect(frames.first.map(hostHex) == kv["thread-pcs"])
+            }
+        }
+
+        @Test
+        func stopWithoutABreakpointReportsTheRunStartNotTheEmittingInstruction() throws {
+            let module = try parseWasm(bytes: try wat2wasm(Self.wat))
+            let base = module.functions[1].code.originalAddress
+
+            try withHandler(debugging: Self.wat) { h in
+                try insert(h, at: base)
+                _ = try h.handle(command: .init(kind: .continue, arguments: ""))
+                _ = try h.handle(
+                    command: .init(kind: .removeSoftwareBreakpoint, arguments: "\(hostHex(base)),1"))
+                _ = try h.handle(command: .init(kind: .resumeThreads, arguments: "s:1"))
+
+                let kv = pairs(try h.handle(command: .init(kind: .threadStopInfo, arguments: "")))
+                let reported = try #require(try callStack(h).first)
+                #expect(kv["thread-pcs"] == hostHex(reported))
+                #expect(kv["reason"] == "trace")
+                #expect(try resolve(module: module, address: reported) > reported)
+            }
+        }
+
+        @Test
+        func aSecondBreakpointInOneRunIsAStopOfItsOwn() throws {
+            let (lower, higher) = try aliasingAddresses()
+            try withHandler(debugging: Self.wat) { h in
+                try insert(h, at: lower)
+                try insert(h, at: higher)
+
+                let first = pairs(try h.handle(command: .init(kind: .continue, arguments: "")))
+                #expect(first["reason"] == "breakpoint")
+                #expect(first["thread-pcs"] == hostHex(lower))
+
+                _ = try h.handle(command: .init(kind: .resumeThreads, arguments: "s:1"))
+                let second = pairs(try h.handle(command: .init(kind: .threadStopInfo, arguments: "")))
+                #expect(second["reason"] == "breakpoint")
+                #expect(second["thread-pcs"] == hostHex(higher))
+                #expect(try callStack(h).first == higher)
             }
         }
 

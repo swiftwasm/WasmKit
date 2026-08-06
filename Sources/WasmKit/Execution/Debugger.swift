@@ -5,7 +5,10 @@
     package struct Debugger: ~Copyable {
         package struct BreakpointState {
             let iseq: Execution.Breakpoint
+            /// Wasm address the engine stopped on.
             package let wasmPc: Int
+            /// Wasm address reported for this stop.
+            package var reportedPc: Int
         }
 
         package enum State {
@@ -51,10 +54,8 @@
         /// carries both what to restore and where, so taking one down never has to resolve again.
         private var armedBreakpoints = [Int: (iseq: Pc, originalHeadSlot: CodeSlot)]()
 
-        /// Resolved Wasm addresses the debugger host has asked for a breakpoint at. A breakpoint traps
-        /// *before* the instruction it replaced, so resuming means taking it out of the bytecode, which
-        /// the host's request outlives. That makes this a different fact from ``armedBreakpoints``.
-        private var hostBreakpoints = Set<Int>()
+        /// Breakpoints requested by the host, keyed by resolved address. Multiple requests may share a slot.
+        private var hostBreakpoints = [Int: Set<Int>]()
 
         /// Resolved Wasm addresses armed to bound the single-instruction step in progress. Every
         /// address execution can reach from the current one has to be armed, and all of them come
@@ -199,7 +200,7 @@
         @discardableResult
         package mutating func enableBreakpoint(address: Int) throws -> Int {
             let (iseq, wasm) = try self.findIseq(forWasmAddress: address)
-            self.hostBreakpoints.insert(wasm)
+            self.hostBreakpoints[wasm, default: []].insert(address)
             self.arm(resolved: wasm, iseq: iseq)
             return wasm
         }
@@ -221,7 +222,12 @@
             // Resolve the same way enableBreakpoint does, so a breakpoint set
             // at an elided address is found under its resolved key.
             let (_, wasm) = try self.findIseq(forWasmAddress: address)
-            self.hostBreakpoints.remove(wasm)
+            self.hostBreakpoints[wasm]?.remove(address)
+
+            // Keep armed if other requests share the slot.
+            guard self.hostBreakpoints[wasm]?.isEmpty ?? true else { return }
+
+            self.hostBreakpoints[wasm] = nil
             guard !self.stepBreakpoints.contains(wasm) else { return }
 
             self.disarm(resolved: wasm)
@@ -300,11 +306,18 @@
                 }
             } catch let breakpoint as Execution.Breakpoint {
                 let pc = breakpoint.pc
-                guard let wasmPc = self.instance.handle.instructionMapping.findWasm(forIseqAddress: pc) else {
+                let mapping = self.instance.handle.instructionMapping
+                guard let wasmPc = mapping.findWasm(forIseqAddress: pc) else {
                     throw Error.noReverseInstructionMappingAvailable(pc)
                 }
 
-                self.state = .stoppedAtBreakpoint(.init(iseq: breakpoint, wasmPc: wasmPc))
+                self.state = .stoppedAtBreakpoint(
+                    .init(
+                        iseq: breakpoint,
+                        wasmPc: wasmPc,
+                        reportedPc: self.hostBreakpoints[wasmPc]?.min() ?? mapping.firstWasm(forIseqAddress: pc) ?? wasmPc
+                    )
+                )
             }
         }
 
@@ -319,15 +332,31 @@
                 return
             }
 
+            // Report any remaining breakpoints sharing this slot before resuming.
+            guard !self.reportPendingHostBreakpoint(after: breakpoint) else { return }
+
             try self.setNextInstructionBreakpoints(breakpoint: breakpoint)
             try self.run()
             self.clearStepBreakpoints()
 
-            // Execution has moved past the instruction the breakpoint replaced, so its slot can hold a
-            // breakpoint again.
-            if self.hostBreakpoints.contains(breakpoint.wasmPc) {
-                try self.enableBreakpoint(address: breakpoint.wasmPc)
+            // Re-arm directly to avoid recording the resolved address as a new host request.
+            if self.hostBreakpoints[breakpoint.wasmPc] != nil {
+                self.arm(resolved: breakpoint.wasmPc, iseq: breakpoint.iseq.pc)
             }
+        }
+
+        /// Reports the next host breakpoint sharing this bytecode slot without resuming execution.
+        private mutating func reportPendingHostBreakpoint(after breakpoint: BreakpointState) -> Bool {
+            guard
+                let pending = self.hostBreakpoints[breakpoint.wasmPc]?
+                    .filter({ $0 > breakpoint.reportedPc })
+                    .min()
+            else { return false }
+
+            var breakpoint = breakpoint
+            breakpoint.reportedPc = pending
+            self.state = .stoppedAtBreakpoint(breakpoint)
+            return true
         }
 
         /// Resumes the module instantiated by the debugger stopped at a breakpoint. The breakpoint from which
@@ -344,7 +373,7 @@
 
             // Landing on a breakpoint the host set is a stop the host is waiting for.
             guard case .stoppedAtBreakpoint(let landed) = self.state,
-                !self.hostBreakpoints.contains(landed.wasmPc)
+                self.hostBreakpoints[landed.wasmPc] == nil
             else {
                 return
             }
@@ -431,16 +460,25 @@
         }
 
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.
-        package var currentCallStack: [Int] {
+        package var currentCallStack: [Int] { self.callStack(atRunStart: false) }
+
+        /// ``currentCallStack`` with frames moved to the start of their instruction run.
+        package var reportedCallStack: [Int] { self.callStack(atRunStart: true) }
+
+        /// Wasm addresses of the frames on the stack, innermost first. Frames with no reverse
+        /// mapping are dropped.
+        private func callStack(atRunStart: Bool) -> [Int] {
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 return []
             }
 
-            var result = [breakpoint.wasmPc]
-            result.append(
-                contentsOf: Execution.captureBacktrace(sp: breakpoint.iseq.sp, store: self.store).symbols.compactMap {
-                    return self.instance.handle.instructionMapping.findWasm(forIseqAddress: $0.address)
-                })
+            let mapping = self.instance.handle.instructionMapping
+            var result = [atRunStart ? breakpoint.reportedPc : breakpoint.wasmPc]
+            for frame in Execution.CallStack(sp: breakpoint.iseq.sp) {
+                let wasm = atRunStart ? mapping.firstWasm(forIseqAddress: frame.pc) : mapping.findWasm(forIseqAddress: frame.pc)
+                guard let wasm else { continue }
+                result.append(wasm)
+            }
 
             return result
         }
@@ -458,7 +496,7 @@
         private mutating func clearStepBreakpoints() {
             let armedForStep = self.stepBreakpoints
             self.stepBreakpoints.removeAll()
-            for resolved in armedForStep where !self.hostBreakpoints.contains(resolved) {
+            for resolved in armedForStep where self.hostBreakpoints[resolved] == nil {
                 self.disarm(resolved: resolved)
             }
         }

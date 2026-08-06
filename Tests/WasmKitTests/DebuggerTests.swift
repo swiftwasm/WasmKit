@@ -1201,6 +1201,7 @@
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
+            let requestedAddress = module.functions[1].code.originalAddress
             let breakpointAddress = try debugger.enableBreakpoint(
                 module: module,
                 function: 1
@@ -1210,8 +1211,8 @@
             #expect(try requireBreakpoint(debugger) == breakpointAddress)
 
             // Simulate lldb-dap breakpoint re-sync: remove then re-add
-            try debugger.disableBreakpoint(address: breakpointAddress)
-            try debugger.enableBreakpoint(address: breakpointAddress)
+            try debugger.disableBreakpoint(address: requestedAddress)
+            try debugger.enableBreakpoint(address: requestedAddress)
 
             // Should work fine after re-sync
             try debugger.step()
@@ -1221,7 +1222,7 @@
             try debugger.run()
             #expect(try requireBreakpoint(debugger) == breakpointAddress)
 
-            try debugger.disableBreakpoint(address: breakpointAddress)
+            try debugger.disableBreakpoint(address: requestedAddress)
             try debugger.runPreservingCurrentBreakpoint()
             let values = try requireReturned(debugger)
             #expect(values == [.i64(6)])

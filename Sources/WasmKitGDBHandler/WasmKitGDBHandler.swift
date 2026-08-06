@@ -251,6 +251,11 @@
             return argument
         }
 
+        /// Matches on the resolved address that caused the trap, rather than the reported address.
+        private func isStoppedAtUserBreakpoint(_ breakpoint: Debugger.BreakpointState) -> Bool {
+            self.userBreakpoints.contains { $0.value == breakpoint.wasmPc }
+        }
+
         var currentThreadStopInfo: GDBTargetResponse.Kind {
             get throws {
                 var result: [(String, String)] = [
@@ -259,16 +264,10 @@
                 ]
                 switch self.debugger.state {
                 case .stoppedAtBreakpoint(let breakpoint):
-                    let pc = breakpoint.wasmPc
-                    let userBreakpoint = self.userBreakpoints.first(where: { $0.value == pc })?.key
-                    // Report user-breakpoint stops at the address the host
-                    // requested, so it can attribute the stop to its
-                    // breakpoint even when the engine resolved the address
-                    // to the next emitted instruction.
-                    let reportedPc = UInt64(userBreakpoint ?? pc) + DebuggerMemoryView.executableCodeOffset
+                    let reportedPc = UInt64(breakpoint.reportedPc) + DebuggerMemoryView.executableCodeOffset
                     result.append(("thread-pcs", self.hexDump(reportedPc, endianness: .big)))
                     result.append(("00", self.hexDump(reportedPc, endianness: .little)))
-                    result.append(("reason", userBreakpoint != nil ? "breakpoint" : "trace"))
+                    result.append(("reason", self.isStoppedAtUserBreakpoint(breakpoint) ? "breakpoint" : "trace"))
                     return .keyValuePairs(result)
 
                 case .entrypointReturned(let values):
@@ -409,7 +408,7 @@
                 )
 
             case .wasmCallStack:
-                let callStack = self.debugger.currentCallStack
+                let callStack = self.debugger.reportedCallStack
                 var buffer = [UInt8]()
                 buffer.reserveCapacity(callStack.count * 8)
                 for pc in callStack {

@@ -958,13 +958,32 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
     // Wasm debugging support.
 
-    /// Current offset to an instruction in the original Wasm binary processed by this translator.
-    var binaryOffset: Int = 0
+    /// Current Wasm offset, updated for every instruction including non-emitting ones.
+    var binaryOffset: Int = 0 {
+        didSet {
+            #if WasmDebuggingSupport
+                guard self.module.isDebuggable else { return }
 
-    /// Mapping from `self.iseqBuilder.instructions` to Wasm instructions.
-    /// As mapping between iSeq to Wasm is many:many, but we only care about first mapping for overlapping address,
-    /// we need to iterate on it in the order the mappings were stored to ensure we don't overwrite the frist mapping.
-    var iseqToWasmMapping = [(iseq: Int, wasm: Int)]()
+                if self.hasEmittedSinceLastInstruction {
+                    self.currentRunStartWasm = self.binaryOffset
+                    self.hasEmittedSinceLastInstruction = false
+                } else if self.currentRunStartWasm == nil {
+                    self.currentRunStartWasm = self.binaryOffset
+                }
+            #endif
+        }
+    }
+
+    #if WasmDebuggingSupport
+        /// Start of the Wasm instruction run sharing the current bytecode slot.
+        var currentRunStartWasm: Int?
+
+        /// True if bytecode was emitted since the last instruction.
+        var hasEmittedSinceLastInstruction: Bool = false
+
+        /// Pending mappings from iseq bytecode offsets to their canonical and emitting Wasm addresses.
+        var iseqToWasmMapping = [(iseq: Int, canonical: Int, emitting: Int)]()
+    #endif
 
     init(
         allocator: ISeqAllocator,
@@ -1017,15 +1036,17 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     private mutating func emit(_ instruction: Instruction, resultRelink: ISeqBuilder.ResultRelink? = nil) {
-        self.updateInstructionMapping()
+        let oldPC = iseqBuilder.insertingPC
         iseqBuilder.emit(instruction, resultRelink: resultRelink)
+        self.updateInstructionMapping(from: oldPC)
     }
 
     @discardableResult
     private mutating func emitCopyStack(from source: VReg, to dest: VReg) -> Bool {
         guard source != dest else { return false }
-        self.updateInstructionMapping()
-        emit(.copyStack(Instruction.CopyStackOperand(source: LVReg(source), dest: LVReg(dest))))
+        let oldPC = iseqBuilder.insertingPC
+        iseqBuilder.emit(.copyStack(Instruction.CopyStackOperand(source: LVReg(source), dest: LVReg(dest))))
+        self.updateInstructionMapping(from: oldPC)
         return true
     }
 
@@ -1292,8 +1313,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             emit(.catchHandlersEnd(Instruction.CatchHandlersEndOperand(count: handlersToUnwind)))
         }
         try visitReturnLike()
-        self.updateInstructionMapping()
+        let oldPC = iseqBuilder.insertingPC
         iseqBuilder.emit(._return)
+        self.updateInstructionMapping(from: oldPC)
     }
     private mutating func markUnreachable() throws(WasmKitError) {
         try controlStack.markUnreachable()
@@ -1308,7 +1330,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // Check dangling labels
         try iseqBuilder.assertDanglingLabels()
 
+        let oldPC = iseqBuilder.insertingPC
         iseqBuilder.emit(._return)
+        self.updateInstructionMapping(from: oldPC)
         let instructions = iseqBuilder.finalize()
         // TODO: Figure out a way to avoid the copy here while keeping the execution performance.
         let buffer = allocator.allocateInstructions(capacity: instructions.count)
@@ -1316,10 +1340,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         assert(initializedElementsIndex == instructions.endIndex)
 
         #if WasmDebuggingSupport
-            for (iseq, wasm) in self.iseqToWasmMapping {
+            for (iseq, canonical, emitting) in self.iseqToWasmMapping {
                 self.module.withValue {
                     let absoluteIseq = iseq + buffer.baseAddress.unsafelyUnwrapped
-                    $0.instructionMapping.add(wasm: wasm, iseq: absoluteIseq)
+                    $0.instructionMapping.add(canonical: canonical, emitting: emitting, iseq: absoluteIseq)
                 }
             }
         #endif
@@ -1332,12 +1356,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         )
     }
 
-    private mutating func updateInstructionMapping() {
-        // This is a hot path, so best to exclude the code altogether if the trait isn't enabled.
+    /// Maps the instruction head emitted at `oldPC`. Operand slots are omitted.
+    private mutating func updateInstructionMapping(from oldPC: MetaProgramCounter) {
         #if WasmDebuggingSupport
-            guard self.module.isDebuggable else { return }
+            guard self.module.isDebuggable, let canonical = self.currentRunStartWasm,
+                oldPC.offsetFromHead < self.iseqBuilder.insertingPC.offsetFromHead
+            else { return }
 
-            self.iseqToWasmMapping.append((self.iseqBuilder.insertingPC.offsetFromHead, self.binaryOffset))
+            self.iseqToWasmMapping.append((oldPC.offsetFromHead, canonical, self.binaryOffset))
+            self.hasEmittedSinceLastInstruction = true
         #endif
     }
 
@@ -1437,7 +1464,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             )
         )
         guard let condition = condition else { return }
-        self.updateInstructionMapping()
+        let oldPC = iseqBuilder.insertingPC
         iseqBuilder.emitWithLabel(Instruction.brIfNot, endLabel) { iseqBuilder, selfPC, endPC in
             let targetPC: MetaProgramCounter
             if let elsePC = iseqBuilder.resolveLabel(elseLabel) {
@@ -1448,6 +1475,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             let elseOrEnd = UInt32(targetPC.offsetFromHead - selfPC.offsetFromHead)
             return Instruction.BrIfOperand(condition: LVReg(condition), offset: Int32(elseOrEnd))
         }
+        self.updateInstructionMapping(from: oldPC)
     }
 
     mutating func visitElse() throws(WasmKitError) -> Output {
@@ -1459,11 +1487,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         try controlStack.resetReachability()
         iseqBuilder.resetLastEmission()
 
-        self.updateInstructionMapping()
+        let oldPC = iseqBuilder.insertingPC
         iseqBuilder.emitWithLabel(Instruction.br, endLabel) { _, selfPC, endPC in
             let offset = endPC.offsetFromHead - selfPC.offsetFromHead
             return Int32(offset)
         }
+        self.updateInstructionMapping(from: oldPC)
         for result in frame.blockType.results.reversed() {
             guard try checkBeforePop(typeHint: result, controlFrame: frame) else { continue }
             _ = try valueStack.pop(result)
@@ -1568,11 +1597,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             currentHeight: valueStack.slotHeight
         )
 
-        self.updateInstructionMapping()
+        let oldPC = iseqBuilder.insertingPC
         iseqBuilder.emitWithLabel(makeInstruction, frame.continuation) { _, selfPC, continuation in
             let relativeOffset = continuation.offsetFromHead - selfPC.offsetFromHead
             return make(Int32(relativeOffset), UInt32(copyCount), popCount)
         }
+        self.updateInstructionMapping(from: oldPC)
     }
     /// Emit `catchHandlersEnd` instructions for any `try_table` blocks that
     /// would be exited by branching to the given relative depth.
@@ -1614,13 +1644,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             guard let condition else { return }
             // Optimization where we don't need copying values when the branch taken
             // and no exception handlers need unwinding.
-            self.updateInstructionMapping()
+            let oldPC = iseqBuilder.insertingPC
             iseqBuilder.emitWithLabel(Instruction.brIf, frame.continuation) { _, selfPC, continuation in
                 let relativeOffset = continuation.offsetFromHead - selfPC.offsetFromHead
                 return Instruction.BrIfOperand(
                     condition: LVReg(condition), offset: Int32(relativeOffset)
                 )
             }
+            self.updateInstructionMapping(from: oldPC)
             return
         }
         preserveOnStack(depth: valueStack.valueHeight - frame.valueStackHeight)
@@ -1648,16 +1679,16 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             // [0x06] (local.get 1 reg:2) <----|---------+
             // [0x07] ...              <-------+
             let onBranchNotTaken = iseqBuilder.allocLabel()
-            self.updateInstructionMapping()
+            let oldPC = iseqBuilder.insertingPC
             iseqBuilder.emitWithLabel(Instruction.brIfNot, onBranchNotTaken) { _, conditionCheckAt, continuation in
                 let relativeOffset = continuation.offsetFromHead - conditionCheckAt.offsetFromHead
                 return Instruction.BrIfOperand(condition: LVReg(condition), offset: Int32(relativeOffset))
             }
+            self.updateInstructionMapping(from: oldPC)
             try copyOnBranch(targetFrame: frame)
             if handlersToUnwind > 0 {
                 emit(.catchHandlersEnd(Instruction.CatchHandlersEndOperand(count: handlersToUnwind)))
             }
-            self.updateInstructionMapping()
             try emitBranch(Instruction.br, relativeDepth: relativeDepth) { offset, copyCount, popCount in
                 return offset
             }
@@ -1684,8 +1715,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             baseAddress: tableBuffer.baseAddress!,
             count: UInt16(tableBuffer.count), index: index
         )
-        self.updateInstructionMapping()
+        let oldPC = iseqBuilder.insertingPC
         iseqBuilder.emit(.brTable(operand))
+        self.updateInstructionMapping(from: oldPC)
         let brTableAt = iseqBuilder.insertingPC
 
         //
@@ -1745,11 +1777,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 if handlersToUnwind > 0 {
                     emit(.catchHandlersEnd(Instruction.CatchHandlersEndOperand(count: handlersToUnwind)))
                 }
-                self.updateInstructionMapping()
+                let oldPC = iseqBuilder.insertingPC
                 iseqBuilder.emitWithLabel(Instruction.br, frame.continuation) { _, brAt, continuation in
                     let relativeOffset = continuation.offsetFromHead - brAt.offsetFromHead
                     return Int32(relativeOffset)
                 }
+                self.updateInstructionMapping(from: oldPC)
             } else {
                 // Optimization: If no value is copied and no handlers to unwind,
                 // we can directly jump to the target
@@ -1934,7 +1967,6 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let catchTable = allocator.allocateCatchTable(capacity: tryCatch.catches.count)
 
         // Emit the catchHandlers instruction first so we know its PC position.
-        self.updateInstructionMapping()
         let operand = Instruction.CatchHandlersOperand(
             baseAddress: UnsafePointer(catchTable.baseAddress!),
             count: catchCount
