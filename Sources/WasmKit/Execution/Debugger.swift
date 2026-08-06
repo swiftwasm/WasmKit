@@ -46,8 +46,21 @@
         /// Threading model of the Wasm engine configuration, cached for a potentially hot path.
         private let threadingModel: EngineConfiguration.ThreadingModel
 
-        /// Mapping from a Wasm address of a breakpoint to a corresponding iseq code slot.
-        package private(set) var breakpoints = [Int: UInt64]()
+        /// Breakpoints currently present in the bytecode, keyed by resolved Wasm address. The value
+        /// carries both what to restore and where, so taking one down never has to resolve again.
+        private var armedBreakpoints = [Int: (iseq: Pc, originalHeadSlot: CodeSlot)]()
+
+        /// Resolved Wasm addresses the debugger host has asked for a breakpoint at. A breakpoint traps
+        /// *before* the instruction it replaced, so resuming means taking it out of the bytecode, which
+        /// the host's request outlives. That makes this a different fact from ``armedBreakpoints``.
+        private var hostBreakpoints = Set<Int>()
+
+        /// Resolved Wasm addresses armed to bound the single-instruction step in progress. Every
+        /// address execution can reach from the current one has to be armed, and all of them come
+        /// down again once the step lands, except where the host wants a breakpoint too.
+        private var stepBreakpoints = Set<Int>()
+
+        package var armedBreakpointAddresses: Set<Int> { Set(self.armedBreakpoints.keys) }
 
         package private(set) var state: State
 
@@ -157,6 +170,25 @@
             throw Error.noInstructionMappingAvailable(address)
         }
 
+        /// Puts a breakpoint into the bytecode at an already resolved Wasm address, preserving the
+        /// instruction it replaces. Idempotent, so that arming for one owner cannot record another
+        /// owner's breakpoint instruction as the original.
+        private mutating func arm(resolved: Int, iseq: Pc) {
+            guard self.armedBreakpoints[resolved] == nil else { return }
+
+            self.armedBreakpoints[resolved] = (iseq: iseq, originalHeadSlot: iseq.pointee)
+            iseq.pointee = Instruction.breakpoint.headSlot(threadingModel: self.threadingModel)
+        }
+
+        /// Takes the breakpoint at an already resolved Wasm address out of the bytecode, restoring
+        /// the instruction it replaced. Leaves ``hostBreakpoints`` and ``stepBreakpoints`` alone: it
+        /// is the bytecode half of a breakpoint, not the request for one.
+        private mutating func disarm(resolved: Int) {
+            guard let armed = self.armedBreakpoints.removeValue(forKey: resolved) else { return }
+
+            armed.iseq.pointee = armed.originalHeadSlot
+        }
+
         /// Enables a breakpoint at a given Wasm address.
         /// - Parameter address: byte offset of the Wasm instruction that will be replaced with a breakpoint. If no
         /// direct internal bytecode matching instruction is found, the next closest internal bytecode instruction
@@ -166,12 +198,8 @@
         @discardableResult
         package mutating func enableBreakpoint(address: Int) throws -> Int {
             let (iseq, wasm) = try self.findIseq(forWasmAddress: address)
-            guard self.breakpoints[wasm] == nil else {
-                return wasm
-            }
-
-            self.breakpoints[wasm] = iseq.pointee
-            iseq.pointee = Instruction.breakpoint.headSlot(threadingModel: self.threadingModel)
+            self.hostBreakpoints.insert(wasm)
+            self.arm(resolved: wasm, iseq: iseq)
             return wasm
         }
 
@@ -191,24 +219,34 @@
         package mutating func disableBreakpoint(address: Int) throws {
             // Resolve the same way enableBreakpoint does, so a breakpoint set
             // at an elided address is found under its resolved key.
-            let (iseq, wasm) = try self.findIseq(forWasmAddress: address)
-            guard let oldCodeSlot = self.breakpoints[wasm] else {
-                return
-            }
+            let (_, wasm) = try self.findIseq(forWasmAddress: address)
+            self.hostBreakpoints.remove(wasm)
+            guard !self.stepBreakpoints.contains(wasm) else { return }
 
-            self.breakpoints[wasm] = nil
-            iseq.pointee = oldCodeSlot
+            self.disarm(resolved: wasm)
         }
 
-        /// Resumes the module instantiated by the debugger stopped at a breakpoint. The breakpoint is disabled
-        /// and execution is resumed until the next breakpoint is triggered or all remaining instructions are
-        /// executed. If the module is not stopped at a breakpoint, this function returns immediately.
+        /// Forgets every breakpoint, so that execution can resume without the debugger observing it
+        /// again.
+        package mutating func removeAllBreakpoints() {
+            self.hostBreakpoints.removeAll()
+            self.stepBreakpoints.removeAll()
+            for armed in self.armedBreakpoints.values {
+                armed.iseq.pointee = armed.originalHeadSlot
+            }
+            self.armedBreakpoints.removeAll()
+        }
+
+        /// Resumes the module instantiated by the debugger stopped at a breakpoint. The lowest-level
+        /// resume: the breakpoint at the current program counter is taken out of the bytecode so that
+        /// execution can make progress, and it is not put back. Execution continues until the next
+        /// breakpoint is triggered or all remaining instructions are executed. If the module is not
+        /// stopped at a breakpoint, this function returns immediately.
         package mutating func run() throws {
             do {
                 switch self.state {
                 case .stoppedAtBreakpoint(let breakpoint):
-                    // Remove the breakpoint before resuming
-                    try self.disableBreakpoint(address: breakpoint.wasmPc)
+                    self.disarm(resolved: breakpoint.wasmPc)
                     self.execution.resetError()
 
                     let iseq = breakpoint.iseq
@@ -268,6 +306,8 @@
         /// Steps by a single Wasm instruction in the module instantiated by the debugger stopped at a breakpoint.
         /// The current breakpoint is disabled and new breakpoints are put on the next instruction (or instructions in case
         /// of multiple possible execution branches). After breakpoints setup, execution is resumed until suspension.
+        /// Every breakpoint the step needed comes down again once it lands, and the breakpoint it stepped off
+        /// goes back in, so a step leaves the host's breakpoints exactly as it found them.
         /// If the module is not stopped at a breakpoint, this function returns immediately.
         package mutating func step() throws {
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
@@ -276,19 +316,34 @@
 
             try self.setNextInstructionBreakpoints(breakpoint: breakpoint)
             try self.run()
+            self.clearStepBreakpoints()
+
+            // Execution has moved past the instruction the breakpoint replaced, so its slot can hold a
+            // breakpoint again.
+            if self.hostBreakpoints.contains(breakpoint.wasmPc) {
+                try self.enableBreakpoint(address: breakpoint.wasmPc)
+            }
         }
 
         /// Resumes the module instantiated by the debugger stopped at a breakpoint. The breakpoint from which
         /// the debugger resumes is preserved. If the module is current not stopped at a breakpoint, this function
         /// returns immediately.
         package mutating func runPreservingCurrentBreakpoint() throws {
-            guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
+            guard case .stoppedAtBreakpoint = self.state else {
                 return
             }
 
-            try self.setNextInstructionBreakpoints(breakpoint: breakpoint)
-            try self.run()
-            try self.enableBreakpoint(address: breakpoint.wasmPc)
+            // A bounded single step is what gets execution out of the slot the resumed-from breakpoint
+            // occupies, which is the precondition for putting that breakpoint back.
+            try self.step()
+
+            // Landing on a breakpoint the host set is a stop the host is waiting for.
+            guard case .stoppedAtBreakpoint(let landed) = self.state,
+                !self.hostBreakpoints.contains(landed.wasmPc)
+            else {
+                return
+            }
+
             try self.run()
         }
 
@@ -378,13 +433,31 @@
             return result
         }
 
+        /// Arms a breakpoint that only exists to bound the step in progress.
+        private mutating func armStepBreakpoint(address: Int) throws {
+            let (iseq, wasm) = try self.findIseq(forWasmAddress: address)
+            self.stepBreakpoints.insert(wasm)
+            self.arm(resolved: wasm, iseq: iseq)
+        }
+
+        /// Takes down the breakpoints that bounded a step that has landed. Only one of them is where
+        /// execution went, and none of them are the host's, so leaving any behind stops the program at
+        /// an address nothing asked about.
+        private mutating func clearStepBreakpoints() {
+            let armedForStep = self.stepBreakpoints
+            self.stepBreakpoints.removeAll()
+            for resolved in armedForStep where !self.hostBreakpoints.contains(resolved) {
+                self.disarm(resolved: resolved)
+            }
+        }
+
         /// Analyzes the control-flow instruction at the given breakpoint and sets breakpoints
         /// at all possible next instruction locations.
         private mutating func setNextInstructionBreakpoints(breakpoint: BreakpointState) throws {
             // If the breakpoint was externally removed (e.g. via disableBreakpoint
             // while stopped), the original instruction has already been restored at the
             // iseq PC, so read it directly.
-            let savedHead = self.breakpoints[breakpoint.wasmPc] ?? breakpoint.iseq.pc.pointee
+            let savedHead = self.armedBreakpoints[breakpoint.wasmPc]?.originalHeadSlot ?? breakpoint.iseq.pc.pointee
             let operandPc = breakpoint.iseq.pc.advanced(by: 1)
             let sp = breakpoint.iseq.sp
 
@@ -398,7 +471,7 @@
                 // Empty targets means terminal (unreachable, endOfExecution) — no breakpoints to set.
                 for pc in targets {
                     if let wasmAddr = self.instance.handle.instructionMapping.findWasm(forIseqAddress: pc) {
-                        try self.enableBreakpoint(address: wasmAddr)
+                        try self.armStepBreakpoint(address: wasmAddr)
                     }
                 }
                 return
@@ -407,12 +480,12 @@
             // The head slot is non-control because a call with args maps its wasm address to a
             // prep slot, not the call.
             if let calleeEntry = self.stepInTargetIfCall(breakpoint: breakpoint) {
-                try self.enableBreakpoint(address: calleeEntry)
+                try self.armStepBreakpoint(address: calleeEntry)
                 return
             }
 
             // Non-control instruction: fall back to next Wasm address
-            try self.enableBreakpoint(address: breakpoint.wasmPc + 1)
+            try self.armStepBreakpoint(address: breakpoint.wasmPc + 1)
         }
 
         /// The call is the last iseq emit for its wasm address (prep slots come first), so `lastIseq`
