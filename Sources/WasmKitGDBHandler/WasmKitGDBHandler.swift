@@ -341,9 +341,8 @@
                 throw Error.killRequestReceived
 
             case .detach:
-                for address in self.debugger.breakpoints.keys {
-                    try self.debugger.disableBreakpoint(address: address)
-                }
+                self.debugger.removeAllBreakpoints()
+                self.userBreakpoints.removeAll()
 
                 try self.debugger.run()
                 throw Error.killRequestReceived

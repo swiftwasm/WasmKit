@@ -359,15 +359,14 @@
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             try debugger.stopAtEntrypoint()
-            #expect(debugger.breakpoints.count == 1)
+            #expect(debugger.armedBreakpointAddresses.count == 1)
 
             try debugger.run()
-            let firstExpectedPc = try #require(debugger.breakpoints.keys.first)
+            let firstExpectedPc = try requireBreakpoint(debugger)
             #expect(debugger.currentCallStack == [firstExpectedPc])
 
             try debugger.step()
-            #expect(debugger.breakpoints.count == 1)
-            let secondExpectedPc = try #require(debugger.breakpoints.keys.first)
+            let secondExpectedPc = try requireBreakpoint(debugger)
             #expect(debugger.currentCallStack == [secondExpectedPc])
 
             #expect(firstExpectedPc < secondExpectedPc)
@@ -1217,9 +1216,113 @@
             // Should work fine after re-sync
             try debugger.step()
             try requireBreakpoint(debugger)
+
+            // The re-added breakpoint is still the one $factorial recurses into.
             try debugger.run()
+            #expect(try requireBreakpoint(debugger) == breakpointAddress)
+
+            try debugger.disableBreakpoint(address: breakpointAddress)
+            try debugger.runPreservingCurrentBreakpoint()
             let values = try requireReturned(debugger)
             #expect(values == [.i64(6)])
+        }
+
+        // MARK: - breakpoint ownership
+
+        /// A step arms a breakpoint at every address execution can reach from the current one. Once
+        /// it has landed, and with nothing of its owner's left, the debugger has nothing to stop for.
+        @Test
+        func stepLeavesNoBreakpointBehind() throws {
+            let store = Store(engine: Engine())
+            let bytes = try wat2wasm(loopWAT)
+            let module = try parseWasm(bytes: bytes)
+            var debugger = try Debugger(module: module, store: store, imports: [:])
+
+            let base = module.functions[0].code.originalAddress
+            let breakpointAddress = try debugger.enableBreakpoint(address: base + 17)  // br_if
+
+            // First of three iterations: $i goes from 3 to 2, so the branch back is taken and the
+            // step has two possible destinations.
+            try debugger.run()
+            #expect(try requireBreakpoint(debugger) == breakpointAddress)
+
+            try debugger.step()
+            try requireBreakpoint(debugger)
+
+            try debugger.disableBreakpoint(address: breakpointAddress)
+            #expect(debugger.armedBreakpointAddresses.isEmpty)
+
+            try debugger.runPreservingCurrentBreakpoint()
+            let values = try requireReturned(debugger)
+            #expect(values == [.i32(0)])
+        }
+
+        /// A step off a breakpoint has to take it out of the bytecode to execute the instruction
+        /// under it, which is not something its owner asked for.
+        @Test
+        func stepKeepsTheBreakpointItSteppedOff() throws {
+            let store = Store(engine: Engine())
+            let bytes = try wat2wasm(loopWAT)
+            let module = try parseWasm(bytes: bytes)
+            var debugger = try Debugger(module: module, store: store, imports: [:])
+
+            let base = module.functions[0].code.originalAddress
+            let breakpointAddress = try debugger.enableBreakpoint(address: base + 17)  // br_if
+
+            try debugger.run()
+            #expect(try requireBreakpoint(debugger) == breakpointAddress)
+
+            try debugger.step()
+            #expect(debugger.armedBreakpointAddresses == [breakpointAddress])
+
+            // Second of three iterations: $i goes from 2 to 1.
+            try debugger.runPreservingCurrentBreakpoint()
+            #expect(try requireBreakpoint(debugger) == breakpointAddress)
+        }
+
+        /// Resuming single-steps off the breakpoint it resumes from. When that step lands on another
+        /// breakpoint, that is a stop rather than a slot to run through.
+        @Test
+        func resumeStopsAtABreakpointOneInstructionAway() throws {
+            let store = Store(engine: Engine())
+            let bytes = try wat2wasm(callInLoopWAT)
+            let module = try parseWasm(bytes: bytes)
+            var debugger = try Debugger(module: module, store: store, imports: [:])
+
+            let callAddress = try debugger.enableBreakpoint(
+                // _start body: i32.const 3 (2) + local.set (2) + block (2) + loop (2) + local.get (2)
+                module: module, function: 0, offsetWithinFunction: 10  // call $decrement
+            )
+            let calleeAddress = try debugger.enableBreakpoint(module: module, function: 1)
+
+            try debugger.run()
+            #expect(try requireBreakpoint(debugger) == callAddress)
+
+            try debugger.runPreservingCurrentBreakpoint()
+            #expect(try requireBreakpoint(debugger) == calleeAddress)
+        }
+
+        /// Detaching has to leave the bytecode as it found it, so that the guest runs on without a
+        /// debugger to report to.
+        @Test
+        func removingAllBreakpointsRunsToCompletion() throws {
+            let store = Store(engine: Engine())
+            let bytes = try wat2wasm(counterDemoWAT)
+            let module = try parseWasm(bytes: bytes)
+            var debugger = try Debugger(module: module, store: store, imports: [:])
+
+            _ = try debugger.enableBreakpoint(module: module, function: 1)
+            _ = try debugger.enableBreakpoint(module: module, function: 2)
+
+            try debugger.run()
+            try requireBreakpoint(debugger)
+
+            debugger.removeAllBreakpoints()
+            #expect(debugger.armedBreakpointAddresses.isEmpty)
+
+            try debugger.run()
+            let values = try requireReturned(debugger)
+            #expect(values == [.i32(2)])
         }
     }
 
