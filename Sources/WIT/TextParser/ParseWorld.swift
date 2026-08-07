@@ -34,7 +34,7 @@ extension WorldItemSyntax {
         case .export:
             return try .export(.parse(lexer: &lexer, documents: documents, attributes: attributes))
         case .use:
-            return try .use(UseSyntax.parse(lexer: &lexer))
+            return try .use(UseSyntax.parse(lexer: &lexer, attributes: attributes))
         case .type:
             return try .type(.init(syntax: .parse(lexer: &lexer, documents: documents, attributes: attributes)))
         case .flags:
