@@ -180,7 +180,7 @@ let package = Package(
             swiftSettings: swiftSettings
         ),
         .target(name: "CWASIPlatform"),
-        .testTarget(name: "WASITests", dependencies: ["WASI", "WasmKitWASI"], swiftSettings: swiftSettings),
+        .testTarget(name: "WASITests", dependencies: ["WASI", "WasmKitWASI", "WAT"], swiftSettings: swiftSettings),
 
         // Component Model (CM)
 

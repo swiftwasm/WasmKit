@@ -155,7 +155,7 @@ extension ImmutableArray: Sequence {
 
 /// A type that can be interned into a unique identifier.
 /// Used for efficient equality comparison.
-protocol Internable {
+package protocol Internable {
     /// Storage representation of an interned value.
     associatedtype Offset: UnsignedInteger & Sendable
 }
@@ -170,7 +170,7 @@ struct Interned<T: Internable>: Equatable, Hashable, Sendable {
 ///
 /// Thread-safe when the `MultiThread` trait is enabled: all access is
 /// serialized by the internal `PlatformMutex`.
-final class Interner<Item: Hashable & Internable & Sendable>: Sendable {
+package final class Interner<Item: Hashable & Internable & Sendable>: Sendable {
     private struct State {
         var itemByIntern: [Item]
         var internByItem: [Item: Interned<Item>]
@@ -211,7 +211,7 @@ final class Interner<Item: Hashable & Internable & Sendable>: Sendable {
 /// A function type is internable for efficient equality comparison.
 /// Usually used for signature checking at indirect calls.
 extension FunctionType: Internable {
-    typealias Offset = UInt32
+    package typealias Offset = UInt32
 }
 
 typealias InternedFuncType = Interned<FunctionType>
@@ -277,7 +277,8 @@ extension StoreAllocator {
         engine: Engine,
         resourceLimiter: any ResourceLimiter,
         imports: Imports,
-        isDebuggable: Bool
+        isDebuggable: Bool,
+        localMemoryResolver: ((_ memoryIndex: Int, _ memoryType: MemoryType) throws -> InternalMemory)? = nil
     ) throws -> InternalInstance {
         // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
 
@@ -410,11 +411,20 @@ extension StoreAllocator {
         )
 
         // Step 4.
-        let memories = try allocateEntities(
-            imports: importedMemories,
-            internals: module.internalMemories,
-            allocateHandle: { m, _ in try allocate(memoryType: m, engineConfiguration: engine.configuration, resourceLimiter: resourceLimiter) }
-        )
+        let memories: ImmutableArray<InternalMemory>
+        if let localMemoryResolver {
+            memories = try allocateEntities(
+                imports: importedMemories,
+                internals: module.internalMemories,
+                allocateHandle: { m, absoluteIndex in try localMemoryResolver(absoluteIndex, m) }
+            )
+        } else {
+            memories = try allocateEntities(
+                imports: importedMemories,
+                internals: module.internalMemories,
+                allocateHandle: { m, _ in try allocate(memoryType: m, engineConfiguration: engine.configuration, resourceLimiter: resourceLimiter) }
+            )
+        }
 
         var functionRefs: Set<InternalFunction> = []
         // Step 5.
@@ -528,6 +538,32 @@ extension StoreAllocator {
         instanceInitialized = true
         return instanceHandle
     }
+
+    #if os(macOS) || os(Linux)
+        /// Allocate an instance for a wasi-threads child thread, resolving shared memories from
+        /// the group's existing storage instead of allocating fresh backing.
+        ///
+        /// `imports` must be registered in the child's `Store`, not the parent's.
+        func allocateForThread(
+            module: Module,
+            engine: Engine,
+            resourceLimiter: any ResourceLimiter,
+            imports: Imports,
+            threadGroup: ThreadGroup
+        ) throws -> InternalInstance {
+            let sharedMemories = threadGroup.sharedMemories
+            let localMemoryResolver: (Int, MemoryType) throws -> InternalMemory = { [self] absoluteIndex, memoryType in
+                if absoluteIndex < sharedMemories.count, let shared = sharedMemories[absoluteIndex] {
+                    return self.allocate(memoryType: memoryType, sharedStorage: shared)
+                }
+                return try self.allocate(
+                    memoryType: memoryType, engineConfiguration: engine.configuration, resourceLimiter: resourceLimiter)
+            }
+            return try allocate(
+                module: module, engine: engine, resourceLimiter: resourceLimiter,
+                imports: imports, isDebuggable: false, localMemoryResolver: localMemoryResolver)
+        }
+    #endif
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-func>

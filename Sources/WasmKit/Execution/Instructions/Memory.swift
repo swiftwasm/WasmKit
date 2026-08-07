@@ -256,6 +256,9 @@ extension Execution {
                 return
             }
 
+            // Do not enter a park that can block indefinitely if the group is already terminating.
+            try checkTermination()
+
             // Value matches - wait for notification or timeout.
             // Per the threads spec: timeout is a signed i64 in nanoseconds.
             //   timeout < 0: never expires (wait indefinitely)
@@ -268,12 +271,17 @@ extension Execution {
             let result = parkingLot.parkConditionally(
                 address: UInt64(address),
                 validate: {
-                    // Re-check the value atomically
+                    // Runs under the parking-lot lock, which `unparkAll` also takes, so a signal
+                    // racing between the pre-park check and registration cannot be lost.
+                    if self.terminationSignaled() { return false }
                     let currentValue = wasmkit_atomic_load_32(rawPtr)
                     return currentValue == expectedValue
                 },
                 deadline: deadline
             )
+
+            // A wait cut short by termination must unwind, not report `.woken` or `.mismatch`.
+            try checkTermination()
 
             let resultValue: Int32
             switch result {
@@ -312,6 +320,9 @@ extension Execution {
                 return
             }
 
+            // Do not enter a park that can block indefinitely if the group is already terminating.
+            try checkTermination()
+
             // Value matches - wait for notification or timeout.
             // Per the threads spec: timeout is a signed i64 in nanoseconds.
             //   timeout < 0: never expires (wait indefinitely)
@@ -324,12 +335,17 @@ extension Execution {
             let result = parkingLot.parkConditionally(
                 address: UInt64(address),
                 validate: {
-                    // Re-check the value atomically
+                    // Runs under the parking-lot lock, which `unparkAll` also takes, so a signal
+                    // racing between the pre-park check and registration cannot be lost.
+                    if self.terminationSignaled() { return false }
                     let currentValue = wasmkit_atomic_load_64(rawPtr)
                     return currentValue == expectedValue
                 },
                 deadline: deadline
             )
+
+            // A wait cut short by termination must unwind, not report `.woken` or `.mismatch`.
+            try checkTermination()
 
             let resultValue: Int32
             switch result {
