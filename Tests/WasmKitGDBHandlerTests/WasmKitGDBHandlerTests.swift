@@ -251,7 +251,7 @@
                     Issue.record("expected a feature string, got \(resp.kind)")
                     return
                 }
-                #expect(features.split(separator: ";").contains("qWasmGlobalInstance+"))
+                #expect(features.split(separator: ";").contains("qWasmInstance+"))
             }
         }
 

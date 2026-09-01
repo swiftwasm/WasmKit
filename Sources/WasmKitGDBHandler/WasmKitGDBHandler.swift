@@ -31,7 +31,7 @@
 
     /// The module instance and global index a `qWasmGlobal` request names.
     ///
-    /// A debugger advertising `qWasmGlobalInstance+` specifies the instance owning
+    /// A debugger advertising `qWasmInstance+` specifies the instance owning
     /// the global index with an `instance:<id>` field. Older debuggers may send
     /// a frame index instead.
     struct WasmGlobalRequest {
@@ -289,7 +289,7 @@
                 ])
 
             case .supportedFeatures:
-                responseKind = .string("qXfer:libraries:read+;qWasmGlobalInstance+;PacketSize=1000;")
+                responseKind = .string("qXfer:libraries:read+;qWasmInstance+;PacketSize=1000;")
 
             case .vContSupportedActions:
                 responseKind = .vContSupportedActions([.continue, .step])
