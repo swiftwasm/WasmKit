@@ -75,7 +75,10 @@ public final class WASIThreads: @unchecked Sendable {
     }
 
     private final class Startup: @unchecked Sendable {
-        private enum State { case pending, ready, failed(WASIThreadsStartupError) }
+        private enum State {
+            case pending, ready
+            case failed(WASIThreadsStartupError)
+        }
         private let state = Mutex<State>(.pending)
         private let event: OpaquePointer
 
@@ -239,7 +242,7 @@ public final class WASIThreads: @unchecked Sendable {
             let imports = try makeImports(store: store)
             let instance = try module.instantiate(store: store, imports: imports)
             guard let entry = instance.exports[function: "wasi_thread_start"],
-                  entry.type == FunctionType(parameters: [.i32, .i32], results: [])
+                entry.type == FunctionType(parameters: [.i32, .i32], results: [])
             else {
                 startup.failed(.init(diagnostic: "missing or incompatible wasi_thread_start export"))
                 releaseThread()

@@ -43,17 +43,18 @@ private final class SendableFunction: @unchecked Sendable {
         let shared = try SharedMemory(
             engine: engine, type: .init(min: 1, max: 1, shared: true), resourceLimiter: DefaultResourceLimiter()
         )
-        let module = try parseWasm(bytes: try wat2wasm(
-            """
-            (module
-              (import "env" "memory" (memory 1 1 shared))
-              (func (export "wait") (result i32)
-                (memory.atomic.wait32 (i32.const 0) (i32.const 0) (i64.const 1000000000)))
-              (func (export "notify") (result i32)
-                (memory.atomic.notify (i32.const 0) (i32.const 1)))
-            )
-            """, features: [.threads]
-        ), features: [.threads])
+        let module = try parseWasm(
+            bytes: try wat2wasm(
+                """
+                (module
+                  (import "env" "memory" (memory 1 1 shared))
+                  (func (export "wait") (result i32)
+                    (memory.atomic.wait32 (i32.const 0) (i32.const 0) (i64.const 1000000000)))
+                  (func (export "notify") (result i32)
+                    (memory.atomic.notify (i32.const 0) (i32.const 1)))
+                )
+                """, features: [.threads]
+            ), features: [.threads])
         let waitStore = Store(engine: engine)
         let notifyStore = Store(engine: engine)
         let waitInstance = try module.instantiate(
@@ -92,19 +93,20 @@ private final class SendableFunction: @unchecked Sendable {
 
     @Test func spawnEntersChildInstanceAndSharesMemory() throws {
         let engine = Engine(configuration: .init(features: [.threads]))
-        let module = try parseWasm(bytes: try wat2wasm(
-            """
-            (module
-              (import "env" "memory" (memory 1 1 shared))
-              (import "wasi" "thread-spawn" (func $spawn (param i32) (result i32)))
-              (func (export "wasi_thread_start") (param i32 i32)
-                (i32.atomic.store (i32.const 0) (local.get 1)))
-              (func (export "run") (result i32)
-                (call $spawn (i32.const 42)))
-            )
-            """,
-            features: [.threads]
-        ), features: [.threads])
+        let module = try parseWasm(
+            bytes: try wat2wasm(
+                """
+                (module
+                  (import "env" "memory" (memory 1 1 shared))
+                  (import "wasi" "thread-spawn" (func $spawn (param i32) (result i32)))
+                  (func (export "wasi_thread_start") (param i32 i32)
+                    (i32.atomic.store (i32.const 0) (local.get 1)))
+                  (func (export "run") (result i32)
+                    (call $spawn (i32.const 42)))
+                )
+                """,
+                features: [.threads]
+            ), features: [.threads])
         let threads = try WASIThreads(
             module: module,
             engine: engine,
@@ -123,7 +125,8 @@ private final class SendableFunction: @unchecked Sendable {
         let deadline = Date().addingTimeInterval(1)
         var result: UInt32 = 0
         while Date() < deadline {
-            result = threads.sharedMemory.byteCount > 0
+            result =
+                threads.sharedMemory.byteCount > 0
                 ? Memory(store: store, sharedMemory: threads.sharedMemory).withUnsafeBufferPointer(offset: 0, count: 4) {
                     $0.baseAddress!.assumingMemoryBound(to: Atomic<UInt32>.self).pointee.load(ordering: .acquiring)
                 }
@@ -136,18 +139,19 @@ private final class SendableFunction: @unchecked Sendable {
 
     @Test func normalWorkersReleaseTheirLiveSlots() throws {
         let engine = Engine(configuration: .init(features: [.threads]))
-        let module = try parseWasm(bytes: try wat2wasm(
-            """
-            (module
-              (import "env" "memory" (memory 1 1 shared))
-              (import "wasi" "thread-spawn" (func $spawn (param i32) (result i32)))
-              (func (export "wasi_thread_start") (param i32 i32)
-                (drop (i32.atomic.rmw.add (i32.const 0) (i32.const 1))))
-              (func (export "run") (result i32) (call $spawn (i32.const 0)))
-            )
-            """,
-            features: [.threads]
-        ), features: [.threads])
+        let module = try parseWasm(
+            bytes: try wat2wasm(
+                """
+                (module
+                  (import "env" "memory" (memory 1 1 shared))
+                  (import "wasi" "thread-spawn" (func $spawn (param i32) (result i32)))
+                  (func (export "wasi_thread_start") (param i32 i32)
+                    (drop (i32.atomic.rmw.add (i32.const 0) (i32.const 1))))
+                  (func (export "run") (result i32) (call $spawn (i32.const 0)))
+                )
+                """,
+                features: [.threads]
+            ), features: [.threads])
         let threads = try WASIThreads(
             module: module, engine: engine,
             configuration: .init(maximumThreads: 2),
@@ -187,16 +191,17 @@ private final class SendableFunction: @unchecked Sendable {
 
     @Test func missingOrIncompatibleEntryReturnsNegativeOne() throws {
         let engine = Engine(configuration: .init(features: [.threads]))
-        let module = try parseWasm(bytes: try wat2wasm(
-            """
-            (module
-              (import "env" "memory" (memory 1 1 shared))
-              (import "wasi" "thread-spawn" (func $spawn (param i32) (result i32)))
-              (func (export "wasi_thread_start") (param i32))
-              (func (export "run") (result i32) (call $spawn (i32.const 0)))
-            )
-            """, features: [.threads]
-        ), features: [.threads])
+        let module = try parseWasm(
+            bytes: try wat2wasm(
+                """
+                (module
+                  (import "env" "memory" (memory 1 1 shared))
+                  (import "wasi" "thread-spawn" (func $spawn (param i32) (result i32)))
+                  (func (export "wasi_thread_start") (param i32))
+                  (func (export "run") (result i32) (call $spawn (i32.const 0)))
+                )
+                """, features: [.threads]
+            ), features: [.threads])
         let threads = try WASIThreads(
             module: module, engine: engine,
             processControl: .init(
@@ -212,16 +217,17 @@ private final class SendableFunction: @unchecked Sendable {
 
     @Test func mainThreadConsumesTheOnlyLiveSlot() throws {
         let engine = Engine(configuration: .init(features: [.threads]))
-        let module = try parseWasm(bytes: try wat2wasm(
-            """
-            (module
-              (import "env" "memory" (memory 1 1 shared))
-              (import "wasi" "thread-spawn" (func $spawn (param i32) (result i32)))
-              (func (export "wasi_thread_start") (param i32 i32))
-              (func (export "run") (result i32) (call $spawn (i32.const 0)))
-            )
-            """, features: [.threads]
-        ), features: [.threads])
+        let module = try parseWasm(
+            bytes: try wat2wasm(
+                """
+                (module
+                  (import "env" "memory" (memory 1 1 shared))
+                  (import "wasi" "thread-spawn" (func $spawn (param i32) (result i32)))
+                  (func (export "wasi_thread_start") (param i32 i32))
+                  (func (export "run") (result i32) (call $spawn (i32.const 0)))
+                )
+                """, features: [.threads]
+            ), features: [.threads])
         let threads = try WASIThreads(
             module: module, engine: engine, configuration: .init(maximumThreads: 1),
             processControl: .init(

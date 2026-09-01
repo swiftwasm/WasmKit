@@ -167,7 +167,7 @@ public struct Module: Sendable {
     /// TODO(yuta): Revisit Module API
     package func exportedFunctionType(named name: String) -> FunctionType? {
         guard let export = exports.first(where: { $0.name == name }),
-              case .function(let index) = export.descriptor
+            case .function(let index) = export.descriptor
         else { return nil }
         return try? resolveFunctionType(index)
     }

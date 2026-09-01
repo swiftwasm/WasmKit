@@ -75,7 +75,8 @@ import Testing
 
         let process = Process()
         process.executableURL = executable
-        process.arguments = threadsEnabled
+        process.arguments =
+            threadsEnabled
             ? ["run", "--feature", "threads", "--wasi-threads", module.path]
             : ["run", "--feature", "threads", module.path]
         let error = Pipe()
