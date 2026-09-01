@@ -31,7 +31,9 @@ import Testing
 
         let process = Process()
         process.executableURL = executable
-        process.arguments = threadsEnabled ? ["run", "--wasi-threads", fixture.path] : ["run", fixture.path]
+        process.arguments = threadsEnabled
+            ? ["run", "--feature", "threads", "--wasi-threads", fixture.path]
+            : ["run", "--feature", "threads", fixture.path]
         let error = Pipe()
         process.standardError = error
         try process.run()

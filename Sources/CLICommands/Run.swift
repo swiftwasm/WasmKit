@@ -60,6 +60,32 @@ package struct Run: AsyncParsableCommand {
     )
     var wasiThreadsMax = 64
 
+    enum Feature: String, CaseIterable, ExpressibleByArgument {
+        case memory64
+        case referenceTypes = "reference-types"
+        case threads
+        case tailCall = "tail-call"
+        case simd
+        case exceptionHandling = "exception-handling"
+
+        var wasmFeature: WasmFeatureSet {
+            switch self {
+            case .memory64: .memory64
+            case .referenceTypes: .referenceTypes
+            case .threads: .threads
+            case .tailCall: .tailCall
+            case .simd: .simd
+            case .exceptionHandling: .exceptionHandling
+            }
+        }
+    }
+
+    @Option(
+        name: .customLong("feature"),
+        help: "Enable a WebAssembly proposal feature (memory64, reference-types, threads, tail-call, simd, exception-handling)"
+    )
+    var features: [Feature] = []
+
     struct EnvOption: ExpressibleByArgument {
         let key: String
         let value: String
@@ -205,10 +231,7 @@ package struct Run: AsyncParsableCommand {
         log("Started parsing module", verbose: true)
 
         let module: Module
-        // Parse the threads proposal even when the capability is disabled so a
-        // threads module reaches normal import linking and reports its missing
-        // `wasi.thread-spawn` import. Execution remains opt-in below.
-        let moduleFeatures: WasmFeatureSet = [.referenceTypes, .exceptionHandling, .threads]
+        let moduleFeatures = deriveRuntimeConfiguration().features
 
         if URL(fileURLWithPath: path).pathExtension == "wat" {
             let wat = try String(contentsOfFile: path, encoding: .utf8)
@@ -349,16 +372,14 @@ package struct Run: AsyncParsableCommand {
         return nil
     }
 
-    private func deriveRuntimeConfiguration() -> EngineConfiguration {
-        var configuration = EngineConfiguration(
+    package func deriveRuntimeConfiguration() -> EngineConfiguration {
+        let enabledFeatures = features.reduce(into: WasmFeatureSet.default) { $0.insert($1.wasmFeature) }
+        return EngineConfiguration(
             threadingModel: self.threadingModel?.resolve(),
             compilationMode: self.compilationMode?.resolve(),
-            stackSize: self.stackSize
+            stackSize: self.stackSize,
+            features: enabledFeatures
         )
-        if wasiThreads {
-            configuration.features.insert(.threads)
-        }
-        return configuration
     }
 
     package func deriveEnvironment() -> [String: String] {
@@ -392,6 +413,9 @@ package struct Run: AsyncParsableCommand {
         }
         if wasiThreads, threadingModel == .token {
             throw ValidationError("--wasi-threads requires direct threading and cannot be combined with --threading-model token.")
+        }
+        if wasiThreads, !features.contains(.threads) {
+            throw ValidationError("--wasi-threads requires --feature threads.")
         }
 
         #if WasmDebuggingSupport

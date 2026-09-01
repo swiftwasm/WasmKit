@@ -128,6 +128,7 @@ public final class WASIThreads: @unchecked Sendable {
         module: Module,
         engine: Engine,
         configuration: WASIThreadsConfiguration = .init(),
+        resourceLimiter: any ResourceLimiter = DefaultResourceLimiter(),
         processControl: WASIThreadsProcessControl,
         childImports: @escaping ChildImportsBuilder
     ) throws {
@@ -171,7 +172,7 @@ public final class WASIThreads: @unchecked Sendable {
         self.configuration = configuration
         self.processControl = processControl
         self.childImports = childImports
-        self.sharedMemory = try SharedMemory(engine: engine, type: memoryType)
+        self.sharedMemory = try SharedMemory(engine: engine, type: memoryType, resourceLimiter: resourceLimiter)
     }
 
     /// Creates the imports for one store, including `env.memory` and

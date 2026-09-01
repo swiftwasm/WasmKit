@@ -1,9 +1,9 @@
 # WASI Threads
 
-WasmKit supports the core WASI Threads Preview 1 ABI in the CLI:
+WasmKit supports the core [WASI Threads](https://github.com/WebAssembly/wasi-threads) Preview 1 ABI in the CLI:
 
 ```console
-wasmkit-cli run --wasi-threads --wasi-threads-max 8 program.wasm
+wasmkit-cli run --feature threads --wasi-threads --wasi-threads-max 8 program.wasm
 ```
 
 This enables the `wasi.thread-spawn` import with signature `(i32) -> i32`.

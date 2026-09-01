@@ -22,7 +22,9 @@ private final class SendableFunction: @unchecked Sendable {
 
     @Test func sharedMemoryIsVisibleAcrossStoreLocalWrappers() throws {
         let engine = Engine(configuration: .init(features: [.threads]))
-        let shared = try SharedMemory(engine: engine, type: .init(min: 1, max: 2, shared: true))
+        let shared = try SharedMemory(
+            engine: engine, type: .init(min: 1, max: 2, shared: true), resourceLimiter: DefaultResourceLimiter()
+        )
         let first = Memory(store: Store(engine: engine), sharedMemory: shared)
         let second = Memory(store: Store(engine: engine), sharedMemory: shared)
         first.withUnsafeMutableBufferPointer(offset: 0, count: 1) { $0[0] = 42 }
@@ -38,7 +40,9 @@ private final class SendableFunction: @unchecked Sendable {
 
     @Test func sharedMemoryAtomicWaitAndNotifyCrossStoreBoundaries() throws {
         let engine = Engine(configuration: .init(features: [.threads]))
-        let shared = try SharedMemory(engine: engine, type: .init(min: 1, max: 1, shared: true))
+        let shared = try SharedMemory(
+            engine: engine, type: .init(min: 1, max: 1, shared: true), resourceLimiter: DefaultResourceLimiter()
+        )
         let module = try parseWasm(bytes: try wat2wasm(
             """
             (module

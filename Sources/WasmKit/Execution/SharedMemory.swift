@@ -8,6 +8,7 @@ import WasmParser
 public final class SharedMemory: @unchecked Sendable {
     /// The declared type of this memory.
     public let type: MemoryType
+    private let resourceLimiter: any ResourceLimiter
 
     #if os(macOS) || os(Linux)
         let storage: SharedMemoryStorage
@@ -16,7 +17,7 @@ public final class SharedMemory: @unchecked Sendable {
         ///
         /// Shared memories require the threads feature and mprotect-based
         /// bounds checking on a supported 64-bit host.
-        public init(engine: Engine, type: MemoryType) throws {
+        public init(engine: Engine, type: MemoryType, resourceLimiter: any ResourceLimiter) throws {
             guard type.shared, !type.isMemory64 else {
                 throw Trap(.sharedMemoryRequiresMprotect)
             }
@@ -24,8 +25,12 @@ public final class SharedMemory: @unchecked Sendable {
 
             let maxPages = type.max ?? MemoryEntity.maxPageCount(isMemory64: false)
             let initialBytes = Int(type.min) * MemoryEntity.pageSize
+            guard try resourceLimiter.limitMemoryGrowth(to: initialBytes) else {
+                throw Trap(.initialMemorySizeExceedsLimit(byteSize: initialBytes))
+            }
             let (maxBytes, overflow) = Int(clamping: maxPages).multipliedReportingOverflow(by: MemoryEntity.pageSize)
             self.type = type
+            self.resourceLimiter = resourceLimiter
             self.storage = try SharedMemoryStorage(
                 initialBytes: initialBytes,
                 maxBytes: overflow ? (Int.max / MemoryEntity.pageSize) * MemoryEntity.pageSize : maxBytes,
@@ -46,11 +51,13 @@ public final class SharedMemory: @unchecked Sendable {
         /// store-local ``Memory`` wrapper made from this backing.
         public func grow(by pageCount: Int) throws -> Int {
             guard pageCount >= 0 else { return -1 }
-            return try storage.grow(by: pageCount, resourceLimiter: UnrestrictedSharedMemoryLimiter.shared)
+            return try storage.grow(by: pageCount, resourceLimiter: resourceLimiter)
         }
     #else
         /// Shared memory is unavailable on this platform.
-        public init(engine: Engine, type: MemoryType) throws {
+        public init(engine: Engine, type: MemoryType, resourceLimiter: any ResourceLimiter) throws {
+            self.type = type
+            self.resourceLimiter = resourceLimiter
             throw Trap(.sharedMemoryRequiresMprotect)
         }
 
@@ -58,12 +65,3 @@ public final class SharedMemory: @unchecked Sendable {
         public var byteCount: Int { 0 }
     #endif
 }
-
-#if os(macOS) || os(Linux)
-    /// Public shared-memory growth has no owning store whose resource limiter
-    /// could be consulted. Embedders that require a policy should grow through
-    /// an importing store instead.
-    private final class UnrestrictedSharedMemoryLimiter: ResourceLimiter, @unchecked Sendable {
-        static let shared = UnrestrictedSharedMemoryLimiter()
-    }
-#endif

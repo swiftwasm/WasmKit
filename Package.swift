@@ -34,7 +34,6 @@ let cliCommandsTestTarget = Target.testTarget(
         "WASI",
         "WasmKit",
         "WasmKitWASI",
-        "WasmKitWASIThreads",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
     ],
     exclude: ["Fixtures"]
@@ -181,7 +180,8 @@ let package = Package(
         ),
         .testTarget(
             name: "WasmKitWASIThreadsTests",
-            dependencies: ["WasmKitWASIThreads", "WasmKit", "WAT"],
+            dependencies: ["WasmKitWASIThreads", "WasmKit", "WAT", "CLICommands"],
+            exclude: ["Fixtures"],
             swiftSettings: swiftSettings
         ),
         .target(

@@ -164,7 +164,8 @@ public struct Module: Sendable {
     /// Returns the type of an exported function, if it exists.
     ///
     /// This is metadata only; it does not instantiate the module.
-    public func exportedFunctionType(named name: String) -> FunctionType? {
+    /// TODO(yuta): Revisit Module API
+    package func exportedFunctionType(named name: String) -> FunctionType? {
         guard let export = exports.first(where: { $0.name == name }),
               case .function(let index) = export.descriptor
         else { return nil }
