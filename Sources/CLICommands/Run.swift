@@ -4,8 +4,15 @@ import WASI
 import WAT
 import WasmKit
 import WasmKitWASI
+import WasmKitWASIThreads
 import WasmParser
 import WasmTypes
+
+#if os(macOS)
+    import Darwin
+#elseif os(Linux)
+    import Glibc
+#endif
 
 #if ComponentModel
     import ComponentModel
@@ -43,6 +50,15 @@ package struct Run: AsyncParsableCommand {
         help: "Enable or disable Signpost logging (macOS only)"
     )
     var signpost: Bool = false
+
+    @Flag(name: .customLong("wasi-threads"), help: "Enable WASI Threads")
+    var wasiThreads = false
+
+    @Option(
+        name: .customLong("wasi-threads-max"),
+        help: "Maximum concurrently live WASI guest threads (default: 64)"
+    )
+    var wasiThreadsMax = 64
 
     struct EnvOption: ExpressibleByArgument {
         let key: String
@@ -189,10 +205,14 @@ package struct Run: AsyncParsableCommand {
         log("Started parsing module", verbose: true)
 
         let module: Module
+        // Parse the threads proposal even when the capability is disabled so a
+        // threads module reaches normal import linking and reports its missing
+        // `wasi.thread-spawn` import. Execution remains opt-in below.
+        let moduleFeatures: WasmFeatureSet = [.referenceTypes, .exceptionHandling, .threads]
 
         if URL(fileURLWithPath: path).pathExtension == "wat" {
             let wat = try String(contentsOfFile: path, encoding: .utf8)
-            module = try WasmKit.parseWasm(bytes: wat2wasm(wat))
+            module = try WasmKit.parseWasm(bytes: wat2wasm(wat, features: moduleFeatures), features: moduleFeatures)
         } else {
             // Sniff the magic bytes to detect the file type (component vs
             // module), then let the parser re-open the file by path.
@@ -228,7 +248,7 @@ package struct Run: AsyncParsableCommand {
             }
 
             let (parsedModule, parseTime) = try measure {
-                try WasmKit.parseWasm(filePath: path)
+                try WasmKit.parseWasm(filePath: path, features: moduleFeatures)
             }
             log("Finished parsing module: \(parseTime)", verbose: true)
             module = parsedModule
@@ -241,6 +261,9 @@ package struct Run: AsyncParsableCommand {
         if module.exports.contains(where: { $0.name == "_start" }) {
             invoke = try instantiateWASI(module: module, interceptor: interceptor)
         } else {
+            if wasiThreads {
+                throw ValidationError("--wasi-threads requires a WASI command module exporting _start.")
+            }
             guard let entry = try instantiateNonWASI(module: module, interceptor: interceptor) else {
                 return
             }
@@ -327,11 +350,15 @@ package struct Run: AsyncParsableCommand {
     }
 
     private func deriveRuntimeConfiguration() -> EngineConfiguration {
-        return EngineConfiguration(
+        var configuration = EngineConfiguration(
             threadingModel: self.threadingModel?.resolve(),
             compilationMode: self.compilationMode?.resolve(),
             stackSize: self.stackSize
         )
+        if wasiThreads {
+            configuration.features.insert(.threads)
+        }
+        return configuration
     }
 
     package func deriveEnvironment() -> [String: String] {
@@ -357,6 +384,16 @@ package struct Run: AsyncParsableCommand {
     package mutating func validate() throws {
         _ = try derivePreopens()
 
+        if wasiThreadsMax < 1 {
+            throw ValidationError("--wasi-threads-max must be at least 1.")
+        }
+        if wasiThreads && (signpost || profileOutput != nil) {
+            throw ValidationError("Signpost logging and profiling are not supported with --wasi-threads.")
+        }
+        if wasiThreads, threadingModel == .token {
+            throw ValidationError("--wasi-threads requires direct threading and cannot be combined with --threading-model token.")
+        }
+
         #if WasmDebuggingSupport
             if debuggerPort != nil, signpost || profileOutput != nil {
                 throw ValidationError(
@@ -381,6 +418,40 @@ package struct Run: AsyncParsableCommand {
     func instantiateWASI(module: Module, interceptor: EngineInterceptor?) throws -> () throws -> Void {
         let wasi = try WASIBridgeToHost(configuration: deriveWASIConfiguration())
         let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
+        if wasiThreads {
+            let processControl = WASIThreadsProcessControl(
+                terminateAfterMainReturn: { code in
+                    terminateProcess(Int32(truncatingIfNeeded: code))
+                },
+                terminateAfterWorkerFailure: { error in
+                    if let exitCode = error as? WASIExitCode {
+                        terminateProcess(Int32(truncatingIfNeeded: exitCode.code))
+                    }
+                    FileHandle.standardError.write(Data(("WASI thread failed: \(error)\n").utf8))
+                    terminateProcess(1)
+                }
+            )
+            let threads = try WASIThreads(
+                module: module,
+                engine: engine,
+                configuration: .init(maximumThreads: wasiThreadsMax),
+                processControl: processControl,
+                childImports: { store in
+                    var imports = Imports()
+                    wasi.link(to: &imports, store: store)
+                    return imports
+                }
+            )
+            let store = Store(engine: engine)
+            return {
+                try wasi.runAndClose { wasi in
+                    let imports = try threads.makeImports(store: store)
+                    let moduleInstance = try module.instantiate(store: store, imports: imports)
+                    let exitCode = try wasi.start(moduleInstance)
+                    threads.mainThreadDidExit(code: exitCode)
+                }
+            }
+        }
         let store = Store(engine: engine)
         return {
             try wasi.runAndClose { wasi in
@@ -455,4 +526,14 @@ extension Run {
 
         return (functionName, parameters)
     }
+}
+
+private func terminateProcess(_ code: Int32) -> Never {
+    #if os(macOS)
+        Darwin.exit(code)
+    #elseif os(Linux)
+        Glibc.exit(code)
+    #else
+        fatalError("WASI Threads is unavailable on this platform")
+    #endif
 }

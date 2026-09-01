@@ -12,6 +12,20 @@ import WasmKitWASI
         #expect(preopens.first?.guestPath == "/host/dir")
     }
 
+    @Test func wasiThreadsMaximumMustBePositive() throws {
+        let error = #expect(throws: (any Error).self) {
+            _ = try Run.parse(["--wasi-threads", "--wasi-threads-max", "0", "module.wasm"])
+        }
+        #expect(Run.message(for: try #require(error)).contains("at least 1"))
+    }
+
+    @Test func wasiThreadsRejectsTokenThreading() throws {
+        let error = #expect(throws: (any Error).self) {
+            _ = try Run.parse(["--wasi-threads", "--threading-model", "token", "module.wasm"])
+        }
+        #expect(Run.message(for: try #require(error)).contains("direct threading"))
+    }
+
     @Test func mappedDirSplitsHostFromGuest() throws {
         let run = try Run.parse(["--dir", "/host/dir::/", "module.wasm"])
         let preopens = try run.derivePreopens()

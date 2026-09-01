@@ -871,6 +871,16 @@ public struct Memory: Equatable {
     }
 
     #if os(macOS) || os(Linux)
+        /// Creates a store-local wrapper around a store-independent shared-memory backing.
+        ///
+        /// The resulting ``Memory`` belongs to `store` and must not be shared
+        /// between stores. Multiple wrappers made from the same
+        /// ``SharedMemory`` observe the same bytes, growth, and atomic
+        /// wait/notify state.
+        public init(store: Store, sharedMemory: SharedMemory) {
+            self.init(store: store, type: sharedMemory.type, sharedStorage: sharedMemory.storage)
+        }
+
         /// Wrap an existing `SharedMemoryStorage` in a new `Memory`, so one shared memory can
         /// be imported into child `Store`s (the `wasi_thread_spawn` path).
         init(store: Store, type: MemoryType, sharedStorage: SharedMemoryStorage) {
