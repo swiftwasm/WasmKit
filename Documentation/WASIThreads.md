@@ -11,10 +11,11 @@ Each successful call returns a positive, monotonically increasing thread ID and
 starts a fresh module instance in a fresh `Store`. The child calls
 `wasi_thread_start(i32 threadID, i32 startArgument)`.
 
-The mode assumes a `wasm32-wasi-threads` module importing one shared memory as
-`env.memory`. That shared backing is the only mutable state shared between
-instances. Modules with imported tables, mutable globals, extra memories, or
-other non-standard shapes are unsupported embedder configurations.
+The mode assumes a `wasm32-wasi-threads` module importing exactly one shared
+wasm32 memory. The import's module/name are preserved for every instance. That
+shared backing is the only mutable state shared between instances. Modules with
+imported tables, mutable globals, extra memories, or other non-standard shapes
+are unsupported embedder configurations.
 
 `--wasi-threads-max` defaults to 64 and includes the main guest thread, so a
 limit of one permits no children. IDs are allocated from 1 through

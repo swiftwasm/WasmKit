@@ -121,6 +121,7 @@ public final class WASIThreads: @unchecked Sendable {
     private let processControl: WASIThreadsProcessControl
     private let childImports: ChildImportsBuilder
     private let state = Mutex<GroupState>(.init())
+    private let sharedMemoryImport: (module: String, name: String)
 
     public let sharedMemory: SharedMemory
 
@@ -159,12 +160,13 @@ public final class WASIThreads: @unchecked Sendable {
         guard !engine.hasInterceptor else {
             throw WASIThreadsError.incompatibleEngine("an engine without an interceptor")
         }
-        guard let memoryImport = module.imports.first(where: { $0.module == "env" && $0.name == "memory" }),
-              case .memory(let memoryType) = memoryImport.descriptor,
-              memoryType.shared,
-              !memoryType.isMemory64
+        let sharedMemoryImports = module.imports.compactMap { imported -> (module: String, name: String, type: MemoryType)? in
+            guard case .memory(let type) = imported.descriptor, type.shared, !type.isMemory64 else { return nil }
+            return (imported.module, imported.name, type)
+        }
+        guard sharedMemoryImports.count == 1, let memoryImport = sharedMemoryImports.first
         else {
-            preconditionFailure("WASI Threads requires a shared wasm32 memory import named env.memory")
+            preconditionFailure("WASI Threads requires exactly one shared wasm32 memory import")
         }
 
         self.module = module
@@ -172,14 +174,18 @@ public final class WASIThreads: @unchecked Sendable {
         self.configuration = configuration
         self.processControl = processControl
         self.childImports = childImports
-        self.sharedMemory = try SharedMemory(engine: engine, type: memoryType, resourceLimiter: resourceLimiter)
+        self.sharedMemoryImport = (memoryImport.module, memoryImport.name)
+        self.sharedMemory = try SharedMemory(engine: engine, type: memoryImport.type, resourceLimiter: resourceLimiter)
     }
 
-    /// Creates the imports for one store, including `env.memory` and
-    /// `wasi.thread-spawn`.
+    /// Creates the imports for one store, including the module's shared memory
+    /// import and `wasi.thread-spawn`.
     public func makeImports(store: Store) throws -> Imports {
         var imports = try childImports(store)
-        imports.define(module: "env", name: "memory", Memory(store: store, sharedMemory: sharedMemory))
+        imports.define(
+            module: sharedMemoryImport.module, name: sharedMemoryImport.name,
+            Memory(store: store, sharedMemory: sharedMemory)
+        )
         imports.define(
             module: "wasi", name: "thread-spawn",
             Function(store: store, parameters: [.i32], results: [.i32]) { [self] _, arguments in
