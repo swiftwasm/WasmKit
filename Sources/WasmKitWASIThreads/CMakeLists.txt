@@ -3,6 +3,10 @@ add_wasmkit_library(WasmKitWASIThreads
   WASIThreads.swift
 )
 
+target_compile_definitions(WasmKitWASIThreads PRIVATE
+  MultiThread
+)
+
 target_link_wasmkit_libraries(WasmKitWASIThreads PUBLIC
   WasmKit
 )

@@ -148,9 +148,11 @@ public final class WASIThreads: @unchecked Sendable {
         #else
             throw WASIThreadsError.unsupportedPlatform
         #endif
-        if let nativeStackSize = configuration.nativeStackSize, nativeStackSize < Int(PTHREAD_STACK_MIN) {
-            throw WASIThreadsError.nativeStackSizeTooSmall(minimum: Int(PTHREAD_STACK_MIN))
-        }
+        #if os(macOS) || os(Linux)
+            if let nativeStackSize = configuration.nativeStackSize, nativeStackSize < Int(PTHREAD_STACK_MIN) {
+                throw WASIThreadsError.nativeStackSizeTooSmall(minimum: Int(PTHREAD_STACK_MIN))
+            }
+        #endif
         guard engine.configuration.features.contains(.threads) else {
             throw WASIThreadsError.incompatibleEngine("the WebAssembly threads feature")
         }
@@ -185,10 +187,14 @@ public final class WASIThreads: @unchecked Sendable {
     /// import and `wasi.thread-spawn`.
     public func makeImports(store: Store) throws -> Imports {
         var imports = try childImports(store)
-        imports.define(
-            module: sharedMemoryImport.module, name: sharedMemoryImport.name,
-            Memory(store: store, sharedMemory: sharedMemory)
-        )
+        #if os(macOS) || os(Linux)
+            imports.define(
+                module: sharedMemoryImport.module, name: sharedMemoryImport.name,
+                Memory(store: store, sharedMemory: sharedMemory)
+            )
+        #else
+            throw WASIThreadsError.unsupportedPlatform
+        #endif
         imports.define(
             module: "wasi", name: "thread-spawn",
             Function(store: store, parameters: [.i32], results: [.i32]) { [self] _, arguments in

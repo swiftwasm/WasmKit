@@ -176,6 +176,7 @@ let package = Package(
         .target(
             name: "WasmKitWASIThreads",
             dependencies: ["WasmKit", "CWasmKitWASIThreads"],
+            exclude: ["CMakeLists.txt"],
             swiftSettings: swiftSettings
         ),
         .testTarget(
