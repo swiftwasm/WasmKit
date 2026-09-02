@@ -14,6 +14,9 @@ int wasmkit_wasi_threads_start(
     size_t stack_size
 );
 
+/// Returns the smallest native stack size accepted by pthreads.
+size_t wasmkit_wasi_threads_min_stack_size(void);
+
 /// A one-shot, blocking event used for worker startup handshakes.
 wasmkit_wasi_threads_event *wasmkit_wasi_threads_event_create(void);
 void wasmkit_wasi_threads_event_destroy(wasmkit_wasi_threads_event *event);

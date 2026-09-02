@@ -1,5 +1,7 @@
 #include "CWasmKitWASIThreads.h"
 
+#if defined(__APPLE__) || defined(__linux__)
+
 #include <errno.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -54,6 +56,14 @@ int wasmkit_wasi_threads_start(
   return error;
 }
 
+size_t wasmkit_wasi_threads_min_stack_size(void) {
+#ifdef PTHREAD_STACK_MIN
+  return PTHREAD_STACK_MIN;
+#else
+  return 0;
+#endif
+}
+
 wasmkit_wasi_threads_event *wasmkit_wasi_threads_event_create(void) {
   struct wasmkit_wasi_threads_event *event = malloc(sizeof(*event));
   if (event == NULL) return NULL;
@@ -90,3 +100,44 @@ void wasmkit_wasi_threads_event_signal(wasmkit_wasi_threads_event *event) {
   (void)pthread_cond_signal(&event->condition);
   (void)pthread_mutex_unlock(&event->mutex);
 }
+
+#else
+
+#include <stdlib.h>
+
+struct wasmkit_wasi_threads_event {
+  int unused;
+};
+
+int wasmkit_wasi_threads_start(
+    wasmkit_wasi_threads_entry entry,
+    void *context,
+    size_t stack_size
+) {
+  (void)entry;
+  (void)context;
+  (void)stack_size;
+  return 1;
+}
+
+size_t wasmkit_wasi_threads_min_stack_size(void) {
+  return 0;
+}
+
+wasmkit_wasi_threads_event *wasmkit_wasi_threads_event_create(void) {
+  return malloc(sizeof(struct wasmkit_wasi_threads_event));
+}
+
+void wasmkit_wasi_threads_event_destroy(wasmkit_wasi_threads_event *event) {
+  free(event);
+}
+
+void wasmkit_wasi_threads_event_wait(wasmkit_wasi_threads_event *event) {
+  (void)event;
+}
+
+void wasmkit_wasi_threads_event_signal(wasmkit_wasi_threads_event *event) {
+  (void)event;
+}
+
+#endif

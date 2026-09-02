@@ -149,8 +149,9 @@ public final class WASIThreads: @unchecked Sendable {
             throw WASIThreadsError.unsupportedPlatform
         #endif
         #if os(macOS) || os(Linux)
-            if let nativeStackSize = configuration.nativeStackSize, nativeStackSize < Int(PTHREAD_STACK_MIN) {
-                throw WASIThreadsError.nativeStackSizeTooSmall(minimum: Int(PTHREAD_STACK_MIN))
+            let minimumStackSize = Int(wasmkit_wasi_threads_min_stack_size())
+            if let nativeStackSize = configuration.nativeStackSize, nativeStackSize < minimumStackSize {
+                throw WASIThreadsError.nativeStackSizeTooSmall(minimum: minimumStackSize)
             }
         #endif
         guard engine.configuration.features.contains(.threads) else {
