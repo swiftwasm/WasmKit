@@ -175,6 +175,28 @@
             )
         }
 
+        /// How far to let the guest run.
+        private enum Resume {
+            /// One Wasm instruction.
+            case step
+            /// Until the next breakpoint.
+            case untilBreakpoint
+            /// Until the guest ends.
+            case toCompletion
+        }
+
+        private func resume(_ resume: Resume) throws {
+            do {
+                switch resume {
+                case .step: try self.debugger.step()
+                case .untilBreakpoint: try self.debugger.runPreservingCurrentBreakpoint()
+                case .toCompletion: try self.debugger.run()
+                }
+            } catch let exit as WASIExitCode {
+                self.debugger.recordExit(status: exit.code)
+            }
+        }
+
         package func close() throws {
             try wasi.close()
         }
@@ -188,11 +210,16 @@
             // Resuming a guest that already returned would be a restart, which is unimplemented.
             guard case .stoppedAtBreakpoint = self.debugger.state else { return }
 
-            try self.debugger.run()
+            try self.resume(.toCompletion)
         }
 
         enum Endianness {
             case big, little
+        }
+
+        /// Reply that the guest has exited with the given exit status.
+        private static func exitReply(status: some FixedWidthInteger) -> GDBTargetResponse.Kind {
+            .string("W\(HexEncoding.encode(UInt8(truncatingIfNeeded: status).bigEndianBytes))")
         }
 
         private func hexDump<I: FixedWidthInteger>(_ value: I, endianness: Endianness) -> String {
@@ -246,14 +273,17 @@
 
                 case .entrypointReturned(let values):
                     guard !values.isEmpty else {
-                        return .string("W\(self.hexDump(0 as UInt8, endianness: .big))")
+                        return Self.exitReply(status: 0)
                     }
 
                     guard case .i32(let exitCode) = values.first else {
                         throw Error.exitCodeUnknown(values)
                     }
 
-                    return .string("W\(self.hexDump(exitCode, endianness: .big))")
+                    return Self.exitReply(status: exitCode)
+
+                case .exited(let status):
+                    return Self.exitReply(status: status)
 
                 case .trapped(let trapReason):
                     result.append(("reason", "trap"))
@@ -400,15 +430,15 @@
 
                 switch threadAction {
                 case .step:
-                    try self.debugger.step()
+                    try self.resume(.step)
                 case .continue:
-                    try self.debugger.runPreservingCurrentBreakpoint()
+                    try self.resume(.untilBreakpoint)
                 }
 
                 responseKind = try self.currentThreadStopInfo
 
             case .continue:
-                try self.debugger.runPreservingCurrentBreakpoint()
+                try self.resume(.untilBreakpoint)
 
                 responseKind = try self.currentThreadStopInfo
 

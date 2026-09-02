@@ -13,6 +13,7 @@
             case stoppedAtBreakpoint(BreakpointState)
             case trapped(String)
             case entrypointReturned([Value])
+            case exited(status: UInt32)
         }
 
         package enum Error: Swift.Error, @unchecked Sendable {
@@ -290,6 +291,10 @@
                     )
                     self.state = .entrypointReturned(result)
 
+                case .exited:
+                    // The guest is gone, so there is nothing to resume.
+                    return
+
                 case .trapped, .entrypointReturned:
                     fatalError("Restarting a Wasm module from the debugger is not implemented yet.")
                 }
@@ -345,6 +350,11 @@
             }
 
             try self.run()
+        }
+
+        /// Records that the guest exited with the given status.
+        package mutating func recordExit(status: UInt32) {
+            self.state = .exited(status: status)
         }
 
         package func getLocal(frameIndex: UInt, localIndex: UInt) throws -> UInt64 {
