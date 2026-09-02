@@ -136,73 +136,70 @@ public final class WASIThreads: @unchecked Sendable {
         processControl: WASIThreadsProcessControl,
         childImports: @escaping ChildImportsBuilder
     ) throws {
-        guard configuration.maximumThreads >= 1 else { throw WASIThreadsError.invalidMaximumThreads }
-        #if !MultiThread
-            throw WASIThreadsError.incompatibleEngine("the MultiThread package trait")
-        #endif
         #if os(macOS) || os(Linux)
-            #if arch(x86_64) || arch(arm64)
+            #if MultiThread && (arch(x86_64) || arch(arm64))
+                guard configuration.maximumThreads >= 1 else { throw WASIThreadsError.invalidMaximumThreads }
+                let minimumStackSize = Int(wasmkit_wasi_threads_min_stack_size())
+                if let nativeStackSize = configuration.nativeStackSize, nativeStackSize < minimumStackSize {
+                    throw WASIThreadsError.nativeStackSizeTooSmall(minimum: minimumStackSize)
+                }
+                guard engine.configuration.features.contains(.threads) else {
+                    throw WASIThreadsError.incompatibleEngine("the WebAssembly threads feature")
+                }
+                guard engine.configuration.threadingModel == .direct else {
+                    throw WASIThreadsError.incompatibleEngine("the direct threading model")
+                }
+                guard engine.configuration.memoryBoundsChecking == .mprotect else {
+                    throw WASIThreadsError.incompatibleEngine("mprotect memory bounds checking")
+                }
+                guard !engine.hasInterceptor else {
+                    throw WASIThreadsError.incompatibleEngine("an engine without an interceptor")
+                }
+                let sharedMemoryImports = module.imports.compactMap { imported -> (module: String, name: String, type: MemoryType)? in
+                    guard case .memory(let type) = imported.descriptor, type.shared, !type.isMemory64 else { return nil }
+                    return (imported.module, imported.name, type)
+                }
+                guard sharedMemoryImports.count == 1, let memoryImport = sharedMemoryImports.first
+                else {
+                    preconditionFailure("WASI Threads requires exactly one shared wasm32 memory import")
+                }
+
+                self.module = module
+                self.engine = engine
+                self.configuration = configuration
+                self.processControl = processControl
+                self.childImports = childImports
+                self.sharedMemoryImport = (memoryImport.module, memoryImport.name)
+                self.sharedMemory = try SharedMemory(engine: engine, type: memoryImport.type, resourceLimiter: resourceLimiter)
+            #elseif !MultiThread
+                throw WASIThreadsError.incompatibleEngine("the MultiThread package trait")
             #else
                 throw WASIThreadsError.unsupportedPlatform
             #endif
         #else
             throw WASIThreadsError.unsupportedPlatform
         #endif
-        #if os(macOS) || os(Linux)
-            let minimumStackSize = Int(wasmkit_wasi_threads_min_stack_size())
-            if let nativeStackSize = configuration.nativeStackSize, nativeStackSize < minimumStackSize {
-                throw WASIThreadsError.nativeStackSizeTooSmall(minimum: minimumStackSize)
-            }
-        #endif
-        guard engine.configuration.features.contains(.threads) else {
-            throw WASIThreadsError.incompatibleEngine("the WebAssembly threads feature")
-        }
-        guard engine.configuration.threadingModel == .direct else {
-            throw WASIThreadsError.incompatibleEngine("the direct threading model")
-        }
-        guard engine.configuration.memoryBoundsChecking == .mprotect else {
-            throw WASIThreadsError.incompatibleEngine("mprotect memory bounds checking")
-        }
-        guard !engine.hasInterceptor else {
-            throw WASIThreadsError.incompatibleEngine("an engine without an interceptor")
-        }
-        let sharedMemoryImports = module.imports.compactMap { imported -> (module: String, name: String, type: MemoryType)? in
-            guard case .memory(let type) = imported.descriptor, type.shared, !type.isMemory64 else { return nil }
-            return (imported.module, imported.name, type)
-        }
-        guard sharedMemoryImports.count == 1, let memoryImport = sharedMemoryImports.first
-        else {
-            preconditionFailure("WASI Threads requires exactly one shared wasm32 memory import")
-        }
-
-        self.module = module
-        self.engine = engine
-        self.configuration = configuration
-        self.processControl = processControl
-        self.childImports = childImports
-        self.sharedMemoryImport = (memoryImport.module, memoryImport.name)
-        self.sharedMemory = try SharedMemory(engine: engine, type: memoryImport.type, resourceLimiter: resourceLimiter)
     }
 
     /// Creates the imports for one store, including the module's shared memory
     /// import and `wasi.thread-spawn`.
     public func makeImports(store: Store) throws -> Imports {
-        var imports = try childImports(store)
         #if os(macOS) || os(Linux)
+            var imports = try childImports(store)
             imports.define(
                 module: sharedMemoryImport.module, name: sharedMemoryImport.name,
                 Memory(store: store, sharedMemory: sharedMemory)
             )
+            imports.define(
+                module: "wasi", name: "thread-spawn",
+                Function(store: store, parameters: [.i32], results: [.i32]) { [self] _, arguments in
+                    [.i32(UInt32(bitPattern: spawn(Int32(bitPattern: arguments[0].i32))))]
+                }
+            )
+            return imports
         #else
             throw WASIThreadsError.unsupportedPlatform
         #endif
-        imports.define(
-            module: "wasi", name: "thread-spawn",
-            Function(store: store, parameters: [.i32], results: [.i32]) { [self] _, arguments in
-                [.i32(UInt32(bitPattern: spawn(Int32(bitPattern: arguments[0].i32))))]
-            }
-        )
-        return imports
     }
 
     /// Terminates the process after the main guest invocation returns.
