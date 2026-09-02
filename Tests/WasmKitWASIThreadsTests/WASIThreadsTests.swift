@@ -14,7 +14,7 @@
         }
     }
 
-    @Suite struct WASIThreadsTests {
+    @Suite(.enabled(if: Engine().configuration.memoryBoundsChecking == .mprotect)) struct WASIThreadsTests {
         @Test func configurationDefaults() {
             let configuration = WASIThreadsConfiguration()
             #expect(configuration.maximumThreads == 64)

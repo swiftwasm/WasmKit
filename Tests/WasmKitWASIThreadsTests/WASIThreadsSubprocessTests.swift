@@ -1,8 +1,9 @@
 #if os(macOS) || os(Linux)
     import Foundation
     import Testing
+    import WasmKit
 
-    @Suite(.serialized) struct WASIThreadsSubprocessTests {
+    @Suite(.serialized, .enabled(if: Engine().configuration.memoryBoundsChecking == .mprotect)) struct WASIThreadsSubprocessTests {
         private struct UpstreamTest: CustomStringConvertible {
             let module: URL
             let expectedExitCode: Int32
