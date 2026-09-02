@@ -9,6 +9,7 @@ add_wasmkit_library(WasmKit
   Validator.swift
   WasmKitError.swift
   ResourceLimiter.swift
+  Execution/SharedMemory.swift
   Component/CanonicalLifting.swift
   Component/CanonicalLowering.swift
   Component/CanonicalCall.swift

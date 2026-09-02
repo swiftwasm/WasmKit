@@ -7,7 +7,7 @@ add_wasmkit_library(CLICommands
 )
 
 target_link_wasmkit_libraries(CLICommands PUBLIC
-  WAT WasmKitWASI WASI WASTRunner)
+  WAT WasmKitWASI WasmKitWASIThreads WASI WASTRunner)
 
 add_dependencies(
   CLICommands
