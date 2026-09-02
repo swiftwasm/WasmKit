@@ -10,8 +10,10 @@ import WasmTypes
 
 #if os(macOS)
     import Darwin
-#elseif os(Linux)
+#elseif canImport(Glibc)
     import Glibc
+#elseif canImport(Musl)
+    import Musl
 #endif
 
 #if ComponentModel
@@ -555,8 +557,10 @@ extension Run {
 private func terminateProcess(_ code: Int32) -> Never {
     #if os(macOS)
         Darwin.exit(code)
-    #elseif os(Linux)
+    #elseif canImport(Glibc)
         Glibc.exit(code)
+    #elseif canImport(Musl)
+        Musl.exit(code)
     #else
         fatalError("WASI Threads is unavailable on this platform")
     #endif

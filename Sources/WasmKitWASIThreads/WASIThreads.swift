@@ -4,12 +4,6 @@ import WasmKit
 import WasmParser
 import WasmTypes
 
-#if canImport(Darwin)
-    import Darwin
-#elseif canImport(Glibc)
-    import Glibc
-#endif
-
 /// Configuration for a process-oriented WASI Threads group.
 public struct WASIThreadsConfiguration: Sendable {
     /// Maximum concurrently live guest threads, including the main guest thread.
