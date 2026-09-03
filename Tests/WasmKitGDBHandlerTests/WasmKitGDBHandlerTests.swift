@@ -1,7 +1,6 @@
 #if WasmDebuggingSupport
 
     import GDBRemoteProtocol
-    import WasmKitWASI
     import Testing
     import WAT
 
@@ -60,25 +59,6 @@
             return try debugger.enableBreakpoint(address: address)
         }
 
-        // Closes on both paths because WASIBridgeToHost's deinit preconditions on close() having run.
-        private func withHandler<R>(_ body: (WasmKitGDBHandler) async throws -> R) async throws -> R {
-            let bytes = try wat2wasm(Self.wat)
-            let h = try WasmKitGDBHandler(
-                wasmBinary: bytes,
-                moduleFilePath: "/tmp/test.wasm",
-                wasiConfiguration: WASIConfiguration(arguments: [], environment: [:], preopens: []),
-                engineConfiguration: EngineConfiguration(),
-                logger: .disabled)
-            do {
-                let result = try await body(h)
-                try h.close()
-                return result
-            } catch {
-                try h.close()
-                throw error
-            }
-        }
-
         private func pairs(_ r: GDBTargetResponse) -> [String: String] {
             guard case .keyValuePairs(let kvs) = r.kind else { return [:] }
             return Dictionary(kvs, uniquingKeysWith: { a, _ in a })
@@ -90,17 +70,17 @@
             HexEncoding.encode((UInt64(wasmAddr) + offset).bigEndianBytes)
         }
 
-        private func insert(_ h: WasmKitGDBHandler, at wasmAddr: Int) async throws {
+        private func insert(_ h: WasmKitGDBHandler, at wasmAddr: Int) throws {
             _ = try h.handle(
                 command: .init(
                     kind: .insertSoftwareBreakpoint, arguments: "\(hostHex(wasmAddr)),1"))
         }
 
         @Test
-        func breakpointStopReportsBreakpointReasonAtRequestedAddress() async throws {
+        func breakpointStopReportsBreakpointReasonAtRequestedAddress() throws {
             let (requested, resolved) = try divergentAddresses()
-            try await withHandler { h in
-                try await insert(h, at: requested)
+            try withHandler(debugging: Self.wat) { h in
+                try insert(h, at: requested)
                 let stop = try h.handle(command: .init(kind: .continue, arguments: ""))
                 let kv = pairs(stop)
                 #expect(kv["reason"] == "breakpoint")
@@ -110,10 +90,10 @@
         }
 
         @Test
-        func removeBreakpointUninstallsAtResolvedAddress() async throws {
+        func removeBreakpointUninstallsAtResolvedAddress() throws {
             let (requested, _) = try divergentAddresses()
-            try await withHandler { h in
-                try await insert(h, at: requested)
+            try withHandler(debugging: Self.wat) { h in
+                try insert(h, at: requested)
                 _ = try h.handle(
                     command: .init(
                         kind: .removeSoftwareBreakpoint, arguments: "\(hostHex(requested)),1"))
@@ -128,10 +108,10 @@
         }
 
         @Test
-        func stepLandingReportsTraceNotBreakpoint() async throws {
+        func stepLandingReportsTraceNotBreakpoint() throws {
             let (requested, _) = try divergentAddresses()
-            try await withHandler { h in
-                try await insert(h, at: requested)
+            try withHandler(debugging: Self.wat) { h in
+                try insert(h, at: requested)
                 _ = try h.handle(command: .init(kind: .continue, arguments: ""))
                 let step = try h.handle(command: .init(kind: .resumeThreads, arguments: "s:1"))
                 #expect(pairs(step)["reason"] == "trace")
@@ -139,10 +119,10 @@
         }
 
         @Test
-        func detachRunsTheGuestToCompletion() async throws {
+        func detachRunsTheGuestToCompletion() throws {
             let (requested, _) = try divergentAddresses()
-            try await withHandler { h in
-                try await insert(h, at: requested)
+            try withHandler(debugging: Self.wat) { h in
+                try insert(h, at: requested)
                 #expect(pairs(try h.handle(command: .init(kind: .continue, arguments: "")))["reason"] == "breakpoint")
 
                 try h.detach()
@@ -157,8 +137,8 @@
         }
 
         @Test
-        func detachOnDisconnectIsRequestedByDefaultAndSelectable() async throws {
-            try await withHandler { h in
+        func detachOnDisconnectIsRequestedByDefaultAndSelectable() throws {
+            try withHandler(debugging: Self.wat) { h in
                 #expect(h.detachesOnDisconnect)
 
                 let off = try h.handle(command: .init(kind: .setDetachOnError, arguments: "0"))
@@ -174,8 +154,8 @@
         }
 
         @Test
-        func setDetachOnErrorRejectsValuesOtherThanZeroOrOne() async throws {
-            _ = try await withHandler { h in
+        func setDetachOnErrorRejectsValuesOtherThanZeroOrOne() throws {
+            _ = try withHandler(debugging: Self.wat) { h in
                 #expect(throws: WasmKitGDBHandler.Error.self) {
                     _ = try h.handle(command: .init(kind: .setDetachOnError, arguments: "2"))
                 }
@@ -192,27 +172,9 @@
               (func (export "_start") (result i32) (global.get $g)))
             """
 
-        private func withGlobalHandler<R>(_ body: (WasmKitGDBHandler) async throws -> R) async throws -> R {
-            let bytes = try wat2wasm(Self.globalWAT)
-            let h = try WasmKitGDBHandler(
-                wasmBinary: bytes,
-                moduleFilePath: "/tmp/test.wasm",
-                wasiConfiguration: WASIConfiguration(arguments: [], environment: [:], preopens: []),
-                engineConfiguration: EngineConfiguration(),
-                logger: .disabled)
-            do {
-                let result = try await body(h)
-                try h.close()
-                return result
-            } catch {
-                try h.close()
-                throw error
-            }
-        }
-
         @Test
-        func wasmGlobalRepliesWithLittleEndianValue() async throws {
-            try await withGlobalHandler { h in
+        func wasmGlobalRepliesWithLittleEndianValue() throws {
+            try withHandler(debugging: Self.globalWAT) { h in
                 let resp = try h.handle(command: .init(kind: .wasmGlobal, arguments: "0;0"))
                 guard case .hexEncodedBinary(let bytes) = resp.kind else {
                     Issue.record("expected hexEncodedBinary, got \(resp.kind)")
@@ -223,8 +185,8 @@
         }
 
         @Test
-        func wasmGlobalIgnoresTheFrameIndex() async throws {
-            try await withGlobalHandler { h in
+        func wasmGlobalIgnoresTheFrameIndex() throws {
+            try withHandler(debugging: Self.globalWAT) { h in
                 let resp = try h.handle(command: .init(kind: .wasmGlobal, arguments: "0;1"))
                 guard case .hexEncodedBinary(let bytes) = resp.kind else {
                     Issue.record("expected hexEncodedBinary, got \(resp.kind)")
@@ -235,8 +197,8 @@
         }
 
         @Test
-        func wasmGlobalRejectsMissingIndex() async throws {
-            _ = try await withGlobalHandler { h in
+        func wasmGlobalRejectsMissingIndex() throws {
+            _ = try withHandler(debugging: Self.globalWAT) { h in
                 #expect(throws: WasmKitGDBHandler.Error.self) {
                     _ = try h.handle(command: .init(kind: .wasmGlobal, arguments: "0;"))
                 }
@@ -244,8 +206,8 @@
         }
 
         @Test
-        func supportedFeaturesAdvertisesInstanceNamedWasmGlobal() async throws {
-            try await withGlobalHandler { h in
+        func supportedFeaturesAdvertisesInstanceNamedWasmGlobal() throws {
+            try withHandler(debugging: Self.globalWAT) { h in
                 let resp = try h.handle(command: .init(kind: .supportedFeatures, arguments: ""))
                 guard case .string(let features) = resp.kind else {
                     Issue.record("expected a feature string, got \(resp.kind)")
@@ -256,8 +218,8 @@
         }
 
         @Test
-        func wasmGlobalReadsTheGlobalOfAnInstanceNamedRequest() async throws {
-            try await withGlobalHandler { h in
+        func wasmGlobalReadsTheGlobalOfAnInstanceNamedRequest() throws {
+            try withHandler(debugging: Self.globalWAT) { h in
                 let resp = try h.handle(
                     command: .init(
                         kind: .wasmGlobal,
@@ -271,8 +233,8 @@
         }
 
         @Test
-        func wasmGlobalAcceptsAnInstanceWithoutATrailingDelimiter() async throws {
-            try await withGlobalHandler { h in
+        func wasmGlobalAcceptsAnInstanceWithoutATrailingDelimiter() throws {
+            try withHandler(debugging: Self.globalWAT) { h in
                 let resp = try h.handle(
                     command: .init(
                         kind: .wasmGlobal,
@@ -286,8 +248,8 @@
         }
 
         @Test
-        func wasmGlobalRefusesAnInstanceItDoesNotRun() async throws {
-            try await withGlobalHandler { h in
+        func wasmGlobalRefusesAnInstanceItDoesNotRun() throws {
+            try withHandler(debugging: Self.globalWAT) { h in
                 let unknown = DebuggerMemoryView.moduleInstanceID + 1
                 let resp = try h.handle(
                     command: .init(kind: .wasmGlobal, arguments: "0;instance:\(unknown);"))
@@ -300,8 +262,8 @@
         }
 
         @Test
-        func wasmGlobalRejectsAnUnparsableInstance() async throws {
-            _ = try await withGlobalHandler { h in
+        func wasmGlobalRejectsAnUnparsableInstance() throws {
+            _ = try withHandler(debugging: Self.globalWAT) { h in
                 #expect(throws: WasmKitGDBHandler.Error.self) {
                     _ = try h.handle(command: .init(kind: .wasmGlobal, arguments: "0;instance:;"))
                 }
@@ -310,8 +272,8 @@
 
         // Both forms at once names the global ambiguously, so neither reading may be served.
         @Test
-        func wasmGlobalRejectsARequestMixingAFrameIndexAndAnInstance() async throws {
-            _ = try await withGlobalHandler { h in
+        func wasmGlobalRejectsARequestMixingAFrameIndexAndAnInstance() throws {
+            _ = try withHandler(debugging: Self.globalWAT) { h in
                 #expect(throws: WasmKitGDBHandler.Error.self) {
                     _ = try h.handle(
                         command: .init(

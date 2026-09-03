@@ -32,7 +32,7 @@
         /// the connection, so a host sees the guest vanish rather than the status it ended with.
         @Test
         func anExitIsReportedWithItsStatus() throws {
-            try withDebuggedHandler(debugging: try wat2wasm(Self.wat)) { handler in
+            try withHandler(debugging: Self.wat) { handler in
                 let reply = try self.continueGuest(handler)
                 #expect(reply == "W4b")
             }
@@ -41,7 +41,7 @@
         /// A host resumes after every stop it is told about, including the last one.
         @Test
         func resumingAfterAnExitReportsItAgain() throws {
-            try withDebuggedHandler(debugging: try wat2wasm(Self.wat)) { handler in
+            try withHandler(debugging: Self.wat) { handler in
                 let first = try self.continueGuest(handler)
                 let again = try self.continueGuest(handler)
                 #expect(again == first)
