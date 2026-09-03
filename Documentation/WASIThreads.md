@@ -26,5 +26,4 @@ This is intentionally a process-oriented CLI capability, not a general
 long-lived embedding API. A worker trap or `proc_exit` terminates the host
 process; returning from `_start` also terminates it, allowing the operating
 system to clean up detached workers. It requires a 64-bit macOS or Linux host,
-the `MultiThread` package trait, direct-threaded execution, the threads
-feature, mprotect bounds checking, and an engine without an interceptor.
+and the `MultiThread` package trait when building the CLI product.
