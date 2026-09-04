@@ -14,6 +14,16 @@
     "revision": "2ce1367c9d1271c83fb63bef26d896a2f290cd23",
     "categories": ["default"]
   },
+  "w2c2": {
+    "repository": "https://github.com/turbolent/w2c2.git",
+    "revision": "2a31254683de4a3f6a750c123daa7ddf97631c69",
+    "categories": []
+  },
+  "wasm-component-ld": {
+    "repository": "https://github.com/bytecodealliance/wasm-component-ld.git",
+    "revision": "0a5f2513f6157e2c01c0485aa68365d8e4622ccb",
+    "categories": []
+  },
   "component-model": {
     "repository": "https://github.com/WebAssembly/component-model.git",
     "revision": "0b951b72b3f4019edf386a93585782587d221a0c",
