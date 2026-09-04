@@ -158,7 +158,8 @@ extension TypeDefSyntax {
         if lexer.eat(.leftBrace) {
             while !lexer.eat(.rightBrace) {
                 let docs = try DocumentsSyntax.parse(lexer: &lexer)
-                functions.append(try ResourceFunctionSyntax.parse(lexer: &lexer, documents: docs, attributes: []))
+                let attributes = try AttributeSyntax.parseItems(lexer: &lexer)
+                functions.append(try ResourceFunctionSyntax.parse(lexer: &lexer, documents: docs, attributes: attributes))
             }
         } else {
             try lexer.expectSemicolon()

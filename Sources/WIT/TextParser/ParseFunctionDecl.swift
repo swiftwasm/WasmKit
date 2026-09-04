@@ -99,11 +99,11 @@ extension FunctionSyntax {
 }
 
 extension NamedFunctionSyntax {
-    static func parse(lexer: inout Lexer, documents: DocumentsSyntax) throws -> SyntaxNode<NamedFunctionSyntax> {
+    static func parse(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax] = []) throws -> SyntaxNode<NamedFunctionSyntax> {
         let name = try Identifier.parse(lexer: &lexer)
         try lexer.expect(.colon)
         let function = try FunctionSyntax.parse(lexer: &lexer)
         try lexer.expectSemicolon()
-        return .init(syntax: NamedFunctionSyntax(documents: documents, attributes: [], name: name, function: function))
+        return .init(syntax: NamedFunctionSyntax(documents: documents, attributes: attributes, name: name, function: function))
     }
 }
