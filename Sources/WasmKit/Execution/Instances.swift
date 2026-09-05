@@ -1224,5 +1224,6 @@ extension InternalUncompiledCode {
     var expression: ArraySlice<UInt8> { withValue { $0.expression } }
     #if WasmDebuggingSupport
         var originalAddress: Int { withValue { $0.originalAddress } }
+        var originalBodyAddress: Int { withValue { $0.originalBodyAddress } }
     #endif
 }

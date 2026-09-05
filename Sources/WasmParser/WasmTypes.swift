@@ -13,17 +13,24 @@ public struct Code: Sendable {
     @usableFromInline
     internal let offset: Int
     @usableFromInline
+    internal let bodyOffset: Int
+    @usableFromInline
     internal let features: WasmFeatureSet
 
     #if WasmDebuggingSupport
         package var originalAddress: Int { self.offset }
+
+        /// Start of the function body (locals declaration). DWARF's `DW_AT_low_pc` typically
+        /// points here.
+        package var originalBodyAddress: Int { self.bodyOffset }
     #endif
 
     @inlinable
-    init(locals: [ValueType], expression: ArraySlice<UInt8>, offset: Int, features: WasmFeatureSet) {
+    init(locals: [ValueType], expression: ArraySlice<UInt8>, offset: Int, bodyOffset: Int, features: WasmFeatureSet) {
         self.locals = locals
         self.expression = expression
         self.offset = offset
+        self.bodyOffset = bodyOffset
         self.features = features
     }
 }

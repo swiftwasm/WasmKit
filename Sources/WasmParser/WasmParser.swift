@@ -1019,7 +1019,7 @@ extension Parser {
             codes.append(
                 Code(
                     locals: locals, expression: expressionBytes,
-                    offset: expressionStart, features: features
+                    offset: expressionStart, bodyOffset: bodyStart, features: features
                 )
             )
         }

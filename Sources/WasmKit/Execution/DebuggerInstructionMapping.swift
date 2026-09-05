@@ -53,11 +53,20 @@ struct DebuggerInstructionMapping {
             }
         }
 
+        /// The bytecode slot for the Wasm instruction at exactly `address`, if it emitted any.
+        func iseq(forWasmAddress address: Int) -> Pc? {
+            self.wasmToIseq[address]
+        }
+
         /// Computes an address of WasmKit's iseq bytecode instruction that matches a given Wasm instruction address.
-        /// - Parameter address: the Wasm instruction to find a mapping for.
+        /// - Parameters:
+        ///   - address: the Wasm instruction to find a mapping for.
+        ///   - bound: Exclusive upper bound. Prevents resolving into a neighboring function.
         /// - Returns: A tuple with an address of found iseq instruction and the original Wasm instruction or next
         /// closest match if no direct match was found.
-        func findIseq(forWasmAddress address: Int) -> (iseq: Pc, wasm: Int)? {
+        func findIseq(forWasmAddress address: Int, before bound: Int) -> (iseq: Pc, wasm: Int)? {
+            guard address < bound else { return nil }
+
             // Look in the main mapping
             if let iseq = self.wasmToIseq[address] {
                 return (iseq, address)
@@ -65,6 +74,7 @@ struct DebuggerInstructionMapping {
 
             // If nothing found, find the closest Wasm address using binary search
             guard let nextAddress = self.wasmMappings.binarySearch(nextClosestTo: address),
+                nextAddress < bound,
                 // Look in the main mapping again with the next closest address if binary search produced anything
                 let iseq = self.wasmToIseq[nextAddress]
             else {
@@ -90,36 +100,32 @@ struct DebuggerInstructionMapping {
 }
 
 #if WasmDebuggingSupport
+    extension RandomAccessCollection {
+        /// Index of the first element for which `belongsInSecondPartition` is true, assuming
+        /// the collection is partitioned by that predicate.
+        func partitioningIndex(where belongsInSecondPartition: (Element) -> Bool) -> Index {
+            var low = self.startIndex
+            var high = self.endIndex
+            while low < high {
+                let middle = self.index(low, offsetBy: self.distance(from: low, to: high) / 2)
+                if belongsInSecondPartition(self[middle]) {
+                    high = middle
+                } else {
+                    low = self.index(after: middle)
+                }
+            }
+            return low
+        }
+    }
+
     extension [Int] {
         /// Uses binary search to find an element in `self` that's next closest to a given value.
         /// - Parameter value: the array element to search for or to use as a baseline when searching.
         /// - Returns: array element `result`, where `result - value` is the smallest possible, while
-        /// `result > value` also holds.
+        /// `result >= value` also holds.
         package func binarySearch(nextClosestTo value: Int) -> Int? {
-            switch self.count {
-            case 0:
-                return nil
-            default:
-                var slice = self[0..<self.count]
-                while let last = slice.last {
-                    guard last >= value else { return nil }
-
-                    let middle = slice.startIndex + (slice.endIndex - slice.startIndex) / 2
-                    guard middle > 0 else { break }
-
-                    if self[middle] < value {
-                        // Not found anything in the lower half, assigning higher half to `slice`.
-                        slice = slice[(middle + 1)..<slice.endIndex]
-                    } else if self[middle] > value && self[middle - 1] > value {
-                        // Not found anything in the higher half, assigning lower half to `slice`.
-                        slice = slice[slice.startIndex..<middle]
-                    } else {
-                        return self[middle]
-                    }
-                }
-
-                return self[slice.startIndex]
-            }
+            let index = self.partitioningIndex { $0 >= value }
+            return index < self.endIndex ? self[index] : nil
         }
     }
 #endif

@@ -72,9 +72,9 @@
         private var md: Md = nil
         private var ms: Ms = 0
 
-        /// Addresses of functions in the original Wasm binary, used for looking up functions when a breakpoint
-        /// is enabled at an arbitrary address if it isn't present in ``InstructionMapping`` yet (i.e. the
-        /// was not compiled yet in lazy compilation mode).
+        /// Starts of this instance's Wasm functions in the original binary, in ascending order,
+        /// paired with their indices. Excludes imported functions: their addresses are offsets
+        /// into the defining binary, not this one.
         private let functionAddresses: [(address: Int, instanceFunctionIndex: Int)]
 
         /// Reverse map from a head code slot to its opcode ID, used for resolving
@@ -106,10 +106,11 @@
             }
 
             self.instance = instance
-            self.functionAddresses = instance.handle.functions.enumerated().filter { $0.element.isWasm }.lazy.map {
+            self.functionAddresses = instance.handle.functions.enumerated().compactMap {
+                guard $0.element.isWasm, $0.element.wasm.instance == instance.handle else { return nil }
                 switch $0.element.wasm.code {
                 case .uncompiled(let wasm), .debuggable(let wasm, _):
-                    return (address: wasm.originalAddress, instanceFunctionIndex: $0.offset)
+                    return (address: wasm.originalBodyAddress, instanceFunctionIndex: $0.offset)
                 case .compiled:
                     fatalError()
                 }
@@ -155,21 +156,39 @@
             }
         }
 
+        /// The Wasm function containing `address` and the start of the next function. Uses the
+        /// module layout to support breakpoints in functions not yet compiled.
+        private func functionContaining(address: Int) -> (function: InternalFunction, upperBound: Int)? {
+            let following = self.functionAddresses.partitioningIndex { $0.address > address }
+            guard following > self.functionAddresses.startIndex else { return nil }
+
+            let entry = self.functionAddresses[following - 1]
+            let upperBound = following < self.functionAddresses.endIndex ? self.functionAddresses[following].address : Int.max
+            return (self.instance.handle.functions[entry.instanceFunctionIndex], upperBound)
+        }
+
         private func findIseq(forWasmAddress address: Int) throws -> (iseq: Pc, wasm: Int) {
-            if let (iseq, wasm) = self.instance.handle.instructionMapping.findIseq(forWasmAddress: address) {
-                return (iseq, wasm)
+            if let iseq = self.instance.handle.instructionMapping.iseq(forWasmAddress: address) {
+                return (iseq, address)
             }
 
-            let followingIndex = self.functionAddresses.firstIndex(where: { $0.address > address }) ?? self.functionAddresses.endIndex
-            let functionIndex = self.functionAddresses[followingIndex - 1].instanceFunctionIndex
-            let function = instance.handle.functions[functionIndex]
+            // Addresses that didn't emit bytecode slide forward to the next emitting instruction.
+            // This requires the containing function to be compiled and bounds the search.
+            guard let (function, upperBound) = self.functionContaining(address: address) else {
+                throw Error.noInstructionMappingAvailable(address)
+            }
             try function.wasm.ensureCompiled(store: StoreRef(self.store))
 
-            if let (iseq, wasm) = self.instance.handle.instructionMapping.findIseq(forWasmAddress: address) {
-                return (iseq, wasm)
+            guard
+                let resolved = self.instance.handle.instructionMapping.findIseq(
+                    forWasmAddress: address,
+                    before: upperBound
+                )
+            else {
+                throw Error.noInstructionMappingAvailable(address)
             }
 
-            throw Error.noInstructionMappingAvailable(address)
+            return resolved
         }
 
         /// Puts a breakpoint into the bytecode at an already resolved Wasm address, preserving the
@@ -335,10 +354,12 @@
             // Report any remaining breakpoints sharing this slot before resuming.
             guard !self.reportPendingHostBreakpoint(after: breakpoint) else { return }
 
+            // Clear step-specific breakpoints even if execution fails.
+            defer { self.clearStepBreakpoints() }
+
             try self.setNextInstructionBreakpoints(breakpoint: breakpoint)
             try self.run()
             self.clearStepBreakpoints()
-
             // Re-arm directly to avoid recording the resolved address as a new host request.
             if self.hostBreakpoints[breakpoint.wasmPc] != nil {
                 self.arm(resolved: breakpoint.wasmPc, iseq: breakpoint.iseq.pc)

@@ -455,8 +455,14 @@
                         separator: ",",
                         endianness: .big
                     ) - DebuggerMemoryView.executableCodeOffset)
-                self.userBreakpoints[requested] = try self.debugger.enableBreakpoint(address: requested)
-                responseKind = .ok
+                // Report refusal as a GDB error instead of throwing to keep the connection open.
+                do {
+                    self.userBreakpoints[requested] = try self.debugger.enableBreakpoint(address: requested)
+                    responseKind = .ok
+                } catch let error as Debugger.Error {
+                    logger.debug("refusing a breakpoint at \(requested): \(error)")
+                    responseKind = .string(Self.errorReply)
+                }
 
             case .removeSoftwareBreakpoint:
                 let requested = Int(
@@ -465,9 +471,14 @@
                         separator: ",",
                         endianness: .big
                     ) - DebuggerMemoryView.executableCodeOffset)
-                try self.debugger.disableBreakpoint(address: requested)
-                self.userBreakpoints[requested] = nil
-                responseKind = .ok
+                do {
+                    try self.debugger.disableBreakpoint(address: requested)
+                    self.userBreakpoints[requested] = nil
+                    responseKind = .ok
+                } catch let error as Debugger.Error {
+                    logger.debug("refusing to remove a breakpoint at \(requested): \(error)")
+                    responseKind = .string(Self.errorReply)
+                }
 
             case .wasmLocal:
                 let arguments = command.arguments.split(separator: ";")
