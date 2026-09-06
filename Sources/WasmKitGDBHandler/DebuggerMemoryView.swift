@@ -25,6 +25,14 @@
 
         package static let executableCodeOffset = objectSpaceTag | (moduleInstanceID << 32)
 
+        package enum Error: Swift.Error {
+            /// The module image mapped at ``executableCodeOffset`` is read-only.
+            case codeIsNotWritable(UInt64)
+
+            /// The address exceeds the target's pointer width.
+            case addressNotRepresentable(UInt64)
+        }
+
         /// WebAssembly binary loaded into memory for execution
         /// and for disassembly by the debugger.
         private let wasmBinary: [UInt8]
@@ -53,6 +61,21 @@
             }
         }
 
+        package func writeMemory(
+            debugger: inout Debugger,
+            addressInProtocolSpace: UInt64,
+            bytes: some Collection<UInt8>
+        ) throws {
+            guard addressInProtocolSpace < Self.executableCodeOffset else {
+                throw Error.codeIsNotWritable(addressInProtocolSpace)
+            }
+
+            guard let address = UInt(exactly: addressInProtocolSpace) else {
+                throw Error.addressNotRepresentable(addressInProtocolSpace)
+            }
+
+            try debugger.writeLinearMemory(address: address, bytes: bytes)
+        }
     }
 
 #endif

@@ -58,6 +58,9 @@ package final class GDBTargetResponseEncoder {
             self.logger.trace("GDBTargetResponseEncoder encoded a response: \(hexDumpResponse)")
             out.append(contentsOf: hexDumpResponse.utf8)
 
+        case .error(let number):
+            out.append(contentsOf: "E\(HexEncoding.encodeByteUppercase(number))".appendedChecksum.utf8)
+
         case .empty:
             out.append(contentsOf: "".appendedChecksum.utf8)
         }

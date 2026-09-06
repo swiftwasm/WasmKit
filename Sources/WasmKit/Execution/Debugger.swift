@@ -21,7 +21,7 @@
 
         package enum Error: Swift.Error, @unchecked Sendable {
             case entrypointFunctionNotFound
-            case unknownCurrentFunctionForResumedBreakpoint(UnsafeMutablePointer<UInt64>)
+            case unknownCurrentFunctionAtBreakpoint(UnsafeMutablePointer<UInt64>)
             case noInstructionMappingAvailable(Int)
             case noReverseInstructionMappingAvailable(UnsafeMutablePointer<UInt64>)
             case stackFrameIndexOOB(UInt)
@@ -30,7 +30,7 @@
             case globalUnsupportedType(UInt)
             case notStoppedAtBreakpoint
             case linearMemoryNotInitialized
-            case linearMemoryOOB(Range<Int>)
+            case linearMemoryOOB(address: UInt, length: UInt)
         }
 
         private let valueStack: Sp
@@ -71,6 +71,7 @@
 
         private var md: Md = nil
         private var ms: Ms = 0
+        private var linearMemoryByteCount = 0
 
         /// Starts of this instance's Wasm functions in the original binary, in ascending order,
         /// paired with their indices. Excludes imported functions: their addresses are offsets
@@ -279,16 +280,6 @@
                     var sp = iseq.sp
                     var pc = iseq.pc
 
-                    guard let currentFunction = sp.currentFunction else {
-                        throw Error.unknownCurrentFunctionForResumedBreakpoint(sp)
-                    }
-
-                    Execution.CurrentMemory.mayUpdateCurrentInstance(
-                        instance: currentFunction.instance,
-                        md: &md,
-                        ms: &ms
-                    )
-
                     do {
                         switch self.threadingModel {
                         case .direct:
@@ -337,6 +328,17 @@
                         reportedPc: self.hostBreakpoints[wasmPc]?.min() ?? mapping.firstWasm(forIseqAddress: pc) ?? wasmPc
                     )
                 )
+
+                guard let currentFunction = breakpoint.sp.currentFunction else {
+                    throw Error.unknownCurrentFunctionAtBreakpoint(breakpoint.sp)
+                }
+                Execution.CurrentMemory.mayUpdateCurrentInstance(
+                    instance: currentFunction.instance,
+                    md: &self.md,
+                    ms: &self.ms
+                )
+                // ms may include uncommitted guard pages that fault outside the trap guard.
+                self.linearMemoryByteCount = currentFunction.instance.memories.first?.byteCount ?? 0
             }
         }
 
@@ -420,7 +422,7 @@
                 }
 
                 guard let currentFunction = frame.sp.currentFunction else {
-                    throw Debugger.Error.unknownCurrentFunctionForResumedBreakpoint(frame.sp)
+                    throw Debugger.Error.unknownCurrentFunctionAtBreakpoint(frame.sp)
                 }
 
                 try currentFunction.ensureCompiled(store: StoreRef(store))
@@ -464,20 +466,30 @@
         }
 
         package func readLinearMemory<T>(address: UInt, length: UInt, reader: (UnsafeRawBufferPointer) -> T) throws(Error) -> T {
-            guard let md, ms > 0 else {
+            let range = try self.linearMemoryRange(address: address, length: length)
+            let memory = UnsafeRawBufferPointer(start: self.md, count: self.linearMemoryByteCount)
+
+            return reader(UnsafeRawBufferPointer(rebasing: memory[range]))
+        }
+
+        package mutating func writeLinearMemory(address: UInt, bytes: some Collection<UInt8>) throws(Error) {
+            let range = try self.linearMemoryRange(address: address, length: UInt(bytes.count))
+            let memory = UnsafeMutableRawBufferPointer(start: self.md, count: self.linearMemoryByteCount)
+
+            UnsafeMutableRawBufferPointer(rebasing: memory[range]).copyBytes(from: bytes)
+        }
+
+        private func linearMemoryRange(address: UInt, length: UInt) throws(Error) -> Range<Int> {
+            guard self.md != nil, self.linearMemoryByteCount > 0 else {
                 throw Error.linearMemoryNotInitialized
             }
 
-            let upperBound = address + length
-            let range = Int(address)..<Int(upperBound)
-
-            guard address + length < ms else {
-                throw Error.linearMemoryOOB(range)
+            let (upperBound, overflowed) = address.addingReportingOverflow(length)
+            guard !overflowed, upperBound <= UInt(self.linearMemoryByteCount) else {
+                throw Error.linearMemoryOOB(address: address, length: length)
             }
 
-            let memory = UnsafeRawBufferPointer(start: md, count: ms)
-
-            return reader(UnsafeRawBufferPointer(rebasing: memory[range]))
+            return Int(address)..<Int(upperBound)
         }
 
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.
