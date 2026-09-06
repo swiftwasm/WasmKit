@@ -105,11 +105,22 @@ struct GDBRemoteProtocolTests {
     }
 
     @Test
+    func decodingWriteMemory() throws {
+        var decoder = self.decoder
+        decoder.feed(Array("+$M1000,2:beef#38".utf8))
+        let packet = try decoder.next()
+        #expect(packet?.payload.kind == .writeMemory)
+        #expect(packet?.payload.arguments == "1000,2:beef")
+    }
+
+    @Test
     func encodingRoundTrip() {
         let encoder = GDBTargetResponseEncoder(logger: .disabled)
         let ok = encoder.encode(data: .init(kind: .ok, isNoAckModeActive: false))
         #expect(String(decoding: ok, as: UTF8.self) == "+$OK#9a")
         let binary = encoder.encode(data: .init(kind: .hexEncodedBinary([0xDE, 0xAD]), isNoAckModeActive: false))
         #expect(String(decoding: binary, as: UTF8.self) == "+$dead#8E")
+        let error = encoder.encode(data: .init(kind: .error(0x09), isNoAckModeActive: false))
+        #expect(String(decoding: error, as: UTF8.self) == "+$E09#AE")
     }
 }

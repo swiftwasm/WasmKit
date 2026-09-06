@@ -43,6 +43,9 @@ package struct GDBTargetResponse {
         /// Binary buffer hex-encoded in the response.
         case hexEncodedBinary([UInt8])
 
+        /// Standard `E<nn>` error response carrying an error number.
+        case error(UInt8)
+
         /// Standard empty response (no content is sent).
         case empty
     }

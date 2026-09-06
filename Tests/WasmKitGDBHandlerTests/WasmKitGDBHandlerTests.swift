@@ -357,11 +357,10 @@
                 let unknown = DebuggerMemoryView.moduleInstanceID + 1
                 let resp = try h.handle(
                     command: .init(kind: .wasmGlobal, arguments: "0;instance:\(unknown);"))
-                guard case .string(let reply) = resp.kind else {
+                guard case .error = resp.kind else {
                     Issue.record("expected an error reply, got \(resp.kind)")
                     return
                 }
-                #expect(reply.hasPrefix("E"))
             }
         }
 

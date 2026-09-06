@@ -81,6 +81,7 @@
         package enum Error: Swift.Error {
             case unknownTransferArguments
             case unknownReadMemoryArguments
+            case unknownWriteMemoryArguments(String)
             case stoppingAtEntrypointFailed
             case multipleThreadsNotSupported
             case unknownThreadAction(String)
@@ -99,7 +100,10 @@
 
         /// Generic error reply. `QEnableErrorStrings` is unsupported, so a bare code is
         /// the only way to refuse a request the target understands but cannot answer.
-        private static let errorReply = "E45"
+        private static let errorReply = GDBTargetResponse.Kind.error(0x45)
+
+        /// Error code for refused memory writes, matching debugserver.
+        private static let memoryWriteFailed: UInt8 = 0x09
 
         private var memoryView: DebuggerMemoryView
         /// User-set breakpoints, keyed by the address the debugger host
@@ -251,6 +255,22 @@
             return argument
         }
 
+        private static func writeMemoryArguments(_ arguments: String) throws -> (addressInProtocolSpace: UInt64, bytes: [UInt8]) {
+            let addressAndRest = arguments.split(separator: ",", maxSplits: 1)
+            guard addressAndRest.count == 2,
+                let addressInProtocolSpace = UInt64(hexEncoded: addressAndRest[0])
+            else { throw Error.unknownWriteMemoryArguments(arguments) }
+
+            let lengthAndBytes = addressAndRest[1].split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+            guard lengthAndBytes.count == 2,
+                let length = Int(hexEncoded: lengthAndBytes[0]),
+                let bytes = HexEncoding.decode(lengthAndBytes[1]),
+                bytes.count == length
+            else { throw Error.unknownWriteMemoryArguments(arguments) }
+
+            return (addressInProtocolSpace, bytes)
+        }
+
         /// Matches on the resolved address that caused the trap, rather than the reported address.
         private func isStoppedAtUserBreakpoint(_ breakpoint: Debugger.BreakpointState) -> Bool {
             self.userBreakpoints.contains { $0.value == breakpoint.wasmPc }
@@ -374,7 +394,7 @@
                         ("generic", "pc"),
                     ])
                 } else {
-                    responseKind = .string(Self.errorReply)
+                    responseKind = Self.errorReply
                 }
 
             case .transfer:
@@ -406,6 +426,20 @@
                         length: length
                     )
                 )
+
+            case .writeMemory:
+                do {
+                    let (addressInProtocolSpace, bytes) = try Self.writeMemoryArguments(command.arguments)
+                    try self.memoryView.writeMemory(
+                        debugger: &self.debugger,
+                        addressInProtocolSpace: addressInProtocolSpace,
+                        bytes: bytes
+                    )
+                    responseKind = .ok
+                } catch {
+                    logger.debug("memory write `\(command.arguments)` failed: \(error)")
+                    responseKind = .error(Self.memoryWriteFailed)
+                }
 
             case .wasmCallStack:
                 let callStack = self.debugger.reportedCallStack
@@ -461,7 +495,7 @@
                     responseKind = .ok
                 } catch let error as Debugger.Error {
                     logger.debug("refusing a breakpoint at \(requested): \(error)")
-                    responseKind = .string(Self.errorReply)
+                    responseKind = Self.errorReply
                 }
 
             case .removeSoftwareBreakpoint:
@@ -477,7 +511,7 @@
                     responseKind = .ok
                 } catch let error as Debugger.Error {
                     logger.debug("refusing to remove a breakpoint at \(requested): \(error)")
-                    responseKind = .string(Self.errorReply)
+                    responseKind = Self.errorReply
                 }
 
             case .wasmLocal:
@@ -504,7 +538,7 @@
                 // space, so a request naming another instance is refused rather than
                 // answered from this one.
                 if let instance = request.instance, instance != DebuggerMemoryView.moduleInstanceID {
-                    responseKind = .string(Self.errorReply)
+                    responseKind = Self.errorReply
                 } else {
                     responseKind = .hexEncodedBinary(
                         try self.debugger.getGlobal(index: request.globalIndex).littleEndianBytes

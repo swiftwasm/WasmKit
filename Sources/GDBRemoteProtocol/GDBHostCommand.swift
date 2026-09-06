@@ -38,6 +38,7 @@ package struct GDBHostCommand: Equatable {
         case transfer
         case readMemoryBinaryData
         case readMemory
+        case writeMemory
         case wasmCallStack
         case threadStopInfo
         case symbolLookup
@@ -148,6 +149,11 @@ package struct GDBHostCommand: Equatable {
         .init(
             kind: .readMemory,
             prefix: "m"
+        ),
+        .init(
+            kind: .writeMemory,
+            prefix: "M",
+            argumentsContainColonDelimiter: true
         ),
         .init(
             kind: .insertSoftwareBreakpoint,
