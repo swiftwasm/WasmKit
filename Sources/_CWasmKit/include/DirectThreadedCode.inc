@@ -1788,6 +1788,30 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_f64MulMul(Sp sp, Pc pc, Md md
     INLINE_CALL next = wasmkit_execute_f64MulMul(&sp, &pc, &md, &ms, state, &error);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
 }
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_brIfI32And(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_brIfI32And(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_brIfI32And(&sp, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_brIfNotI32And(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_brIfNotI32And(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_brIfNotI32And(&sp, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_brIfI64And(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_brIfI64And(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_brIfI64And(&sp, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_brIfNotI64And(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_brIfNotI64And(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_brIfNotI64And(&sp, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
+}
 // Indexed by opcode ID. Opcodes whose handlers are bit-identical (see
 // `Instruction.handlerIdentity` in VMSpec) share a single entry point here,
 // so that dispatch never goes through a compiler-generated merge thunk.
@@ -2121,4 +2145,8 @@ static const uintptr_t wasmkit_tc_exec_handlers[] = {
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_f64MulAdd),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_f64MulSub),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_f64MulMul),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_brIfI32And),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_brIfNotI32And),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_brIfI64And),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_brIfNotI64And),
 };

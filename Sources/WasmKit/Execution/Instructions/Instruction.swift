@@ -889,6 +889,22 @@ enum Instruction: Equatable {
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
     case f64MulMul(Instruction.FloatBinBinOperand)
+    /// Conditional pc-relative branch if `(lhs & rhs) != 0` for `i32` operands
+    /// 
+    /// Fused form of `i32.and` followed by `br_if`.
+    case brIfI32And(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `(lhs & rhs) == 0` for `i32` operands
+    /// 
+    /// Fused form of `i32.and` followed by `br_if_not`.
+    case brIfNotI32And(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `(lhs & rhs) != 0` for `i64` operands
+    /// 
+    /// Fused form of `i64.and` followed by `br_if`.
+    case brIfI64And(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `(lhs & rhs) == 0` for `i64` operands
+    /// 
+    /// Fused form of `i64.and` followed by `br_if_not`.
+    case brIfNotI64And(Instruction.BrIfCmpOperand)
 }
 
 extension Instruction {
@@ -2022,6 +2038,10 @@ extension Instruction {
         case .f64MulAdd(let immediate): return immediate
         case .f64MulSub(let immediate): return immediate
         case .f64MulMul(let immediate): return immediate
+        case .brIfI32And(let immediate): return immediate
+        case .brIfNotI32And(let immediate): return immediate
+        case .brIfI64And(let immediate): return immediate
+        case .brIfNotI64And(let immediate): return immediate
         default: return nil
         }
     }
@@ -2351,6 +2371,10 @@ extension Instruction {
         case .f64MulAdd(let immediate): immediate.emit(to: emit)
         case .f64MulSub(let immediate): immediate.emit(to: emit)
         case .f64MulMul(let immediate): immediate.emit(to: emit)
+        case .brIfI32And(let immediate): immediate.emit(to: emit)
+        case .brIfNotI32And(let immediate): immediate.emit(to: emit)
+        case .brIfI64And(let immediate): immediate.emit(to: emit)
+        case .brIfNotI64And(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -2690,6 +2714,10 @@ extension Instruction {
         case .f64MulAdd: return 326
         case .f64MulSub: return 327
         case .f64MulMul: return 328
+        case .brIfI32And: return 329
+        case .brIfNotI32And: return 330
+        case .brIfI64And: return 331
+        case .brIfNotI64And: return 332
         }
     }
 }
@@ -3030,6 +3058,10 @@ extension Instruction {
         case 326: return .f64MulAdd(Instruction.FloatBinBinOperand.load(from: &pc))
         case 327: return .f64MulSub(Instruction.FloatBinBinOperand.load(from: &pc))
         case 328: return .f64MulMul(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 329: return .brIfI32And(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 330: return .brIfNotI32And(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 331: return .brIfI64And(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 332: return .brIfNotI64And(Instruction.BrIfCmpOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -3373,6 +3405,10 @@ extension Instruction {
         case 326: return "f64MulAdd"
         case 327: return "f64MulSub"
         case 328: return "f64MulMul"
+        case 329: return "brIfI32And"
+        case 330: return "brIfNotI32And"
+        case 331: return "brIfI64And"
+        case 332: return "brIfNotI64And"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
@@ -3437,6 +3473,10 @@ protocol NextInstructionPredictor: ~Copyable {
     mutating func predictNext_brIfF64Le(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_brIfNotF64Lt(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_brIfNotF64Le(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32And(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfNotI32And(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64And(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfNotI64And(operandPc: Pc, sp: Sp) -> [Pc]
 }
 
 extension Instruction {
@@ -3497,6 +3537,10 @@ extension Instruction {
         case 308: return predictor.predictNext_brIfF64Le(operandPc: operandPc, sp: sp)
         case 309: return predictor.predictNext_brIfNotF64Lt(operandPc: operandPc, sp: sp)
         case 310: return predictor.predictNext_brIfNotF64Le(operandPc: operandPc, sp: sp)
+        case 329: return predictor.predictNext_brIfI32And(operandPc: operandPc, sp: sp)
+        case 330: return predictor.predictNext_brIfNotI32And(operandPc: operandPc, sp: sp)
+        case 331: return predictor.predictNext_brIfI64And(operandPc: operandPc, sp: sp)
+        case 332: return predictor.predictNext_brIfNotI64And(operandPc: operandPc, sp: sp)
         default: return nil
         }
     }
@@ -3707,6 +3751,22 @@ extension Instruction {
             }
             do {
                 let inst = Instruction.brIfNotF64Le(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32And(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfNotI32And(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64And(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfNotI64And(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
         return map

@@ -784,6 +784,24 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
 
+    /// The operand width of a fused `and`+branch (`brIf{Not}{I32,I64}And`).
+    fileprivate enum FusedAndWidth {
+        case i32, i64
+
+        /// The fused branch for this width at the given branch polarity.
+        func makeBrIf(
+            polarity: FusedBranchPolarity, lhs: VReg, rhs: VReg, offset: Int32
+        ) -> Instruction {
+            let operand = Instruction.BrIfCmpOperand(lhs: lhs, rhs: rhs, offset: offset)
+            switch (self, polarity) {
+            case (.i32, .ifTrue): return Instruction.brIfI32And(operand)
+            case (.i32, .ifFalse): return Instruction.brIfNotI32And(operand)
+            case (.i64, .ifTrue): return Instruction.brIfI64And(operand)
+            case (.i64, .ifFalse): return Instruction.brIfNotI64And(operand)
+            }
+        }
+    }
+
     /// A float binary operation that has two-operation superinstruction forms
     /// (`f64MulAdd` and friends).
     fileprivate enum FloatBinOp {
@@ -855,6 +873,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case compare(kind: FusedCmpKind, lhs: VReg, rhs: VReg)
         /// `result = lhs <kind> rhs` for a float comparison
         case floatCompare(kind: FusedFCmpKind, lhs: VReg, rhs: VReg)
+        /// `result = lhs & rhs`, tested against zero by the branch that pops it
+        case and(width: FusedAndWidth, lhs: VReg, rhs: VReg)
         /// `result = (input == 0)` for a 32-bit `input`
         case i32Eqz(input: VReg)
         /// `result = (inner == 0)`, i.e. an `i32.eqz` applied to another
@@ -2135,6 +2155,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             return { polarity, offset in
                 kind.makeBrIf(polarity: polarity, lhs: lhs, rhs: rhs, offset: offset)
             }
+        case .and(let width, let lhs, let rhs):
+            // The polarity is part of the opcode here; see `FusedAndWidth`.
+            return { polarity, offset in
+                width.makeBrIf(polarity: polarity, lhs: lhs, rhs: rhs, offset: offset)
+            }
         case .i32Eqz(let input):
             // `eqz(x)` is non-zero exactly when `x` is zero, so the fused form
             // is just the plain branch with the opposite polarity on `x`.
@@ -3375,10 +3400,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             return instruction(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
+    /// `makeCondition`, when given, records the operation as a candidate for
+    /// fusion into the conditional branch that pops its result.
     private mutating func visitBinary(
         _ operand: ValueType,
         _ result: ValueType,
-        _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction
+        _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction,
+        fusableCondition makeCondition: ((_ lhs: VReg, _ rhs: VReg) -> FusableCondition)? = nil
     ) throws(WasmKitError) {
         let rhs = try popVRegOperand(operand)
         let lhs = try popVRegOperand(operand)
@@ -3388,7 +3416,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             instruction(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(result))),
             resultRelink: { result in
                 return instruction(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(result)))
-            }
+            },
+            fusable: makeCondition.map { ($0(lhs, rhs), result, nil) }
         )
     }
     /// Emits a float `add`/`sub`/`mul`, folding it with the float operation
@@ -3569,6 +3598,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case .f64Add: return try visitFloatBinary(.f64, .add, Instruction.f64Add)
         case .f64Sub: return try visitFloatBinary(.f64, .sub, Instruction.f64Sub)
         case .f64Mul: return try visitFloatBinary(.f64, .mul, Instruction.f64Mul)
+        // A bit test popped by a conditional branch fuses into it.
+        case .i32And:
+            return try visitBinary(.i32, .i32, Instruction.i32And) { .and(width: .i32, lhs: $0, rhs: $1) }
+        case .i64And:
+            return try visitBinary(.i64, .i64, Instruction.i64And) { .and(width: .i64, lhs: $0, rhs: $1) }
         default: break
         }
         let operand: ValueType
@@ -3623,9 +3657,24 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         try visitBinary(operand, result, instruction)
     }
     mutating func visitI64Eqz() throws(WasmKitError) -> Output {
-        try popPushEmit(.i64, .i32) { value, result in
-            .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
+        // Captured before `popVRegOperand`, which resets the last emission.
+        let candidate = iseqBuilder.fusableEmission
+        let value = try popVRegOperand(.i64)
+        let result = valueStack.push(.i32)
+        guard let value = value else { return }
+        // An `i64.eqz` of a 64-bit `and` the previous instruction just computed is
+        // that bit test negated, so a following branch can replace both.
+        var fusable: (condition: FusableCondition, result: VReg, start: MetaProgramCounter?)?
+        if let candidate, candidate.result == value, iseqBuilder.canRewind(to: candidate) {
+            fusable = (.negated(candidate.condition), result, candidate.position)
         }
+        emit(
+            .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value))),
+            resultRelink: { newResult in
+                .i64Eqz(Instruction.UnaryOperand(result: LVReg(newResult), input: LVReg(value)))
+            },
+            fusable: fusable
+        )
     }
     mutating func visitUnary(_ unary: WasmParser.Instruction.Unary) throws(WasmKitError) {
         let operand: ValueType
