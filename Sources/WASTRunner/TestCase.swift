@@ -384,7 +384,7 @@ extension WASTRunContext {
 
     static func deriveFeatureSet(rootPath: String) -> WasmFeatureSet {
         var features = WasmFeatureSet.default
-        if rootPath.hasSuffix("proposals/memory64") {
+        if rootPath.hasSuffix("memory64") {
             features.insert(.memory64)
         }
         features.insert(.simd)

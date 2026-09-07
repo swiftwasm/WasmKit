@@ -62,7 +62,10 @@ static inline void wasmkit_atomic_fence(void) {
 typedef uint64_t *WASMKIT_NONNULL Sp;
 typedef void *WASMKIT_NULLABLE Pc;
 typedef void *WASMKIT_NULLABLE Md;
-typedef size_t Ms;
+// NOTE: `uintptr_t`, not `size_t`: they have the same representation, but Swift's
+// ClangImporter maps `size_t` to `Int` and `uintptr_t` to `UInt`, and `Ms` must be
+// unsigned on the Swift side so that a bounds check is a single unsigned compare.
+typedef uintptr_t Ms;
 
 #include "TrapGuard.h"
 
