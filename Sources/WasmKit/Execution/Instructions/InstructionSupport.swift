@@ -120,6 +120,10 @@ extension Instruction.GlobalAndVRegOperand {
     var global: InternalGlobal {
         InternalGlobal(bitPattern: UInt(rawGlobal)).unsafelyUnwrapped
     }
+    /// The second slot of a `v128` operand, which occupies two stack slots.
+    var regHi: LLVReg {
+        LLVReg(storage: reg.value &+ Int64(MemoryLayout<StackSlot>.size))
+    }
 }
 
 extension Instruction.BrTableOperand {
@@ -385,6 +389,10 @@ extension Instruction {
                 target.write("\(reg(op.reg)) = global.get \(global(op.global))")
             case .globalSet(let op):
                 target.write("global.set \(global(op.global)), \(reg(op.reg))")
+            case .globalGetV128(let op):
+                target.write("\(reg(op.reg)) = global.get.v128 \(global(op.global))")
+            case .globalSetV128(let op):
+                target.write("global.set.v128 \(global(op.global)), \(reg(op.reg))")
             case .const32(let op):
                 target.write("\(reg(op.result)) = \(hex(op.value))")
             case .v128Const(let op):

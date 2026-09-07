@@ -763,8 +763,10 @@ extension VMGen {
                 $0.field(name: "source", type: .LVReg)
                 $0.field(name: "dest", type: .LVReg)
             },
-            Instruction(name: "globalGet", documentation: "WebAssembly Core Instruction `global.get`", immediateLayout: .globalAndVRegOperand),
-            Instruction(name: "globalSet", documentation: "WebAssembly Core Instruction `global.set`", immediateLayout: .globalAndVRegOperand),
+            Instruction(name: "globalGet", documentation: "WebAssembly Core Instruction `global.get` for a scalar (64-bit slot) global", immediateLayout: .globalAndVRegOperand),
+            Instruction(name: "globalSet", documentation: "WebAssembly Core Instruction `global.set` for a scalar (64-bit slot) global", immediateLayout: .globalAndVRegOperand),
+            Instruction(name: "globalGetV128", documentation: "WebAssembly Core Instruction `global.get` for a `v128` global", immediateLayout: .globalAndVRegOperand),
+            Instruction(name: "globalSetV128", documentation: "WebAssembly Core Instruction `global.set` for a `v128` global", immediateLayout: .globalAndVRegOperand),
             // Controls
             Instruction(
                 name: "call", documentation: "WebAssembly Core Instruction `call`",
