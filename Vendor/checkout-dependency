@@ -85,6 +85,12 @@ class CheckoutDependency:
         print(f"Checking out '{dependency_name}' to {dependency['revision']}")
         subprocess.run(["git", "-C", dependency_path, "checkout", dependency["revision"]], check=True)
 
+        if dependency.get("submodules", False):
+            print(f"Updating submodules of '{dependency_name}'")
+            subprocess.run(
+                ["git", "-C", dependency_path, "submodule", "update", "--init", "--depth=1"],
+                check=True)
+
     def checkout(self, dependency_name):
         dependency = self.dependencies.get(dependency_name)
 

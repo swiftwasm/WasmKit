@@ -4,7 +4,8 @@ import os
 import shutil
 from dataclasses import dataclass
 
-SOURCE_ROOT = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
+BENCHMARKS_ROOT = os.path.dirname(os.path.realpath(__file__))
+SOURCE_ROOT = os.path.join(BENCHMARKS_ROOT, "..")
 
 
 class Engine:
@@ -48,12 +49,29 @@ class Benchmark:
     name: str
     eta_sec: float
 
+    def build(self, runner):
+        """Build whatever this benchmark needs before it can run."""
+
 
 class CoreMarkBenchmark(Benchmark):
     def __init__(self):
         super().__init__("CoreMark", 20.0)
         self.path = os.path.join(
             SOURCE_ROOT, "Vendor", "coremark", "coremark.wasm")
+
+    def build(self, runner):
+        wasi_sdk_path = os.getenv("WASI_SDK_PATH")
+        if wasi_sdk_path is None:
+            raise Exception("WASI_SDK_PATH environment variable not set")
+
+        runner.run_command([
+            "make",
+            "compile", "-C", os.path.join(SOURCE_ROOT, "Vendor", "coremark"),
+            "PORT_DIR=simple", f"CC={wasi_sdk_path}/bin/clang",
+            "PORT_CFLAGS=-O3 -D_WASI_EMULATED_PROCESS_CLOCKS -lwasi-emulated-process-clocks",
+            "EXE=.wasm"
+        ])
+        runner.build_wasmkit_cli()
 
     def __call__(self, runner, engines):
         for engine_name, engine in engines.items():
@@ -80,6 +98,9 @@ class WishYouWereFastBenchmark(Benchmark):
         add_dir("libsodium")
         self.targets = sorted(targets)
 
+    def build(self, runner):
+        runner.build_wasmkit_cli()
+
     def __call__(self, runner, engines):
         # Save the result CSV file at ./results/{engine_name}/{target_name}.csv
         results_dir = runner.results_dir
@@ -103,10 +124,60 @@ class WishYouWereFastBenchmark(Benchmark):
                 runner.run_command(command)
 
 
+class WasmiBenchmarksBenchmark(Benchmark):
+    """Replays the wasmi-benchmarks suite through the WasmKit library.
+
+    Unlike the other benchmarks here this one does not shell out to a runtime
+    executable per module: the suite drives exported `setup`/`run`/`teardown`
+    functions in-process, so it only supports the WasmKit engine. Run wasmi's
+    own criterion harness in the vendored checkout for comparable numbers; see
+    README.md.
+    """
+
+    def __init__(self):
+        super().__init__("WasmiBenchmarks", 120.0)
+        self.harness = os.path.join(
+            BENCHMARKS_ROOT, ".build", "release", "WasmiBenchmarks")
+        self.suite_path = os.path.join(SOURCE_ROOT, "Vendor", "wasmi-benchmarks")
+
+    def build(self, runner):
+        runner.run_command([
+            "swift", "build", "-c", "release", "--package-path", BENCHMARKS_ROOT,
+            "--product", "WasmiBenchmarks",
+        ])
+
+    def __call__(self, runner, engines):
+        if "WasmKit" not in engines:
+            print(f"===== Skipping {self.name}: only the WasmKit engine is supported =====")
+            return
+        if not os.path.exists(self.suite_path):
+            raise Exception(
+                f"{self.suite_path} not found; "
+                "run ./Vendor/checkout-dependency --category benchmark")
+
+        # Written at the top level of the results directory: the layout
+        # `concat_results` merges is hyperfine's, and this CSV is not that.
+        runner.run_command(["mkdir", "-p", runner.results_dir])
+        csv_path = os.path.join(runner.results_dir, "wasmi-benchmarks.csv")
+
+        print(f"===== Running {self.name} with WasmKit =====")
+        command = [self.harness, "--root", self.suite_path]
+        if runner.verbose or runner.dry_run:
+            print(f"+ {command} > {csv_path}")
+        if runner.dry_run:
+            return
+        output = subprocess.check_output(command, text=True)
+        print(output, end="")
+        with open(csv_path, "w") as f:
+            f.write("case,mean_ms,min_ms,iters\n")
+            f.write(output)
+
+
 def available_benchmarks():
     benchmarks = [
         CoreMarkBenchmark(),
         WishYouWereFastBenchmark(),
+        WasmiBenchmarksBenchmark(),
     ]
     return {b.name: b for b in benchmarks}
 
@@ -125,6 +196,7 @@ class Runner:
 
         self.engines = filter_dict(engines, args.engine)
         self.benchmarks = filter_dict(benchmarks, args.benchmark)
+        self.built_wasmkit_cli = False
 
     def run_command(self, command):
         if self.verbose or self.dry_run:
@@ -132,26 +204,19 @@ class Runner:
         if not self.dry_run:
             subprocess.check_call(command)
 
-    def build(self):
-        """Build .wasm file to benchmark."""
-
-        wasi_sdk_path = os.getenv("WASI_SDK_PATH")
-        if wasi_sdk_path is None:
-            raise Exception("WASI_SDK_PATH environment variable not set")
-
-        vendor_path = os.path.join(SOURCE_ROOT, "Vendor")
-
-        self.run_command([
-            "make",
-            "compile", "-C", os.path.join(vendor_path, "coremark"),
-            "PORT_DIR=simple", f"CC={wasi_sdk_path}/bin/clang",
-            "PORT_CFLAGS=-O3 -D_WASI_EMULATED_PROCESS_CLOCKS -lwasi-emulated-process-clocks",
-            "EXE=.wasm"
-        ])
-
+    def build_wasmkit_cli(self):
+        """Build wasmkit-cli, once per run, for the executable-driven benchmarks."""
+        if self.built_wasmkit_cli:
+            return
+        self.built_wasmkit_cli = True
         self.run_command([
             "swift", "build", "-c", "release", "--package-path", SOURCE_ROOT, "--product", "wasmkit-cli"
         ])
+
+    def build(self):
+        """Build what the selected benchmarks need."""
+        for benchmark in self.benchmarks.values():
+            benchmark.build(self)
 
     def run(self):
         engines = dict(sorted(self.engines.items(), key=lambda x: x[0]))

@@ -50,6 +50,12 @@
     "revision": "576ef7ff3b9713d75519eab0cb1f2b738220b636",
     "categories": ["benchmark"]
   },
+  "wasmi-benchmarks": {
+    "repository": "https://github.com/wasmi-labs/wasmi-benchmarks.git",
+    "revision": "b361a36b09340781db6681582804e0e61f35f9af",
+    "submodules": true,
+    "categories": ["benchmark"]
+  },
   "coremark": {
     "repository": "https://github.com/eembc/coremark.git",
     "revision": "d5fad6bd094899101a4e5fd53af7298160ced6ab",
