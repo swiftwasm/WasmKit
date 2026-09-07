@@ -457,6 +457,9 @@ extension Instruction {
             func store(_ name: String, _ op: Instruction.StoreOperand) {
                 target.write("\(name) \(reg(op.pointer)) + \(offset(op.offset)), \(reg(op.value))")
             }
+            func floatBinBin(_ name: String, _ op: Instruction.FloatBinBinOperand) {
+                target.write("\(reg(op.result)) = \(name) \(reg(op.x)), \(reg(op.y)), \(reg(op.z))")
+            }
             func brIfCmp(_ name: String, _ op: Instruction.BrIfCmpOperand) {
                 target.write("br_if.\(name) \(reg(op.lhs)), \(reg(op.rhs)), \(branchTarget(instructionOffset, Int(op.offset)))")
             }
@@ -557,6 +560,36 @@ extension Instruction {
             case .brIfI64LeU(let op): brIfCmp("i64.le_u", op)
             case .brIfI64GeS(let op): brIfCmp("i64.ge_s", op)
             case .brIfI64GeU(let op): brIfCmp("i64.ge_u", op)
+            case .brIfF32Eq(let op): brIfCmp("f32.eq", op)
+            case .brIfF32Ne(let op): brIfCmp("f32.ne", op)
+            case .brIfF32Lt(let op): brIfCmp("f32.lt", op)
+            case .brIfF32Le(let op): brIfCmp("f32.le", op)
+            case .brIfNotF32Lt(let op): brIfCmp("not.f32.lt", op)
+            case .brIfNotF32Le(let op): brIfCmp("not.f32.le", op)
+            case .brIfF64Eq(let op): brIfCmp("f64.eq", op)
+            case .brIfF64Ne(let op): brIfCmp("f64.ne", op)
+            case .brIfF64Lt(let op): brIfCmp("f64.lt", op)
+            case .brIfF64Le(let op): brIfCmp("f64.le", op)
+            case .brIfNotF64Lt(let op): brIfCmp("not.f64.lt", op)
+            case .brIfNotF64Le(let op): brIfCmp("not.f64.le", op)
+            case .f32AddAdd(let op): floatBinBin("f32.add.add", op)
+            case .f32AddSub(let op): floatBinBin("f32.add.sub", op)
+            case .f32AddMul(let op): floatBinBin("f32.add.mul", op)
+            case .f32SubAdd(let op): floatBinBin("f32.sub.add", op)
+            case .f32SubSub(let op): floatBinBin("f32.sub.sub", op)
+            case .f32SubMul(let op): floatBinBin("f32.sub.mul", op)
+            case .f32MulAdd(let op): floatBinBin("f32.mul.add", op)
+            case .f32MulSub(let op): floatBinBin("f32.mul.sub", op)
+            case .f32MulMul(let op): floatBinBin("f32.mul.mul", op)
+            case .f64AddAdd(let op): floatBinBin("f64.add.add", op)
+            case .f64AddSub(let op): floatBinBin("f64.add.sub", op)
+            case .f64AddMul(let op): floatBinBin("f64.add.mul", op)
+            case .f64SubAdd(let op): floatBinBin("f64.sub.add", op)
+            case .f64SubSub(let op): floatBinBin("f64.sub.sub", op)
+            case .f64SubMul(let op): floatBinBin("f64.sub.mul", op)
+            case .f64MulAdd(let op): floatBinBin("f64.mul.add", op)
+            case .f64MulSub(let op): floatBinBin("f64.mul.sub", op)
+            case .f64MulMul(let op): floatBinBin("f64.mul.mul", op)
             case .br(let offset):
                 target.write("br \(branchTarget(instructionOffset, Int(offset)))")
             case .brTable(let table):

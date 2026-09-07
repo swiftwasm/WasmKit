@@ -668,10 +668,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
     /// An integer comparison that the ISA has a fused compare+branch form for.
     ///
-    /// Only integer comparisons are fusable: the complement of an integer
-    /// comparison is another integer comparison, so `br_if_not` can be fused by
-    /// flipping the operator. Float comparisons have no complement (NaN makes
-    /// both a comparison and its "opposite" false), so they are left unfused.
+    /// The complement of an integer comparison is another integer comparison,
+    /// so `br_if_not` can be fused by flipping the operator. Float comparisons
+    /// have no complement (NaN makes both a comparison and its "opposite"
+    /// false) and use ``FusedFCmpKind`` instead.
     fileprivate enum FusedCmpKind {
         case i32Eq, i32Ne, i32LtS, i32LtU, i32GtS, i32GtU, i32LeS, i32LeU, i32GeS, i32GeU
         case i64Eq, i64Ne, i64LtS, i64LtU, i64GtS, i64GtU, i64LeS, i64LeU, i64GeS, i64GeU
@@ -729,14 +729,142 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
 
+    /// A float comparison that the ISA has fused compare+branch forms for.
+    ///
+    /// Unlike ``FusedCmpKind`` there is no `complement`: NaN makes both `a < b`
+    /// and `a >= b` false, so the `br_if_not` form of a float comparison is not
+    /// another float comparison. The branch polarity is instead part of the
+    /// opcode, and ``makeBrIf(polarity:lhs:rhs:offset:)`` picks it.
+    fileprivate enum FusedFCmpKind {
+        case f32Eq, f32Ne, f32Lt, f32Gt, f32Le, f32Ge
+        case f64Eq, f64Ne, f64Lt, f64Gt, f64Le, f64Ge
+
+        /// The fused branch for this comparison at the given branch polarity.
+        ///
+        /// Three rewrites happen here, all of them exact under NaN:
+        /// - `ne` is the exact complement of `eq` (`f64.ne` *is* `!(a == b)`),
+        ///   so the two swap places between the polarities;
+        /// - `a > b` is `b < a` and `a >= b` is `b <= a`, so `gt`/`ge` are
+        ///   `lt`/`le` with the operands swapped;
+        /// - `lt`/`le` at `ifFalse` use the dedicated `brIfNot*` opcodes rather
+        ///   than being flipped to `ge`/`gt`, which would differ on NaN.
+        func makeBrIf(
+            polarity: FusedBranchPolarity, lhs: VReg, rhs: VReg, offset: Int32
+        ) -> Instruction {
+            /// `(instruction, swapOperands)` for this (comparison, polarity).
+            let make: (Instruction.BrIfCmpOperand) -> Instruction
+            let swapped: Bool
+            switch (self, polarity) {
+            case (.f32Eq, .ifTrue), (.f32Ne, .ifFalse): (make, swapped) = (Instruction.brIfF32Eq, false)
+            case (.f32Eq, .ifFalse), (.f32Ne, .ifTrue): (make, swapped) = (Instruction.brIfF32Ne, false)
+            case (.f32Lt, .ifTrue): (make, swapped) = (Instruction.brIfF32Lt, false)
+            case (.f32Lt, .ifFalse): (make, swapped) = (Instruction.brIfNotF32Lt, false)
+            case (.f32Gt, .ifTrue): (make, swapped) = (Instruction.brIfF32Lt, true)
+            case (.f32Gt, .ifFalse): (make, swapped) = (Instruction.brIfNotF32Lt, true)
+            case (.f32Le, .ifTrue): (make, swapped) = (Instruction.brIfF32Le, false)
+            case (.f32Le, .ifFalse): (make, swapped) = (Instruction.brIfNotF32Le, false)
+            case (.f32Ge, .ifTrue): (make, swapped) = (Instruction.brIfF32Le, true)
+            case (.f32Ge, .ifFalse): (make, swapped) = (Instruction.brIfNotF32Le, true)
+            case (.f64Eq, .ifTrue), (.f64Ne, .ifFalse): (make, swapped) = (Instruction.brIfF64Eq, false)
+            case (.f64Eq, .ifFalse), (.f64Ne, .ifTrue): (make, swapped) = (Instruction.brIfF64Ne, false)
+            case (.f64Lt, .ifTrue): (make, swapped) = (Instruction.brIfF64Lt, false)
+            case (.f64Lt, .ifFalse): (make, swapped) = (Instruction.brIfNotF64Lt, false)
+            case (.f64Gt, .ifTrue): (make, swapped) = (Instruction.brIfF64Lt, true)
+            case (.f64Gt, .ifFalse): (make, swapped) = (Instruction.brIfNotF64Lt, true)
+            case (.f64Le, .ifTrue): (make, swapped) = (Instruction.brIfF64Le, false)
+            case (.f64Le, .ifFalse): (make, swapped) = (Instruction.brIfNotF64Le, false)
+            case (.f64Ge, .ifTrue): (make, swapped) = (Instruction.brIfF64Le, true)
+            case (.f64Ge, .ifFalse): (make, swapped) = (Instruction.brIfNotF64Le, true)
+            }
+            return make(
+                Instruction.BrIfCmpOperand(
+                    lhs: swapped ? rhs : lhs, rhs: swapped ? lhs : rhs, offset: offset
+                )
+            )
+        }
+    }
+
+    /// A float binary operation that has two-operation superinstruction forms
+    /// (`f64MulAdd` and friends).
+    fileprivate enum FloatBinOp {
+        case add, sub, mul
+
+        /// Whether `a op b` and `b op a` are the same operation.
+        ///
+        /// Used when the intermediate is the *right* operand of the consumer:
+        /// the superinstruction always computes `(x op1 y) op2 z`, so a
+        /// `z op2 (x op1 y)` can only be expressed by swapping, which is valid
+        /// exactly when `op2` commutes. IEEE-754 addition and multiplication
+        /// commute (including for signed zeroes and infinities; a NaN result is
+        /// nondeterministic in Wasm, so the payload is free either way).
+        /// Subtraction does not, so `z - (x op1 y)` is left unfused.
+        var isCommutative: Bool { self != .sub }
+    }
+
+    /// The superinstruction computing `result = (x op1 y) op2 z` for `type`.
+    fileprivate static func floatBinBinInstruction(
+        _ type: ValueType, _ op1: FloatBinOp, _ op2: FloatBinOp
+    ) -> (Instruction.FloatBinBinOperand) -> Instruction {
+        switch (type, op1, op2) {
+        case (.f32, .add, .add): return Instruction.f32AddAdd
+        case (.f32, .add, .sub): return Instruction.f32AddSub
+        case (.f32, .add, .mul): return Instruction.f32AddMul
+        case (.f32, .sub, .add): return Instruction.f32SubAdd
+        case (.f32, .sub, .sub): return Instruction.f32SubSub
+        case (.f32, .sub, .mul): return Instruction.f32SubMul
+        case (.f32, .mul, .add): return Instruction.f32MulAdd
+        case (.f32, .mul, .sub): return Instruction.f32MulSub
+        case (.f32, .mul, .mul): return Instruction.f32MulMul
+        case (.f64, .add, .add): return Instruction.f64AddAdd
+        case (.f64, .add, .sub): return Instruction.f64AddSub
+        case (.f64, .add, .mul): return Instruction.f64AddMul
+        case (.f64, .sub, .add): return Instruction.f64SubAdd
+        case (.f64, .sub, .sub): return Instruction.f64SubSub
+        case (.f64, .sub, .mul): return Instruction.f64SubMul
+        case (.f64, .mul, .add): return Instruction.f64MulAdd
+        case (.f64, .mul, .sub): return Instruction.f64MulSub
+        case (.f64, .mul, .mul): return Instruction.f64MulMul
+        default:
+            preconditionFailure("Internal consistency error: no float superinstruction for \(type) \(op1)/\(op2)")
+        }
+    }
+
+    /// A float `add`/`sub`/`mul` as recorded on its emission, for folding into
+    /// the float operation that consumes its result.
+    fileprivate struct FloatBinaryOperation {
+        let type: ValueType
+        let op: FloatBinOp
+        let lhs: VReg
+        let rhs: VReg
+        let result: VReg
+    }
+
+    /// A just-emitted float binary operation whose result can be kept in a
+    /// register by folding it into the float operation that consumes it.
+    fileprivate struct FloatBinaryEmission {
+        let position: MetaProgramCounter
+        let end: MetaProgramCounter
+        let operation: FloatBinaryOperation
+    }
+
     /// A just-emitted instruction whose result feeds a following conditional
     /// branch directly, and which can therefore be replaced by a fused
     /// compare+branch instruction.
     fileprivate enum FusableCondition {
         /// `result = lhs <kind> rhs`
         case compare(kind: FusedCmpKind, lhs: VReg, rhs: VReg)
+        /// `result = lhs <kind> rhs` for a float comparison
+        case floatCompare(kind: FusedFCmpKind, lhs: VReg, rhs: VReg)
         /// `result = (input == 0)` for a 32-bit `input`
         case i32Eqz(input: VReg)
+        /// `result = (inner == 0)`, i.e. an `i32.eqz` applied to another
+        /// fusable condition.
+        ///
+        /// LLVM routinely emits `<cmp>; i32.eqz; if` for a `while` whose exit
+        /// test is the comparison. Recorded with the *comparison's* start
+        /// position so that a following branch rewinds both instructions away
+        /// and emits one fused branch of the opposite polarity.
+        indirect case negated(FusableCondition)
     }
 
     /// The last emission, positioned, when it is a fusion candidate.
@@ -800,7 +928,17 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             let resultRelink: ResultRelink?
             /// Set when the emission can be folded into a following conditional
             /// branch. See ``FusableCondition``.
-            let fusable: (condition: FusableCondition, result: VReg)?
+            ///
+            /// `start` is where the buffer must be rewound to when the fusion
+            /// happens. It is normally this emission's own `position`, but is
+            /// earlier when the emission extends a condition another
+            /// instruction already computed (`<cmp>` + `i32.eqz`), in which
+            /// case both instructions are replaced by the fused branch.
+            let fusable: (condition: FusableCondition, result: VReg, start: MetaProgramCounter)?
+            /// Set when the emission is a float `add`/`sub`/`mul` whose result
+            /// can be folded into a following float operation. See
+            /// ``FloatBinaryEmission``.
+            let floatBinary: FloatBinaryOperation?
         }
 
         private var labels: [LabelEntry] = []
@@ -857,16 +995,49 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             lastEmission = nil
         }
 
+        /// Forgets how to relink the last emission's result, but keeps what it
+        /// offers to a fusion.
+        ///
+        /// Used when a value that emits nothing (a local or a constant slot) is
+        /// pushed above the emission's result: a following `local.set` pops that
+        /// value, so it must not relink the emission. The compare+branch fusion
+        /// and the float superinstructions check that they consume the
+        /// emission's own result, so their records stay valid.
+        mutating func dropResultRelink() {
+            guard let emission = lastEmission else { return }
+            lastEmission = LastEmission(
+                position: emission.position, end: emission.end, resultRelink: nil,
+                fusable: emission.fusable, floatBinary: emission.floatBinary
+            )
+        }
+
         /// The last emitted instruction if it can be fused with a conditional
         /// branch emitted right after it.
         fileprivate var fusableEmission: FusableEmission? {
             guard let lastEmission, let fusable = lastEmission.fusable else { return nil }
             return FusableEmission(
-                position: lastEmission.position,
+                position: fusable.start,
                 end: lastEmission.end,
                 result: fusable.result,
                 condition: fusable.condition
             )
+        }
+
+        /// The last emitted instruction when it is a float binary operation
+        /// whose result a following float operation can consume from a
+        /// register.
+        fileprivate var floatBinaryEmission: FloatBinaryEmission? {
+            guard let lastEmission, let float = lastEmission.floatBinary else { return nil }
+            return FloatBinaryEmission(
+                position: lastEmission.position, end: lastEmission.end, operation: float
+            )
+        }
+
+        /// Whether `emission` is still the last thing in the buffer and can be
+        /// replaced by a two-operation superinstruction.
+        fileprivate func canRewind(to emission: FloatBinaryEmission) -> Bool {
+            guard emission.end.offsetFromHead == insertingPC.offsetFromHead else { return false }
+            return canRewind(to: emission.position)
         }
 
         /// Whether `emission` is still the last thing in the buffer and can be
@@ -951,10 +1122,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             return instructions
         }
 
+        /// - Parameter fusable: the condition this emission makes available to
+        ///   a following conditional branch, and the position a fusion has to
+        ///   rewind to (`nil` start = this instruction's own position).
         mutating func emit(
             _ instruction: Instruction,
             resultRelink: ResultRelink? = nil,
-            fusable: (condition: FusableCondition, result: VReg)? = nil
+            fusable: (condition: FusableCondition, result: VReg, start: MetaProgramCounter?)? = nil,
+            floatBinary: FloatBinaryOperation? = nil
         ) {
             let position = insertingPC
             trace("emitInstruction: \(instruction)")
@@ -964,7 +1139,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             for slot in slots { emitSlot(slot) }
             self.lastEmission = LastEmission(
                 position: position, end: insertingPC,
-                resultRelink: resultRelink, fusable: fusable
+                resultRelink: resultRelink,
+                fusable: fusable.map { ($0.condition, $0.result, $0.start ?? position) },
+                floatBinary: floatBinary
             )
         }
 
@@ -1286,10 +1463,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     private mutating func emit(
         _ instruction: Instruction,
         resultRelink: ISeqBuilder.ResultRelink? = nil,
-        fusable: (condition: FusableCondition, result: VReg)? = nil
+        fusable: (condition: FusableCondition, result: VReg, start: MetaProgramCounter?)? = nil,
+        floatBinary: FloatBinaryOperation? = nil
     ) {
         let oldPC = iseqBuilder.insertingPC
-        iseqBuilder.emit(instruction, resultRelink: resultRelink, fusable: fusable)
+        iseqBuilder.emit(instruction, resultRelink: resultRelink, fusable: fusable, floatBinary: floatBinary)
         self.updateInstructionMapping(from: oldPC)
     }
 
@@ -1899,11 +2077,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     /// Which way a conditional branch tests the popped `i32` condition.
-    private enum FusedBranchPolarity {
+    fileprivate enum FusedBranchPolarity {
         /// Branch when the condition is non-zero (`brIf`).
         case ifTrue
         /// Branch when the condition is zero (`brIfNot`).
         case ifFalse
+
+        var flipped: FusedBranchPolarity { self == .ifTrue ? .ifFalse : .ifTrue }
     }
 
     /// Builds a fused compare+branch for a given polarity and pc-relative offset.
@@ -1935,27 +2115,44 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         guard let candidate, candidate.result == condition else { return nil }
         guard iseqBuilder.canRewind(to: candidate) else { return nil }
 
-        let factory: FusedBranchFactory
-        switch candidate.condition {
+        let factory = Self.fusedBranchFactory(for: candidate.condition)
+        iseqBuilder.rewind(to: candidate.position)
+        self.rewindInstructionMapping(to: candidate.position)
+        return factory
+    }
+
+    /// The fused branch that tests `condition`, as a function of the branch
+    /// polarity and the pc-relative offset.
+    private static func fusedBranchFactory(for condition: FusableCondition) -> FusedBranchFactory {
+        switch condition {
         case .compare(let kind, let lhs, let rhs):
-            factory = { polarity, offset in
+            return { polarity, offset in
                 let fused = polarity == .ifTrue ? kind : kind.complement
                 return fused.makeBrIf(Instruction.BrIfCmpOperand(lhs: lhs, rhs: rhs, offset: offset))
+            }
+        case .floatCompare(let kind, let lhs, let rhs):
+            // The polarity is part of the opcode here; see `FusedFCmpKind`.
+            return { polarity, offset in
+                kind.makeBrIf(polarity: polarity, lhs: lhs, rhs: rhs, offset: offset)
             }
         case .i32Eqz(let input):
             // `eqz(x)` is non-zero exactly when `x` is zero, so the fused form
             // is just the plain branch with the opposite polarity on `x`.
-            factory = { polarity, offset in
+            return { polarity, offset in
                 let operand = Instruction.BrIfOperand(condition: LVReg(input), offset: offset)
                 switch polarity {
                 case .ifTrue: return Instruction.brIfNot(operand)
                 case .ifFalse: return Instruction.brIf(operand)
                 }
             }
+        case .negated(let inner):
+            // `i32.eqz` of a condition: the same branch with the polarity
+            // flipped. This is not a predicate complement (which would be wrong
+            // for floats under NaN): the comparison produced 0 or 1, and `eqz`
+            // inverts that exactly.
+            let innerFactory = fusedBranchFactory(for: inner)
+            return { polarity, offset in innerFactory(polarity.flipped, offset) }
         }
-        iseqBuilder.rewind(to: candidate.position)
-        self.rewindInstructionMapping(to: candidate.position)
-        return factory
     }
 
     private mutating func emitBranch<Immediate: InstructionImmediate>(
@@ -2577,7 +2774,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
     mutating func visitLocalGet(localIndex: UInt32) throws(WasmKitError) -> Output {
-        iseqBuilder.resetLastEmission()
+        iseqBuilder.dropResultRelink()
         try valueStack.pushLocal(localIndex, locals: &locals)
     }
     /// Shared lowering of `local.set` and `local.tee`. `local.tee` differs
@@ -3137,7 +3334,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // TODO: document this behavior
         if let constSlotIndex = constantSlots.allocate(value) {
             valueStack.pushConst(constSlotIndex, type: type)
-            iseqBuilder.resetLastEmission()
+            iseqBuilder.dropResultRelink()
             return
         }
         let value = UntypedValue(value)
@@ -3194,18 +3391,81 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             }
         )
     }
-    /// Emits a comparison, recording it as a candidate for compare+branch fusion
-    /// when `fusedKind` names an integer comparison the ISA can fuse.
-    private mutating func visitCmp(
-        _ operand: ValueType,
-        _ fusedKind: FusedCmpKind?,
+    /// Emits a float `add`/`sub`/`mul`, folding it with the float operation
+    /// that produced one of its operands whenever that is possible.
+    ///
+    /// The fold applies when the previous instruction is a float `add`/`sub`/
+    /// `mul` of the same type, is still the last thing in the instruction
+    /// buffer, and its result is exactly one of this operation's two operands.
+    /// That result is a value-stack temporary this operation pops, so nothing
+    /// else can read it and the write to its slot can simply disappear -- the
+    /// same argument (and the same ``ISeqBuilder/canRewind(to:)`` guards) as
+    /// the compare+branch fusion.
+    ///
+    /// Both operand positions are covered:
+    /// - intermediate as the **left** operand, for all nine `(op1, op2)` pairs;
+    /// - intermediate as the **right** operand, only when `op2` commutes
+    ///   (`add`, `mul`), because the superinstruction always evaluates
+    ///   `(x op1 y) op2 z`. `z - (x op1 y)` has no encoding and stays unfused.
+    private mutating func visitFloatBinary(
+        _ type: ValueType,
+        _ op: FloatBinOp,
         _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction
     ) throws(WasmKitError) {
-        guard let fusedKind else {
-            // Float comparisons: not fusable, see `FusedCmpKind`.
-            try visitBinary(operand, .i32, instruction)
-            return
+        // Captured before `popVRegOperand`, which resets the last emission.
+        let candidate = iseqBuilder.floatBinaryEmission
+        let rhs = try popVRegOperand(type)
+        let lhs = try popVRegOperand(type)
+        let result = valueStack.push(type)
+        guard let lhs = lhs, let rhs = rhs else { return }
+
+        if let candidate, candidate.operation.type == type, iseqBuilder.canRewind(to: candidate) {
+            let produced = candidate.operation
+            // `z` must not be the intermediate itself: its slot is no longer
+            // written once the producer is rewound away. (`t op t` cannot arise
+            // from a well-formed operand stack, but the check is cheap and
+            // keeps the argument local.)
+            let z: VReg?
+            if produced.result == lhs, produced.result != rhs {
+                z = rhs
+            } else if produced.result == rhs, produced.result != lhs, op.isCommutative {
+                z = lhs
+            } else {
+                z = nil
+            }
+            if let z {
+                let make = Self.floatBinBinInstruction(type, produced.op, op)
+                let x = produced.lhs
+                let y = produced.rhs
+                iseqBuilder.rewind(to: candidate.position)
+                self.rewindInstructionMapping(to: candidate.position)
+                emit(
+                    make(Instruction.FloatBinBinOperand(result: result, x: x, y: y, z: z)),
+                    resultRelink: { newResult in
+                        make(Instruction.FloatBinBinOperand(result: newResult, x: x, y: y, z: z))
+                    }
+                )
+                return
+            }
         }
+
+        emit(
+            instruction(Instruction.BinaryOperand(result: LVReg(result), lhs: lhs, rhs: rhs)),
+            resultRelink: { newResult in
+                instruction(Instruction.BinaryOperand(result: LVReg(newResult), lhs: lhs, rhs: rhs))
+            },
+            floatBinary: FloatBinaryOperation(type: type, op: op, lhs: lhs, rhs: rhs, result: result)
+        )
+    }
+
+    /// Emits a comparison, recording it as a candidate for compare+branch
+    /// fusion. `makeCondition` builds the ``FusableCondition`` from the
+    /// comparison's operand registers.
+    private mutating func visitCmp(
+        _ operand: ValueType,
+        _ makeCondition: (_ lhs: VReg, _ rhs: VReg) -> FusableCondition,
+        _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction
+    ) throws(WasmKitError) {
         let rhs = try popVRegOperand(operand)
         let lhs = try popVRegOperand(operand)
         let result = valueStack.push(.i32)
@@ -3215,7 +3475,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             resultRelink: { result in
                 return instruction(Instruction.BinaryOperand(result: LVReg(result), lhs: lhs, rhs: rhs))
             },
-            fusable: (.compare(kind: fusedKind, lhs: lhs, rhs: rhs), result)
+            fusable: (makeCondition(lhs, rhs), result, nil)
         )
     }
     private mutating func visitConversion(_ from: ValueType, _ to: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws(WasmKitError) {
@@ -3224,58 +3484,93 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
     mutating func visitI32Eqz() throws(WasmKitError) -> Output {
+        // Captured before `popVRegOperand`, which resets the last emission.
+        let candidate = iseqBuilder.fusableEmission
         let value = try popVRegOperand(.i32)
         let result = valueStack.push(.i32)
         guard let value = value else { return }
+        // When the operand is a condition another instruction just computed,
+        // the pair is itself a fusable condition: the negation of the first.
+        // It is recorded with that instruction's start position, so a branch
+        // consuming this `i32.eqz` rewinds both away and emits a single fused
+        // branch of the opposite polarity. Nothing is lost when no branch
+        // follows: the `i32.eqz` below is still emitted and still materializes
+        // the boolean.
+        let fusable: (condition: FusableCondition, result: VReg, start: MetaProgramCounter?)
+        if let candidate, candidate.result == value, iseqBuilder.canRewind(to: candidate) {
+            fusable = (.negated(candidate.condition), result, candidate.position)
+        } else {
+            fusable = (.i32Eqz(input: value), result, nil)
+        }
         emit(
             .i32Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value))),
             resultRelink: { newResult in
                 .i32Eqz(Instruction.UnaryOperand(result: LVReg(newResult), input: LVReg(value)))
             },
-            fusable: (.i32Eqz(input: value), result)
+            fusable: fusable
         )
     }
     mutating func visitCmp(_ cmp: WasmParser.Instruction.Cmp) throws(WasmKitError) {
         let operand: ValueType
         let instruction: (Instruction.BinaryOperand) -> Instruction
         let fusedKind: FusedCmpKind?
+        let fusedFloatKind: FusedFCmpKind?
         switch cmp {
-        case .i32Eq: (operand, instruction, fusedKind) = (.i32, Instruction.i32Eq, .i32Eq)
-        case .i32Ne: (operand, instruction, fusedKind) = (.i32, Instruction.i32Ne, .i32Ne)
-        case .i32LtS: (operand, instruction, fusedKind) = (.i32, Instruction.i32LtS, .i32LtS)
-        case .i32LtU: (operand, instruction, fusedKind) = (.i32, Instruction.i32LtU, .i32LtU)
-        case .i32GtS: (operand, instruction, fusedKind) = (.i32, Instruction.i32GtS, .i32GtS)
-        case .i32GtU: (operand, instruction, fusedKind) = (.i32, Instruction.i32GtU, .i32GtU)
-        case .i32LeS: (operand, instruction, fusedKind) = (.i32, Instruction.i32LeS, .i32LeS)
-        case .i32LeU: (operand, instruction, fusedKind) = (.i32, Instruction.i32LeU, .i32LeU)
-        case .i32GeS: (operand, instruction, fusedKind) = (.i32, Instruction.i32GeS, .i32GeS)
-        case .i32GeU: (operand, instruction, fusedKind) = (.i32, Instruction.i32GeU, .i32GeU)
-        case .i64Eq: (operand, instruction, fusedKind) = (.i64, Instruction.i64Eq, .i64Eq)
-        case .i64Ne: (operand, instruction, fusedKind) = (.i64, Instruction.i64Ne, .i64Ne)
-        case .i64LtS: (operand, instruction, fusedKind) = (.i64, Instruction.i64LtS, .i64LtS)
-        case .i64LtU: (operand, instruction, fusedKind) = (.i64, Instruction.i64LtU, .i64LtU)
-        case .i64GtS: (operand, instruction, fusedKind) = (.i64, Instruction.i64GtS, .i64GtS)
-        case .i64GtU: (operand, instruction, fusedKind) = (.i64, Instruction.i64GtU, .i64GtU)
-        case .i64LeS: (operand, instruction, fusedKind) = (.i64, Instruction.i64LeS, .i64LeS)
-        case .i64LeU: (operand, instruction, fusedKind) = (.i64, Instruction.i64LeU, .i64LeU)
-        case .i64GeS: (operand, instruction, fusedKind) = (.i64, Instruction.i64GeS, .i64GeS)
-        case .i64GeU: (operand, instruction, fusedKind) = (.i64, Instruction.i64GeU, .i64GeU)
-        case .f32Eq: (operand, instruction, fusedKind) = (.f32, Instruction.f32Eq, nil)
-        case .f32Ne: (operand, instruction, fusedKind) = (.f32, Instruction.f32Ne, nil)
-        case .f32Lt: (operand, instruction, fusedKind) = (.f32, Instruction.f32Lt, nil)
-        case .f32Gt: (operand, instruction, fusedKind) = (.f32, Instruction.f32Gt, nil)
-        case .f32Le: (operand, instruction, fusedKind) = (.f32, Instruction.f32Le, nil)
-        case .f32Ge: (operand, instruction, fusedKind) = (.f32, Instruction.f32Ge, nil)
-        case .f64Eq: (operand, instruction, fusedKind) = (.f64, Instruction.f64Eq, nil)
-        case .f64Ne: (operand, instruction, fusedKind) = (.f64, Instruction.f64Ne, nil)
-        case .f64Lt: (operand, instruction, fusedKind) = (.f64, Instruction.f64Lt, nil)
-        case .f64Gt: (operand, instruction, fusedKind) = (.f64, Instruction.f64Gt, nil)
-        case .f64Le: (operand, instruction, fusedKind) = (.f64, Instruction.f64Le, nil)
-        case .f64Ge: (operand, instruction, fusedKind) = (.f64, Instruction.f64Ge, nil)
+        case .i32Eq: (operand, instruction, fusedKind, fusedFloatKind) = (.i32, Instruction.i32Eq, .i32Eq, nil)
+        case .i32Ne: (operand, instruction, fusedKind, fusedFloatKind) = (.i32, Instruction.i32Ne, .i32Ne, nil)
+        case .i32LtS: (operand, instruction, fusedKind, fusedFloatKind) = (.i32, Instruction.i32LtS, .i32LtS, nil)
+        case .i32LtU: (operand, instruction, fusedKind, fusedFloatKind) = (.i32, Instruction.i32LtU, .i32LtU, nil)
+        case .i32GtS: (operand, instruction, fusedKind, fusedFloatKind) = (.i32, Instruction.i32GtS, .i32GtS, nil)
+        case .i32GtU: (operand, instruction, fusedKind, fusedFloatKind) = (.i32, Instruction.i32GtU, .i32GtU, nil)
+        case .i32LeS: (operand, instruction, fusedKind, fusedFloatKind) = (.i32, Instruction.i32LeS, .i32LeS, nil)
+        case .i32LeU: (operand, instruction, fusedKind, fusedFloatKind) = (.i32, Instruction.i32LeU, .i32LeU, nil)
+        case .i32GeS: (operand, instruction, fusedKind, fusedFloatKind) = (.i32, Instruction.i32GeS, .i32GeS, nil)
+        case .i32GeU: (operand, instruction, fusedKind, fusedFloatKind) = (.i32, Instruction.i32GeU, .i32GeU, nil)
+        case .i64Eq: (operand, instruction, fusedKind, fusedFloatKind) = (.i64, Instruction.i64Eq, .i64Eq, nil)
+        case .i64Ne: (operand, instruction, fusedKind, fusedFloatKind) = (.i64, Instruction.i64Ne, .i64Ne, nil)
+        case .i64LtS: (operand, instruction, fusedKind, fusedFloatKind) = (.i64, Instruction.i64LtS, .i64LtS, nil)
+        case .i64LtU: (operand, instruction, fusedKind, fusedFloatKind) = (.i64, Instruction.i64LtU, .i64LtU, nil)
+        case .i64GtS: (operand, instruction, fusedKind, fusedFloatKind) = (.i64, Instruction.i64GtS, .i64GtS, nil)
+        case .i64GtU: (operand, instruction, fusedKind, fusedFloatKind) = (.i64, Instruction.i64GtU, .i64GtU, nil)
+        case .i64LeS: (operand, instruction, fusedKind, fusedFloatKind) = (.i64, Instruction.i64LeS, .i64LeS, nil)
+        case .i64LeU: (operand, instruction, fusedKind, fusedFloatKind) = (.i64, Instruction.i64LeU, .i64LeU, nil)
+        case .i64GeS: (operand, instruction, fusedKind, fusedFloatKind) = (.i64, Instruction.i64GeS, .i64GeS, nil)
+        case .i64GeU: (operand, instruction, fusedKind, fusedFloatKind) = (.i64, Instruction.i64GeU, .i64GeU, nil)
+        case .f32Eq: (operand, instruction, fusedKind, fusedFloatKind) = (.f32, Instruction.f32Eq, nil, .f32Eq)
+        case .f32Ne: (operand, instruction, fusedKind, fusedFloatKind) = (.f32, Instruction.f32Ne, nil, .f32Ne)
+        case .f32Lt: (operand, instruction, fusedKind, fusedFloatKind) = (.f32, Instruction.f32Lt, nil, .f32Lt)
+        case .f32Gt: (operand, instruction, fusedKind, fusedFloatKind) = (.f32, Instruction.f32Gt, nil, .f32Gt)
+        case .f32Le: (operand, instruction, fusedKind, fusedFloatKind) = (.f32, Instruction.f32Le, nil, .f32Le)
+        case .f32Ge: (operand, instruction, fusedKind, fusedFloatKind) = (.f32, Instruction.f32Ge, nil, .f32Ge)
+        case .f64Eq: (operand, instruction, fusedKind, fusedFloatKind) = (.f64, Instruction.f64Eq, nil, .f64Eq)
+        case .f64Ne: (operand, instruction, fusedKind, fusedFloatKind) = (.f64, Instruction.f64Ne, nil, .f64Ne)
+        case .f64Lt: (operand, instruction, fusedKind, fusedFloatKind) = (.f64, Instruction.f64Lt, nil, .f64Lt)
+        case .f64Gt: (operand, instruction, fusedKind, fusedFloatKind) = (.f64, Instruction.f64Gt, nil, .f64Gt)
+        case .f64Le: (operand, instruction, fusedKind, fusedFloatKind) = (.f64, Instruction.f64Le, nil, .f64Le)
+        case .f64Ge: (operand, instruction, fusedKind, fusedFloatKind) = (.f64, Instruction.f64Ge, nil, .f64Ge)
         }
-        try visitCmp(operand, fusedKind, instruction)
+        let makeCondition: (VReg, VReg) -> FusableCondition
+        if let fusedKind {
+            makeCondition = { .compare(kind: fusedKind, lhs: $0, rhs: $1) }
+        } else if let fusedFloatKind {
+            makeCondition = { .floatCompare(kind: fusedFloatKind, lhs: $0, rhs: $1) }
+        } else {
+            preconditionFailure("Internal consistency error: every comparison has a fused form")
+        }
+        try visitCmp(operand, makeCondition, instruction)
     }
     public mutating func visitBinary(_ binary: WasmParser.Instruction.Binary) throws(WasmKitError) {
+        // The float `add`/`sub`/`mul` forms go through `visitFloatBinary`,
+        // which folds adjacent pairs into a two-operation superinstruction.
+        switch binary {
+        case .f32Add: return try visitFloatBinary(.f32, .add, Instruction.f32Add)
+        case .f32Sub: return try visitFloatBinary(.f32, .sub, Instruction.f32Sub)
+        case .f32Mul: return try visitFloatBinary(.f32, .mul, Instruction.f32Mul)
+        case .f64Add: return try visitFloatBinary(.f64, .add, Instruction.f64Add)
+        case .f64Sub: return try visitFloatBinary(.f64, .sub, Instruction.f64Sub)
+        case .f64Mul: return try visitFloatBinary(.f64, .mul, Instruction.f64Mul)
+        default: break
+        }
         let operand: ValueType
         let result: ValueType
         let instruction: (Instruction.BinaryOperand) -> Instruction

@@ -661,6 +661,234 @@ enum Instruction: Equatable {
     case memoryOutOfBoundsTrap
     /// Raise `Trap(.unalignedAtomic)`. Dispatched to by the atomic handlers; never emitted.
     case unalignedAtomicTrap
+    /// Conditional pc-relative branch if `a == b` holds for `f32` operands
+    /// 
+    /// Fused form of a `f32` comparison followed by a conditional
+    /// branch. NaN falls on the side the polarity in the opcode name
+    /// says: an unordered comparison is false, so `a == b` is
+    /// false when either operand is NaN.
+    case brIfF32Eq(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `a != b` holds for `f32` operands
+    /// 
+    /// Fused form of a `f32` comparison followed by a conditional
+    /// branch. NaN falls on the side the polarity in the opcode name
+    /// says: an unordered comparison is false, so `a != b` is
+    /// true when either operand is NaN.
+    case brIfF32Ne(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `a < b` holds for `f32` operands
+    /// 
+    /// Fused form of a `f32` comparison followed by a conditional
+    /// branch. NaN falls on the side the polarity in the opcode name
+    /// says: an unordered comparison is false, so `a < b` is
+    /// false when either operand is NaN.
+    case brIfF32Lt(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `a <= b` holds for `f32` operands
+    /// 
+    /// Fused form of a `f32` comparison followed by a conditional
+    /// branch. NaN falls on the side the polarity in the opcode name
+    /// says: an unordered comparison is false, so `a <= b` is
+    /// false when either operand is NaN.
+    case brIfF32Le(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `!(a < b)` holds for `f32` operands
+    /// 
+    /// Fused form of a `f32` comparison followed by a conditional
+    /// branch. NaN falls on the side the polarity in the opcode name
+    /// says: an unordered comparison is false, so `!(a < b)` is
+    /// true when either operand is NaN.
+    case brIfNotF32Lt(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `!(a <= b)` holds for `f32` operands
+    /// 
+    /// Fused form of a `f32` comparison followed by a conditional
+    /// branch. NaN falls on the side the polarity in the opcode name
+    /// says: an unordered comparison is false, so `!(a <= b)` is
+    /// true when either operand is NaN.
+    case brIfNotF32Le(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `a == b` holds for `f64` operands
+    /// 
+    /// Fused form of a `f64` comparison followed by a conditional
+    /// branch. NaN falls on the side the polarity in the opcode name
+    /// says: an unordered comparison is false, so `a == b` is
+    /// false when either operand is NaN.
+    case brIfF64Eq(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `a != b` holds for `f64` operands
+    /// 
+    /// Fused form of a `f64` comparison followed by a conditional
+    /// branch. NaN falls on the side the polarity in the opcode name
+    /// says: an unordered comparison is false, so `a != b` is
+    /// true when either operand is NaN.
+    case brIfF64Ne(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `a < b` holds for `f64` operands
+    /// 
+    /// Fused form of a `f64` comparison followed by a conditional
+    /// branch. NaN falls on the side the polarity in the opcode name
+    /// says: an unordered comparison is false, so `a < b` is
+    /// false when either operand is NaN.
+    case brIfF64Lt(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `a <= b` holds for `f64` operands
+    /// 
+    /// Fused form of a `f64` comparison followed by a conditional
+    /// branch. NaN falls on the side the polarity in the opcode name
+    /// says: an unordered comparison is false, so `a <= b` is
+    /// false when either operand is NaN.
+    case brIfF64Le(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `!(a < b)` holds for `f64` operands
+    /// 
+    /// Fused form of a `f64` comparison followed by a conditional
+    /// branch. NaN falls on the side the polarity in the opcode name
+    /// says: an unordered comparison is false, so `!(a < b)` is
+    /// true when either operand is NaN.
+    case brIfNotF64Lt(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `!(a <= b)` holds for `f64` operands
+    /// 
+    /// Fused form of a `f64` comparison followed by a conditional
+    /// branch. NaN falls on the side the polarity in the opcode name
+    /// says: an unordered comparison is false, so `!(a <= b)` is
+    /// true when either operand is NaN.
+    case brIfNotF64Le(Instruction.BrIfCmpOperand)
+    /// `result = (x add y) add z`, on `f32` operands
+    /// 
+    /// Superinstruction fusing `f32.add` with the
+    /// `f32.add` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f32AddAdd(Instruction.FloatBinBinOperand)
+    /// `result = (x add y) sub z`, on `f32` operands
+    /// 
+    /// Superinstruction fusing `f32.add` with the
+    /// `f32.sub` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f32AddSub(Instruction.FloatBinBinOperand)
+    /// `result = (x add y) mul z`, on `f32` operands
+    /// 
+    /// Superinstruction fusing `f32.add` with the
+    /// `f32.mul` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f32AddMul(Instruction.FloatBinBinOperand)
+    /// `result = (x sub y) add z`, on `f32` operands
+    /// 
+    /// Superinstruction fusing `f32.sub` with the
+    /// `f32.add` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f32SubAdd(Instruction.FloatBinBinOperand)
+    /// `result = (x sub y) sub z`, on `f32` operands
+    /// 
+    /// Superinstruction fusing `f32.sub` with the
+    /// `f32.sub` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f32SubSub(Instruction.FloatBinBinOperand)
+    /// `result = (x sub y) mul z`, on `f32` operands
+    /// 
+    /// Superinstruction fusing `f32.sub` with the
+    /// `f32.mul` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f32SubMul(Instruction.FloatBinBinOperand)
+    /// `result = (x mul y) add z`, on `f32` operands
+    /// 
+    /// Superinstruction fusing `f32.mul` with the
+    /// `f32.add` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f32MulAdd(Instruction.FloatBinBinOperand)
+    /// `result = (x mul y) sub z`, on `f32` operands
+    /// 
+    /// Superinstruction fusing `f32.mul` with the
+    /// `f32.sub` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f32MulSub(Instruction.FloatBinBinOperand)
+    /// `result = (x mul y) mul z`, on `f32` operands
+    /// 
+    /// Superinstruction fusing `f32.mul` with the
+    /// `f32.mul` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f32MulMul(Instruction.FloatBinBinOperand)
+    /// `result = (x add y) add z`, on `f64` operands
+    /// 
+    /// Superinstruction fusing `f64.add` with the
+    /// `f64.add` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f64AddAdd(Instruction.FloatBinBinOperand)
+    /// `result = (x add y) sub z`, on `f64` operands
+    /// 
+    /// Superinstruction fusing `f64.add` with the
+    /// `f64.sub` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f64AddSub(Instruction.FloatBinBinOperand)
+    /// `result = (x add y) mul z`, on `f64` operands
+    /// 
+    /// Superinstruction fusing `f64.add` with the
+    /// `f64.mul` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f64AddMul(Instruction.FloatBinBinOperand)
+    /// `result = (x sub y) add z`, on `f64` operands
+    /// 
+    /// Superinstruction fusing `f64.sub` with the
+    /// `f64.add` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f64SubAdd(Instruction.FloatBinBinOperand)
+    /// `result = (x sub y) sub z`, on `f64` operands
+    /// 
+    /// Superinstruction fusing `f64.sub` with the
+    /// `f64.sub` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f64SubSub(Instruction.FloatBinBinOperand)
+    /// `result = (x sub y) mul z`, on `f64` operands
+    /// 
+    /// Superinstruction fusing `f64.sub` with the
+    /// `f64.mul` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f64SubMul(Instruction.FloatBinBinOperand)
+    /// `result = (x mul y) add z`, on `f64` operands
+    /// 
+    /// Superinstruction fusing `f64.mul` with the
+    /// `f64.add` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f64MulAdd(Instruction.FloatBinBinOperand)
+    /// `result = (x mul y) sub z`, on `f64` operands
+    /// 
+    /// Superinstruction fusing `f64.mul` with the
+    /// `f64.sub` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f64MulSub(Instruction.FloatBinBinOperand)
+    /// `result = (x mul y) mul z`, on `f64` operands
+    /// 
+    /// Superinstruction fusing `f64.mul` with the
+    /// `f64.mul` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot. Each
+    /// operation rounds separately -- this is **not** a fused
+    /// multiply-add.
+    case f64MulMul(Instruction.FloatBinBinOperand)
 }
 
 extension Instruction {
@@ -1309,6 +1537,20 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.lhs, $0.rhs, $0.offset) as (VReg, VReg, Int32), to: CodeSlot.self) }
         }
     }
+
+    struct FloatBinBinOperand: Equatable, InstructionImmediate {
+        var result: VReg
+        var x: VReg
+        var y: VReg
+        var z: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (result, x, y, z) = pc.read((VReg, VReg, VReg, VReg).self)
+            return Self(result: result, x: x, y: y, z: z)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.result, $0.x, $0.y, $0.z) as (VReg, VReg, VReg, VReg), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -1604,6 +1846,36 @@ extension Instruction {
         case .brIfI64LeU(let immediate): return immediate
         case .brIfI64GeS(let immediate): return immediate
         case .brIfI64GeU(let immediate): return immediate
+        case .brIfF32Eq(let immediate): return immediate
+        case .brIfF32Ne(let immediate): return immediate
+        case .brIfF32Lt(let immediate): return immediate
+        case .brIfF32Le(let immediate): return immediate
+        case .brIfNotF32Lt(let immediate): return immediate
+        case .brIfNotF32Le(let immediate): return immediate
+        case .brIfF64Eq(let immediate): return immediate
+        case .brIfF64Ne(let immediate): return immediate
+        case .brIfF64Lt(let immediate): return immediate
+        case .brIfF64Le(let immediate): return immediate
+        case .brIfNotF64Lt(let immediate): return immediate
+        case .brIfNotF64Le(let immediate): return immediate
+        case .f32AddAdd(let immediate): return immediate
+        case .f32AddSub(let immediate): return immediate
+        case .f32AddMul(let immediate): return immediate
+        case .f32SubAdd(let immediate): return immediate
+        case .f32SubSub(let immediate): return immediate
+        case .f32SubMul(let immediate): return immediate
+        case .f32MulAdd(let immediate): return immediate
+        case .f32MulSub(let immediate): return immediate
+        case .f32MulMul(let immediate): return immediate
+        case .f64AddAdd(let immediate): return immediate
+        case .f64AddSub(let immediate): return immediate
+        case .f64AddMul(let immediate): return immediate
+        case .f64SubAdd(let immediate): return immediate
+        case .f64SubSub(let immediate): return immediate
+        case .f64SubMul(let immediate): return immediate
+        case .f64MulAdd(let immediate): return immediate
+        case .f64MulSub(let immediate): return immediate
+        case .f64MulMul(let immediate): return immediate
         default: return nil
         }
     }
@@ -1903,6 +2175,36 @@ extension Instruction {
         case .brIfI64LeU(let immediate): immediate.emit(to: emit)
         case .brIfI64GeS(let immediate): immediate.emit(to: emit)
         case .brIfI64GeU(let immediate): immediate.emit(to: emit)
+        case .brIfF32Eq(let immediate): immediate.emit(to: emit)
+        case .brIfF32Ne(let immediate): immediate.emit(to: emit)
+        case .brIfF32Lt(let immediate): immediate.emit(to: emit)
+        case .brIfF32Le(let immediate): immediate.emit(to: emit)
+        case .brIfNotF32Lt(let immediate): immediate.emit(to: emit)
+        case .brIfNotF32Le(let immediate): immediate.emit(to: emit)
+        case .brIfF64Eq(let immediate): immediate.emit(to: emit)
+        case .brIfF64Ne(let immediate): immediate.emit(to: emit)
+        case .brIfF64Lt(let immediate): immediate.emit(to: emit)
+        case .brIfF64Le(let immediate): immediate.emit(to: emit)
+        case .brIfNotF64Lt(let immediate): immediate.emit(to: emit)
+        case .brIfNotF64Le(let immediate): immediate.emit(to: emit)
+        case .f32AddAdd(let immediate): immediate.emit(to: emit)
+        case .f32AddSub(let immediate): immediate.emit(to: emit)
+        case .f32AddMul(let immediate): immediate.emit(to: emit)
+        case .f32SubAdd(let immediate): immediate.emit(to: emit)
+        case .f32SubSub(let immediate): immediate.emit(to: emit)
+        case .f32SubMul(let immediate): immediate.emit(to: emit)
+        case .f32MulAdd(let immediate): immediate.emit(to: emit)
+        case .f32MulSub(let immediate): immediate.emit(to: emit)
+        case .f32MulMul(let immediate): immediate.emit(to: emit)
+        case .f64AddAdd(let immediate): immediate.emit(to: emit)
+        case .f64AddSub(let immediate): immediate.emit(to: emit)
+        case .f64AddMul(let immediate): immediate.emit(to: emit)
+        case .f64SubAdd(let immediate): immediate.emit(to: emit)
+        case .f64SubSub(let immediate): immediate.emit(to: emit)
+        case .f64SubMul(let immediate): immediate.emit(to: emit)
+        case .f64MulAdd(let immediate): immediate.emit(to: emit)
+        case .f64MulSub(let immediate): immediate.emit(to: emit)
+        case .f64MulMul(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -2212,6 +2514,36 @@ extension Instruction {
         case .returnCrossInstance: return 296
         case .memoryOutOfBoundsTrap: return 297
         case .unalignedAtomicTrap: return 298
+        case .brIfF32Eq: return 299
+        case .brIfF32Ne: return 300
+        case .brIfF32Lt: return 301
+        case .brIfF32Le: return 302
+        case .brIfNotF32Lt: return 303
+        case .brIfNotF32Le: return 304
+        case .brIfF64Eq: return 305
+        case .brIfF64Ne: return 306
+        case .brIfF64Lt: return 307
+        case .brIfF64Le: return 308
+        case .brIfNotF64Lt: return 309
+        case .brIfNotF64Le: return 310
+        case .f32AddAdd: return 311
+        case .f32AddSub: return 312
+        case .f32AddMul: return 313
+        case .f32SubAdd: return 314
+        case .f32SubSub: return 315
+        case .f32SubMul: return 316
+        case .f32MulAdd: return 317
+        case .f32MulSub: return 318
+        case .f32MulMul: return 319
+        case .f64AddAdd: return 320
+        case .f64AddSub: return 321
+        case .f64AddMul: return 322
+        case .f64SubAdd: return 323
+        case .f64SubSub: return 324
+        case .f64SubMul: return 325
+        case .f64MulAdd: return 326
+        case .f64MulSub: return 327
+        case .f64MulMul: return 328
         }
     }
 }
@@ -2522,6 +2854,36 @@ extension Instruction {
         case 296: return .returnCrossInstance
         case 297: return .memoryOutOfBoundsTrap
         case 298: return .unalignedAtomicTrap
+        case 299: return .brIfF32Eq(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 300: return .brIfF32Ne(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 301: return .brIfF32Lt(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 302: return .brIfF32Le(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 303: return .brIfNotF32Lt(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 304: return .brIfNotF32Le(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 305: return .brIfF64Eq(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 306: return .brIfF64Ne(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 307: return .brIfF64Lt(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 308: return .brIfF64Le(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 309: return .brIfNotF64Lt(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 310: return .brIfNotF64Le(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 311: return .f32AddAdd(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 312: return .f32AddSub(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 313: return .f32AddMul(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 314: return .f32SubAdd(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 315: return .f32SubSub(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 316: return .f32SubMul(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 317: return .f32MulAdd(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 318: return .f32MulSub(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 319: return .f32MulMul(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 320: return .f64AddAdd(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 321: return .f64AddSub(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 322: return .f64AddMul(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 323: return .f64SubAdd(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 324: return .f64SubSub(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 325: return .f64SubMul(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 326: return .f64MulAdd(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 327: return .f64MulSub(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 328: return .f64MulMul(Instruction.FloatBinBinOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -2835,6 +3197,36 @@ extension Instruction {
         case 296: return "returnCrossInstance"
         case 297: return "memoryOutOfBoundsTrap"
         case 298: return "unalignedAtomicTrap"
+        case 299: return "brIfF32Eq"
+        case 300: return "brIfF32Ne"
+        case 301: return "brIfF32Lt"
+        case 302: return "brIfF32Le"
+        case 303: return "brIfNotF32Lt"
+        case 304: return "brIfNotF32Le"
+        case 305: return "brIfF64Eq"
+        case 306: return "brIfF64Ne"
+        case 307: return "brIfF64Lt"
+        case 308: return "brIfF64Le"
+        case 309: return "brIfNotF64Lt"
+        case 310: return "brIfNotF64Le"
+        case 311: return "f32AddAdd"
+        case 312: return "f32AddSub"
+        case 313: return "f32AddMul"
+        case 314: return "f32SubAdd"
+        case 315: return "f32SubSub"
+        case 316: return "f32SubMul"
+        case 317: return "f32MulAdd"
+        case 318: return "f32MulSub"
+        case 319: return "f32MulMul"
+        case 320: return "f64AddAdd"
+        case 321: return "f64AddSub"
+        case 322: return "f64AddMul"
+        case 323: return "f64SubAdd"
+        case 324: return "f64SubSub"
+        case 325: return "f64SubMul"
+        case 326: return "f64MulAdd"
+        case 327: return "f64MulSub"
+        case 328: return "f64MulMul"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
@@ -2887,6 +3279,18 @@ protocol NextInstructionPredictor: ~Copyable {
     mutating func predictNext_brIfI64GeS(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_brIfI64GeU(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_returnCrossInstance(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfF32Eq(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfF32Ne(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfF32Lt(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfF32Le(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfNotF32Lt(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfNotF32Le(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfF64Eq(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfF64Ne(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfF64Lt(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfF64Le(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfNotF64Lt(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfNotF64Le(operandPc: Pc, sp: Sp) -> [Pc]
 }
 
 extension Instruction {
@@ -2935,6 +3339,18 @@ extension Instruction {
         case 294: return predictor.predictNext_brIfI64GeS(operandPc: operandPc, sp: sp)
         case 295: return predictor.predictNext_brIfI64GeU(operandPc: operandPc, sp: sp)
         case 296: return predictor.predictNext_returnCrossInstance(operandPc: operandPc, sp: sp)
+        case 299: return predictor.predictNext_brIfF32Eq(operandPc: operandPc, sp: sp)
+        case 300: return predictor.predictNext_brIfF32Ne(operandPc: operandPc, sp: sp)
+        case 301: return predictor.predictNext_brIfF32Lt(operandPc: operandPc, sp: sp)
+        case 302: return predictor.predictNext_brIfF32Le(operandPc: operandPc, sp: sp)
+        case 303: return predictor.predictNext_brIfNotF32Lt(operandPc: operandPc, sp: sp)
+        case 304: return predictor.predictNext_brIfNotF32Le(operandPc: operandPc, sp: sp)
+        case 305: return predictor.predictNext_brIfF64Eq(operandPc: operandPc, sp: sp)
+        case 306: return predictor.predictNext_brIfF64Ne(operandPc: operandPc, sp: sp)
+        case 307: return predictor.predictNext_brIfF64Lt(operandPc: operandPc, sp: sp)
+        case 308: return predictor.predictNext_brIfF64Le(operandPc: operandPc, sp: sp)
+        case 309: return predictor.predictNext_brIfNotF64Lt(operandPc: operandPc, sp: sp)
+        case 310: return predictor.predictNext_brIfNotF64Le(operandPc: operandPc, sp: sp)
         default: return nil
         }
     }
@@ -3097,6 +3513,54 @@ extension Instruction {
             }
             do {
                 let inst = Instruction.returnCrossInstance
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfF32Eq(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfF32Ne(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfF32Lt(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfF32Le(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfNotF32Lt(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfNotF32Le(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfF64Eq(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfF64Ne(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfF64Lt(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfF64Le(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfNotF64Lt(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfNotF64Le(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
         return map
