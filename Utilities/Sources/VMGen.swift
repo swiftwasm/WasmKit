@@ -58,6 +58,7 @@ enum VMGen {
             precondition(
                 canonical.mayThrow == inst.mayThrow && canonical.mayUpdatePc == inst.mayUpdatePc
                     && canonical.mayUpdateFrame == inst.mayUpdateFrame
+                    && canonical.mayDispatchToTrap == inst.mayDispatchToTrap
                     && canonical.immediate?.type == inst.immediate?.type,
                 "\(inst.name) and \(canonical.name) claim the same handler identity '\(identity)' but have different handler shapes"
             )
@@ -83,7 +84,8 @@ enum VMGen {
 
         for (opcode, inst) in instructions.enumerated() {
             let owner = owners[inst.name]!
-            let tryPrefix = inst.mayThrow ? "try " : ""
+            let tryPrefix = inst.mayThrow || inst.mayDispatchToTrap ? "try " : ""
+            let prefix = inst.mayDispatchToTrap ? "executeToken_" : "execute_"
             let args = ExecutionParameter.allCases.map { "\($0.label): &\($0.label)" }
             if owner.name != inst.name {
                 output += """
@@ -93,7 +95,7 @@ enum VMGen {
             }
             output += """
 
-                        case \(opcode): return \(tryPrefix)self.execute_\(owner.name)(\(args.joined(separator: ", ")))
+                        case \(opcode): return \(tryPrefix)self.\(prefix)\(owner.name)(\(args.joined(separator: ", ")))
                 """
         }
         output += """
@@ -122,23 +124,34 @@ enum VMGen {
 
         for op in memoryLoadOps {
             inlineImpls[op.instruction.name] = """
-            try memoryLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) })
+            if let trap = memoryLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) }) { %TRAP% }
             """
         }
         for op in memoryStoreOps {
             inlineImpls[op.instruction.name] = """
-            try memoryStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { \(op.castFromValue) })
+            if let trap = memoryStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { \(op.castFromValue) }) { %TRAP% }
+            """
+        }
+
+        for op in memoryLoadOps {
+            inlineImpls[op.narrowInstruction.name] = """
+            if let trap = memoryLoadNarrow(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) }) { %TRAP% }
+            """
+        }
+        for op in memoryStoreOps {
+            inlineImpls[op.narrowInstruction.name] = """
+            if let trap = memoryStoreNarrow(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { \(op.castFromValue) }) { %TRAP% }
             """
         }
 
         for op in memoryAtomicLoadOps {
             inlineImpls[op.atomicInstruction.name] = """
-            try atomicLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) })
+            if let trap = atomicLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) }) { %TRAP% }
             """
         }
         for op in memoryAtomicStoreOps {
             inlineImpls[op.atomicInstruction.name] = """
-            try atomicStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { \(op.castFromValue) })
+            if let trap = atomicStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { \(op.castFromValue) }) { %TRAP% }
             """
         }
 
@@ -148,7 +161,7 @@ enum VMGen {
             let loadAs = op.type == "i32" ? "UInt32" : "UInt64"
             let cFunc = "wasmkit_atomic_rmw_\(opLower)_\(width)"
             inlineImpls[op.instruction.name] = """
-            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: \(loadAs).self, atomicOp: { \(cFunc)($0, $1) }, castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
+            if let trap = atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: \(loadAs).self, atomicOp: { \(cFunc)($0, $1) }, castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) }) { %TRAP% }
             """
         }
 
@@ -156,7 +169,7 @@ enum VMGen {
             let opLower = op.op.lowercased()
             let cFunc = "wasmkit_atomic_rmw_\(opLower)_8"
             inlineImpls[op.instruction.name] = """
-            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, atomicOp: { \(cFunc)($0, $1) }, castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
+            if let trap = atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, atomicOp: { \(cFunc)($0, $1) }, castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) }) { %TRAP% }
             """
         }
 
@@ -164,7 +177,7 @@ enum VMGen {
             let opLower = op.op.lowercased()
             let cFunc = "wasmkit_atomic_rmw_\(opLower)_16"
             inlineImpls[op.instruction.name] = """
-            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, atomicOp: { \(cFunc)($0, $1) }, castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
+            if let trap = atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, atomicOp: { \(cFunc)($0, $1) }, castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) }) { %TRAP% }
             """
         }
 
@@ -172,30 +185,30 @@ enum VMGen {
             let opLower = op.op.lowercased()
             let cFunc = "wasmkit_atomic_rmw_\(opLower)_32"
             inlineImpls[op.instruction.name] = """
-            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, atomicOp: { \(cFunc)($0, $1) }, castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
+            if let trap = atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, atomicOp: { \(cFunc)($0, $1) }, castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) }) { %TRAP% }
             """
         }
 
         inlineImpls["i32AtomicRmwCmpxchg"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt32.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_32(ptr, &exp, desired); return exp }, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
+        if let trap = atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt32.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_32(ptr, &exp, desired); return exp }, castFromValue: { $0.i32 }, castToValue: { .i32($0) }) { %TRAP% }
         """
         inlineImpls["i64AtomicRmwCmpxchg"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt64.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_64(ptr, &exp, desired); return exp }, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
+        if let trap = atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt64.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_64(ptr, &exp, desired); return exp }, castFromValue: { $0.i64 }, castToValue: { .i64($0) }) { %TRAP% }
         """
         inlineImpls["i32AtomicRmw8CmpxchgU"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt8.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_8(ptr, &exp, desired); return exp }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        if let trap = atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt8.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_8(ptr, &exp, desired); return exp }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) }) { %TRAP% }
         """
         inlineImpls["i32AtomicRmw16CmpxchgU"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt16.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_16(ptr, &exp, desired); return exp }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        if let trap = atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt16.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_16(ptr, &exp, desired); return exp }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) }) { %TRAP% }
         """
         inlineImpls["i64AtomicRmw8CmpxchgU"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt8.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_8(ptr, &exp, desired); return exp }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        if let trap = atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt8.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_8(ptr, &exp, desired); return exp }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) }) { %TRAP% }
         """
         inlineImpls["i64AtomicRmw16CmpxchgU"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt16.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_16(ptr, &exp, desired); return exp }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        if let trap = atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt16.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_16(ptr, &exp, desired); return exp }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) }) { %TRAP% }
         """
         inlineImpls["i64AtomicRmw32CmpxchgU"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt32.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_32(ptr, &exp, desired); return exp }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        if let trap = atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt32.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_32(ptr, &exp, desired); return exp }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) }) { %TRAP% }
         """
         inlineImpls["memoryAtomicWait32"] = """
         try atomicWait32(sp: sp.pointee, md: md.pointee, ms: ms.pointee, waitOperand: immediate)
@@ -563,6 +576,19 @@ enum VMGen {
                         (pc.pointee, next) = \(call)
 
                 """
+            } else if inst.mayDispatchToTrap {
+                // Read the next head slot and bump `pc` up front: the body has a second
+                // exit (a trap pseudo-instruction's head slot) and tail-merging the two
+                // exits would cost the fast path an extra address computation plus a
+                // branch to reach the shared load. See `Instruction.mayDispatchToTrap`.
+                let impl = (inlineImpls[inst.name] ?? call)
+                    .replacingOccurrences(of: "%TRAP%", with: "return trap.directThreadedHeadSlot")
+                output += """
+                        let next = pc.pointee.pointee
+                        pc.pointee = pc.pointee.advanced(by: 1)
+                        \(impl)
+
+                """
             } else {
                 output += """
                         \(inlineImpls[inst.name] ?? call)
@@ -578,6 +604,91 @@ enum VMGen {
         }
         output += """
 
+            }
+
+            """
+        return output
+    }
+
+    /// Emits the token-threaded wrapper of every handler that can dispatch to a trap
+    /// pseudo-instruction.
+    ///
+    /// The direct-threaded wrapper returns the trap handler's address so that the C
+    /// trampoline tail-calls it; token threading has no handler addresses, so it raises
+    /// the trap from the dispatcher instead. The handler body itself is written once and
+    /// inlined into both.
+    static func generateTokenThreadedTrapWrappers(instructions: [Instruction], inlineImpls: [String: String]) -> String {
+        let wrapped = instructions.filter { $0.mayDispatchToTrap }
+        guard !wrapped.isEmpty else { return "" }
+        var output = """
+            extension Execution {
+            """
+        for inst in wrapped {
+            let args = inst.parameters.map { label, _, isInout in
+                let isExecParam = ExecutionParameter.allCases.contains { $0.label == label }
+                if isExecParam {
+                    return "\(label): \(isInout ? "&" : "")\(label).pointee"
+                } else {
+                    return "\(label): \(isInout ? "&" : "")\(label)"
+                }
+            }.joined(separator: ", ")
+            let call = "self.\(inst.name)(\(args))"
+            let impl = (inlineImpls[inst.name] ?? call)
+                .replacingOccurrences(of: "%TRAP%", with: "try trap.raise()")
+            output += """
+
+                @inline(__always)
+                mutating func executeToken_\(inst.name)(\(ExecutionParameter.allCases.map { "\($0.label): UnsafeMutablePointer<\($0.type)>" }.joined(separator: ", "))) throws -> CodeSlot {
+
+            """
+            if let immediate = inst.immediate {
+                output += """
+                        let \(immediate.label) = \(immediate.type).load(from: &pc.pointee)
+
+                """
+            }
+            output += """
+                    \(impl)
+                    let next = pc.pointee.pointee
+                    pc.pointee = pc.pointee.advanced(by: 1)
+                    return next
+                }
+            """
+        }
+        output += """
+
+            }
+
+            """
+        return output
+    }
+
+    /// Emits a constant-foldable head-slot accessor for each trap pseudo-instruction.
+    static func generateTrapPseudoInstructionSlots(instructions: [Instruction]) -> String {
+        var output = """
+
+            extension Instruction {
+
+            """
+        for (opcode, inst) in instructions.enumerated() where inst.isTrapPseudoInstruction {
+            output += """
+                    /// The direct-threaded head slot of the `\(inst.name)` pseudo-instruction.
+                    ///
+                    /// Reads one element of the handler table directly: going through
+                    /// `handler` would copy the whole table into a stack temporary and
+                    /// leave the reading handler with a stack-protector prologue.
+                    @inline(__always)
+                    static var \(inst.name)HeadSlot: CodeSlot {
+                        #if os(WASI) || $Embedded
+                        fatalError("Direct threading is not supported on this platform")
+                        #else
+                        return CodeSlot(wasmkit_tc_exec_handlers.\(opcode))
+                        #endif
+                    }
+
+            """
+        }
+        output += """
             }
 
             """
@@ -678,6 +789,10 @@ enum VMGen {
                 + """
 
 
+                """
+                + generateTokenThreadedTrapWrappers(instructions: instructions, inlineImpls: inlineImpls)
+                + """
+
                 // MARK: - Direct Threaded Code
 
                 """
@@ -701,6 +816,7 @@ enum VMGen {
                 }
 
                 """
+                + generateTrapPseudoInstructionSlots(instructions: instructions)
             ),
             GeneratedFile(
                 projectSources + ["_CWasmKit", "include", "DirectThreadedCode.inc"],

@@ -80,6 +80,22 @@ extension VMGen {
         /// control instructions to be distinct.
         var handlerIdentity: String? = nil
 
+        /// Whether the handler body can return the head slot of a trap pseudo-instruction
+        /// instead of falling through to the next instruction (see `memoryTrapInsts`).
+        ///
+        /// Such a handler has two exits, so the generated wrapper loads the next
+        /// instruction's head slot and bumps `pc` *before* running the body: otherwise the
+        /// two exits get tail-merged and the fast path pays an extra address computation
+        /// and a branch to reach the shared load. Only valid for a body that neither reads
+        /// `pc` nor throws.
+        var mayDispatchToTrap: Bool = false
+
+        /// Whether this is a trap pseudo-instruction (see `memoryTrapInsts`): never
+        /// emitted by the translator, only dispatched to by another handler. The
+        /// generator gives each one a constant-foldable head-slot accessor so that a
+        /// handler's cold path can reach it without materialising an `Instruction`.
+        var isTrapPseudoInstruction: Bool = false
+
         var mayUpdatePc: Bool {
             self.isControl
         }
@@ -390,14 +406,25 @@ extension VMGen {
         }
         var instruction: Instruction {
             var inst = Instruction(name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
-                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .load)
+                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .load)
+            inst.mayDispatchToTrap = true
             inst.handlerIdentity = "load(\(identitySuffix))"
             return inst
         }
         var atomicInstruction: Instruction {
             var inst = Instruction(name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
-                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .load)
+                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .load)
+            inst.mayDispatchToTrap = true
             inst.handlerIdentity = "atomicLoad(\(identitySuffix))"
+            return inst
+        }
+        /// The two-code-slot form used when the memory is 32-bit and the static offset
+        /// fits in `UInt32`. See `ImmediateLayout.loadNarrow`.
+        var narrowInstruction: Instruction {
+            var inst = Instruction(name: "\(type)\(op)Narrow", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))` on a 32-bit memory with a 32-bit offset",
+                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .loadNarrow)
+            inst.mayDispatchToTrap = true
+            inst.handlerIdentity = "loadNarrow(\(identitySuffix))"
             return inst
         }
     }
@@ -435,14 +462,25 @@ extension VMGen {
 
         var instruction: Instruction {
             var inst = Instruction(name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
-                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .store)
+                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .store)
+            inst.mayDispatchToTrap = true
             inst.handlerIdentity = "store(\(storeWidth))"
             return inst
         }
         var atomicInstruction: Instruction {
             var inst = Instruction(name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
-                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .store)
+                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .store)
+            inst.mayDispatchToTrap = true
             inst.handlerIdentity = "atomicStore(\(storeWidth))"
+            return inst
+        }
+        /// The two-code-slot form used when the memory is 32-bit and the static offset
+        /// fits in `UInt32`. See `ImmediateLayout.storeNarrow`.
+        var narrowInstruction: Instruction {
+            var inst = Instruction(name: "\(type)\(op)Narrow", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))` on a 32-bit memory with a 32-bit offset",
+                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .storeNarrow)
+            inst.mayDispatchToTrap = true
+            inst.handlerIdentity = "storeNarrow(\(storeWidth))"
             return inst
         }
     }
@@ -461,6 +499,9 @@ extension VMGen {
     }
     static let memoryAtomicStoreOps = memoryStoreOps.filter { !$0.isFloatingPoint }
     static let memoryLoadStoreInsts: [Instruction] = memoryLoadOps.map(\.instruction) + memoryStoreOps.map(\.instruction)
+    /// The two-code-slot forms of the loads and stores, for a 32-bit memory with a
+    /// `UInt32` offset. The translator picks between these and the wide forms.
+    static let memoryLoadStoreNarrowInsts: [Instruction] = memoryLoadOps.map(\.narrowInstruction) + memoryStoreOps.map(\.narrowInstruction)
     static let memoryAtomicInsts: [Instruction] = memoryAtomicLoadOps.map(\.atomicInstruction) + memoryAtomicStoreOps.map(\.atomicInstruction)
 
     // MARK: - Atomic RMW Operations
@@ -485,7 +526,8 @@ extension VMGen {
                 doc = "WebAssembly Core Instruction `\(type).atomic.rmw.\(VMGen.snakeCase(pascalCase: op))`"
             }
             var inst = Instruction(name: name, documentation: doc,
-                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .rmw)
+                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .rmw)
+            inst.mayDispatchToTrap = true
             // The handler truncates the operand to `accessWidth` bits, applies the
             // atomic operation and zero-extends the old value back into the slot, so
             // the operation and the access width fully determine the code
@@ -569,8 +611,26 @@ extension VMGen {
         ("i64AtomicRmw32CmpxchgU", "i64.atomic.rmw32.cmpxchg_u", 32),
     ].map { (name, wasmName, width) in
         var inst = Instruction(name: name, documentation: "WebAssembly Core Instruction `\(wasmName)`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg)
+                    mayThrow: false, useCurrentMemory: .read, immediateLayout: .cmpxchg)
+        inst.mayDispatchToTrap = true
         inst.handlerIdentity = "rmw(Cmpxchg,\(width))"
+        return inst
+    }
+
+    /// Pseudo-instructions that raise a memory trap.
+    ///
+    /// They are never emitted into an instruction sequence. The memory load/store and
+    /// atomic handlers dispatch to them -- by returning their head slot as the "next"
+    /// instruction -- instead of throwing. That keeps the out-of-bounds path a tail call
+    /// (`b`) with no live state, so the fast path needs no native frame at all; a `throw`
+    /// out of the handler body would be a `bl` and force a prologue/epilogue onto every
+    /// load and store. See `.track/issues/015`.
+    static let memoryTrapInsts: [Instruction] = [
+        Instruction(name: "memoryOutOfBoundsTrap", documentation: "Raise `Trap(.memoryOutOfBounds)`. Dispatched to by the memory handlers; never emitted.", mayThrow: true),
+        Instruction(name: "unalignedAtomicTrap", documentation: "Raise `Trap(.unalignedAtomic)`. Dispatched to by the atomic handlers; never emitted.", mayThrow: true),
+    ].map {
+        var inst = $0
+        inst.isTrapPseudoInstruction = true
         return inst
     }
 
@@ -881,6 +941,8 @@ extension VMGen {
                 isControl: true, mayUpdateFrame: true, useCurrentMemory: .write
             )
         ]
+        instructions += memoryTrapInsts
+        instructions += memoryLoadStoreNarrowInsts
         return instructions
     }
 

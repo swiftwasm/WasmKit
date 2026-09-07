@@ -375,6 +375,12 @@ extension Instruction {
             func store(_ name: String, _ op: Instruction.StoreOperand) {
                 target.write("\(name) \(reg(op.pointer)) + \(offset(op.offset)), \(reg(op.value))")
             }
+            func loadNarrow(_ name: String, _ op: Instruction.LoadOperandNarrow) {
+                target.write("\(reg(op.result)) = \(name) \(reg(op.pointer)), \(offset(UInt64(op.offset)))")
+            }
+            func storeNarrow(_ name: String, _ op: Instruction.StoreOperandNarrow) {
+                target.write("\(name) \(reg(op.pointer)) + \(offset(UInt64(op.offset))), \(reg(op.value))")
+            }
             func brIfCmp(_ name: String, _ op: Instruction.BrIfCmpOperand) {
                 target.write("br_if.\(name) \(reg(op.lhs)), \(reg(op.rhs)), \(branchTarget(instructionOffset, Int(op.offset)))")
             }
@@ -409,6 +415,10 @@ extension Instruction {
             case .i64Load(let op): load("i64.load", op)
             case .f32Load(let op): load("f32.load", op)
             case .f64Load(let op): load("f64.load", op)
+            case .i32LoadNarrow(let op): loadNarrow("i32.load", op)
+            case .i64LoadNarrow(let op): loadNarrow("i64.load", op)
+            case .f32LoadNarrow(let op): loadNarrow("f32.load", op)
+            case .f64LoadNarrow(let op): loadNarrow("f64.load", op)
             case .i8x16Shuffle(let op):
                 let lanes = [
                     op.lane0, op.lane1, op.lane2, op.lane3,
@@ -451,6 +461,8 @@ extension Instruction {
             case .i64Eq(let op): binop("i64.eq", op)
             case .i64Eqz(let op): unop("i64.eqz", op)
             case .i32Store(let op): store("i32.store", op)
+            case .i32StoreNarrow(let op): storeNarrow("i32.store", op)
+            case .i64StoreNarrow(let op): storeNarrow("i64.store", op)
             case .brIfNot(let op):
                 target.write("br_if_not \(reg(op.condition)), \(branchTarget(instructionOffset, Int(op.offset)))")
             case .brIf(let op):

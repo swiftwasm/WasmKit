@@ -177,6 +177,23 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "value", type: .VReg)
     }
 
+    /// Immediate layout of a load on a 32-bit memory whose static offset fits in
+    /// `UInt32`, which is every load an LLVM-compiled guest emits. The offset shares the
+    /// register slot instead of taking a code slot of its own, so the instruction is two
+    /// code slots instead of three.
+    static let loadNarrow = Self(name: "LoadOperandNarrow") {
+        $0.field(name: "pointer", type: .VReg)
+        $0.field(name: "result", type: .VReg)
+        $0.field(name: "offset", type: .UInt32)
+    }
+
+    /// Immediate layout of a store on a 32-bit memory. See ``loadNarrow``.
+    static let storeNarrow = Self(name: "StoreOperandNarrow") {
+        $0.field(name: "pointer", type: .VReg)
+        $0.field(name: "value", type: .VReg)
+        $0.field(name: "offset", type: .UInt32)
+    }
+
     static let globalAndVRegOperand = Self(name: "GlobalAndVRegOperand") {
         $0.field(name: "reg", type: .LLVReg)
         $0.field(name: "rawGlobal", type: .UInt64)

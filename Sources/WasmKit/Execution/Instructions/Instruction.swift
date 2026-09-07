@@ -657,6 +657,56 @@ enum Instruction: Equatable {
     /// stack frame. It receives the *unmodified* `sp`/`pc` of the `_return`
     /// that handed off to it.
     case returnCrossInstance
+    /// Raise `Trap(.memoryOutOfBounds)`. Dispatched to by the memory handlers; never emitted.
+    case memoryOutOfBoundsTrap
+    /// Raise `Trap(.unalignedAtomic)`. Dispatched to by the atomic handlers; never emitted.
+    case unalignedAtomicTrap
+    /// WebAssembly Core Instruction `i32.load` on a 32-bit memory with a 32-bit offset
+    case i32LoadNarrow(Instruction.LoadOperandNarrow)
+    /// WebAssembly Core Instruction `i64.load` on a 32-bit memory with a 32-bit offset
+    case i64LoadNarrow(Instruction.LoadOperandNarrow)
+    /// WebAssembly Core Instruction `f32.load` on a 32-bit memory with a 32-bit offset
+    case f32LoadNarrow(Instruction.LoadOperandNarrow)
+    /// WebAssembly Core Instruction `f64.load` on a 32-bit memory with a 32-bit offset
+    case f64LoadNarrow(Instruction.LoadOperandNarrow)
+    /// WebAssembly Core Instruction `i32.load8_s` on a 32-bit memory with a 32-bit offset
+    case i32Load8SNarrow(Instruction.LoadOperandNarrow)
+    /// WebAssembly Core Instruction `i32.load8_u` on a 32-bit memory with a 32-bit offset
+    case i32Load8UNarrow(Instruction.LoadOperandNarrow)
+    /// WebAssembly Core Instruction `i32.load16_s` on a 32-bit memory with a 32-bit offset
+    case i32Load16SNarrow(Instruction.LoadOperandNarrow)
+    /// WebAssembly Core Instruction `i32.load16_u` on a 32-bit memory with a 32-bit offset
+    case i32Load16UNarrow(Instruction.LoadOperandNarrow)
+    /// WebAssembly Core Instruction `i64.load8_s` on a 32-bit memory with a 32-bit offset
+    case i64Load8SNarrow(Instruction.LoadOperandNarrow)
+    /// WebAssembly Core Instruction `i64.load8_u` on a 32-bit memory with a 32-bit offset
+    case i64Load8UNarrow(Instruction.LoadOperandNarrow)
+    /// WebAssembly Core Instruction `i64.load16_s` on a 32-bit memory with a 32-bit offset
+    case i64Load16SNarrow(Instruction.LoadOperandNarrow)
+    /// WebAssembly Core Instruction `i64.load16_u` on a 32-bit memory with a 32-bit offset
+    case i64Load16UNarrow(Instruction.LoadOperandNarrow)
+    /// WebAssembly Core Instruction `i64.load32_s` on a 32-bit memory with a 32-bit offset
+    case i64Load32SNarrow(Instruction.LoadOperandNarrow)
+    /// WebAssembly Core Instruction `i64.load32_u` on a 32-bit memory with a 32-bit offset
+    case i64Load32UNarrow(Instruction.LoadOperandNarrow)
+    /// WebAssembly Core Instruction `i32.store` on a 32-bit memory with a 32-bit offset
+    case i32StoreNarrow(Instruction.StoreOperandNarrow)
+    /// WebAssembly Core Instruction `i64.store` on a 32-bit memory with a 32-bit offset
+    case i64StoreNarrow(Instruction.StoreOperandNarrow)
+    /// WebAssembly Core Instruction `f32.store` on a 32-bit memory with a 32-bit offset
+    case f32StoreNarrow(Instruction.StoreOperandNarrow)
+    /// WebAssembly Core Instruction `f64.store` on a 32-bit memory with a 32-bit offset
+    case f64StoreNarrow(Instruction.StoreOperandNarrow)
+    /// WebAssembly Core Instruction `i32.store8` on a 32-bit memory with a 32-bit offset
+    case i32Store8Narrow(Instruction.StoreOperandNarrow)
+    /// WebAssembly Core Instruction `i32.store16` on a 32-bit memory with a 32-bit offset
+    case i32Store16Narrow(Instruction.StoreOperandNarrow)
+    /// WebAssembly Core Instruction `i64.store8` on a 32-bit memory with a 32-bit offset
+    case i64Store8Narrow(Instruction.StoreOperandNarrow)
+    /// WebAssembly Core Instruction `i64.store16` on a 32-bit memory with a 32-bit offset
+    case i64Store16Narrow(Instruction.StoreOperandNarrow)
+    /// WebAssembly Core Instruction `i64.store32` on a 32-bit memory with a 32-bit offset
+    case i64Store32Narrow(Instruction.StoreOperandNarrow)
 }
 
 extension Instruction {
@@ -1305,6 +1355,32 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.lhs, $0.rhs, $0.offset) as (VReg, VReg, Int32), to: CodeSlot.self) }
         }
     }
+
+    struct LoadOperandNarrow: Equatable, InstructionImmediate {
+        var pointer: VReg
+        var result: VReg
+        var offset: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (pointer, result, offset) = pc.read((VReg, VReg, UInt32).self)
+            return Self(pointer: pointer, result: result, offset: offset)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.pointer, $0.result, $0.offset) as (VReg, VReg, UInt32), to: CodeSlot.self) }
+        }
+    }
+
+    struct StoreOperandNarrow: Equatable, InstructionImmediate {
+        var pointer: VReg
+        var value: VReg
+        var offset: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (pointer, value, offset) = pc.read((VReg, VReg, UInt32).self)
+            return Self(pointer: pointer, value: value, offset: offset)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.pointer, $0.value, $0.offset) as (VReg, VReg, UInt32), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -1600,6 +1676,29 @@ extension Instruction {
         case .brIfI64LeU(let immediate): return immediate
         case .brIfI64GeS(let immediate): return immediate
         case .brIfI64GeU(let immediate): return immediate
+        case .i32LoadNarrow(let immediate): return immediate
+        case .i64LoadNarrow(let immediate): return immediate
+        case .f32LoadNarrow(let immediate): return immediate
+        case .f64LoadNarrow(let immediate): return immediate
+        case .i32Load8SNarrow(let immediate): return immediate
+        case .i32Load8UNarrow(let immediate): return immediate
+        case .i32Load16SNarrow(let immediate): return immediate
+        case .i32Load16UNarrow(let immediate): return immediate
+        case .i64Load8SNarrow(let immediate): return immediate
+        case .i64Load8UNarrow(let immediate): return immediate
+        case .i64Load16SNarrow(let immediate): return immediate
+        case .i64Load16UNarrow(let immediate): return immediate
+        case .i64Load32SNarrow(let immediate): return immediate
+        case .i64Load32UNarrow(let immediate): return immediate
+        case .i32StoreNarrow(let immediate): return immediate
+        case .i64StoreNarrow(let immediate): return immediate
+        case .f32StoreNarrow(let immediate): return immediate
+        case .f64StoreNarrow(let immediate): return immediate
+        case .i32Store8Narrow(let immediate): return immediate
+        case .i32Store16Narrow(let immediate): return immediate
+        case .i64Store8Narrow(let immediate): return immediate
+        case .i64Store16Narrow(let immediate): return immediate
+        case .i64Store32Narrow(let immediate): return immediate
         default: return nil
         }
     }
@@ -1899,6 +1998,29 @@ extension Instruction {
         case .brIfI64LeU(let immediate): immediate.emit(to: emit)
         case .brIfI64GeS(let immediate): immediate.emit(to: emit)
         case .brIfI64GeU(let immediate): immediate.emit(to: emit)
+        case .i32LoadNarrow(let immediate): immediate.emit(to: emit)
+        case .i64LoadNarrow(let immediate): immediate.emit(to: emit)
+        case .f32LoadNarrow(let immediate): immediate.emit(to: emit)
+        case .f64LoadNarrow(let immediate): immediate.emit(to: emit)
+        case .i32Load8SNarrow(let immediate): immediate.emit(to: emit)
+        case .i32Load8UNarrow(let immediate): immediate.emit(to: emit)
+        case .i32Load16SNarrow(let immediate): immediate.emit(to: emit)
+        case .i32Load16UNarrow(let immediate): immediate.emit(to: emit)
+        case .i64Load8SNarrow(let immediate): immediate.emit(to: emit)
+        case .i64Load8UNarrow(let immediate): immediate.emit(to: emit)
+        case .i64Load16SNarrow(let immediate): immediate.emit(to: emit)
+        case .i64Load16UNarrow(let immediate): immediate.emit(to: emit)
+        case .i64Load32SNarrow(let immediate): immediate.emit(to: emit)
+        case .i64Load32UNarrow(let immediate): immediate.emit(to: emit)
+        case .i32StoreNarrow(let immediate): immediate.emit(to: emit)
+        case .i64StoreNarrow(let immediate): immediate.emit(to: emit)
+        case .f32StoreNarrow(let immediate): immediate.emit(to: emit)
+        case .f64StoreNarrow(let immediate): immediate.emit(to: emit)
+        case .i32Store8Narrow(let immediate): immediate.emit(to: emit)
+        case .i32Store16Narrow(let immediate): immediate.emit(to: emit)
+        case .i64Store8Narrow(let immediate): immediate.emit(to: emit)
+        case .i64Store16Narrow(let immediate): immediate.emit(to: emit)
+        case .i64Store32Narrow(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -2206,6 +2328,31 @@ extension Instruction {
         case .brIfI64GeS: return 294
         case .brIfI64GeU: return 295
         case .returnCrossInstance: return 296
+        case .memoryOutOfBoundsTrap: return 297
+        case .unalignedAtomicTrap: return 298
+        case .i32LoadNarrow: return 299
+        case .i64LoadNarrow: return 300
+        case .f32LoadNarrow: return 301
+        case .f64LoadNarrow: return 302
+        case .i32Load8SNarrow: return 303
+        case .i32Load8UNarrow: return 304
+        case .i32Load16SNarrow: return 305
+        case .i32Load16UNarrow: return 306
+        case .i64Load8SNarrow: return 307
+        case .i64Load8UNarrow: return 308
+        case .i64Load16SNarrow: return 309
+        case .i64Load16UNarrow: return 310
+        case .i64Load32SNarrow: return 311
+        case .i64Load32UNarrow: return 312
+        case .i32StoreNarrow: return 313
+        case .i64StoreNarrow: return 314
+        case .f32StoreNarrow: return 315
+        case .f64StoreNarrow: return 316
+        case .i32Store8Narrow: return 317
+        case .i32Store16Narrow: return 318
+        case .i64Store8Narrow: return 319
+        case .i64Store16Narrow: return 320
+        case .i64Store32Narrow: return 321
         }
     }
 }
@@ -2514,6 +2661,31 @@ extension Instruction {
         case 294: return .brIfI64GeS(Instruction.BrIfCmpOperand.load(from: &pc))
         case 295: return .brIfI64GeU(Instruction.BrIfCmpOperand.load(from: &pc))
         case 296: return .returnCrossInstance
+        case 297: return .memoryOutOfBoundsTrap
+        case 298: return .unalignedAtomicTrap
+        case 299: return .i32LoadNarrow(Instruction.LoadOperandNarrow.load(from: &pc))
+        case 300: return .i64LoadNarrow(Instruction.LoadOperandNarrow.load(from: &pc))
+        case 301: return .f32LoadNarrow(Instruction.LoadOperandNarrow.load(from: &pc))
+        case 302: return .f64LoadNarrow(Instruction.LoadOperandNarrow.load(from: &pc))
+        case 303: return .i32Load8SNarrow(Instruction.LoadOperandNarrow.load(from: &pc))
+        case 304: return .i32Load8UNarrow(Instruction.LoadOperandNarrow.load(from: &pc))
+        case 305: return .i32Load16SNarrow(Instruction.LoadOperandNarrow.load(from: &pc))
+        case 306: return .i32Load16UNarrow(Instruction.LoadOperandNarrow.load(from: &pc))
+        case 307: return .i64Load8SNarrow(Instruction.LoadOperandNarrow.load(from: &pc))
+        case 308: return .i64Load8UNarrow(Instruction.LoadOperandNarrow.load(from: &pc))
+        case 309: return .i64Load16SNarrow(Instruction.LoadOperandNarrow.load(from: &pc))
+        case 310: return .i64Load16UNarrow(Instruction.LoadOperandNarrow.load(from: &pc))
+        case 311: return .i64Load32SNarrow(Instruction.LoadOperandNarrow.load(from: &pc))
+        case 312: return .i64Load32UNarrow(Instruction.LoadOperandNarrow.load(from: &pc))
+        case 313: return .i32StoreNarrow(Instruction.StoreOperandNarrow.load(from: &pc))
+        case 314: return .i64StoreNarrow(Instruction.StoreOperandNarrow.load(from: &pc))
+        case 315: return .f32StoreNarrow(Instruction.StoreOperandNarrow.load(from: &pc))
+        case 316: return .f64StoreNarrow(Instruction.StoreOperandNarrow.load(from: &pc))
+        case 317: return .i32Store8Narrow(Instruction.StoreOperandNarrow.load(from: &pc))
+        case 318: return .i32Store16Narrow(Instruction.StoreOperandNarrow.load(from: &pc))
+        case 319: return .i64Store8Narrow(Instruction.StoreOperandNarrow.load(from: &pc))
+        case 320: return .i64Store16Narrow(Instruction.StoreOperandNarrow.load(from: &pc))
+        case 321: return .i64Store32Narrow(Instruction.StoreOperandNarrow.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -2825,6 +2997,31 @@ extension Instruction {
         case 294: return "brIfI64GeS"
         case 295: return "brIfI64GeU"
         case 296: return "returnCrossInstance"
+        case 297: return "memoryOutOfBoundsTrap"
+        case 298: return "unalignedAtomicTrap"
+        case 299: return "i32LoadNarrow"
+        case 300: return "i64LoadNarrow"
+        case 301: return "f32LoadNarrow"
+        case 302: return "f64LoadNarrow"
+        case 303: return "i32Load8SNarrow"
+        case 304: return "i32Load8UNarrow"
+        case 305: return "i32Load16SNarrow"
+        case 306: return "i32Load16UNarrow"
+        case 307: return "i64Load8SNarrow"
+        case 308: return "i64Load8UNarrow"
+        case 309: return "i64Load16SNarrow"
+        case 310: return "i64Load16UNarrow"
+        case 311: return "i64Load32SNarrow"
+        case 312: return "i64Load32UNarrow"
+        case 313: return "i32StoreNarrow"
+        case 314: return "i64StoreNarrow"
+        case 315: return "f32StoreNarrow"
+        case 316: return "f64StoreNarrow"
+        case 317: return "i32Store8Narrow"
+        case 318: return "i32Store16Narrow"
+        case 319: return "i64Store8Narrow"
+        case 320: return "i64Store16Narrow"
+        case 321: return "i64Store32Narrow"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }

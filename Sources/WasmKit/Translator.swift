@@ -2557,14 +2557,37 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             })
     }
 
+    /// Whether to emit the two-code-slot form of a load/store.
+    ///
+    /// Direct threading only. Under token threading every opcode is a case of one large
+    /// `switch`, which the compiler lowers to a tree of range checks over jump tables, so
+    /// adding hot opcodes there costs more mispredicted dispatch branches than the smaller
+    /// encoding saves: measured on the wasmi-benchmarks suite, emitting the narrow forms
+    /// under token threading cost ~7% on the execute geomean and ~10% on CoreMark, while
+    /// under direct threading (which has no such switch) it gains ~4% and ~1%.
+    private var emitsNarrowMemoryAccess: Bool {
+        engineConfiguration.threadingModel == .direct
+    }
+
     private mutating func visitLoad(
         _ memarg: MemArg,
         _ type: ValueType,
         _ naturalAlignment: Int,
-        _ instruction: @escaping (Instruction.LoadOperand) -> Instruction
+        _ instruction: @escaping (Instruction.LoadOperand) -> Instruction,
+        narrow narrowInstruction: ((Instruction.LoadOperandNarrow) -> Instruction)? = nil
     ) throws(WasmKitError) {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        // Two code slots instead of three whenever the offset fits beside the registers,
+        // which is every load a 32-bit-memory guest emits. See `emitsNarrowMemoryAccess`.
+        if emitsNarrowMemoryAccess, !isMemory64, let narrowInstruction, let offset = UInt32(exactly: memarg.offset) {
+            try popPushEmit(.address(isMemory64: false), type) { value, result in
+                narrowInstruction(
+                    Instruction.LoadOperandNarrow(pointer: value, result: result, offset: offset)
+                )
+            }
+            return
+        }
         try popPushEmit(.address(isMemory64: isMemory64), type) { value, result in
             let loadOperand = Instruction.LoadOperand(
                 offset: memarg.offset,
@@ -2578,13 +2601,22 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         _ memarg: MemArg,
         _ type: ValueType,
         _ naturalAlignment: Int,
-        _ instruction: (Instruction.StoreOperand) -> Instruction
+        _ instruction: (Instruction.StoreOperand) -> Instruction,
+        narrow narrowInstruction: ((Instruction.StoreOperandNarrow) -> Instruction)? = nil
     ) throws(WasmKitError) {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let value = try popVRegOperand(type)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
         if let value = value, let pointer = pointer {
+            // See `visitLoad`.
+            if emitsNarrowMemoryAccess, !isMemory64, let narrowInstruction, let offset = UInt32(exactly: memarg.offset) {
+                emit(
+                    narrowInstruction(
+                        Instruction.StoreOperandNarrow(pointer: pointer, value: value, offset: offset)
+                    ))
+                return
+            }
             let storeOperand = Instruction.StoreOperand(
                 offset: memarg.offset,
                 pointer: pointer,
@@ -2596,11 +2628,21 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
     mutating func visitLoad(_ load: WasmParser.Instruction.Load, memarg: MemArg) throws(WasmKitError) {
         let instruction: (Instruction.LoadOperand) -> Instruction
+        /// The two-code-slot form, when this load has one (the atomic loads do not).
+        var narrowInstruction: ((Instruction.LoadOperandNarrow) -> Instruction)? = nil
         switch load {
-        case .i32Load: instruction = Instruction.i32Load
-        case .i64Load: instruction = Instruction.i64Load
-        case .f32Load: instruction = Instruction.f32Load
-        case .f64Load: instruction = Instruction.f64Load
+        case .i32Load:
+            instruction = Instruction.i32Load
+            narrowInstruction = Instruction.i32LoadNarrow
+        case .i64Load:
+            instruction = Instruction.i64Load
+            narrowInstruction = Instruction.i64LoadNarrow
+        case .f32Load:
+            instruction = Instruction.f32Load
+            narrowInstruction = Instruction.f32LoadNarrow
+        case .f64Load:
+            instruction = Instruction.f64Load
+            narrowInstruction = Instruction.f64LoadNarrow
         case .v128Load, .v128Load8X8S, .v128Load8X8U, .v128Load16X4S, .v128Load16X4U,
             .v128Load32X2S, .v128Load32X2U, .v128Load8Splat, .v128Load16Splat, .v128Load32Splat,
             .v128Load64Splat, .v128Load32Zero, .v128Load64Zero:
@@ -2621,16 +2663,36 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                     ))
             }
             return
-        case .i32Load8S: instruction = Instruction.i32Load8S
-        case .i32Load8U: instruction = Instruction.i32Load8U
-        case .i32Load16S: instruction = Instruction.i32Load16S
-        case .i32Load16U: instruction = Instruction.i32Load16U
-        case .i64Load8S: instruction = Instruction.i64Load8S
-        case .i64Load8U: instruction = Instruction.i64Load8U
-        case .i64Load16S: instruction = Instruction.i64Load16S
-        case .i64Load16U: instruction = Instruction.i64Load16U
-        case .i64Load32S: instruction = Instruction.i64Load32S
-        case .i64Load32U: instruction = Instruction.i64Load32U
+        case .i32Load8S:
+            instruction = Instruction.i32Load8S
+            narrowInstruction = Instruction.i32Load8SNarrow
+        case .i32Load8U:
+            instruction = Instruction.i32Load8U
+            narrowInstruction = Instruction.i32Load8UNarrow
+        case .i32Load16S:
+            instruction = Instruction.i32Load16S
+            narrowInstruction = Instruction.i32Load16SNarrow
+        case .i32Load16U:
+            instruction = Instruction.i32Load16U
+            narrowInstruction = Instruction.i32Load16UNarrow
+        case .i64Load8S:
+            instruction = Instruction.i64Load8S
+            narrowInstruction = Instruction.i64Load8SNarrow
+        case .i64Load8U:
+            instruction = Instruction.i64Load8U
+            narrowInstruction = Instruction.i64Load8UNarrow
+        case .i64Load16S:
+            instruction = Instruction.i64Load16S
+            narrowInstruction = Instruction.i64Load16SNarrow
+        case .i64Load16U:
+            instruction = Instruction.i64Load16U
+            narrowInstruction = Instruction.i64Load16UNarrow
+        case .i64Load32S:
+            instruction = Instruction.i64Load32S
+            narrowInstruction = Instruction.i64Load32SNarrow
+        case .i64Load32U:
+            instruction = Instruction.i64Load32U
+            narrowInstruction = Instruction.i64Load32UNarrow
         case .i32AtomicLoad: instruction = Instruction.i32AtomicLoad
         case .i64AtomicLoad: instruction = Instruction.i64AtomicLoad
         case .i32AtomicLoad8U: instruction = Instruction.i32AtomicLoad8U
@@ -2640,16 +2702,26 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case .i64AtomicLoad32U: instruction = Instruction.i64AtomicLoad32U
 
         }
-        try visitLoad(memarg, load.type, load.naturalAlignment, instruction)
+        try visitLoad(memarg, load.type, load.naturalAlignment, instruction, narrow: narrowInstruction)
     }
 
     mutating func visitStore(_ store: WasmParser.Instruction.Store, memarg: MemArg) throws(WasmKitError) {
         let instruction: (Instruction.StoreOperand) -> Instruction
+        /// The two-code-slot form, when this store has one (the atomic stores do not).
+        var narrowInstruction: ((Instruction.StoreOperandNarrow) -> Instruction)? = nil
         switch store {
-        case .i32Store: instruction = Instruction.i32Store
-        case .i64Store: instruction = Instruction.i64Store
-        case .f32Store: instruction = Instruction.f32Store
-        case .f64Store: instruction = Instruction.f64Store
+        case .i32Store:
+            instruction = Instruction.i32Store
+            narrowInstruction = Instruction.i32StoreNarrow
+        case .i64Store:
+            instruction = Instruction.i64Store
+            narrowInstruction = Instruction.i64StoreNarrow
+        case .f32Store:
+            instruction = Instruction.f32Store
+            narrowInstruction = Instruction.f32StoreNarrow
+        case .f64Store:
+            instruction = Instruction.f64Store
+            narrowInstruction = Instruction.f64StoreNarrow
         case .v128Store:
             let isMemory64 = try module.isMemory64(memoryIndex: 0)
             try validator.validateMemArg(memarg, naturalAlignment: store.naturalAlignment)
@@ -2671,11 +2743,21 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                         )))
             }
             return
-        case .i32Store8: instruction = Instruction.i32Store8
-        case .i32Store16: instruction = Instruction.i32Store16
-        case .i64Store8: instruction = Instruction.i64Store8
-        case .i64Store16: instruction = Instruction.i64Store16
-        case .i64Store32: instruction = Instruction.i64Store32
+        case .i32Store8:
+            instruction = Instruction.i32Store8
+            narrowInstruction = Instruction.i32Store8Narrow
+        case .i32Store16:
+            instruction = Instruction.i32Store16
+            narrowInstruction = Instruction.i32Store16Narrow
+        case .i64Store8:
+            instruction = Instruction.i64Store8
+            narrowInstruction = Instruction.i64Store8Narrow
+        case .i64Store16:
+            instruction = Instruction.i64Store16
+            narrowInstruction = Instruction.i64Store16Narrow
+        case .i64Store32:
+            instruction = Instruction.i64Store32
+            narrowInstruction = Instruction.i64Store32Narrow
         case .i32AtomicStore: instruction = Instruction.i32AtomicStore
         case .i64AtomicStore: instruction = Instruction.i64AtomicStore
         case .i32AtomicStore8: instruction = Instruction.i32AtomicStore8
@@ -2684,7 +2766,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case .i64AtomicStore16: instruction = Instruction.i64AtomicStore16
         case .i64AtomicStore32: instruction = Instruction.i64AtomicStore32
         }
-        try visitStore(memarg, store.type, store.naturalAlignment, instruction)
+        try visitStore(memarg, store.type, store.naturalAlignment, instruction, narrow: narrowInstruction)
     }
 
     mutating func visitV128Const(value: V128) throws(WasmKitError) {

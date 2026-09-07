@@ -247,7 +247,11 @@ typealias CodeSlot = UInt64
 typealias Md = UnsafeMutableRawPointer?
 /// The "m"emory "s"ize intended to be bound to a physical register.
 /// Stores the size of the default memory of the current execution context.
-typealias Ms = Int
+///
+/// Unsigned, matching the `Ms` typedef in `_CWasmKit.h`, so that the bounds check in a
+/// load/store handler is a single unsigned compare: a signed `Ms` made the compiler put a
+/// `tbnz ms, #63` sign test in front of every one of them.
+typealias Ms = UInt
 /// The "s"tack "p"ointer intended to be bound to a physical register.
 /// Stores the base address of the current frame's register storage.
 typealias Sp = UnsafeMutablePointer<StackSlot>
@@ -519,7 +523,7 @@ extension Execution {
             // so the software check never rejects a valid address that another thread just
             // grew into; the guard pages enforce the real bound. For non-shared memory it is
             // the committed size (the tight software bound).
-            ms = memory.boundsCheckLimit
+            ms = UInt(bitPattern: memory.boundsCheckLimit)
             wasmkit_trap_guard_set_current_memory(md, memory.trapGuardReservationSize)
         }
 
