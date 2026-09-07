@@ -58,7 +58,7 @@ package struct Run: AsyncParsableCommand {
 
     @Option(
         name: .customLong("wasi-threads-max"),
-        help: "Maximum concurrently live WASI guest threads (default: 64)"
+        help: "Maximum concurrently live WASI guest threads"
     )
     var wasiThreadsMax = 64
 
@@ -80,13 +80,19 @@ package struct Run: AsyncParsableCommand {
             case .exceptionHandling: .exceptionHandling
             }
         }
+
+        /// The features already enabled without any `--feature` option, derived
+        /// from the parser's default set so that the two never drift apart.
+        static var enabledByDefault: [Feature] {
+            allCases.filter { WasmFeatureSet.default.contains($0.wasmFeature) }
+        }
     }
 
     @Option(
         name: .customLong("feature"),
         help: """
-            Enable a WebAssembly proposal feature in addition to the default set \
-            (memory64, reference-types, threads, tail-call, simd, exception-handling)
+            Enable a WebAssembly proposal feature in addition to those enabled by default \
+            (\(Feature.enabledByDefault.map(\.rawValue).joined(separator: ", ")))
             """
     )
     var features: [Feature] = []
