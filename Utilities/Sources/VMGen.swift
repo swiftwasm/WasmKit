@@ -28,7 +28,46 @@ enum VMGen {
         (size + alignment - 1) / alignment * alignment
     }
 
+    /// Maps every instruction name to the instruction that owns the handler body it runs.
+    ///
+    /// Instructions that declare the same `handlerIdentity` compile to bit-identical
+    /// handler bodies; the first one in instruction order becomes the canonical owner
+    /// and the rest are aliases of it. Instructions without an identity, and the
+    /// canonical member of each group, map to themselves.
+    ///
+    /// Both threading models must agree on this mapping: the direct-threaded handler
+    /// table and the token-threaded dispatcher are generated from it, so an alias can
+    /// never end up running a different body depending on the threading model.
+    static func canonicalHandlerOwners(instructions: [Instruction]) -> [String: Instruction] {
+        var canonicalOfIdentity: [String: Instruction] = [:]
+        var owners: [String: Instruction] = [:]
+        for inst in instructions {
+            guard let identity = inst.handlerIdentity else {
+                owners[inst.name] = inst
+                continue
+            }
+            precondition(
+                !inst.isControl,
+                "\(inst.name): control instructions must not share a handler; the debugger maps head slots back to opcode IDs"
+            )
+            guard let canonical = canonicalOfIdentity[identity] else {
+                canonicalOfIdentity[identity] = inst
+                owners[inst.name] = inst
+                continue
+            }
+            precondition(
+                canonical.mayThrow == inst.mayThrow && canonical.mayUpdatePc == inst.mayUpdatePc
+                    && canonical.mayUpdateFrame == inst.mayUpdateFrame
+                    && canonical.immediate?.type == inst.immediate?.type,
+                "\(inst.name) and \(canonical.name) claim the same handler identity '\(identity)' but have different handler shapes"
+            )
+            owners[inst.name] = canonical
+        }
+        return owners
+    }
+
     static func generateDispatcher(instructions: [Instruction]) -> String {
+        let owners = canonicalHandlerOwners(instructions: instructions)
         let doExecuteParams: [Instruction.Parameter] =
             [("opcode", "OpcodeID", false)]
             + ExecutionParameter.allCases.map { ($0.label, $0.type, true) }
@@ -43,11 +82,18 @@ enum VMGen {
             """
 
         for (opcode, inst) in instructions.enumerated() {
+            let owner = owners[inst.name]!
             let tryPrefix = inst.mayThrow ? "try " : ""
             let args = ExecutionParameter.allCases.map { "\($0.label): &\($0.label)" }
+            if owner.name != inst.name {
+                output += """
+
+                            // \(inst.name) shares \(owner.name)'s handler body; see Instruction.handlerIdentity
+                    """
+            }
             output += """
 
-                        case \(opcode): return \(tryPrefix)self.execute_\(inst.name)(\(args.joined(separator: ", ")))
+                        case \(opcode): return \(tryPrefix)self.execute_\(owner.name)(\(args.joined(separator: ", ")))
                 """
         }
         output += """
@@ -545,7 +591,17 @@ enum VMGen {
             "wasmkit_tc_\(inst.name)"
         }
 
-        for inst in instructions {
+        // Instructions that declare the same `handlerIdentity` compile to bit-identical
+        // handler bodies, so emit the trampoline once and let every opcode in the group
+        // point its handler-table entry at it. Leaving the duplicates in makes the
+        // compiler's function merging pass fold them and replace each duplicate with a
+        // `b <canonical>` thunk, which the table then points at: one extra taken branch
+        // on every dispatch to that opcode. The token-threaded dispatcher is generated
+        // from the same mapping, so both models run the same body for an alias.
+        let owners = canonicalHandlerOwners(instructions: instructions)
+        let emittedHandlers = instructions.filter { owners[$0.name]!.name == $0.name }
+
+        for inst in emittedHandlers {
             let params = ExecutionParameter.allCases
             output += """
             SWIFT_CC(swiftasync) static inline void \(handlerName(inst))(\(params.map { "\($0.type) \($0.label)" }.joined(separator: ", ")), SWIFT_CONTEXT void *state) {
@@ -564,11 +620,14 @@ enum VMGen {
         }
 
         output += """
+        // Indexed by opcode ID. Opcodes whose handlers are bit-identical (see
+        // `Instruction.handlerIdentity` in VMSpec) share a single entry point here,
+        // so that dispatch never goes through a compiler-generated merge thunk.
         static const uintptr_t wasmkit_tc_exec_handlers[] = {
 
         """
         for inst in instructions {
-            output += "    (uintptr_t)((wasmkit_tc_exec)&\(handlerName(inst))),\n"
+            output += "    (uintptr_t)((wasmkit_tc_exec)&\(handlerName(owners[inst.name]!))),\n"
         }
         output += """
         };

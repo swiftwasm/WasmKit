@@ -33,27 +33,37 @@ extension Execution {
         case 17: return try self.execute_endOfExecution(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 18: return try self.execute_i32Load(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 19: return try self.execute_i64Load(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 20: return try self.execute_f32Load(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 21: return try self.execute_f64Load(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // f32Load shares i32Load's handler body; see Instruction.handlerIdentity
+        case 20: return try self.execute_i32Load(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // f64Load shares i64Load's handler body; see Instruction.handlerIdentity
+        case 21: return try self.execute_i64Load(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 22: return try self.execute_i32Load8S(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 23: return try self.execute_i32Load8U(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 24: return try self.execute_i32Load16S(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 25: return try self.execute_i32Load16U(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 26: return try self.execute_i64Load8S(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 27: return try self.execute_i64Load8U(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64Load8U shares i32Load8U's handler body; see Instruction.handlerIdentity
+        case 27: return try self.execute_i32Load8U(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 28: return try self.execute_i64Load16S(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 29: return try self.execute_i64Load16U(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64Load16U shares i32Load16U's handler body; see Instruction.handlerIdentity
+        case 29: return try self.execute_i32Load16U(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 30: return try self.execute_i64Load32S(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 31: return try self.execute_i64Load32U(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64Load32U shares i32Load's handler body; see Instruction.handlerIdentity
+        case 31: return try self.execute_i32Load(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 32: return try self.execute_i32Store(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 33: return try self.execute_i64Store(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 34: return try self.execute_f32Store(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 35: return try self.execute_f64Store(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // f32Store shares i32Store's handler body; see Instruction.handlerIdentity
+        case 34: return try self.execute_i32Store(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // f64Store shares i64Store's handler body; see Instruction.handlerIdentity
+        case 35: return try self.execute_i64Store(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 36: return try self.execute_i32Store8(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 37: return try self.execute_i32Store16(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 38: return try self.execute_i64Store8(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 39: return try self.execute_i64Store16(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 40: return try self.execute_i64Store32(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64Store8 shares i32Store8's handler body; see Instruction.handlerIdentity
+        case 38: return try self.execute_i32Store8(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64Store16 shares i32Store16's handler body; see Instruction.handlerIdentity
+        case 39: return try self.execute_i32Store16(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64Store32 shares i32Store's handler body; see Instruction.handlerIdentity
+        case 40: return try self.execute_i32Store(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 41: return self.execute_memorySize(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 42: return try self.execute_memoryGrow(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 43: return try self.execute_memoryInit(sp: &sp, pc: &pc, md: &md, ms: &ms)
@@ -155,10 +165,13 @@ extension Execution {
         case 139: return self.execute_f64ConvertI32U(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 140: return self.execute_f64ConvertI64S(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 141: return self.execute_f64ConvertI64U(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 142: return self.execute_f32ReinterpretI32(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // f32ReinterpretI32 shares i64ExtendI32U's handler body; see Instruction.handlerIdentity
+        case 142: return self.execute_i64ExtendI32U(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 143: return self.execute_f64ReinterpretI64(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 144: return self.execute_i32ReinterpretF32(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 145: return self.execute_i64ReinterpretF64(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i32ReinterpretF32 shares i64ExtendI32U's handler body; see Instruction.handlerIdentity
+        case 144: return self.execute_i64ExtendI32U(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64ReinterpretF64 shares f64ReinterpretI64's handler body; see Instruction.handlerIdentity
+        case 145: return self.execute_f64ReinterpretI64(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 146: return self.execute_f32Add(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 147: return self.execute_f64Add(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 148: return self.execute_f32Sub(sp: &sp, pc: &pc, md: &md, ms: &ms)
@@ -220,16 +233,22 @@ extension Execution {
         case 204: return try self.execute_i64AtomicLoad(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 205: return try self.execute_i32AtomicLoad8U(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 206: return try self.execute_i32AtomicLoad16U(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 207: return try self.execute_i64AtomicLoad8U(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 208: return try self.execute_i64AtomicLoad16U(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 209: return try self.execute_i64AtomicLoad32U(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicLoad8U shares i32AtomicLoad8U's handler body; see Instruction.handlerIdentity
+        case 207: return try self.execute_i32AtomicLoad8U(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicLoad16U shares i32AtomicLoad16U's handler body; see Instruction.handlerIdentity
+        case 208: return try self.execute_i32AtomicLoad16U(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicLoad32U shares i32AtomicLoad's handler body; see Instruction.handlerIdentity
+        case 209: return try self.execute_i32AtomicLoad(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 210: return try self.execute_i32AtomicStore(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 211: return try self.execute_i64AtomicStore(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 212: return try self.execute_i32AtomicStore8(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 213: return try self.execute_i32AtomicStore16(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 214: return try self.execute_i64AtomicStore8(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 215: return try self.execute_i64AtomicStore16(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 216: return try self.execute_i64AtomicStore32(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicStore8 shares i32AtomicStore8's handler body; see Instruction.handlerIdentity
+        case 214: return try self.execute_i32AtomicStore8(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicStore16 shares i32AtomicStore16's handler body; see Instruction.handlerIdentity
+        case 215: return try self.execute_i32AtomicStore16(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicStore32 shares i32AtomicStore's handler body; see Instruction.handlerIdentity
+        case 216: return try self.execute_i32AtomicStore(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 217: return try self.execute_i32AtomicRmwAdd(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 218: return try self.execute_i64AtomicRmwAdd(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 219: return try self.execute_i32AtomicRmwSub(sp: &sp, pc: &pc, md: &md, ms: &ms)
@@ -243,42 +262,63 @@ extension Execution {
         case 227: return try self.execute_i32AtomicRmwXchg(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 228: return try self.execute_i64AtomicRmwXchg(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 229: return try self.execute_i32AtomicRmw8AddU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 230: return try self.execute_i64AtomicRmw8AddU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw8AddU shares i32AtomicRmw8AddU's handler body; see Instruction.handlerIdentity
+        case 230: return try self.execute_i32AtomicRmw8AddU(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 231: return try self.execute_i32AtomicRmw8SubU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 232: return try self.execute_i64AtomicRmw8SubU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw8SubU shares i32AtomicRmw8SubU's handler body; see Instruction.handlerIdentity
+        case 232: return try self.execute_i32AtomicRmw8SubU(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 233: return try self.execute_i32AtomicRmw8AndU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 234: return try self.execute_i64AtomicRmw8AndU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw8AndU shares i32AtomicRmw8AndU's handler body; see Instruction.handlerIdentity
+        case 234: return try self.execute_i32AtomicRmw8AndU(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 235: return try self.execute_i32AtomicRmw8OrU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 236: return try self.execute_i64AtomicRmw8OrU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw8OrU shares i32AtomicRmw8OrU's handler body; see Instruction.handlerIdentity
+        case 236: return try self.execute_i32AtomicRmw8OrU(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 237: return try self.execute_i32AtomicRmw8XorU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 238: return try self.execute_i64AtomicRmw8XorU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw8XorU shares i32AtomicRmw8XorU's handler body; see Instruction.handlerIdentity
+        case 238: return try self.execute_i32AtomicRmw8XorU(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 239: return try self.execute_i32AtomicRmw8XchgU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 240: return try self.execute_i64AtomicRmw8XchgU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw8XchgU shares i32AtomicRmw8XchgU's handler body; see Instruction.handlerIdentity
+        case 240: return try self.execute_i32AtomicRmw8XchgU(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 241: return try self.execute_i32AtomicRmw16AddU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 242: return try self.execute_i64AtomicRmw16AddU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw16AddU shares i32AtomicRmw16AddU's handler body; see Instruction.handlerIdentity
+        case 242: return try self.execute_i32AtomicRmw16AddU(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 243: return try self.execute_i32AtomicRmw16SubU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 244: return try self.execute_i64AtomicRmw16SubU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw16SubU shares i32AtomicRmw16SubU's handler body; see Instruction.handlerIdentity
+        case 244: return try self.execute_i32AtomicRmw16SubU(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 245: return try self.execute_i32AtomicRmw16AndU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 246: return try self.execute_i64AtomicRmw16AndU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw16AndU shares i32AtomicRmw16AndU's handler body; see Instruction.handlerIdentity
+        case 246: return try self.execute_i32AtomicRmw16AndU(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 247: return try self.execute_i32AtomicRmw16OrU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 248: return try self.execute_i64AtomicRmw16OrU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw16OrU shares i32AtomicRmw16OrU's handler body; see Instruction.handlerIdentity
+        case 248: return try self.execute_i32AtomicRmw16OrU(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 249: return try self.execute_i32AtomicRmw16XorU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 250: return try self.execute_i64AtomicRmw16XorU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw16XorU shares i32AtomicRmw16XorU's handler body; see Instruction.handlerIdentity
+        case 250: return try self.execute_i32AtomicRmw16XorU(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 251: return try self.execute_i32AtomicRmw16XchgU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 252: return try self.execute_i64AtomicRmw16XchgU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 253: return try self.execute_i64AtomicRmw32AddU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 254: return try self.execute_i64AtomicRmw32SubU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 255: return try self.execute_i64AtomicRmw32AndU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 256: return try self.execute_i64AtomicRmw32OrU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 257: return try self.execute_i64AtomicRmw32XorU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 258: return try self.execute_i64AtomicRmw32XchgU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw16XchgU shares i32AtomicRmw16XchgU's handler body; see Instruction.handlerIdentity
+        case 252: return try self.execute_i32AtomicRmw16XchgU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw32AddU shares i32AtomicRmwAdd's handler body; see Instruction.handlerIdentity
+        case 253: return try self.execute_i32AtomicRmwAdd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw32SubU shares i32AtomicRmwSub's handler body; see Instruction.handlerIdentity
+        case 254: return try self.execute_i32AtomicRmwSub(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw32AndU shares i32AtomicRmwAnd's handler body; see Instruction.handlerIdentity
+        case 255: return try self.execute_i32AtomicRmwAnd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw32OrU shares i32AtomicRmwOr's handler body; see Instruction.handlerIdentity
+        case 256: return try self.execute_i32AtomicRmwOr(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw32XorU shares i32AtomicRmwXor's handler body; see Instruction.handlerIdentity
+        case 257: return try self.execute_i32AtomicRmwXor(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw32XchgU shares i32AtomicRmwXchg's handler body; see Instruction.handlerIdentity
+        case 258: return try self.execute_i32AtomicRmwXchg(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 259: return try self.execute_i32AtomicRmwCmpxchg(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 260: return try self.execute_i64AtomicRmwCmpxchg(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 261: return try self.execute_i32AtomicRmw8CmpxchgU(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 262: return try self.execute_i32AtomicRmw16CmpxchgU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 263: return try self.execute_i64AtomicRmw8CmpxchgU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 264: return try self.execute_i64AtomicRmw16CmpxchgU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 265: return try self.execute_i64AtomicRmw32CmpxchgU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw8CmpxchgU shares i32AtomicRmw8CmpxchgU's handler body; see Instruction.handlerIdentity
+        case 263: return try self.execute_i32AtomicRmw8CmpxchgU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw16CmpxchgU shares i32AtomicRmw16CmpxchgU's handler body; see Instruction.handlerIdentity
+        case 264: return try self.execute_i32AtomicRmw16CmpxchgU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        // i64AtomicRmw32CmpxchgU shares i32AtomicRmwCmpxchg's handler body; see Instruction.handlerIdentity
+        case 265: return try self.execute_i32AtomicRmwCmpxchg(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 266: return try self.execute_memoryAtomicWait32(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 267: return try self.execute_memoryAtomicWait64(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 268: return try self.execute_memoryAtomicNotify(sp: &sp, pc: &pc, md: &md, ms: &ms)

@@ -62,6 +62,23 @@ extension VMGen {
         var immediate: Immediate?
         /// The layout of the immediate operand.
         var immediateLayout: ImmediateLayout?
+        /// A key identifying the machine code of this instruction's direct-threaded handler.
+        ///
+        /// Several instructions differ only in the *static* WebAssembly type they
+        /// operate on and compile to bit-identical handler bodies (`i32.load` and
+        /// `f32.load` both zero-extend a 32-bit load into the 64-bit stack slot, for
+        /// example). Instructions sharing a non-nil identity get a single
+        /// `wasmkit_tc_*` handler; every opcode in the group points its handler-table
+        /// entry at it. Without this the compiler's function merging pass folds the
+        /// duplicates anyway and leaves a `b <canonical>` thunk behind, which costs an
+        /// extra taken branch on every dispatch to the duplicated opcode.
+        ///
+        /// The identity must describe the *raw* slot-to-slot behaviour of the handler,
+        /// so it has to be derived from the same fields that generate the body.
+        /// Control instructions must never share an identity: the debugger maps a
+        /// direct-threaded head slot back to an opcode ID, which requires handlers of
+        /// control instructions to be distinct.
+        var handlerIdentity: String? = nil
 
         var mayUpdatePc: Bool {
             self.isControl
@@ -196,11 +213,15 @@ extension VMGen {
         var inputType: String
         var resultType: String
         var mayThrow: Bool = false
+        /// See `Instruction.handlerIdentity`.
+        var handlerIdentity: String? = nil
 
         /// The instruction definition of this unary operation.
         var instruction: Instruction {
-            Instruction(name: name, documentation: "WebAssembly Core Instruction `\(inputType).\(VMGen.snakeCase(pascalCase: op))`",
+            var inst = Instruction(name: name, documentation: "WebAssembly Core Instruction `\(inputType).\(VMGen.snakeCase(pascalCase: op))`",
                         mayThrow: mayThrow, immediateLayout: .unary)
+            inst.handlerIdentity = handlerIdentity
+            return inst
         }
     }
 
@@ -247,7 +268,10 @@ extension VMGen {
         results += [UnOpInfo(op: "Wrap", name: "i32WrapI64", inputType: "i64", resultType: "i32")]
         // (i32) -> i64
         results += ["ExtendI32S", "ExtendI32U"].map { op -> UnOpInfo in
-            UnOpInfo(op: op, name: "i64\(op)", inputType: "i32", resultType: "i64")
+            // `i64.extend_i32_u` reads the low 32 bits of the slot and zero-extends
+            // them back into it, which is exactly a 32-bit slot move.
+            let identity = op == "ExtendI32U" ? "move(32)" : nil
+            return UnOpInfo(op: op, name: "i64\(op)", inputType: "i32", resultType: "i64", handlerIdentity: identity)
         }
         // (T) -> T for all T in int types
         results += ["Extend8S", "Extend16S"].flatMap { op -> [UnOpInfo] in
@@ -284,8 +308,10 @@ extension VMGen {
             ("i32", "f32"), ("i64", "f64"), ("f32", "i32"), ("f64", "i64")
         ]
         results += reinterpretInOut.flatMap { source, result in
-            [
-                UnOpInfo(op: "ReinterpretTo\(result.uppercased())", name: "\(result)Reinterpret\(source.uppercased())", inputType: source, resultType: result),
+            // A reinterpret is a pure slot move of the value's bit width.
+            let width = source.hasSuffix("32") ? 32 : 64
+            return [
+                UnOpInfo(op: "ReinterpretTo\(result.uppercased())", name: "\(result)Reinterpret\(source.uppercased())", inputType: source, resultType: result, handlerIdentity: "move(\(width))"),
             ]
         }
         return results
@@ -355,13 +381,24 @@ extension VMGen {
         let castToValue: String
         let isSigned: Bool
         let isFloatingPoint: Bool
+        /// The raw behaviour of the handler: load `loadAs` from memory and widen it
+        /// into the 64-bit stack slot. Unsigned loads always zero-extend, so the
+        /// result type does not matter (`.i32`, `.i64`, `.rawF32` and `.rawF64` all
+        /// zero-extend); signed loads sign-extend to the width of the result type.
+        private var identitySuffix: String {
+            "\(loadAs),\(isSigned ? "sext\(type)" : "zext")"
+        }
         var instruction: Instruction {
-            Instruction(name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
+            var inst = Instruction(name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
                         mayThrow: true, useCurrentMemory: .read, immediateLayout: .load)
+            inst.handlerIdentity = "load(\(identitySuffix))"
+            return inst
         }
         var atomicInstruction: Instruction {
-            Instruction(name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
+            var inst = Instruction(name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
                         mayThrow: true, useCurrentMemory: .read, immediateLayout: .load)
+            inst.handlerIdentity = "atomicLoad(\(identitySuffix))"
+            return inst
         }
     }
 
@@ -388,30 +425,39 @@ extension VMGen {
 
     struct StoreOpInfo {
         let type: String
+        /// The number of bits actually written to memory. Every store truncates the
+        /// 64-bit stack slot to this width, so the width alone determines the code
+        /// (`i32.store`, `f32.store` and `i64.store32` all store the low 32 bits).
+        let storeWidth: Int
         let op: String
         let castFromValue: String
         let isFloatingPoint: Bool
+
         var instruction: Instruction {
-            Instruction(name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
+            var inst = Instruction(name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
                         mayThrow: true, useCurrentMemory: .read, immediateLayout: .store)
+            inst.handlerIdentity = "store(\(storeWidth))"
+            return inst
         }
         var atomicInstruction: Instruction {
-            Instruction(name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
+            var inst = Instruction(name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
                         mayThrow: true, useCurrentMemory: .read, immediateLayout: .store)
+            inst.handlerIdentity = "atomicStore(\(storeWidth))"
+            return inst
         }
     }
     static let memoryStoreOps: [StoreOpInfo] = [
-        ("i32", "Store", "$0.i32", false),
-        ("i64", "Store", "$0.i64", false),
-        ("f32", "Store", "$0.rawF32", true),
-        ("f64", "Store", "$0.rawF64", true),
-        ("i32", "Store8", "UInt8(truncatingIfNeeded: $0.i32)", false),
-        ("i32", "Store16", "UInt16(truncatingIfNeeded: $0.i32)", false),
-        ("i64", "Store8", "UInt8(truncatingIfNeeded: $0.i64)", false),
-        ("i64", "Store16", "UInt16(truncatingIfNeeded: $0.i64)", false),
-        ("i64", "Store32", "UInt32(truncatingIfNeeded: $0.i64)", false),
-    ].map { (type, op, castFromValue, isFloatingPoint) in
-        return StoreOpInfo(type: type, op: op, castFromValue: castFromValue, isFloatingPoint: isFloatingPoint)
+        ("i32", 32, "Store", "$0.i32", false),
+        ("i64", 64, "Store", "$0.i64", false),
+        ("f32", 32, "Store", "$0.rawF32", true),
+        ("f64", 64, "Store", "$0.rawF64", true),
+        ("i32", 8, "Store8", "UInt8(truncatingIfNeeded: $0.i32)", false),
+        ("i32", 16, "Store16", "UInt16(truncatingIfNeeded: $0.i32)", false),
+        ("i64", 8, "Store8", "UInt8(truncatingIfNeeded: $0.i64)", false),
+        ("i64", 16, "Store16", "UInt16(truncatingIfNeeded: $0.i64)", false),
+        ("i64", 32, "Store32", "UInt32(truncatingIfNeeded: $0.i64)", false),
+    ].map { (type, storeWidth, op, castFromValue, isFloatingPoint) in
+        return StoreOpInfo(type: type, storeWidth: storeWidth, op: op, castFromValue: castFromValue, isFloatingPoint: isFloatingPoint)
     }
     static let memoryAtomicStoreOps = memoryStoreOps.filter { !$0.isFloatingPoint }
     static let memoryLoadStoreInsts: [Instruction] = memoryLoadOps.map(\.instruction) + memoryStoreOps.map(\.instruction)
@@ -438,8 +484,14 @@ extension VMGen {
             } else {
                 doc = "WebAssembly Core Instruction `\(type).atomic.rmw.\(VMGen.snakeCase(pascalCase: op))`"
             }
-            return Instruction(name: name, documentation: doc,
+            var inst = Instruction(name: name, documentation: doc,
                         mayThrow: true, useCurrentMemory: .read, immediateLayout: .rmw)
+            // The handler truncates the operand to `accessWidth` bits, applies the
+            // atomic operation and zero-extends the old value back into the slot, so
+            // the operation and the access width fully determine the code
+            // (`i32.atomic.rmw.add` and `i64.atomic.rmw32.add_u` are the same).
+            inst.handlerIdentity = "rmw(\(op),\(size ?? (type == "i32" ? "32" : "64")))"
+            return inst
         }
     }
 
@@ -505,22 +557,22 @@ extension VMGen {
         return RmwOpInfo(type: type, op: op, size: size, castFromValue: castFromValue, castToValue: castToValue)
     }
 
+    /// The compare-exchange instructions, as (instruction name, WebAssembly name, accessed width).
+    /// Like the other RMW handlers, the accessed width alone determines the machine code.
     static let atomicCmpxchgOps: [Instruction] = [
-        Instruction(name: "i32AtomicRmwCmpxchg", documentation: "WebAssembly Core Instruction `i32.atomic.rmw.cmpxchg`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
-        Instruction(name: "i64AtomicRmwCmpxchg", documentation: "WebAssembly Core Instruction `i64.atomic.rmw.cmpxchg`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
-        Instruction(name: "i32AtomicRmw8CmpxchgU", documentation: "WebAssembly Core Instruction `i32.atomic.rmw8.cmpxchg_u`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
-        Instruction(name: "i32AtomicRmw16CmpxchgU", documentation: "WebAssembly Core Instruction `i32.atomic.rmw16.cmpxchg_u`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
-        Instruction(name: "i64AtomicRmw8CmpxchgU", documentation: "WebAssembly Core Instruction `i64.atomic.rmw8.cmpxchg_u`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
-        Instruction(name: "i64AtomicRmw16CmpxchgU", documentation: "WebAssembly Core Instruction `i64.atomic.rmw16.cmpxchg_u`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
-        Instruction(name: "i64AtomicRmw32CmpxchgU", documentation: "WebAssembly Core Instruction `i64.atomic.rmw32.cmpxchg_u`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
-    ]
+        ("i32AtomicRmwCmpxchg", "i32.atomic.rmw.cmpxchg", 32),
+        ("i64AtomicRmwCmpxchg", "i64.atomic.rmw.cmpxchg", 64),
+        ("i32AtomicRmw8CmpxchgU", "i32.atomic.rmw8.cmpxchg_u", 8),
+        ("i32AtomicRmw16CmpxchgU", "i32.atomic.rmw16.cmpxchg_u", 16),
+        ("i64AtomicRmw8CmpxchgU", "i64.atomic.rmw8.cmpxchg_u", 8),
+        ("i64AtomicRmw16CmpxchgU", "i64.atomic.rmw16.cmpxchg_u", 16),
+        ("i64AtomicRmw32CmpxchgU", "i64.atomic.rmw32.cmpxchg_u", 32),
+    ].map { (name, wasmName, width) in
+        var inst = Instruction(name: name, documentation: "WebAssembly Core Instruction `\(wasmName)`",
+                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg)
+        inst.handlerIdentity = "rmw(Cmpxchg,\(width))"
+        return inst
+    }
 
     static let atomicWaitNotifyInsts: [Instruction] = [
         Instruction(name: "memoryAtomicWait32", documentation: "WebAssembly Core Instruction `memory.atomic.wait32`",
