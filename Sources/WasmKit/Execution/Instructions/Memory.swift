@@ -101,7 +101,7 @@ extension Execution {
             guard !destinationIndex.addingReportingOverflow(copyCounter).overflow else {
                 throw Trap(.memoryOutOfBounds)
             }
-            try memoryInstance.fill(offset: destinationIndex, value: value.littleEndianBytes[0], count: copyCounter)
+            try memoryInstance.fill(offset: destinationIndex, value: UInt8(truncatingIfNeeded: value), count: copyCounter)
         }
     }
 

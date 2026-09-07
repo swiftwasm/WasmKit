@@ -366,14 +366,19 @@ struct TableEntity /* : ~Copyable */ {
             throw Trap(.tableOutOfBounds(Int(sourceEnd)))
         }
 
-        let source = UnsafeBufferPointer(rebasing: sourceTable[source..<source + count])
-        let destination = UnsafeMutableBufferPointer(rebasing: destinationTable[destination..<destination + count])
+        guard count > 0,
+            let sourceBase = sourceTable.baseAddress,
+            let destinationBase = destinationTable.baseAddress
+        else { return }
 
-        // Note: Do not use `UnsafeMutableBufferPointer.update(from:)` overload here because it does not
-        // provide the same semantics as `memmove` for overlapping memory regions.
-        // TODO: We can optimize this to use `memcpy` if the source and destination tables are known to be different
-        // at translation time.
-        _ = destination.update(fromContentsOf: source)
+        // `Reference` is a trivial (bitwise-copyable) type, so the elements can be
+        // moved with a single `memmove`, which is also overlap-safe as required when
+        // the source and destination tables are the same.
+        let destination = UnsafeMutableRawPointer(destinationBase.advanced(by: destination))
+        destination.copyMemory(
+            from: sourceBase.advanced(by: source),
+            byteCount: count * MemoryLayout<Reference>.stride
+        )
     }
 }
 
@@ -761,19 +766,13 @@ struct MemoryEntity: ~Copyable {
             throw Trap(.memoryOutOfBounds)
         }
         let count = Int(count)
-        guard count > 0 else { return }
-        guard let baseAddress = baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-        let destination = Int(destination)
-        let source = Int(source)
-        if destination < source {
-            for i in 0..<count {
-                baseAddress[destination + i] = baseAddress[source + i]
-            }
-        } else if destination > source {
-            for i in stride(from: count - 1, through: 0, by: -1) {
-                baseAddress[destination + i] = baseAddress[source + i]
-            }
-        }
+        guard count > 0, let baseAddress = baseAddress else { return }
+        // Both ranges have been bounds-checked above, so a single `memmove` is
+        // enough here. `memmove` is overlap-safe, which `memory.copy` requires.
+        baseAddress.advanced(by: Int(destination)).copyMemory(
+            from: baseAddress.advanced(by: Int(source)),
+            byteCount: count
+        )
     }
 
     mutating func initialize(_ segment: InternalDataSegment, from source: UInt32, to destination: UInt64, count: UInt32) throws {
