@@ -75,3 +75,17 @@ package.targets += [
         ]
     ),
 ]
+
+// Replay of the wasmi-benchmarks suite. Not an ordo-one benchmark target: it is
+// a plain executable that prints CSV, so its numbers line up with the ones
+// wasmi's own criterion harness prints. See README.md.
+package.targets += [
+    .executableTarget(
+        name: "WasmiBenchmarks",
+        dependencies: [
+            .product(name: "WAT", package: "WasmKit"),
+            .product(name: "WasmKit", package: "WasmKit"),
+        ],
+        path: "Sources/WasmiBenchmarks"
+    ),
+]
