@@ -251,7 +251,9 @@ jobs:
 
   build-android:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # Enough headroom for a cold run: a cache miss has to create the AVD and
+    # boot the emulator twice before any test runs.
+    timeout-minutes: 25
     strategy:
       matrix:
         include:
