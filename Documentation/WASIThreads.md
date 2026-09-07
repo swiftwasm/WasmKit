@@ -3,8 +3,13 @@
 WasmKit supports the core [WASI Threads](https://github.com/WebAssembly/wasi-threads) Preview 1 ABI in the CLI:
 
 ```console
-wasmkit-cli run --feature threads --wasi-threads --wasi-threads-max 8 program.wasm
+wasmkit-cli run --wasi-threads --wasi-threads-max 8 program.wasm
 ```
+
+`--wasi-threads` implies the core `threads` proposal, so `--feature threads`
+does not need to be passed as well. The opposite does not hold: `--feature
+threads` alone only enables the core proposal and leaves `wasi.thread-spawn`
+unlinked.
 
 This enables the `wasi.thread-spawn` import with signature `(i32) -> i32`.
 Each successful call returns a positive, monotonically increasing thread ID and

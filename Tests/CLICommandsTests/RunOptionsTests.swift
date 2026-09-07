@@ -14,23 +14,26 @@ import WasmKitWASI
 
     @Test func wasiThreadsMaximumMustBePositive() throws {
         let error = #expect(throws: (any Error).self) {
-            _ = try Run.parse(["--feature", "threads", "--wasi-threads", "--wasi-threads-max", "0", "module.wasm"])
+            _ = try Run.parse(["--wasi-threads", "--wasi-threads-max", "0", "module.wasm"])
         }
         #expect(Run.message(for: try #require(error)).contains("at least 1"))
     }
 
     @Test func wasiThreadsRejectsTokenThreading() throws {
         let error = #expect(throws: (any Error).self) {
-            _ = try Run.parse(["--feature", "threads", "--wasi-threads", "--threading-model", "token", "module.wasm"])
+            _ = try Run.parse(["--wasi-threads", "--threading-model", "token", "module.wasm"])
         }
         #expect(Run.message(for: try #require(error)).contains("direct threading"))
     }
 
-    @Test func wasiThreadsRequiresThreadsFeature() throws {
-        let error = #expect(throws: (any Error).self) {
-            _ = try Run.parse(["--wasi-threads", "module.wasm"])
-        }
-        #expect(Run.message(for: try #require(error)).contains("--feature threads"))
+    @Test func wasiThreadsImpliesTheThreadsFeature() throws {
+        let run = try Run.parse(["--wasi-threads", "module.wasm"])
+        #expect(run.deriveRuntimeConfiguration().features.contains(.threads))
+    }
+
+    @Test func threadsFeatureAloneDoesNotEnableWASIThreads() throws {
+        let run = try Run.parse(["--feature", "threads", "module.wasm"])
+        #expect(!run.wasiThreads)
     }
 
     @Test func featureOptionEnablesTheEngineFeature() throws {

@@ -79,7 +79,7 @@
             process.executableURL = executable
             process.arguments =
                 threadsEnabled
-                ? ["run", "--feature", "threads", "--wasi-threads", module.path]
+                ? ["run", "--wasi-threads", module.path]
                 : ["run", "--feature", "threads", module.path]
             let error = Pipe()
             // Keep stdin open without supplying data so the upstream `fd_read`

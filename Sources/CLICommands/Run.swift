@@ -53,8 +53,8 @@ package struct Run: AsyncParsableCommand {
     )
     var signpost: Bool = false
 
-    @Flag(name: .customLong("wasi-threads"), help: "Enable WASI Threads")
-    var wasiThreads = false
+    @Flag(name: .customLong("wasi-threads"), help: "Enable WASI Threads (implies --feature threads)")
+    package var wasiThreads = false
 
     @Option(
         name: .customLong("wasi-threads-max"),
@@ -84,7 +84,10 @@ package struct Run: AsyncParsableCommand {
 
     @Option(
         name: .customLong("feature"),
-        help: "Enable a WebAssembly proposal feature (memory64, reference-types, threads, tail-call, simd, exception-handling)"
+        help: """
+            Enable a WebAssembly proposal feature in addition to the default set \
+            (memory64, reference-types, threads, tail-call, simd, exception-handling)
+            """
     )
     var features: [Feature] = []
 
@@ -375,7 +378,14 @@ package struct Run: AsyncParsableCommand {
     }
 
     package func deriveRuntimeConfiguration() -> EngineConfiguration {
-        let enabledFeatures = features.reduce(into: WasmFeatureSet.default) { $0.insert($1.wasmFeature) }
+        // Start from the parser's default set so that `--feature` only ever adds
+        // to what the CLI already accepts without any flag.
+        var enabledFeatures = features.reduce(into: WasmFeatureSet.default) { $0.insert($1.wasmFeature) }
+        if wasiThreads {
+            // wasi-threads builds on the core threads proposal, so opting into
+            // the former implies the latter. The reverse does not hold.
+            enabledFeatures.insert(.threads)
+        }
         return EngineConfiguration(
             threadingModel: self.threadingModel?.resolve(),
             compilationMode: self.compilationMode?.resolve(),
@@ -416,9 +426,6 @@ package struct Run: AsyncParsableCommand {
         if wasiThreads, threadingModel == .token {
             throw ValidationError("--wasi-threads requires direct threading and cannot be combined with --threading-model token.")
         }
-        if wasiThreads, !features.contains(.threads) {
-            throw ValidationError("--wasi-threads requires --feature threads.")
-        }
 
         #if WasmDebuggingSupport
             if debuggerPort != nil, signpost || profileOutput != nil {
@@ -447,14 +454,14 @@ package struct Run: AsyncParsableCommand {
         if wasiThreads {
             let processControl = WASIThreadsProcessControl(
                 terminateAfterMainReturn: { code in
-                    terminateProcess(Int32(truncatingIfNeeded: code))
+                    wasiThreadsTerminateProcess(Int32(truncatingIfNeeded: code))
                 },
                 terminateAfterWorkerFailure: { error in
                     if let exitCode = error as? WASIExitCode {
-                        terminateProcess(Int32(truncatingIfNeeded: exitCode.code))
+                        wasiThreadsTerminateProcess(Int32(truncatingIfNeeded: exitCode.code))
                     }
                     FileHandle.standardError.write(Data(("WASI thread failed: \(error)\n").utf8))
-                    terminateProcess(1)
+                    wasiThreadsTerminateProcess(1)
                 }
             )
             let threads = try WASIThreads(
@@ -554,7 +561,7 @@ extension Run {
     }
 }
 
-private func terminateProcess(_ code: Int32) -> Never {
+private func wasiThreadsTerminateProcess(_ code: Int32) -> Never {
     #if os(macOS)
         Darwin.exit(code)
     #elseif canImport(Glibc)
