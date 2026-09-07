@@ -1637,6 +1637,12 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_brIfI64GeU(Sp sp, Pc pc, Md m
     INLINE_CALL next = wasmkit_execute_brIfI64GeU(&sp, &pc, &md, &ms, state, &error);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
 }
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_returnCrossInstance(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_returnCrossInstance(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_returnCrossInstance(&sp, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
+}
 // Indexed by opcode ID. Opcodes whose handlers are bit-identical (see
 // `Instruction.handlerIdentity` in VMSpec) share a single entry point here,
 // so that dispatch never goes through a compiler-generated merge thunk.
@@ -1937,4 +1943,5 @@ static const uintptr_t wasmkit_tc_exec_handlers[] = {
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_brIfI64LeU),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_brIfI64GeS),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_brIfI64GeU),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_returnCrossInstance),
 };
