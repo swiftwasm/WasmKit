@@ -62,29 +62,26 @@ package struct Run: AsyncParsableCommand {
     )
     var wasiThreadsMax = 64
 
-    enum Feature: String, CaseIterable, ExpressibleByArgument {
-        case memory64
-        case referenceTypes = "reference-types"
-        case threads
-        case tailCall = "tail-call"
-        case simd
-        case exceptionHandling = "exception-handling"
+    /// A single WebAssembly proposal accepted by `--feature`.
+    struct Feature: ExpressibleByArgument {
+        let feature: WasmFeatureSet.Feature
 
-        var wasmFeature: WasmFeatureSet {
-            switch self {
-            case .memory64: .memory64
-            case .referenceTypes: .referenceTypes
-            case .threads: .threads
-            case .tailCall: .tailCall
-            case .simd: .simd
-            case .exceptionHandling: .exceptionHandling
+        var wasmFeature: WasmFeatureSet { WasmFeatureSet(feature) }
+
+        init?(argument: String) {
+            guard let feature = WasmFeatureSet.Feature.allCases.first(where: { $0.commandLineName == argument }) else {
+                return nil
             }
+            self.feature = feature
         }
 
-        /// The features already enabled without any `--feature` option, derived
-        /// from the parser's default set so that the two never drift apart.
-        static var enabledByDefault: [Feature] {
-            allCases.filter { WasmFeatureSet.default.contains($0.wasmFeature) }
+        static var allValueStrings: [String] {
+            WasmFeatureSet.Feature.allCases.map(\.commandLineName)
+        }
+
+        /// The proposals already enabled without any `--feature` option.
+        static var enabledByDefault: [WasmFeatureSet.Feature] {
+            WasmFeatureSet.Feature.allCases.filter { WasmFeatureSet.default.contains(WasmFeatureSet($0)) }
         }
     }
 
@@ -92,7 +89,7 @@ package struct Run: AsyncParsableCommand {
         name: .customLong("feature"),
         help: """
             Enable a WebAssembly proposal feature in addition to those enabled by default \
-            (\(Feature.enabledByDefault.map(\.rawValue).joined(separator: ", ")))
+            (\(Feature.enabledByDefault.map(\.commandLineName).joined(separator: ", ")))
             """
     )
     var features: [Feature] = []
@@ -564,6 +561,22 @@ extension Run {
         }
 
         return (functionName, parameters)
+    }
+}
+
+extension WasmFeatureSet.Feature {
+    /// The name this proposal is spelled with on the command line. The switch is
+    /// exhaustive on purpose: a proposal added to `WasmFeatureSet` has to be
+    /// given a command-line name here before the CLI builds again.
+    var commandLineName: String {
+        switch self {
+        case .memory64: "memory64"
+        case .referenceTypes: "reference-types"
+        case .threads: "threads"
+        case .tailCall: "tail-call"
+        case .simd: "simd"
+        case .exceptionHandling: "exception-handling"
+        }
     }
 }
 
