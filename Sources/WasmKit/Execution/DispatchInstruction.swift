@@ -327,6 +327,26 @@ extension Execution {
         case 271: return try self.execute_throwRef(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 272: return self.execute_catchHandlers(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 273: return self.execute_catchHandlersEnd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 274: return self.execute_brIfI32Eq(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 275: return self.execute_brIfI32Ne(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 276: return self.execute_brIfI32LtS(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 277: return self.execute_brIfI32LtU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 278: return self.execute_brIfI32GtS(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 279: return self.execute_brIfI32GtU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 280: return self.execute_brIfI32LeS(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 281: return self.execute_brIfI32LeU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 282: return self.execute_brIfI32GeS(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 283: return self.execute_brIfI32GeU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 284: return self.execute_brIfI64Eq(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 285: return self.execute_brIfI64Ne(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 286: return self.execute_brIfI64LtS(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 287: return self.execute_brIfI64LtU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 288: return self.execute_brIfI64GtS(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 289: return self.execute_brIfI64GtU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 290: return self.execute_brIfI64LeS(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 291: return self.execute_brIfI64LeU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 292: return self.execute_brIfI64GeS(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 293: return self.execute_brIfI64GeU(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -2502,6 +2522,146 @@ extension Execution {
         self.catchHandlersEnd(sp: sp.pointee, immediate: immediate)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32Eq") @inline(__always)
+    mutating func execute_brIfI32Eq(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32Eq(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32Ne") @inline(__always)
+    mutating func execute_brIfI32Ne(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32Ne(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32LtS") @inline(__always)
+    mutating func execute_brIfI32LtS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32LtS(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32LtU") @inline(__always)
+    mutating func execute_brIfI32LtU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32LtU(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32GtS") @inline(__always)
+    mutating func execute_brIfI32GtS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32GtS(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32GtU") @inline(__always)
+    mutating func execute_brIfI32GtU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32GtU(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32LeS") @inline(__always)
+    mutating func execute_brIfI32LeS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32LeS(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32LeU") @inline(__always)
+    mutating func execute_brIfI32LeU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32LeU(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32GeS") @inline(__always)
+    mutating func execute_brIfI32GeS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32GeS(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32GeU") @inline(__always)
+    mutating func execute_brIfI32GeU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32GeU(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64Eq") @inline(__always)
+    mutating func execute_brIfI64Eq(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64Eq(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64Ne") @inline(__always)
+    mutating func execute_brIfI64Ne(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64Ne(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64LtS") @inline(__always)
+    mutating func execute_brIfI64LtS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64LtS(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64LtU") @inline(__always)
+    mutating func execute_brIfI64LtU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64LtU(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64GtS") @inline(__always)
+    mutating func execute_brIfI64GtS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64GtS(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64GtU") @inline(__always)
+    mutating func execute_brIfI64GtU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64GtU(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64LeS") @inline(__always)
+    mutating func execute_brIfI64LeS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64LeS(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64LeU") @inline(__always)
+    mutating func execute_brIfI64LeU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64LeU(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64GeS") @inline(__always)
+    mutating func execute_brIfI64GeS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64GeS(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64GeU") @inline(__always)
+    mutating func execute_brIfI64GeU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64GeU(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
         return next
     }
 }

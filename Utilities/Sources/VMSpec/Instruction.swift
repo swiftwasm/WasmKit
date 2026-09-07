@@ -718,6 +718,42 @@ extension VMGen {
         },
     ]
 
+    // MARK: - Fused compare + branch instructions
+
+    /// The integer comparison operators that have a fused compare+branch form.
+    ///
+    /// Only integer comparisons are fused: the complement of an integer
+    /// comparison is another integer comparison, so a `br_if_not` on a compare
+    /// can be expressed by flipping the operator. Float comparisons have no such
+    /// complement because of NaN, so they are left unfused.
+    static let brIfCmpOps = [
+        "Eq", "Ne", "LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU",
+    ]
+
+    static func buildBrIfCmpInsts() -> [Instruction] {
+        var results: [Instruction] = []
+        for type in intValueTypes {
+            for op in brIfCmpOps {
+                let typeName = type.uppercased()
+                results.append(
+                    Instruction(
+                        name: "brIf\(typeName)\(op)",
+                        documentation: """
+                            Conditional pc-relative branch if `\(type).\(VMGen.snakeCase(pascalCase: op))` holds
+
+                            Fused form of `\(type).\(VMGen.snakeCase(pascalCase: op))` followed by `br_if`.
+                            """,
+                        isControl: true, mayUpdateFrame: false,
+                        immediateLayout: .brIfCmpOperand
+                    )
+                )
+            }
+        }
+        return results
+    }
+
+    static let brIfCmpInsts: [Instruction] = buildBrIfCmpInsts()
+
     // MARK: - Instruction generation
 
     static func buildInstructions() -> [Instruction] {
@@ -827,6 +863,7 @@ extension VMGen {
         instructions += atomicWaitNotifyInsts
         // Exception handling
         instructions += exceptionHandlingInsts
+        instructions += brIfCmpInsts
         return instructions
     }
 
