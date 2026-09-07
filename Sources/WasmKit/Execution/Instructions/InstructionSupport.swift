@@ -206,8 +206,23 @@ extension Instruction.CallOperand {
 
 extension Instruction.CallIndirectOperand {
 
-    init(tableIndex: UInt32, type: InternedFuncType, index: VReg, spAddend: VReg) {
-        self.init(tableIndex: tableIndex, rawType: type.id, index: index, spAddend: spAddend)
+    init(
+        table: InternalTable, callerInstance: InternalInstance, type: InternedFuncType,
+        index: VReg, spAddend: VReg
+    ) {
+        self.init(
+            rawTable: UInt64(UInt(bitPattern: table.bitPattern)),
+            rawCallerInstance: UInt64(UInt(bitPattern: callerInstance.bitPattern)),
+            rawType: type.id, index: index, spAddend: spAddend
+        )
+    }
+
+    var table: InternalTable {
+        InternalTable(bitPattern: UInt(rawTable)).unsafelyUnwrapped
+    }
+
+    var callerInstance: InternalInstance {
+        InternalInstance(bitPattern: UInt(rawCallerInstance)).unsafelyUnwrapped
     }
 
     var type: InternedFuncType {
@@ -227,8 +242,20 @@ extension Instruction.ReturnCallOperand {
 
 extension Instruction.ReturnCallIndirectOperand {
 
-    init(tableIndex: UInt32, type: InternedFuncType, index: VReg) {
-        self.init(tableIndex: tableIndex, rawType: type.id, index: index)
+    init(table: InternalTable, callerInstance: InternalInstance, type: InternedFuncType, index: VReg) {
+        self.init(
+            rawTable: UInt64(UInt(bitPattern: table.bitPattern)),
+            rawCallerInstance: UInt64(UInt(bitPattern: callerInstance.bitPattern)),
+            rawType: type.id, index: index
+        )
+    }
+
+    var table: InternalTable {
+        InternalTable(bitPattern: UInt(rawTable)).unsafelyUnwrapped
+    }
+
+    var callerInstance: InternalInstance {
+        InternalInstance(bitPattern: UInt(rawCallerInstance)).unsafelyUnwrapped
     }
 
     var type: InternedFuncType {
@@ -400,7 +427,7 @@ extension Instruction {
             case .call(let op):
                 target.write("call \(callee(op.callee)), sp: +\(op.spAddend)")
             case .callIndirect(let op):
-                target.write("call_indirect \(reg(op.index)), \(op.tableIndex), (func_ty id:\(op.type.id)), sp: +\(op.spAddend)")
+                target.write("call_indirect \(reg(op.index)), table:\(hex(UInt32(truncatingIfNeeded: op.rawTable))), (func_ty id:\(op.type.id)), sp: +\(op.spAddend)")
             case .compilingCall(let op):
                 target.write("compiling_call \(callee(op.callee)), sp: +\(op.spAddend)")
             case .returnCall(let op):

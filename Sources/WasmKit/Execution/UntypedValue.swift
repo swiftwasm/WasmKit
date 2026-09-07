@@ -15,7 +15,7 @@ struct UntypedValue: Equatable, Hashable {
     }
 
     /// The mask pattern to check if the value is a null reference.
-    private static var isNullMaskPattern: UInt64 { (0x1 << 63) }
+    static var isNullMaskPattern: UInt64 { (0x1 << 63) }
 
     /// Creates a new value from the given signed 32-bit integer.
     init(signed value: Int32) {

@@ -145,47 +145,150 @@ extension Execution {
         return pc.next()
     }
 
-    @inline(never)
-    private func prepareForIndirectCall(
-        sp: Sp, tableIndex: TableIndex, expectedType: InternedFuncType,
-        address: VReg
-    ) throws -> (InternalFunction, InternalInstance) {
-        let callerInstance = currentInstance(sp: sp)
-        let table = callerInstance.tables[Int(tableIndex)]
-        let value = sp[address].asAddressOffset(table.limits.isMemory64)
-        let elementIndex = Int(value)
-        guard elementIndex < table.elements.count else {
-            throw Trap(.tableOutOfBounds(elementIndex))
+    /// Loads a `call_indirect` table entry, or `0` when the index is out of
+    /// bounds.
+    ///
+    /// The table's address is baked into the immediate, so this is two loads off
+    /// that address (`rawElements` and `count`, independent of each other) plus
+    /// the element load -- no instance chase, no `Array` bounds-check machinery,
+    /// and no reference counting, because the elements are plain 64-bit words in
+    /// the ``UntypedValue`` encoding.
+    ///
+    /// `0` doubles as the out-of-bounds sentinel: it is not a representable
+    /// reference, since a null one has bit 63 set and a non-null one is an entity
+    /// address. So one signed comparison on the result covers both "out of
+    /// bounds" and "null", which is what keeps the fast handler's prologue-free
+    /// resolution down to five instructions.
+    @inline(__always)
+    private func loadIndirectCallee(sp: Sp, table: InternalTable, address: VReg) -> UInt64 {
+        let index = sp[address].asAddressOffset()
+        return table.withValue { table -> UInt64 in
+            guard _fastPath(index < UInt64(bitPattern: Int64(table.count))) else { return 0 }
+            return table.rawElements[Int(bitPattern: UInt(index))]
         }
-        guard case .function(let rawBitPattern?) = table.elements[elementIndex]
-        else {
-            throw Trap(.indirectCallToNull(elementIndex))
-        }
-        let function = InternalFunction(bitPattern: rawBitPattern)
-        guard function.type == expectedType else {
-            throw Trap(
-                .typeMismatchCall(
-                    actual: store.value.engine.resolveType(function.type),
-                    expected: store.value.engine.resolveType(expectedType)
-                ))
-        }
-        return (function, callerInstance)
     }
 
+    /// Builds the trap for a `call_indirect` whose table entry could not be used.
+    @inline(never)
+    private func indirectCallResolutionTrap(table: InternalTable, index: UInt64) -> Error {
+        let elementIndex = Int(truncatingIfNeeded: index)
+        guard index < UInt64(bitPattern: Int64(table.count)) else {
+            return Trap(.tableOutOfBounds(elementIndex))
+        }
+        return Trap(.indirectCallToNull(elementIndex))
+    }
+
+    @inline(never)
+    private func indirectCallTypeMismatchTrap(actual: InternedFuncType, expected: InternedFuncType) -> Error {
+        Trap(
+            .typeMismatchCall(
+                actual: store.value.engine.resolveType(actual),
+                expected: store.value.engine.resolveType(expected)
+            ))
+    }
+
+    /// Resolves a `call_indirect` table entry the way `returnCallIndirect` needs
+    /// it: throwing, since that handler has a stack frame anyway.
     @inline(__always)
-    mutating func callIndirect(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CallIndirectOperand) throws -> (Pc, CodeSlot) {
-        var pc = pc
-        let (function, callerInstance) = try prepareForIndirectCall(
-            sp: sp, tableIndex: immediate.tableIndex, expectedType: immediate.type,
-            address: immediate.index
-        )
-        (pc, sp) = try invoke(
-            function: function,
-            callerInstance: callerInstance,
+    private func resolveIndirectCallee(
+        sp: Sp, table: InternalTable, address: VReg
+    ) throws -> InternalFunction {
+        let raw = loadIndirectCallee(sp: sp, table: table, address: address)
+        guard _fastPath(Int64(bitPattern: raw) > 0) else {
+            throw indirectCallResolutionTrap(
+                table: table, index: sp[address].asAddressOffset()
+            )
+        }
+        return InternalFunction(bitPattern: Int(bitPattern: UInt(raw)))
+    }
+
+    /// `call_indirect`, fast path.
+    ///
+    /// Every check below bails to ``callIndirectSlow`` rather than handling its
+    /// case, so that this handler contains no call and therefore no prologue: a
+    /// trap has to build a `Trap` (a type-metadata accessor plus
+    /// `swift_allocError`), compiling a callee is a call, entering a host callee
+    /// is a call, switching `md`/`ms` is a call, and a frame-init image over
+    /// ``Execution/inlineFrameInitLimit`` slots is a `memcpy`. The hand-off costs
+    /// one extra dispatch on paths that were already doing far more work.
+    ///
+    /// `sp` is left untouched and `pc` is rewound to the start of the shared
+    /// immediate, so ``callIndirectSlow`` decodes exactly the same operand and
+    /// redoes the resolution from scratch -- which is what makes the traps come
+    /// out in the order the spec asks for without this handler knowing about them.
+    @inline(__always)
+    mutating func callIndirect(sp: inout Sp, pc: Pc, immediate: Instruction.CallIndirectOperand) -> (Pc, CodeSlot) {
+        // `CallIndirectOperand` occupies 3 slots and `pc` is past all of them.
+        // The slot is read through the engine: loads only, no call.
+        let handOff = (pc.advanced(by: -3), store.value.engine.callIndirectSlowSlot)
+
+        let raw = loadIndirectCallee(sp: sp, table: immediate.table, address: immediate.index)
+        // Out of bounds (0) or null (bit 63) in one signed compare.
+        guard _fastPath(Int64(bitPattern: raw) > 0) else { return handOff }
+        // Bit 0 tags a host function, whose entity is not a `WasmFunctionEntity`.
+        guard _fastPath(raw & 0b1 == 0) else { return handOff }
+        let callee = EntityHandle<WasmFunctionEntity>(bitPattern: UInt(raw)).unsafelyUnwrapped
+        guard _fastPath(callee.type == immediate.type) else { return handOff }
+        // One load of the code state and a branch, instead of a call into
+        // `ensureCompiled` on every indirect call.
+        guard let iseq = callee.compiledIseq else { return handOff }
+        // Same instance: no `md`/`ms` update, and the saved-PC flag stays clear so
+        // the matching `_return` keeps its fast path too.
+        guard _fastPath(callee.instance == immediate.callerInstance) else { return handOff }
+        guard
+            let newSp = pushFrameWithoutCalling(
+                iseq: iseq, function: callee,
+                sp: sp, returnPC: pc, spAddend: immediate.spAddend
+            )
+        else { return handOff }
+        sp = newSp
+        return iseq.baseAddress.next()
+    }
+
+    /// `call_indirect`, everything ``callIndirect`` declined to do.
+    ///
+    /// Never emitted by the translator. It receives the `sp` its `callIndirect`
+    /// was given and a `pc` rewound to the shared immediate, so it can resolve
+    /// from scratch.
+    @inline(__always)
+    mutating func callIndirectSlow(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CallIndirectOperand) throws -> (Pc, CodeSlot) {
+        let function = try resolveIndirectCallee(sp: sp, table: immediate.table, address: immediate.index)
+        guard function.isWasm else {
+            // A host callee runs in place and leaves `sp`, `pc`, `md` and `ms`
+            // alone. `Execution.invokeHostFunction` is the `self`-free form on
+            // purpose: a method taking `Execution` by reference makes the
+            // optimizer materialise a 48-byte copy of it on the native stack.
+            guard function.type == immediate.type else {
+                throw indirectCallTypeMismatchTrap(actual: function.type, expected: immediate.type)
+            }
+            try Execution.invokeHostFunction(
+                store: store, function: function.host, sp: sp, spAddend: immediate.spAddend
+            )
+            return pc.next()
+        }
+        let callee = function.wasm
+        guard callee.type == immediate.type else {
+            throw indirectCallTypeMismatchTrap(actual: callee.type, expected: immediate.type)
+        }
+        let iseq: InstructionSequence
+        if let compiled = callee.compiledIseq {
+            iseq = compiled
+        } else {
+            iseq = try callee.ensureCompiled(store: store)
+        }
+        let calleeInstance = callee.instance
+        let switchesInstance = calleeInstance != immediate.callerInstance
+        sp = try pushFrame(
+            iseq: iseq,
+            function: callee,
+            sp: sp, returnPC: pc,
             spAddend: immediate.spAddend,
-            sp: sp, pc: pc, md: &md, ms: &ms
+            needsMemoryRestoreOnReturn: switchesInstance
         )
-        return pc.next()
+        if switchesInstance {
+            Execution.CurrentMemory.mayUpdateCurrentInstance(instance: calleeInstance, md: &md, ms: &ms)
+        }
+        return iseq.baseAddress.next()
     }
 
     mutating func returnCall(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.ReturnCallOperand) throws -> (Pc, CodeSlot) {
@@ -200,13 +303,16 @@ extension Execution {
 
     mutating func returnCallIndirect(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.ReturnCallIndirectOperand) throws -> (Pc, CodeSlot) {
         var pc = pc
-        let (function, callerInstance) = try prepareForIndirectCall(
-            sp: sp, tableIndex: immediate.tableIndex, expectedType: immediate.type,
-            address: immediate.index
-        )
+        // Resolution is inlined the same way as `callIndirect`'s; the entry itself
+        // stays in `tailInvoke`, which has to reuse the current frame and is far
+        // rarer than a plain indirect call.
+        let function = try resolveIndirectCallee(sp: sp, table: immediate.table, address: immediate.index)
+        guard _fastPath(function.type == immediate.type) else {
+            throw indirectCallTypeMismatchTrap(actual: function.type, expected: immediate.type)
+        }
         (pc, sp) = try tailInvoke(
             function: function,
-            callerInstance: callerInstance,
+            callerInstance: immediate.callerInstance,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()

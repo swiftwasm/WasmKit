@@ -294,6 +294,22 @@ struct WasmFunctionEntity {
 }
 
 extension EntityHandle<WasmFunctionEntity> {
+    /// The compiled instruction sequence, or `nil` if the function has not been
+    /// compiled yet.
+    ///
+    /// One load of the code state's tag plus the payload loads -- the point being
+    /// that the hot call paths can branch on it and leave ``ensureCompiled(store:)``,
+    /// which is a real call, on the cold side.
+    @inline(__always)
+    var compiledIseq: InstructionSequence? {
+        withValue { entity in
+            switch entity.code {
+            case .compiled(let iseq), .debuggable(_, let iseq): return iseq
+            case .uncompiled: return nil
+            }
+        }
+    }
+
     @inline(never)
     @discardableResult
     func ensureCompiled(store: StoreRef) throws -> InstructionSequence {

@@ -90,9 +90,9 @@
             Instruction.call(.init(rawCallee: UInt64(0), spAddend: VReg(0))).opcodeID,
             Instruction.compilingCall(.init(rawCallee: UInt64(0), spAddend: VReg(0))).opcodeID,
             Instruction.internalCall(.init(rawCallee: UInt64(0), spAddend: VReg(0))).opcodeID,
-            Instruction.callIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg(0), spAddend: VReg(0))).opcodeID,
+            Instruction.callIndirect(.init(rawTable: UInt64(0), rawCallerInstance: UInt64(0), rawType: UInt32(0), index: VReg(0), spAddend: VReg(0))).opcodeID,
             Instruction.returnCall(.init(rawCallee: UInt64(0))).opcodeID,
-            Instruction.returnCallIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg(0))).opcodeID,
+            Instruction.returnCallIndirect(.init(rawTable: UInt64(0), rawCallerInstance: UInt64(0), rawType: UInt32(0), index: VReg(0))).opcodeID,
         ]
 
         /// Initializes a new debugger state instance.
@@ -752,26 +752,29 @@
         /// Resolves a callee function from a table and returns its iseq base address.
         /// Returns `nil` if the callee is a host function or the resolution fails.
         private mutating func resolveIndirectCallee(
-            tableIndex: UInt32, index: VReg, sp: Sp
+            table: InternalTable, index: VReg, sp: Sp
         ) -> Pc? {
-            let callerInstance = self.instance.handle
-            let table = callerInstance.tables[Int(tableIndex)]
-            let value = sp[index].asAddressOffset(table.limits.isMemory64)
-            let elementIndex = Int(value)
-            guard elementIndex < table.elements.count,
-                case .function(let rawBitPattern?) = table.elements[elementIndex]
-            else { return nil }
-            let function = InternalFunction(bitPattern: rawBitPattern)
+            let value = sp[index].asAddressOffset()
+            guard value < UInt64(bitPattern: Int64(table.count)) else { return nil }
+            let raw = table.rawElement(at: Int(value))
+            guard raw & UntypedValue.isNullMaskPattern == 0 else { return nil }
+            let function = InternalFunction(bitPattern: Int(bitPattern: UInt(raw)))
             return calleeEntryPc(function)
         }
 
         mutating func predictNext_callIndirect(operandPc: Pc, sp: Sp) -> [Pc] {
             var pc = operandPc
             let op = Instruction.CallIndirectOperand.load(from: &pc)
-            guard let target = resolveIndirectCallee(tableIndex: op.tableIndex, index: op.index, sp: sp) else {
+            guard let target = resolveIndirectCallee(table: op.table, index: op.index, sp: sp) else {
                 return []
             }
             return [target]
+        }
+
+        mutating func predictNext_callIndirectSlow(operandPc: Pc, sp: Sp) -> [Pc] {
+            // `callIndirectSlow` is only ever reached from `callIndirect` and is
+            // handed the same immediate, so it lands in the same place.
+            predictNext_callIndirect(operandPc: operandPc, sp: sp)
         }
 
         mutating func predictNext_returnCall(operandPc: Pc, sp: Sp) -> [Pc] {
@@ -785,7 +788,7 @@
         mutating func predictNext_returnCallIndirect(operandPc: Pc, sp: Sp) -> [Pc] {
             var pc = operandPc
             let op = Instruction.ReturnCallIndirectOperand.load(from: &pc)
-            guard let target = resolveIndirectCallee(tableIndex: op.tableIndex, index: op.index, sp: sp) else {
+            guard let target = resolveIndirectCallee(table: op.table, index: op.index, sp: sp) else {
                 return []
             }
             return [target]

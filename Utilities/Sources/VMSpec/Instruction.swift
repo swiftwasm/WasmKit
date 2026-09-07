@@ -824,13 +824,22 @@ extension VMGen {
                 """,
                 isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .call
             ),
-            Instruction(name: "callIndirect", documentation: "WebAssembly Core Instruction `call_indirect`",
-                        isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
-                $0.field(name: "tableIndex", type: .UInt32)
-                $0.field(name: "rawType", type: .UInt32)
-                $0.field(name: "index", type: .VReg)
-                $0.field(name: "spAddend", type: .VReg)
-            },
+            Instruction(
+                name: "callIndirect", documentation: """
+                    WebAssembly Core Instruction `call_indirect`, fast path only
+
+                    Resolves the entry out of the table entity baked into the immediate,
+                    checks the type and the callee's code state, and lays the callee's
+                    frame out inline. Everything else -- an out-of-bounds or null entry, a
+                    type mismatch, a host callee, a callee that is not compiled yet, a
+                    callee in another instance, a frame that would overflow the VM stack
+                    or whose init image is too large to copy inline -- is handed to
+                    `callIndirectSlow`, so that this handler contains no call and
+                    therefore needs no stack frame.
+                    """,
+                isControl: true, mayThrow: false, mayUpdateFrame: true, useCurrentMemory: .none,
+                immediateLayout: .callIndirectOperand
+            ),
             Instruction(name: "resizeFrameHeader", documentation: """
                         Resize the frame header by increasing param/result slots and copying `sizeToCopy`
                         slots placed after the header
@@ -845,7 +854,8 @@ extension VMGen {
             },
             Instruction(name: "returnCallIndirect", documentation: "WebAssembly Core Instruction `return_call_indirect`",
                         isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
-                $0.field(name: "tableIndex", type: .UInt32)
+                $0.field(name: "rawTable", type: .UInt64)
+                $0.field(name: "rawCallerInstance", type: .UInt64)
                 $0.field(name: "rawType", type: .UInt32)
                 $0.field(name: "index", type: .VReg)
             },
@@ -918,6 +928,24 @@ extension VMGen {
             )
         ]
         instructions += memoryTrapInsts
+        instructions += [
+            Instruction(
+                name: "callIndirectSlow",
+                documentation: """
+                    Everything `call_indirect` can do that its fast handler does not
+
+                    Never emitted by the translator. `callIndirect` dispatches here, with
+                    `sp` unmodified and `pc` rewound to the start of the shared immediate,
+                    whenever the entry is out of bounds or null, the type does not match,
+                    the callee is a host function or is not compiled yet, the callee runs
+                    in another instance, or the frame does not fit the fast path. It
+                    redoes the resolution from scratch so that the trap it raises is the
+                    one the spec asks for.
+                    """,
+                isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,
+                immediateLayout: .callIndirectOperand
+            )
+        ]
         return instructions
     }
 

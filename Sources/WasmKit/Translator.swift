@@ -2225,8 +2225,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         guard let spAddend = try visitCallLike(calleeType: calleeType) else { return }
         guard let address = address else { return }
         let internType = funcTypeInterner.intern(calleeType)
+        // The table handle and the caller's instance are fixed for the lifetime of
+        // this function, so bake both into the immediate rather than chasing
+        // `sp[-3] -> function entity -> instance -> tables[i]` on every call.
+        let table = try module.tables[validating: Int(tableIndex)]
         let operand = Instruction.CallIndirectOperand(
-            tableIndex: tableIndex,
+            table: table,
+            callerInstance: module,
             type: internType,
             index: address,
             spAddend: spAddend
@@ -2306,8 +2311,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             stackTopHeightToCopy: stackTopHeightToCopy
         )
 
+        let table = try module.tables[validating: Int(tableIndex)]
         let operand = Instruction.ReturnCallIndirectOperand(
-            tableIndex: tableIndex,
+            table: table,
+            callerInstance: module,
             type: internType,
             index: address
         )

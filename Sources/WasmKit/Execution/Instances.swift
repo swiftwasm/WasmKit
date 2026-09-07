@@ -267,26 +267,85 @@ extension Instance {
 @available(*, deprecated, renamed: "Instance", message: "ModuleInstance has been renamed to Instance to match the terminology in the WebAssembly ecosystem")
 public typealias ModuleInstance = Instance
 
+/// Owns the flat element buffer of a ``TableEntity``.
+///
+/// A class purely for the lifetime hook: `TableEntity` lives in a
+/// `BumpAllocator`, which offers nothing but the struct's own destructor, and a
+/// class reference gives exactly that.
+final class TableStorage {
+    var buffer: UnsafeMutablePointer<UInt64>
+    var capacity: Int
+
+    init(capacity: Int, repeating value: UInt64) {
+        // Always allocate at least one slot so `buffer` is a usable base address
+        // even for an empty table.
+        self.capacity = capacity
+        self.buffer = .allocate(capacity: Swift.max(capacity, 1))
+        if capacity > 0 { self.buffer.initialize(repeating: value, count: capacity) }
+    }
+
+    deinit { buffer.deallocate() }
+}
+
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#table-instances>
 struct TableEntity /* : ~Copyable */ {
-    var elements: [Reference]
+    /// The table's elements, flat, in the raw ``UntypedValue`` encoding: bit 63
+    /// set means null, anything else is the referenced entity's address -- for a
+    /// funcref table, exactly an ``InternalFunction`` bit pattern.
+    ///
+    /// `call_indirect` bakes the table's address into its immediate and reads
+    /// these two fields straight off it, so they come first and are kept plain.
+    /// An `Array` here would cost a buffer load, a bounds check, and -- because
+    /// reading it out of an `EntityHandle` copies the array struct -- a
+    /// retain/release pair, i.e. a call, on the hottest indirect-call path.
+    private(set) var rawElements: UnsafeMutablePointer<UInt64>
+    /// The number of elements currently in the table.
+    private(set) var count: Int
+    /// Owns ``rawElements``. Replaced (not resized in place) when the table grows.
+    private var storage: TableStorage
     let tableType: TableType
     var limits: Limits { tableType.limits }
+
+    /// The raw encoding of a null reference. The same for every reference type:
+    /// ``UntypedValue`` marks null with bit 63.
+    @inline(__always)
+    static var rawNull: UInt64 { UntypedValue(.ref(.function(nil))).storage }
+
+    @inline(__always)
+    static func encode(_ reference: Reference) -> UInt64 {
+        UntypedValue(.ref(reference)).storage
+    }
+
+    @inline(__always)
+    func decode(_ raw: UInt64) -> Reference {
+        UntypedValue(storage: raw).asReference(tableType.elementType)
+    }
+
+    /// The element at `index`, decoded back into a ``Reference``.
+    func element(at index: Int) -> Reference {
+        precondition(index >= 0 && index < count, "table element index out of range")
+        return decode(rawElements[index])
+    }
+
+    mutating func setElement(_ reference: Reference, at index: Int) {
+        precondition(index >= 0 && index < count, "table element index out of range")
+        rawElements[index] = Self.encode(reference)
+    }
+
+    /// All elements, decoded. For diagnostics and the public API only.
+    var elements: [Reference] {
+        (0..<count).map { decode(rawElements[$0]) }
+    }
 
     static func maxSize(isMemory64: Bool) -> UInt64 {
         return UInt64(UInt32.max)
     }
 
     init(_ tableType: TableType, resourceLimiter: any ResourceLimiter) throws {
-        let emptyElement: Reference
         switch tableType.elementType.heapType {
-        case .abstract(.funcRef):
-            emptyElement = .function(nil)
-        case .abstract(.externRef):
-            emptyElement = .extern(nil)
-        case .abstract(.exnRef):
-            emptyElement = .exception(nil)
+        case .abstract(.funcRef), .abstract(.externRef), .abstract(.exnRef):
+            break
         case .concrete:
             throw Trap(.unimplemented(feature: "heap type other than `func`, `extern`, and `exn`"))
         }
@@ -295,28 +354,43 @@ struct TableEntity /* : ~Copyable */ {
         guard try resourceLimiter.limitTableGrowth(to: numberOfElements) else {
             throw Trap(.initialTableSizeExceedsLimit(numberOfElements: numberOfElements))
         }
-        elements = Array(repeating: emptyElement, count: numberOfElements)
+
+        let storage = TableStorage(capacity: numberOfElements, repeating: Self.rawNull)
+        self.storage = storage
+        self.rawElements = storage.buffer
+        self.count = numberOfElements
         self.tableType = tableType
+    }
+
+    /// Makes room for at least `newCount` elements, moving the existing ones over
+    /// when the buffer has to be replaced.
+    private mutating func reserve(_ newCount: Int) {
+        guard newCount > storage.capacity else { return }
+        let newCapacity = Swift.max(newCount, storage.capacity &* 2)
+        let newStorage = TableStorage(capacity: newCapacity, repeating: Self.rawNull)
+        newStorage.buffer.update(from: rawElements, count: count)
+        storage = newStorage
+        rawElements = newStorage.buffer
     }
 
     /// > Note: https://webassembly.github.io/spec/core/exec/modules.html#grow-table
     /// Returns true if gorwth succeeds, otherwise returns false
     mutating func grow(by growthSize: UInt64, value: Reference, resourceLimiter: any ResourceLimiter) throws -> Bool {
-        let oldSize = UInt64(elements.count)
-        guard !UInt64(elements.count).addingReportingOverflow(growthSize).overflow else {
-            return false
-        }
+        let oldSize = UInt64(count)
+        let (newSize, overflow) = oldSize.addingReportingOverflow(growthSize)
+        guard !overflow else { return false }
 
         let maxLimit = limits.max ?? (limits.isMemory64 ? UInt64.max : UInt64(UInt32.max))
 
-        let newSize = oldSize + growthSize
-        if newSize > maxLimit {
-            return false
-        }
+        if newSize > maxLimit { return false }
+        guard newSize <= UInt64(Int.max) else { return false }
         guard try resourceLimiter.limitTableGrowth(to: Int(newSize)) else {
             return false
         }
-        elements.append(contentsOf: Array(repeating: value, count: Int(growthSize)))
+        let newCount = Int(newSize)
+        reserve(newCount)
+        (rawElements + count).initialize(repeating: Self.encode(value), count: newCount - count)
+        count = newCount
         return true
     }
 
@@ -328,56 +402,50 @@ struct TableEntity /* : ~Copyable */ {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
-        guard !destinationOverflow, destinationEnd <= elements.count else {
+        guard !destinationOverflow, destinationEnd <= self.count else {
             throw Trap(.tableOutOfBounds(destinationEnd))
         }
         guard !sourceOverflow, sourceEnd <= references.count else {
             throw Trap(.tableOutOfBounds(sourceEnd))
         }
 
-        elements.withUnsafeMutableBufferPointer { table in
-            references.withUnsafeBufferPointer { segment in
-                _ = table[destination..<destination + count].initialize(from: segment[source..<source + count])
-            }
+        let destinationBase = rawElements + destination
+        for offset in 0..<count {
+            destinationBase[offset] = Self.encode(references[source + offset])
         }
     }
 
-    mutating func fill(repeating value: Reference, from index: Int, count: Int) throws {
-        let (end, overflow) = index.addingReportingOverflow(count)
-        guard !overflow, end <= elements.count else { throw Trap(.tableOutOfBounds(end)) }
+    mutating func fill(repeating value: Reference, from index: Int, count fillCount: Int) throws {
+        let (end, overflow) = index.addingReportingOverflow(fillCount)
+        guard !overflow, end <= self.count else { throw Trap(.tableOutOfBounds(end)) }
 
-        elements.withUnsafeMutableBufferPointer {
-            $0[index..<index + count].initialize(repeating: value)
-        }
+        (rawElements + index).update(repeating: Self.encode(value), count: fillCount)
     }
 
     static func copy(
-        _ sourceTable: UnsafeBufferPointer<Reference>,
-        _ destinationTable: UnsafeMutableBufferPointer<Reference>,
+        _ sourceTable: UnsafePointer<UInt64>, sourceCount: Int,
+        _ destinationTable: UnsafeMutablePointer<UInt64>, destinationCount: Int,
         from source: Int, to destination: Int, count: Int
     ) throws {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
-        guard !destinationOverflow, destinationEnd <= destinationTable.count else {
+        guard !destinationOverflow, destinationEnd <= destinationCount else {
             throw Trap(.tableOutOfBounds(Int(destinationEnd)))
         }
-        guard !sourceOverflow, sourceEnd <= sourceTable.count else {
+        guard !sourceOverflow, sourceEnd <= sourceCount else {
             throw Trap(.tableOutOfBounds(Int(sourceEnd)))
         }
 
-        guard count > 0,
-            let sourceBase = sourceTable.baseAddress,
-            let destinationBase = destinationTable.baseAddress
-        else { return }
+        guard count > 0 else { return }
 
-        // `Reference` is a trivial (bitwise-copyable) type, so the elements can be
-        // moved with a single `memmove`, which is also overlap-safe as required when
-        // the source and destination tables are the same.
-        let destination = UnsafeMutableRawPointer(destinationBase.advanced(by: destination))
+        // Elements are plain 64-bit words, so they can be moved with a single
+        // `memmove`, which is also overlap-safe as required when the source and
+        // destination tables are the same.
+        let destination = UnsafeMutableRawPointer(destinationTable.advanced(by: destination))
         destination.copyMemory(
-            from: sourceBase.advanced(by: source),
-            byteCount: count * MemoryLayout<Reference>.stride
+            from: sourceTable.advanced(by: source),
+            byteCount: count * MemoryLayout<UInt64>.stride
         )
     }
 }
@@ -396,18 +464,20 @@ extension InternalTable {
         // access enforcement
         if self == sourceTable {
             try withValue {
-                try $0.elements.withUnsafeMutableBufferPointer {
-                    try TableEntity.copy(UnsafeBufferPointer($0), $0, from: source, to: destination, count: count)
-                }
+                try TableEntity.copy(
+                    $0.rawElements, sourceCount: $0.count,
+                    $0.rawElements, destinationCount: $0.count,
+                    from: source, to: destination, count: count
+                )
             }
         } else {
             try withValue { destinationTable in
                 try sourceTable.withValue { sourceTable in
-                    try destinationTable.elements.withUnsafeMutableBufferPointer { dest in
-                        try sourceTable.elements.withUnsafeBufferPointer { src in
-                            try TableEntity.copy(src, dest, from: source, to: destination, count: count)
-                        }
-                    }
+                    try TableEntity.copy(
+                        sourceTable.rawElements, sourceCount: sourceTable.count,
+                        destinationTable.rawElements, destinationCount: destinationTable.count,
+                        from: source, to: destination, count: count
+                    )
                 }
             }
         }
@@ -459,8 +529,8 @@ public struct Table: Equatable {
 
     /// Accesses the element at the given index.
     public subscript(index: Int) -> Reference {
-        get { handle.elements[index] }
-        nonmutating set { handle.withValue { $0.elements[index] = newValue } }
+        get { handle.withValue { $0.element(at: index) } }
+        nonmutating set { handle.withValue { $0.setElement(newValue, at: index) } }
     }
 }
 
@@ -1194,8 +1264,16 @@ extension InternalInstance {
 
 extension InternalTable {
     var elements: [Reference] { withValue { $0.elements } }
+    var count: Int { withValue { $0.count } }
     var tableType: TableType { withValue { $0.tableType } }
     var limits: Limits { withValue { $0.limits } }
+
+    /// The raw element at `index`, in ``UntypedValue`` encoding.
+    /// - Precondition: `index` is within bounds.
+    @inline(__always)
+    func rawElement(at index: Int) -> UInt64 {
+        withValue { $0.rawElements[index] }
+    }
 }
 
 extension InternalMemory {

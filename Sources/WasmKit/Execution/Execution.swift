@@ -128,7 +128,7 @@ struct Execution: ~Copyable {
         // looped so that no loop remains for the optimizer to turn back into a
         // `memcpy` call.
         if count >= 8 {
-            if count > 16 {
+            if count > Self.inlineFrameInitLimit {
                 // `copyMemory` rather than `update(from:count:)`: the latter emits
                 // an overlap check that is dead here (the image lives in the iseq
                 // allocation, never on the VM stack).
@@ -150,11 +150,37 @@ struct Execution: ~Copyable {
         }
     }
 
+    /// The largest frame-init image copied without calling `memcpy`.
+    static var inlineFrameInitLimit: Int { 16 }
+
+    /// The `> inlineFrameInitLimit` branch of ``initializeFrame(sp:iseq:)``,
+    /// spelled out separately for handlers that must contain no call at all and
+    /// therefore refuse larger images rather than reaching `memcpy`.
+    ///
+    /// - Precondition: `count <= inlineFrameInitLimit`.
+    @inline(__always)
+    static func copySmallImage(
+        _ dst: UnsafeMutablePointer<UntypedValue>, _ src: UnsafePointer<UntypedValue>, _ count: Int
+    ) {
+        if count >= 8 {
+            copy8(dst, src, 0)
+            copy8(dst, src, count - 8)
+        } else if count >= 4 {
+            copy4(dst, src, 0)
+            copy4(dst, src, count - 4)
+        } else if count >= 2 {
+            copyPair(dst, src, 0)
+            copyPair(dst, src, count - 2)
+        } else if count == 1 {
+            dst[0] = src[0]
+        }
+    }
+
     /// Copies two slots as one 16-byte unit, so this lowers to a single vector
     /// load/store pair -- `ldr q`/`str q` on arm64, `movups` on x86-64 -- rather
     /// than two scalar ones.
     @inline(__always)
-    private static func copyPair(
+    static func copyPair(
         _ dst: UnsafeMutablePointer<UntypedValue>, _ src: UnsafePointer<UntypedValue>, _ o: Int
     ) {
         let bytes = UnsafeRawPointer(src + o).loadUnaligned(as: SIMD2<UInt64>.self)
@@ -162,7 +188,7 @@ struct Execution: ~Copyable {
     }
 
     @inline(__always)
-    private static func copy4(
+    static func copy4(
         _ dst: UnsafeMutablePointer<UntypedValue>, _ src: UnsafePointer<UntypedValue>, _ o: Int
     ) {
         copyPair(dst, src, o)
@@ -170,7 +196,7 @@ struct Execution: ~Copyable {
     }
 
     @inline(__always)
-    private static func copy8(
+    static func copy8(
         _ dst: UnsafeMutablePointer<UntypedValue>, _ src: UnsafePointer<UntypedValue>, _ o: Int
     ) {
         copy4(dst, src, o)
@@ -195,6 +221,41 @@ struct Execution: ~Copyable {
         initializeFrame(sp: newSp, iseq: iseq)
         newSp.previousSP = sp
         newSp.setReturnPC(returnPC, needsMemoryRestore: needsMemoryRestoreOnReturn)
+        newSp.currentFunction = function
+        return newSp
+    }
+
+    /// The call-free form of ``pushFrame(iseq:function:sp:returnPC:spAddend:needsMemoryRestoreOnReturn:)``
+    /// for a callee in the caller's own instance.
+    ///
+    /// Returns `nil` instead of throwing or calling out when the frame would
+    /// overflow the VM stack or its init image is too large to copy inline; the
+    /// caller hands those cases to a handler that can afford a stack frame.
+    /// Building a `Trap` needs a call (a type-metadata accessor and
+    /// `swift_allocError`) and so does `memcpy`, and a single call anywhere in a
+    /// handler costs a prologue and epilogue on *every* execution of it.
+    ///
+    /// The saved-PC flag is always left clear: this only lays out same-instance
+    /// frames, so the matching ``_return`` stays on its fast path.
+    @inline(__always)
+    func pushFrameWithoutCalling(
+        iseq: InstructionSequence,
+        function: EntityHandle<WasmFunctionEntity>,
+        sp: Sp, returnPC: Pc,
+        spAddend: VReg
+    ) -> Sp? {
+        let newSp = sp.advanced(by: Int(spAddend))
+        guard _fastPath(newSp.advanced(by: iseq.maxStackHeight) < stackEnd) else { return nil }
+        let image = iseq.frameInit
+        if let src = image.baseAddress {
+            let count = image.count
+            guard _fastPath(count <= Self.inlineFrameInitLimit) else { return nil }
+            Self.copySmallImage(
+                UnsafeMutableRawPointer(newSp).assumingMemoryBound(to: UntypedValue.self), src, count
+            )
+        }
+        newSp.previousSP = sp
+        newSp.setReturnPC(returnPC, needsMemoryRestore: false)
         newSp.currentFunction = function
         return newSp
     }
@@ -803,12 +864,27 @@ extension Execution {
     /// stack pointer nor the program counter.
     @inline(never)
     private func invokeHostFunction(function: EntityHandle<HostFunctionEntity>, sp: Sp, spAddend: VReg) throws {
+        try Execution.invokeHostFunction(store: store, function: function, sp: sp, spAddend: spAddend)
+    }
+
+    /// The `self`-free form of ``invokeHostFunction(function:sp:spAddend:)``.
+    ///
+    /// It takes `store` rather than the whole `Execution` on purpose: a handler
+    /// that calls a method taking `Execution` by reference makes the optimizer
+    /// materialise a 48-byte copy of it on the native stack -- unconditionally, at
+    /// the top of the handler, plus a stack-protector cookie -- even when the call
+    /// itself sits on a cold branch. ``Execution/callIndirect(sp:pc:md:ms:immediate:)``
+    /// reaches a host callee rarely enough that it must not pay for it.
+    @inline(never)
+    static func invokeHostFunction(
+        store: StoreRef, function: EntityHandle<HostFunctionEntity>, sp: Sp, spAddend: VReg
+    ) throws {
         let resolvedType = store.value.engine.resolveType(function.type)
         let layout = FrameHeaderLayout(type: resolvedType)
         let parameters = resolvedType.parameters.enumerated().map { (i, type) in
             sp.loadValue(at: spAddend + layout.paramReg(i), type: type)
         }
-        let instance = self.currentInstance(sp: sp)
+        let instance = sp.currentInstance.unsafelyUnwrapped
         let caller = Caller(
             instanceHandle: instance,
             store: store.value,

@@ -27,7 +27,16 @@ enum Instruction: Equatable {
     /// 
     /// This instruction can skip switching the current instance.
     case internalCall(Instruction.CallOperand)
-    /// WebAssembly Core Instruction `call_indirect`
+    /// WebAssembly Core Instruction `call_indirect`, fast path only
+    /// 
+    /// Resolves the entry out of the table entity baked into the immediate,
+    /// checks the type and the callee's code state, and lays the callee's
+    /// frame out inline. Everything else -- an out-of-bounds or null entry, a
+    /// type mismatch, a host callee, a callee that is not compiled yet, a
+    /// callee in another instance, a frame that would overflow the VM stack
+    /// or whose init image is too large to copy inline -- is handed to
+    /// `callIndirectSlow`, so that this handler contains no call and
+    /// therefore needs no stack frame.
     case callIndirect(Instruction.CallIndirectOperand)
     /// Resize the frame header by increasing param/result slots and copying `sizeToCopy`
     /// slots placed after the header
@@ -661,6 +670,16 @@ enum Instruction: Equatable {
     case memoryOutOfBoundsTrap
     /// Raise `Trap(.unalignedAtomic)`. Dispatched to by the atomic handlers; never emitted.
     case unalignedAtomicTrap
+    /// Everything `call_indirect` can do that its fast handler does not
+    /// 
+    /// Never emitted by the translator. `callIndirect` dispatches here, with
+    /// `sp` unmodified and `pc` rewound to the start of the shared immediate,
+    /// whenever the entry is out of bounds or null, the type does not match,
+    /// the callee is a host function or is not compiled yet, the callee runs
+    /// in another instance, or the frame does not fit the fast path. It
+    /// redoes the resolution from scratch so that the trap it raises is the
+    /// one the spec asks for.
+    case callIndirectSlow(Instruction.CallIndirectOperand)
 }
 
 extension Instruction {
@@ -707,18 +726,21 @@ extension Instruction {
     }
 
     struct CallIndirectOperand: Equatable, InstructionImmediate {
-        var tableIndex: UInt32
+        var rawTable: UInt64
+        var rawCallerInstance: UInt64
         var rawType: UInt32
         var index: VReg
         var spAddend: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let (tableIndex, rawType) = pc.read((UInt32, UInt32).self)
-            let (index, spAddend, _, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
-            return Self(tableIndex: tableIndex, rawType: rawType, index: index, spAddend: spAddend)
+            let (rawTable) = pc.read((UInt64).self)
+            let (rawCallerInstance) = pc.read((UInt64).self)
+            let (rawType, index, spAddend) = pc.read((UInt32, VReg, VReg).self)
+            return Self(rawTable: rawTable, rawCallerInstance: rawCallerInstance, rawType: rawType, index: index, spAddend: spAddend)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { unsafeBitCast(($0.tableIndex, $0.rawType) as (UInt32, UInt32), to: CodeSlot.self) }
-            emitSlot { unsafeBitCast(($0.index, $0.spAddend, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+            emitSlot { $0.rawTable }
+            emitSlot { $0.rawCallerInstance }
+            emitSlot { unsafeBitCast(($0.rawType, $0.index, $0.spAddend) as (UInt32, VReg, VReg), to: CodeSlot.self) }
         }
     }
 
@@ -746,17 +768,20 @@ extension Instruction {
     }
 
     struct ReturnCallIndirectOperand: Equatable, InstructionImmediate {
-        var tableIndex: UInt32
+        var rawTable: UInt64
+        var rawCallerInstance: UInt64
         var rawType: UInt32
         var index: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let (tableIndex, rawType) = pc.read((UInt32, UInt32).self)
-            let (index, _, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
-            return Self(tableIndex: tableIndex, rawType: rawType, index: index)
+            let (rawTable) = pc.read((UInt64).self)
+            let (rawCallerInstance) = pc.read((UInt64).self)
+            let (rawType, index, _, _) = pc.read((UInt32, VReg, UInt8, UInt8).self)
+            return Self(rawTable: rawTable, rawCallerInstance: rawCallerInstance, rawType: rawType, index: index)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { unsafeBitCast(($0.tableIndex, $0.rawType) as (UInt32, UInt32), to: CodeSlot.self) }
-            emitSlot { unsafeBitCast(($0.index, 0, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+            emitSlot { $0.rawTable }
+            emitSlot { $0.rawCallerInstance }
+            emitSlot { unsafeBitCast(($0.rawType, $0.index, 0, 0) as (UInt32, VReg, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
@@ -1604,6 +1629,7 @@ extension Instruction {
         case .brIfI64LeU(let immediate): return immediate
         case .brIfI64GeS(let immediate): return immediate
         case .brIfI64GeU(let immediate): return immediate
+        case .callIndirectSlow(let immediate): return immediate
         default: return nil
         }
     }
@@ -1903,6 +1929,7 @@ extension Instruction {
         case .brIfI64LeU(let immediate): immediate.emit(to: emit)
         case .brIfI64GeS(let immediate): immediate.emit(to: emit)
         case .brIfI64GeU(let immediate): immediate.emit(to: emit)
+        case .callIndirectSlow(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -2212,6 +2239,7 @@ extension Instruction {
         case .returnCrossInstance: return 296
         case .memoryOutOfBoundsTrap: return 297
         case .unalignedAtomicTrap: return 298
+        case .callIndirectSlow: return 299
         }
     }
 }
@@ -2522,6 +2550,7 @@ extension Instruction {
         case 296: return .returnCrossInstance
         case 297: return .memoryOutOfBoundsTrap
         case 298: return .unalignedAtomicTrap
+        case 299: return .callIndirectSlow(Instruction.CallIndirectOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -2835,6 +2864,7 @@ extension Instruction {
         case 296: return "returnCrossInstance"
         case 297: return "memoryOutOfBoundsTrap"
         case 298: return "unalignedAtomicTrap"
+        case 299: return "callIndirectSlow"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
@@ -2887,6 +2917,7 @@ protocol NextInstructionPredictor: ~Copyable {
     mutating func predictNext_brIfI64GeS(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_brIfI64GeU(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_returnCrossInstance(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_callIndirectSlow(operandPc: Pc, sp: Sp) -> [Pc]
 }
 
 extension Instruction {
@@ -2935,6 +2966,7 @@ extension Instruction {
         case 294: return predictor.predictNext_brIfI64GeS(operandPc: operandPc, sp: sp)
         case 295: return predictor.predictNext_brIfI64GeU(operandPc: operandPc, sp: sp)
         case 296: return predictor.predictNext_returnCrossInstance(operandPc: operandPc, sp: sp)
+        case 299: return predictor.predictNext_callIndirectSlow(operandPc: operandPc, sp: sp)
         default: return nil
         }
     }
@@ -2960,7 +2992,7 @@ extension Instruction {
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.callIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg(0), spAddend: VReg(0)))
+                let inst = Instruction.callIndirect(.init(rawTable: UInt64(0), rawCallerInstance: UInt64(0), rawType: UInt32(0), index: VReg(0), spAddend: VReg(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
@@ -2968,7 +3000,7 @@ extension Instruction {
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.returnCallIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg(0)))
+                let inst = Instruction.returnCallIndirect(.init(rawTable: UInt64(0), rawCallerInstance: UInt64(0), rawType: UInt32(0), index: VReg(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
@@ -3097,6 +3129,10 @@ extension Instruction {
             }
             do {
                 let inst = Instruction.returnCrossInstance
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.callIndirectSlow(.init(rawTable: UInt64(0), rawCallerInstance: UInt64(0), rawType: UInt32(0), index: VReg(0), spAddend: VReg(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
         return map

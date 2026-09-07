@@ -182,6 +182,20 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "rawGlobal", type: .UInt64)
     }
 
+    /// The immediate shared by `callIndirect` and `callIndirectSlow`.
+    ///
+    /// `rawTable` and `rawCallerInstance` are baked by the translator: both are
+    /// fixed for the lifetime of the function being translated (a function
+    /// belongs to exactly one instance, and an instance's table list is fixed at
+    /// instantiation), so neither handler chases the instance to find them.
+    static let callIndirectOperand = Self(name: "CallIndirectOperand") {
+        $0.field(name: "rawTable", type: .UInt64)
+        $0.field(name: "rawCallerInstance", type: .UInt64)
+        $0.field(name: "rawType", type: .UInt32)
+        $0.field(name: "index", type: .VReg)
+        $0.field(name: "spAddend", type: .VReg)
+    }
+
     static let brIfOperand = Self(name: "BrIfOperand") {
         $0.field(name: "condition", type: .LVReg)
         $0.field(name: "offset", type: .Int32)

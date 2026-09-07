@@ -25,6 +25,11 @@ public final class Engine {
     /// and read through the execution state instead.
     let crossInstanceReturnSlot: CodeSlot
 
+    /// The head slot of the `callIndirectSlow` handler under this engine's
+    /// threading model, read by `callIndirect` to hand off everything but its
+    /// fast case, for the same reason as ``crossInstanceReturnSlot``.
+    let callIndirectSlowSlot: CodeSlot
+
     /// Whether this engine has an interceptor which is unsafe to share with
     /// concurrently executing stores.
     package var hasInterceptor: Bool { interceptor != nil }
@@ -56,6 +61,9 @@ public final class Engine {
         self.crossInstanceReturnSlot = Instruction.returnCrossInstance.headSlot(
             threadingModel: configuration.threadingModel
         )
+        self.callIndirectSlowSlot = Instruction.callIndirectSlow(
+            Instruction.CallIndirectOperand(rawTable: 0, rawCallerInstance: 0, rawType: 0, index: 0, spAddend: 0)
+        ).headSlot(threadingModel: configuration.threadingModel)
     }
 
     /// Migration aid for the old ``Runtime/instantiate(module:)``

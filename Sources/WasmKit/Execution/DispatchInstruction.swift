@@ -21,7 +21,7 @@ extension Execution {
         case 5: return try self.execute_call(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 6: return try self.execute_compilingCall(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 7: return try self.execute_internalCall(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 8: return try self.execute_callIndirect(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 8: return self.execute_callIndirect(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 9: return try self.execute_resizeFrameHeader(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 10: return try self.execute_returnCall(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 11: return try self.execute_returnCallIndirect(sp: &sp, pc: &pc, md: &md, ms: &ms)
@@ -352,6 +352,7 @@ extension Execution {
         case 296: return self.execute_returnCrossInstance(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 297: return try self.execute_memoryOutOfBoundsTrap(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 298: return try self.execute_unalignedAtomicTrap(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 299: return try self.execute_callIndirectSlow(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -1112,10 +1113,10 @@ extension Execution {
         return next
     }
     @_silgen_name("wasmkit_execute_callIndirect") @inline(__always)
-    mutating func execute_callIndirect(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
+    mutating func execute_callIndirect(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
         let immediate = Instruction.CallIndirectOperand.load(from: &pc.pointee)
         let next: CodeSlot
-        (pc.pointee, next) = try self.callIndirect(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee, immediate: immediate)
+        (pc.pointee, next) = self.callIndirect(sp: &sp.pointee, pc: pc.pointee, immediate: immediate)
         return next
     }
     @_silgen_name("wasmkit_execute_resizeFrameHeader") @inline(__always)
@@ -3393,6 +3394,13 @@ extension Execution {
         try self.unalignedAtomicTrap(sp: sp.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_callIndirectSlow") @inline(__always)
+    mutating func execute_callIndirectSlow(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
+        let immediate = Instruction.CallIndirectOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = try self.callIndirectSlow(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee, immediate: immediate)
         return next
     }
 }

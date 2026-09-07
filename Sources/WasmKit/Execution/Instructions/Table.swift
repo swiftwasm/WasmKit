@@ -9,8 +9,7 @@ extension Execution {
 
         let elementIndex = try getElementIndex(sp: sp, VReg(immediate.index), table)
 
-        let reference = table.elements[Int(elementIndex)]
-        sp[immediate.result] = UntypedValue(.ref(reference))
+        sp[immediate.result] = UntypedValue(storage: table.rawElement(at: Int(elementIndex)))
     }
     mutating func tableSet(sp: Sp, immediate: Instruction.TableSetOperand) throws {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
@@ -21,7 +20,7 @@ extension Execution {
     }
     mutating func tableSize(sp: Sp, immediate: Instruction.TableSizeOperand) {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
-        let elementsCount = table.elements.count
+        let elementsCount = table.count
         sp[immediate.result] = UntypedValue(table.limits.isMemory64 ? .i64(UInt64(elementsCount)) : .i32(UInt32(elementsCount)))
     }
     mutating func tableGrow(sp: Sp, immediate: Instruction.TableGrowOperand) throws {
@@ -30,7 +29,7 @@ extension Execution {
         let growthSize = sp[immediate.delta].asAddressOffset(table.limits.isMemory64)
         let growthValue = sp.getReference(VReg(immediate.value), type: table.tableType)
 
-        let oldSize = table.elements.count
+        let oldSize = table.count
         guard try table.withValue({ try $0.grow(by: growthSize, value: growthValue, resourceLimiter: store.value.resourceLimiter) }) else {
             sp[immediate.result] = UntypedValue(.i32(Int32(-1).unsigned))
             return
@@ -89,7 +88,7 @@ extension Execution {
         _ reference: Reference
     ) {
         table.withValue {
-            $0.elements[elementIndex] = reference
+            $0.setElement(reference, at: elementIndex)
         }
     }
 }
@@ -105,8 +104,8 @@ extension Execution {
     ) throws -> ElementIndex {
         let elementIndex = sp[register].asAddressOffset(table.limits.isMemory64)
 
-        guard elementIndex < table.elements.count else {
-            throw Trap(.tableOutOfBounds(Int(elementIndex)))
+        guard elementIndex < UInt64(table.count) else {
+            throw Trap(.tableOutOfBounds(Int(truncatingIfNeeded: elementIndex)))
         }
 
         return ElementIndex(elementIndex)

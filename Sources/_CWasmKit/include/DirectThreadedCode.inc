@@ -57,7 +57,6 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_callIndirect(Sp sp, Pc pc, Md
     SWIFT_CC(swift) uint64_t wasmkit_execute_callIndirect(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
     void * _Nullable error = NULL; uint64_t next;
     INLINE_CALL next = wasmkit_execute_callIndirect(&sp, &pc, &md, &ms, state, &error);
-    if (error) return wasmkit_execution_state_set_error(error, sp, state);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
 }
 SWIFT_CC(swiftasync) static inline void wasmkit_tc_resizeFrameHeader(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
@@ -1608,6 +1607,13 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_unalignedAtomicTrap(Sp sp, Pc
     if (error) return wasmkit_execution_state_set_error(error, sp, state);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
 }
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_callIndirectSlow(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_callIndirectSlow(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_callIndirectSlow(&sp, &pc, &md, &ms, state, &error);
+    if (error) return wasmkit_execution_state_set_error(error, sp, state);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
+}
 // Indexed by opcode ID. Opcodes whose handlers are bit-identical (see
 // `Instruction.handlerIdentity` in VMSpec) share a single entry point here,
 // so that dispatch never goes through a compiler-generated merge thunk.
@@ -1911,4 +1917,5 @@ static const uintptr_t wasmkit_tc_exec_handlers[] = {
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_returnCrossInstance),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_memoryOutOfBoundsTrap),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_unalignedAtomicTrap),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_callIndirectSlow),
 };
