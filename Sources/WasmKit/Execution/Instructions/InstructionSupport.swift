@@ -1,8 +1,5 @@
 import WasmParser
 
-/// A register that is used to store a value in the stack.
-typealias VReg = Int16
-
 /// A register value that is pre-shifted to avoid runtime shift operation.
 protocol ShiftedVReg {
     associatedtype Storage: FixedWidthInteger
@@ -12,20 +9,103 @@ protocol ShiftedVReg {
     var value: Storage { get }
 }
 
+/// A register that is used to store a value in the stack.
+///
+/// The stored representation is the **byte** offset of the slot from `sp`
+/// (`slotIndex * MemoryLayout<StackSlot>.size`), not the raw slot index, so a
+/// handler can address a 32-bit operand with a plain register offset. On arm64
+/// a 32-bit load cannot scale its index by 8, so a slot index would need an
+/// `lsl #3` before every such `ldr w`. ``LVReg`` and ``LLVReg`` use the same
+/// convention with a wider storage.
+///
+/// Pre-shifting costs three bits of range: an `Int16` byte offset addresses
+/// slots ``minSlotIndex``...``maxSlotIndex`` (-4096...4095). The translator
+/// rejects a function whose frame does not fit (see
+/// `InstructionTranslator.checkFrameFitsVRegRange`).
+struct VReg: Equatable, Hashable, ShiftedVReg, CustomStringConvertible {
+    /// The pre-shifted byte offset from `sp`. Always a multiple of
+    /// `MemoryLayout<StackSlot>.size`.
+    let value: Int16
+
+    /// The size, in bytes, of a single stack slot.
+    @inline(__always)
+    static var slotSize: Int16 { Int16(MemoryLayout<StackSlot>.size) }
+
+    /// The lowest slot index representable as a pre-shifted `Int16` byte offset.
+    static var minSlotIndex: Int { Int(Int16.min) / Int(MemoryLayout<StackSlot>.size) }
+    /// The highest slot index representable as a pre-shifted `Int16` byte offset.
+    static var maxSlotIndex: Int { Int(Int16.max) / Int(MemoryLayout<StackSlot>.size) }
+
+    /// Whether `slotIndex` can be represented without truncation.
+    @inline(__always)
+    static func canRepresent(slotIndex: Int) -> Bool {
+        minSlotIndex <= slotIndex && slotIndex <= maxSlotIndex
+    }
+
+    /// Creates a register from a slot index relative to `sp`.
+    ///
+    /// - Note: Out-of-range indices wrap rather than trap. The translator
+    ///   validates the whole frame extent once, before the instruction sequence
+    ///   it built can be executed (`InstructionTranslator.checkFrameFitsVRegRange`), so a
+    ///   function with an unrepresentable frame is rejected as a whole instead of
+    ///   crashing part-way through translation.
+    @inline(__always)
+    init(slotIndex: Int) {
+        self.value = Int16(truncatingIfNeeded: slotIndex) &* Self.slotSize
+    }
+
+    /// Creates a register from an already pre-shifted byte offset.
+    @inline(__always)
+    init(byteOffset: Int16) {
+        self.value = byteOffset
+    }
+
+    /// The slot index this register addresses.
+    @inline(__always)
+    var slotIndex: Int16 { value / Self.slotSize }
+
+    /// The byte offset from `sp` this register addresses.
+    @inline(__always)
+    var byteOffset: Int16 { value }
+
+    /// The register of the slot right after this one, used by `v128` operands,
+    /// which occupy two consecutive slots.
+    @inline(__always)
+    var nextSlot: VReg { VReg(byteOffset: value &+ Self.slotSize) }
+
+    /// The register at slot index zero, i.e. `sp` itself.
+    static let zero = VReg(byteOffset: 0)
+
+    /// Slot-index arithmetic. Byte offsets scale linearly with slot indices, so
+    /// these are the same operations on either representation.
+    @inline(__always)
+    static func + (lhs: VReg, rhs: VReg) -> VReg { VReg(byteOffset: lhs.value &+ rhs.value) }
+    @inline(__always)
+    static func - (lhs: VReg, rhs: VReg) -> VReg { VReg(byteOffset: lhs.value &- rhs.value) }
+    @inline(__always)
+    static func += (lhs: inout VReg, rhs: VReg) { lhs = lhs + rhs }
+    @inline(__always)
+    static prefix func - (operand: VReg) -> VReg { VReg(byteOffset: 0 &- operand.value) }
+
+    var description: String { "\(slotIndex)" }
+}
+
 /// A larger (32-bit) version of `VReg`
 /// Used to utilize halfword loads instructions.
 struct LVReg: Equatable, ShiftedVReg, CustomStringConvertible {
     let value: Int32
 
-    init(_ value: VReg) {
-        // Pre-shift to avoid runtime shift operation by using
-        // unused high bits.
-        self.value = Int32(value) * Int32(MemoryLayout<StackSlot>.size)
+    init(_ reg: VReg) {
+        // `VReg` is already pre-shifted; just widen it.
+        self.value = Int32(reg.byteOffset)
     }
 
     init(storage: Int32) {
         self.value = storage
     }
+
+    /// The register at slot index zero, i.e. `sp` itself.
+    static let zero = LVReg(storage: 0)
 
     var description: String {
         "\(value / Int32(MemoryLayout<StackSlot>.size))"
@@ -37,15 +117,17 @@ struct LVReg: Equatable, ShiftedVReg, CustomStringConvertible {
 struct LLVReg: Equatable, ShiftedVReg, CustomStringConvertible {
     let value: Int64
 
-    init(_ value: VReg) {
-        // Pre-shift to avoid runtime shift operation by using
-        // unused high bits.
-        self.value = Int64(value) * Int64(MemoryLayout<StackSlot>.size)
+    init(_ reg: VReg) {
+        // `VReg` is already pre-shifted; just widen it.
+        self.value = Int64(reg.byteOffset)
     }
 
     init(storage: Int64) {
         self.value = storage
     }
+
+    /// The register at slot index zero, i.e. `sp` itself.
+    static let zero = LLVReg(storage: 0)
 
     var description: String {
         "\(value / Int64(MemoryLayout<StackSlot>.size))"

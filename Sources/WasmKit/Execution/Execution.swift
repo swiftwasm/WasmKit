@@ -190,7 +190,11 @@ struct Execution: ~Copyable {
         spAddend: VReg,
         needsMemoryRestoreOnReturn: Bool
     ) throws -> Sp {
-        let newSp = sp.advanced(by: Int(spAddend))
+        // `spAddend` is a pre-shifted byte offset, so this is a plain byte add
+        // rather than a shifted one.
+        let newSp = UnsafeMutableRawPointer(sp)
+            .advanced(by: Int(spAddend.byteOffset))
+            .assumingMemoryBound(to: StackSlot.self)
         try checkStackBoundary(newSp.advanced(by: iseq.maxStackHeight))
         initializeFrame(sp: newSp, iseq: iseq)
         newSp.previousSP = sp
@@ -335,8 +339,8 @@ extension Sp {
     func loadValue(at reg: VReg, type: ValueType) -> Value {
         switch type {
         case .v128:
-            let lo = self[Int(reg)]
-            let hi = self[Int(reg) + 1]
+            let lo = self[reg].storage
+            let hi = self[reg.nextSlot].storage
             return .v128(V128Storage(lo: lo, hi: hi).value)
         case .i32, .i64, .f32, .f64, .ref:
             return self[reg].cast(to: type)
@@ -350,8 +354,8 @@ extension Sp {
                 preconditionFailure("type mismatch: expected v128, got \(value)")
             }
             let storage = V128Storage(v)
-            self[Int(reg)] = storage.lo
-            self[Int(reg) + 1] = storage.hi
+            self[reg] = UntypedValue(storage: storage.lo)
+            self[reg.nextSlot] = UntypedValue(storage: storage.hi)
         case .i32, .i64, .f32, .f64, .ref:
             self[reg] = UntypedValue(value)
         }
@@ -443,8 +447,9 @@ func executeWasm(
         sp.previousSP = nil
         sp.currentFunction = nil
         let layout = FrameHeaderLayout(type: type)
+        try FrameHeaderLayout.checkFitsVRegRange(layout.size)
         for (index, argument) in arguments.enumerated() {
-            let reg = layout.size + layout.paramReg(index)
+            let reg = VReg(slotIndex: layout.size) + layout.paramReg(index)
             sp.storeValue(argument, at: reg, type: type.parameters[index])
         }
 
@@ -460,7 +465,7 @@ func executeWasm(
             )
         }
         return type.results.enumerated().map { (i, resultType) in
-            let reg = layout.size + layout.returnReg(i)
+            let reg = VReg(slotIndex: layout.size) + layout.returnReg(i)
             return sp.loadValue(at: reg, type: resultType)
         }
     }
@@ -486,8 +491,9 @@ extension Execution {
             sp.previousSP = nil
             sp.currentFunction = nil
             let layout = FrameHeaderLayout(type: type)
+            try FrameHeaderLayout.checkFitsVRegRange(layout.size)
             for (index, argument) in arguments.enumerated() {
-                let reg = layout.size + layout.paramReg(index)
+                let reg = VReg(slotIndex: layout.size) + layout.paramReg(index)
                 sp.storeValue(argument, at: reg, type: type.parameters[index])
             }
 
@@ -499,7 +505,7 @@ extension Execution {
             )
 
             return type.results.enumerated().map { (i, resultType) in
-                let reg = layout.size + layout.returnReg(i)
+                let reg = VReg(slotIndex: layout.size) + layout.returnReg(i)
                 return sp.loadValue(at: reg, type: resultType)
             }
         }
@@ -582,7 +588,7 @@ extension Execution {
         (pc, sp) = try invoke(
             function: handle,
             callerInstance: nil,
-            spAddend: FrameHeaderLayout.size(of: type),
+            spAddend: VReg(slotIndex: FrameHeaderLayout.size(of: type)),
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         do {
@@ -737,7 +743,7 @@ extension Execution {
                 sp: sp, md: &md, ms: &ms
             )
         } else {
-            try invokeHostFunction(function: function.host, sp: sp, spAddend: 0)
+            try invokeHostFunction(function: function.host, sp: sp, spAddend: .zero)
             return (pc, sp)
         }
     }
@@ -805,6 +811,9 @@ extension Execution {
     private func invokeHostFunction(function: EntityHandle<HostFunctionEntity>, sp: Sp, spAddend: VReg) throws {
         let resolvedType = store.value.engine.resolveType(function.type)
         let layout = FrameHeaderLayout(type: resolvedType)
+        // A Wasm function's frame header is checked when the function is
+        // translated; a host function is never translated, so check it here.
+        try FrameHeaderLayout.checkFitsVRegRange(layout.size)
         let parameters = resolvedType.parameters.enumerated().map { (i, type) in
             sp.loadValue(at: spAddend + layout.paramReg(i), type: type)
         }

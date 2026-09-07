@@ -724,13 +724,13 @@ extension Instruction {
 
     struct ResizeFrameHeaderOperand: Equatable, InstructionImmediate {
         var delta: VReg
-        var sizeToCopy: VReg
+        var sizeToCopy: UInt16
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let (delta, sizeToCopy, _, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
+            let (delta, sizeToCopy, _, _, _, _) = pc.read((VReg, UInt16, UInt8, UInt8, UInt8, UInt8).self)
             return Self(delta: delta, sizeToCopy: sizeToCopy)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { unsafeBitCast(($0.delta, $0.sizeToCopy, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.delta, $0.sizeToCopy, 0, 0, 0, 0) as (VReg, UInt16, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
@@ -2948,19 +2948,19 @@ extension Instruction {
     ) -> [CodeSlot: OpcodeID] {
         var map = [CodeSlot: OpcodeID]()
             do {
-                let inst = Instruction.call(.init(rawCallee: UInt64(0), spAddend: VReg(0)))
+                let inst = Instruction.call(.init(rawCallee: UInt64(0), spAddend: VReg.zero))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.compilingCall(.init(rawCallee: UInt64(0), spAddend: VReg(0)))
+                let inst = Instruction.compilingCall(.init(rawCallee: UInt64(0), spAddend: VReg.zero))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.internalCall(.init(rawCallee: UInt64(0), spAddend: VReg(0)))
+                let inst = Instruction.internalCall(.init(rawCallee: UInt64(0), spAddend: VReg.zero))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.callIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg(0), spAddend: VReg(0)))
+                let inst = Instruction.callIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg.zero, spAddend: VReg.zero))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
@@ -2968,7 +2968,7 @@ extension Instruction {
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.returnCallIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg(0)))
+                let inst = Instruction.returnCallIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg.zero))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
@@ -2980,15 +2980,15 @@ extension Instruction {
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIf(.init(condition: LVReg(0), offset: Int32(0)))
+                let inst = Instruction.brIf(.init(condition: LVReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfNot(.init(condition: LVReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfNot(.init(condition: LVReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brTable(.init(rawBaseAddress: UInt64(0), count: UInt16(0), index: VReg(0)))
+                let inst = Instruction.brTable(.init(rawBaseAddress: UInt64(0), count: UInt16(0), index: VReg.zero))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
@@ -3004,11 +3004,11 @@ extension Instruction {
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.throwTag(.init(tagIndex: UInt32(0), payloadBase: VReg(0)))
+                let inst = Instruction.throwTag(.init(tagIndex: UInt32(0), payloadBase: VReg.zero))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.throwRef(.init(exnRef: VReg(0)))
+                let inst = Instruction.throwRef(.init(exnRef: VReg.zero))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
@@ -3016,83 +3016,83 @@ extension Instruction {
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI32Eq(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI32Eq(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI32Ne(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI32Ne(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI32LtS(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI32LtS(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI32LtU(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI32LtU(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI32GtS(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI32GtS(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI32GtU(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI32GtU(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI32LeS(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI32LeS(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI32LeU(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI32LeU(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI32GeS(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI32GeS(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI32GeU(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI32GeU(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI64Eq(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI64Eq(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI64Ne(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI64Ne(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI64LtS(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI64LtS(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI64LtU(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI64LtU(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI64GtS(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI64GtS(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI64GtU(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI64GtU(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI64LeS(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI64LeS(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI64LeU(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI64LeU(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI64GeS(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI64GeS(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brIfI64GeU(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                let inst = Instruction.brIfI64GeU(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {

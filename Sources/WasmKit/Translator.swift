@@ -201,7 +201,9 @@ private struct MetaProgramCounter {
 
 struct FrameHeaderLayout {
     let type: FunctionType
-    let size: VReg
+    /// The number of slots the frame header occupies, i.e. the distance from the
+    /// start of the header to `sp`.
+    let size: Int
     private let paramSlotOffsets: [Int]
     private let resultSlotOffsets: [Int]
 
@@ -213,14 +215,14 @@ struct FrameHeaderLayout {
     }
 
     func paramReg(_ index: Int) -> VReg {
-        VReg(paramSlotOffsets[index]) - size
+        VReg(slotIndex: paramSlotOffsets[index] - size)
     }
 
     func returnReg(_ index: Int) -> VReg {
-        VReg(resultSlotOffsets[index]) - size
+        VReg(slotIndex: resultSlotOffsets[index] - size)
     }
 
-    internal static func size(of: FunctionType) -> VReg {
+    internal static func size(of: FunctionType) -> Int {
         let paramSlotOffsets = Self.slotOffsets(of: of.parameters)
         let resultSlotOffsets = Self.slotOffsets(of: of.results)
         return Self.size(of: of, paramSlotOffsets: paramSlotOffsets, resultSlotOffsets: resultSlotOffsets)
@@ -229,10 +231,10 @@ struct FrameHeaderLayout {
         of type: FunctionType,
         paramSlotOffsets: [Int],
         resultSlotOffsets: [Int]
-    ) -> VReg {
+    ) -> Int {
         let paramSlots = (paramSlotOffsets.last ?? 0) + (type.parameters.last?.stackSlotCount ?? 0)
         let resultSlots = (resultSlotOffsets.last ?? 0) + (type.results.last?.stackSlotCount ?? 0)
-        return VReg(max(paramSlots, resultSlots)) + VReg(numberOfSavingSlots)
+        return max(paramSlots, resultSlots) + numberOfSavingSlots
     }
 
     private static func slotOffsets(of types: [WasmTypes.ValueType]) -> [Int] {
@@ -247,6 +249,25 @@ struct FrameHeaderLayout {
     }
     /// The number of slots used to save the current instance, PC, and SP
     internal static var numberOfSavingSlots: Int { 3 }
+
+    /// Rejects a frame header that a ``VReg`` cannot address.
+    ///
+    /// A Wasm function's whole frame is checked when it is translated
+    /// (`InstructionTranslator.checkFrameFitsVRegRange`); this is for the paths
+    /// that build a frame header from a ``FunctionType`` without translating
+    /// anything, namely host-function calls and the root frame of an invocation.
+    internal static func checkFitsVRegRange(_ size: Int) throws {
+        guard VReg.canRepresent(slotIndex: -size) else {
+            throw Trap(
+                .message(
+                    .init(
+                        "The frame header of this function type is too large for the interpreter: "
+                            + "\(size) slots, but only \(-VReg.minSlotIndex) are addressable"
+                    )
+                )
+            )
+        }
+    }
 }
 
 struct StackLayout {
@@ -256,8 +277,14 @@ struct StackLayout {
     private let nonParameterLocalSlotOffsets: [Int]
     let numberOfNonParameterLocalSlots: Int
 
+    /// The slot index of the first value-stack slot, i.e. right after the
+    /// locals and the constant pool.
+    var stackRegBaseSlotIndex: Int {
+        return numberOfNonParameterLocalSlots + constantSlotSize
+    }
+
     var stackRegBase: VReg {
-        return VReg(numberOfNonParameterLocalSlots + constantSlotSize)
+        return VReg(slotIndex: stackRegBaseSlotIndex)
     }
 
     init(type: FunctionType, locals: [WasmTypes.ValueType], codeSize: Int) throws(WasmKitError) {
@@ -271,8 +298,13 @@ struct StackLayout {
         // and the size of stack frame. Cap the slot size to avoid size explosion.
         self.constantSlotSize = min(max(codeSize / 20, 4), 128)
         let (maxSlots, overflow) = self.constantSlotSize.addingReportingOverflow(numberOfNonParameterLocalSlots)
-        guard !overflow, maxSlots < VReg.max else {
-            throw WasmKitError("The number of constant slots overflows")
+        guard !overflow, VReg.canRepresent(slotIndex: maxSlots) else {
+            // The locals and the constant pool alone already reach past what a
+            // `VReg` can address. See ``VReg`` for the range and why it is small.
+            throw WasmKitError(
+                "The frame of this function is too large for the interpreter: its locals and constant pool "
+                    + "need \(maxSlots) slots, but only \(VReg.maxSlotIndex) are addressable"
+            )
         }
     }
 
@@ -281,7 +313,7 @@ struct StackLayout {
             return frameHeader.paramReg(Int(index))
         } else {
             let nonParamIndex = Int(index) - frameHeader.type.parameters.count
-            return VReg(nonParameterLocalSlotOffsets[nonParamIndex])
+            return VReg(slotIndex: nonParameterLocalSlotOffsets[nonParamIndex])
         }
     }
 
@@ -290,16 +322,16 @@ struct StackLayout {
     }
 
     func constReg(_ index: Int) -> VReg {
-        return VReg(numberOfNonParameterLocalSlots + index)
+        return VReg(slotIndex: numberOfNonParameterLocalSlots + index)
     }
 
     #if Disassembler
         func dump<Target: TextOutputStream>(to target: inout Target, iseq: InstructionSequence) {
             let frameHeaderSize = FrameHeaderLayout.size(of: frameHeader.type)
-            let slotMinIndex = VReg(-frameHeaderSize)
-            let slotMaxIndex = VReg(stackRegBase - 1)
+            let slotMinIndex = -frameHeaderSize
+            let slotMaxIndex = stackRegBaseSlotIndex - 1
             let slotIndexWidth = max(String(slotMinIndex).count, String(slotMaxIndex).count)
-            func writeSlot(_ target: inout Target, _ index: VReg, _ description: String) {
+            func writeSlot(_ target: inout Target, _ index: Int, _ description: String) {
                 var index = String(index)
                 index = String(repeating: " ", count: slotIndexWidth - index.count) + index
 
@@ -311,7 +343,7 @@ struct StackLayout {
             }
 
             let savedItems: [String] = ["Instance", "Pc", "Sp"]
-            for i in 0..<frameHeaderSize - VReg(savedItems.count) {
+            for i in 0..<frameHeaderSize - savedItems.count {
                 var descriptions: [String] = []
                 if i < frameHeader.type.parameters.count {
                     descriptions.append("Param \(i)")
@@ -319,21 +351,21 @@ struct StackLayout {
                 if i < frameHeader.type.results.count {
                     descriptions.append("Result \(i)")
                 }
-                writeSlot(&target, VReg(i - frameHeaderSize), descriptions.joined(separator: ", "))
+                writeSlot(&target, i - frameHeaderSize, descriptions.joined(separator: ", "))
             }
 
             for (i, name) in savedItems.enumerated() {
-                writeSlot(&target, VReg(i - savedItems.count), "Saved \(name)")
+                writeSlot(&target, i - savedItems.count, "Saved \(name)")
             }
 
             var localSlot = 0
             for (i, t) in localTypes.enumerated() {
-                writeSlot(&target, VReg(localSlot), "Local \(i) (\(t))")
+                writeSlot(&target, localSlot, "Local \(i) (\(t))")
                 localSlot += t.stackSlotCount
             }
             for i in 0..<(iseq.frameInit.count - numberOfNonParameterLocalSlots) {
                 let value = iseq.frameInit[numberOfNonParameterLocalSlots + i]
-                writeSlot(&target, VReg(numberOfNonParameterLocalSlots + i), "Const \(i) = \(value)")
+                writeSlot(&target, numberOfNonParameterLocalSlots + i, "Const \(i) = \(value)")
             }
         }
     #endif  // Disassembler
@@ -502,7 +534,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             self.startSlotOffsets.append(usedSlotOffset)
             self.slotHeight += width
             assert(valueHeight < UInt16.max)
-            return stackRegBase + VReg(usedSlotOffset)
+            return stackRegBase + VReg(slotIndex: usedSlotOffset)
         }
         mutating func pushLocal(_ localIndex: LocalIndex, locals: inout Locals) throws(WasmKitError) {
             let type = try locals.type(of: localIndex)
@@ -523,7 +555,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             for i in 0..<values.count {
                 guard case .local(let type, localIndex) = self.values[i] else { continue }
                 self.values[i] = .stack(.some(type))
-                copyTo.append((to: stackRegBase + VReg(startSlotOffsets[i]), type: type))
+                copyTo.append((to: stackRegBase + VReg(slotIndex: startSlotOffsets[i]), type: type))
             }
             return copyTo
         }
@@ -535,7 +567,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 let value = self.values[valueIndex]
                 guard case .local(let type, let localIndex) = value else { continue }
                 self.values[valueIndex] = .stack(.some(type))
-                copies.append((localIndex, self.stackRegBase + VReg(startSlotOffsets[valueIndex]), type))
+                copies.append((localIndex, self.stackRegBase + VReg(slotIndex: startSlotOffsets[valueIndex]), type))
             }
             return copies
         }
@@ -547,7 +579,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 let value = self.values[valueIndex]
                 guard case .const(let type, let index) = value else { continue }
                 self.values[valueIndex] = .stack(.some(type))
-                copies.append((stackLayout.constReg(index), self.stackRegBase + VReg(startSlotOffsets[valueIndex]), type))
+                copies.append((stackLayout.constReg(index), self.stackRegBase + VReg(slotIndex: startSlotOffsets[valueIndex]), type))
             }
             return copies
         }
@@ -575,7 +607,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             case .local(_, let localIndex):
                 source = .local(localIndex)
             case .stack:
-                source = .vreg(stackRegBase + VReg(startSlotOffsets[valueIndex]))
+                source = .vreg(stackRegBase + VReg(slotIndex: startSlotOffsets[valueIndex]))
             case .const(let type, let index):
                 source = .const(index, type)
             }
@@ -596,7 +628,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             case .local(_, let localIndex):
                 source = .local(localIndex)
             case .stack:
-                source = .vreg(stackRegBase + VReg(startSlotOffset))
+                source = .vreg(stackRegBase + VReg(slotIndex: startSlotOffset))
             case .const(let type, let index):
                 source = .const(index, type)
             }
@@ -1161,6 +1193,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     let isIntercepting: Bool
     var constantSlots: ConstSlots
 
+    /// The highest slot index this function addresses, tracked for the frame-range
+    /// check in ``finalize()``.
+    ///
+    /// ``ValueStack/maxSlotHeight`` covers the value stack itself; this covers the
+    /// places that reach past it, namely a call's `spAddend` (which adds the
+    /// callee's frame header) and a `return_call`'s frame-header resize.
+    var maxFrameSlotIndex: Int = 0
+
     let validator: InstructionValidator
 
     // Wasm debugging support.
@@ -1221,6 +1261,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         self.isIntercepting = isIntercepting
         self.constantSlots = ConstSlots(stackLayout: stackLayout)
         self.validator = InstructionValidator(context: module)
+        self.maxFrameSlotIndex = stackLayout.stackRegBaseSlotIndex
 
         do {
             let endLabel = self.iseqBuilder.allocLabel()
@@ -1265,7 +1306,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     private mutating func emitCopyValueSlots(_ type: ValueType, from source: VReg, to dest: VReg) -> Bool {
         var copied = false
         for offset in 0..<type.stackSlotCount {
-            copied = emitCopyStack(from: source + VReg(offset), to: dest + VReg(offset)) || copied
+            copied = emitCopyStack(from: source + VReg(slotIndex: offset), to: dest + VReg(slotIndex: offset)) || copied
         }
         return copied
     }
@@ -1354,7 +1395,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
     private mutating func ensureOnVReg(_ source: ValueSource) -> VReg {
         // TODO: Copy to stack if source is on preg
-        // let copyTo = valueStack.stackRegBase + VReg(valueStack.slotHeight)
+        // let copyTo = valueStack.stackRegBase + VReg(slotIndex: valueStack.slotHeight)
         switch source {
         case .vreg(let register):
             return register
@@ -1365,7 +1406,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
     private mutating func ensureOnStack(_ source: ValueSource, type: ValueType) -> VReg {
-        let copyTo = valueStack.stackRegBase + VReg(valueStack.slotHeight)
+        let copyTo = valueStack.stackRegBase + VReg(slotIndex: valueStack.slotHeight)
         switch source {
         case .vreg(let vReg):
             return vReg
@@ -1453,7 +1494,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             if case .local(let localIndex) = operand, stackLayout.isParameter(localIndex) {
                 // Parameter space is shared with return values, so we need to copy it to the stack
                 // before copying to the return slot to avoid overwriting the parameter value.
-                let copyTo = valueStack.stackRegBase + VReg(valueStack.slotHeight)
+                let copyTo = valueStack.stackRegBase + VReg(slotIndex: valueStack.slotHeight)
                 emitCopyValueSlots(resultType, from: localReg(localIndex), to: copyTo)
                 source = copyTo
             }
@@ -1477,7 +1518,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             if case .local(let localIndex) = operand, stackLayout.isParameter(localIndex) {
                 // Parameter space is shared with frame header slots, so copy to stack first
                 // to avoid overwriting when the destination is also in the frame header.
-                let copyTo = valueStack.stackRegBase + VReg(valueStack.slotHeight)
+                let copyTo = valueStack.stackRegBase + VReg(slotIndex: valueStack.slotHeight)
                 emitCopyValueSlots(paramType, from: localReg(localIndex), to: copyTo)
                 source = copyTo
             }
@@ -1493,18 +1534,18 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     private mutating func copyOnBranch(targetFrame frame: ControlStack.ControlFrame) throws(WasmKitError) -> Bool {
         let depthValues = min(frame.copyTypes.count, valueStack.valueHeight - frame.valueStackHeight)
         preserveOnStack(depth: depthValues)
-        let copyCount = VReg(frame.copySlotCount)
-        let sourceBase = valueStack.stackRegBase + VReg(valueStack.slotHeight)
-        let destBase = valueStack.stackRegBase + VReg(frame.slotStackHeight)
+        let copyCount = Int(frame.copySlotCount)
+        let sourceBase = valueStack.stackRegBase + VReg(slotIndex: valueStack.slotHeight)
+        let destBase = valueStack.stackRegBase + VReg(slotIndex: frame.slotStackHeight)
         var emittedCopy = false
         for i in (0..<copyCount).reversed() {
-            let source = sourceBase - 1 - VReg(i)
+            let source = sourceBase + VReg(slotIndex: -1 - i)
             let dest: VReg
             if case .block(root: true) = frame.kind {
                 guard frame.copySlotCount > 0 else { continue }
-                dest = returnReg(0) + copyCount - 1 - VReg(i)
+                dest = returnReg(0) + VReg(slotIndex: copyCount - 1 - i)
             } else {
-                dest = destBase + copyCount - 1 - VReg(i)
+                dest = destBase + VReg(slotIndex: copyCount - 1 - i)
             }
             let copied = emitCopyStack(from: source, to: dest)
             emittedCopy = emittedCopy || copied
@@ -1534,10 +1575,44 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         try valueStack.truncate(height: currentFrame.valueStackHeight)
     }
 
+    /// The extent of the frame this function addresses, as the closed range
+    /// `[lowest, highest]` of slot indices relative to `sp`.
+    ///
+    /// The lowest is the start of the frame header (parameters and results live
+    /// below `sp`); the highest is the top of the value stack, or the `spAddend`
+    /// of the widest call, whichever reaches further.
+    private var frameSlotIndexExtent: (lowest: Int, highest: Int) {
+        (
+            lowest: -stackLayout.frameHeader.size,
+            highest: max(maxFrameSlotIndex, stackLayout.stackRegBaseSlotIndex + valueStack.maxSlotHeight)
+        )
+    }
+
+    /// Rejects a function whose frame does not fit the pre-shifted ``VReg``
+    /// encoding.
+    ///
+    /// ``VReg`` stores a slot's byte offset rather than its index, which saves a
+    /// shift per 32-bit operand access on arm64 at the cost of three bits of
+    /// range: only slots `VReg.minSlotIndex...VReg.maxSlotIndex` are addressable.
+    /// Out-of-range indices wrap silently while a function is being translated,
+    /// so this check runs before the instruction sequence built from them is
+    /// handed out.
+    private func checkFrameFitsVRegRange() throws(WasmKitError) {
+        let extent = frameSlotIndexExtent
+        guard VReg.canRepresent(slotIndex: extent.lowest), VReg.canRepresent(slotIndex: extent.highest) else {
+            throw WasmKitError(
+                "The frame of this function is too large for the interpreter: it needs slots "
+                    + "\(extent.lowest)...\(extent.highest), but only "
+                    + "\(VReg.minSlotIndex)...\(VReg.maxSlotIndex) are addressable"
+            )
+        }
+    }
+
     private consuming func finalize() throws(WasmKitError) -> InstructionSequence {
         if controlStack.numberOfFrames > 1 {
             throw WasmKitError(message: .expectedMoreEndInstructions(count: controlStack.numberOfFrames - 1))
         }
+        try checkFrameFitsVRegRange()
         // Check dangling labels
         try iseqBuilder.assertDanglingLabels()
 
@@ -1565,7 +1640,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         )
         return InstructionSequence(
             instructions: buffer,
-            maxStackHeight: Int(valueStack.stackRegBase) + valueStack.maxSlotHeight,
+            maxStackHeight: stackLayout.stackRegBaseSlotIndex + valueStack.maxSlotHeight,
             frameInit: frameInit
         )
     }
@@ -2191,14 +2266,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             guard (try popOnStackOperand(parameter)) != nil else { return nil }
         }
 
-        let spAddend =
-            valueStack.stackRegBase + VReg(valueStack.slotHeight)
+        let spAddendSlots =
+            stackLayout.stackRegBaseSlotIndex + valueStack.slotHeight
             + FrameHeaderLayout.size(of: calleeType)
+        self.maxFrameSlotIndex = max(self.maxFrameSlotIndex, spAddendSlots)
 
         for result in calleeType.results {
             _ = valueStack.push(result)
         }
-        return VReg(spAddend)
+        return VReg(slotIndex: spAddendSlots)
     }
     mutating func visitCall(functionIndex: UInt32) throws(WasmKitError) -> Output {
         let calleeType = try self.module.functionType(functionIndex, interner: funcTypeInterner)
@@ -2254,8 +2330,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             // to the resized positions
             let newHeaderSize = FrameHeaderLayout.size(of: calleeType)
             let delta = newHeaderSize - FrameHeaderLayout.size(of: type)
-            let sizeToCopy = VReg(FrameHeaderLayout.numberOfSavingSlots) + valueStack.stackRegBase + VReg(stackTopHeightToCopy)
-            emit(.resizeFrameHeader(Instruction.ResizeFrameHeaderOperand(delta: delta, sizeToCopy: sizeToCopy)))
+            let slotsToCopy =
+                FrameHeaderLayout.numberOfSavingSlots + stackLayout.stackRegBaseSlotIndex + stackTopHeightToCopy
+            self.maxFrameSlotIndex = max(self.maxFrameSlotIndex, slotsToCopy)
+            guard VReg.canRepresent(slotIndex: delta), let sizeToCopy = UInt16(exactly: slotsToCopy) else {
+                throw WasmKitError("The frame header of a return_call is too large to encode")
+            }
+            emit(.resizeFrameHeader(Instruction.ResizeFrameHeaderOperand(delta: VReg(slotIndex: delta), sizeToCopy: sizeToCopy)))
         }
         try copyValuesIntoParamSlots(calleeType.parameters, frameHeader: calleeFrameHeader)
     }
@@ -2322,7 +2403,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         for param in tagType.parameters.reversed() {
             guard (try popOnStackOperand(param)) != nil else { return }
         }
-        let payloadBase = valueStack.stackRegBase + VReg(valueStack.slotHeight)
+        let payloadBase = valueStack.stackRegBase + VReg(slotIndex: valueStack.slotHeight)
         // Push the parameter values back (they've been popped for on-stack guarantee)
         for param in tagType.parameters {
             _ = valueStack.push(param)
@@ -2411,7 +2492,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
             // The payload register base is where the handler will write values.
             // This is at the target frame's stack base.
-            let payloadRegBase = valueStack.stackRegBase + VReg(targetFrame.slotStackHeight)
+            let payloadRegBase = valueStack.stackRegBase + VReg(slotIndex: targetFrame.slotStackHeight)
 
             // Initialize the entry with a placeholder pcOffset (will be resolved)
             catchTable[i] = CatchTableEntry(
@@ -2466,7 +2547,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             let onFalse = ensureOnVReg(value1)
             if value1Type.concreteType == .v128 {
                 emit(.select(.init(result: result, condition: condition, onTrue: onTrue, onFalse: onFalse)))
-                emit(.select(.init(result: result + 1, condition: condition, onTrue: onTrue + 1, onFalse: onFalse + 1)))
+                emit(.select(.init(result: result.nextSlot, condition: condition, onTrue: onTrue.nextSlot, onFalse: onFalse.nextSlot)))
             } else {
                 emit(.select(.init(result: result, condition: condition, onTrue: onTrue, onFalse: onFalse)))
             }
@@ -2489,7 +2570,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             let onFalse = ensureOnVReg(value1)
             if type == .v128 {
                 emit(.select(.init(result: result, condition: condition, onTrue: onTrue, onFalse: onFalse)))
-                emit(.select(.init(result: result + 1, condition: condition, onTrue: onTrue + 1, onFalse: onFalse + 1)))
+                emit(.select(.init(result: result.nextSlot, condition: condition, onTrue: onTrue.nextSlot, onFalse: onFalse.nextSlot)))
             } else {
                 emit(.select(.init(result: result, condition: condition, onTrue: onTrue, onFalse: onFalse)))
             }
@@ -2729,8 +2810,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                         reserved: 0,
                         offset: memarg.offset,
                         input0: pointer,
-                        input1: 0,
-                        input2: 0,
+                        input1: .zero,
+                        input2: .zero,
                         result: result
                     ))
             }
@@ -2780,8 +2861,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                             offset: memarg.offset,
                             input0: pointer,
                             input1: value,
-                            input2: 0,
-                            result: 0
+                            input2: .zero,
+                            result: .zero
                         )))
             }
             return
@@ -2832,14 +2913,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         guard let opcode = SIMDOpcode.fromSimd(simd) else { preconditionFailure("missing SIMDOpcode mapping: \(simd)") }
         func emitUnaryV128() throws(WasmKitError) {
             try popPushEmit(.v128, .v128) { v0, result in
-                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: v0, input1: 0, input2: 0, result: result))
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: v0, input1: .zero, input2: .zero, result: result))
             }
         }
         func emitBinaryV128() throws(WasmKitError) {
             try pop2PushEmit((.v128, .v128), .v128) { popped, result in
                 let rhs = popped.0
                 let lhs = popped.1
-                return .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: lhs, input1: rhs, input2: 0, result: result))
+                return .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: lhs, input1: rhs, input2: .zero, result: result))
             }
         }
         func emitTernaryV128() throws(WasmKitError) {
@@ -2852,33 +2933,33 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
         func emitUnaryI32() throws(WasmKitError) {
             try popPushEmit(.v128, .i32) { v0, result in
-                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: v0, input1: 0, input2: 0, result: result))
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: v0, input1: .zero, input2: .zero, result: result))
             }
         }
         func emitShift() throws(WasmKitError) {
             try pop2PushEmit((.i32, .v128), .v128) { popped, result in
                 let shift = popped.0
                 let vec = popped.1
-                return .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: vec, input1: shift, input2: 0, result: result))
+                return .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: vec, input1: shift, input2: .zero, result: result))
             }
         }
 
         switch simd {
         case .i8x16Splat, .i16x8Splat, .i32x4Splat:
             try popPushEmit(.i32, .v128) { scalar, result in
-                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: scalar, input1: 0, input2: 0, result: result))
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: scalar, input1: .zero, input2: .zero, result: result))
             }
         case .i64x2Splat:
             try popPushEmit(.i64, .v128) { scalar, result in
-                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: scalar, input1: 0, input2: 0, result: result))
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: scalar, input1: .zero, input2: .zero, result: result))
             }
         case .f32x4Splat:
             try popPushEmit(.f32, .v128) { scalar, result in
-                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: scalar, input1: 0, input2: 0, result: result))
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: scalar, input1: .zero, input2: .zero, result: result))
             }
         case .f64x2Splat:
             try popPushEmit(.f64, .v128) { scalar, result in
-                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: scalar, input1: 0, input2: 0, result: result))
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: scalar, input1: .zero, input2: .zero, result: result))
             }
 
         case .v128Bitselect:
@@ -2967,39 +3048,39 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         switch simdLane {
         case .i8x16ExtractLaneS, .i8x16ExtractLaneU, .i16x8ExtractLaneS, .i16x8ExtractLaneU, .i32x4ExtractLane:
             try popPushEmit(.v128, .i32) { vec, result in
-                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: vec, input1: 0, input2: 0, result: result))
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: vec, input1: .zero, input2: .zero, result: result))
             }
         case .i64x2ExtractLane:
             try popPushEmit(.v128, .i64) { vec, result in
-                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: vec, input1: 0, input2: 0, result: result))
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: vec, input1: .zero, input2: .zero, result: result))
             }
         case .f32x4ExtractLane:
             try popPushEmit(.v128, .f32) { vec, result in
-                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: vec, input1: 0, input2: 0, result: result))
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: vec, input1: .zero, input2: .zero, result: result))
             }
         case .f64x2ExtractLane:
             try popPushEmit(.v128, .f64) { vec, result in
-                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: vec, input1: 0, input2: 0, result: result))
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: vec, input1: .zero, input2: .zero, result: result))
             }
         case .i8x16ReplaceLane:
             try pop2PushEmit((.i32, .v128), .v128) { popped, result in
-                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: 0, result: result))
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: .zero, result: result))
             }
         case .i16x8ReplaceLane, .i32x4ReplaceLane:
             try pop2PushEmit((.i32, .v128), .v128) { popped, result in
-                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: 0, result: result))
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: .zero, result: result))
             }
         case .i64x2ReplaceLane:
             try pop2PushEmit((.i64, .v128), .v128) { popped, result in
-                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: 0, result: result))
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: .zero, result: result))
             }
         case .f32x4ReplaceLane:
             try pop2PushEmit((.f32, .v128), .v128) { popped, result in
-                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: 0, result: result))
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: .zero, result: result))
             }
         case .f64x2ReplaceLane:
             try pop2PushEmit((.f64, .v128), .v128) { popped, result in
-                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: 0, result: result))
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: .zero, result: result))
             }
         }
     }
@@ -3025,13 +3106,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             try pop2PushEmit((.v128, .address(isMemory64: isMemory64)), .v128) { popped, result in
                 let vec = popped.0
                 let ptr = popped.1
-                return .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: memarg.offset, input0: ptr, input1: vec, input2: 0, result: result))
+                return .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: memarg.offset, input0: ptr, input1: vec, input2: .zero, result: result))
             }
         case .v128Store8Lane, .v128Store16Lane, .v128Store32Lane, .v128Store64Lane:
             let vec = try popVRegOperand(.v128)
             let ptr = try popVRegOperand(.address(isMemory64: isMemory64))
             if let vec = vec, let ptr = ptr {
-                emit(.simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: memarg.offset, input0: ptr, input1: vec, input2: 0, result: 0)))
+                emit(.simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: memarg.offset, input0: ptr, input1: vec, input2: .zero, result: .zero)))
             }
         }
     }
@@ -3853,7 +3934,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             pointer: pointer,
             expected: expected,
             timeout: timeout,
-            result: VReg(result)
+            result: result
         )
         emit(.memoryAtomicWait32(waitOperand))
     }
@@ -3873,7 +3954,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             pointer: pointer,
             expected: expected,
             timeout: timeout,
-            result: VReg(result)
+            result: result
         )
         emit(.memoryAtomicWait64(waitOperand))
     }
@@ -3891,7 +3972,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             offset: memarg.offset,
             pointer: pointer,
             count: count,
-            result: VReg(result)
+            result: result
         )
         emit(.memoryAtomicNotify(notifyOperand))
     }

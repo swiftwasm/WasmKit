@@ -837,7 +837,8 @@ extension VMGen {
                         """,
                         mayThrow: true, mayUpdateFrame: true) {
                 $0.field(name: "delta", type: .VReg)
-                $0.field(name: "sizeToCopy", type: .VReg)
+                // A slot *count*, not a register, so it stays an unscaled index.
+                $0.field(name: "sizeToCopy", type: .UInt16)
             },
             Instruction(name: "returnCall", documentation: "WebAssembly Core Instruction `return_call`",
                         isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
