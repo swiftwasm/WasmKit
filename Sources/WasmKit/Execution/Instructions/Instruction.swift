@@ -565,6 +565,86 @@ enum Instruction: Equatable {
     case catchHandlers(Instruction.CatchHandlersOperand)
     /// Unregister exception handlers for a `try_table` block
     case catchHandlersEnd(Instruction.CatchHandlersEndOperand)
+    /// Conditional pc-relative branch if `i32.eq` holds
+    /// 
+    /// Fused form of `i32.eq` followed by `br_if`.
+    case brIfI32Eq(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i32.ne` holds
+    /// 
+    /// Fused form of `i32.ne` followed by `br_if`.
+    case brIfI32Ne(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i32.lt_s` holds
+    /// 
+    /// Fused form of `i32.lt_s` followed by `br_if`.
+    case brIfI32LtS(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i32.lt_u` holds
+    /// 
+    /// Fused form of `i32.lt_u` followed by `br_if`.
+    case brIfI32LtU(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i32.gt_s` holds
+    /// 
+    /// Fused form of `i32.gt_s` followed by `br_if`.
+    case brIfI32GtS(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i32.gt_u` holds
+    /// 
+    /// Fused form of `i32.gt_u` followed by `br_if`.
+    case brIfI32GtU(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i32.le_s` holds
+    /// 
+    /// Fused form of `i32.le_s` followed by `br_if`.
+    case brIfI32LeS(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i32.le_u` holds
+    /// 
+    /// Fused form of `i32.le_u` followed by `br_if`.
+    case brIfI32LeU(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i32.ge_s` holds
+    /// 
+    /// Fused form of `i32.ge_s` followed by `br_if`.
+    case brIfI32GeS(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i32.ge_u` holds
+    /// 
+    /// Fused form of `i32.ge_u` followed by `br_if`.
+    case brIfI32GeU(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i64.eq` holds
+    /// 
+    /// Fused form of `i64.eq` followed by `br_if`.
+    case brIfI64Eq(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i64.ne` holds
+    /// 
+    /// Fused form of `i64.ne` followed by `br_if`.
+    case brIfI64Ne(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i64.lt_s` holds
+    /// 
+    /// Fused form of `i64.lt_s` followed by `br_if`.
+    case brIfI64LtS(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i64.lt_u` holds
+    /// 
+    /// Fused form of `i64.lt_u` followed by `br_if`.
+    case brIfI64LtU(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i64.gt_s` holds
+    /// 
+    /// Fused form of `i64.gt_s` followed by `br_if`.
+    case brIfI64GtS(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i64.gt_u` holds
+    /// 
+    /// Fused form of `i64.gt_u` followed by `br_if`.
+    case brIfI64GtU(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i64.le_s` holds
+    /// 
+    /// Fused form of `i64.le_s` followed by `br_if`.
+    case brIfI64LeS(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i64.le_u` holds
+    /// 
+    /// Fused form of `i64.le_u` followed by `br_if`.
+    case brIfI64LeU(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i64.ge_s` holds
+    /// 
+    /// Fused form of `i64.ge_s` followed by `br_if`.
+    case brIfI64GeS(Instruction.BrIfCmpOperand)
+    /// Conditional pc-relative branch if `i64.ge_u` holds
+    /// 
+    /// Fused form of `i64.ge_u` followed by `br_if`.
+    case brIfI64GeU(Instruction.BrIfCmpOperand)
 }
 
 extension Instruction {
@@ -1200,6 +1280,19 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.count, 0, 0, 0, 0, 0, 0) as (UInt16, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
+
+    struct BrIfCmpOperand: Equatable, InstructionImmediate {
+        var lhs: VReg
+        var rhs: VReg
+        var offset: Int32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (lhs, rhs, offset) = pc.read((VReg, VReg, Int32).self)
+            return Self(lhs: lhs, rhs: rhs, offset: offset)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.lhs, $0.rhs, $0.offset) as (VReg, VReg, Int32), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -1473,6 +1566,26 @@ extension Instruction {
         case .throwRef(let immediate): return immediate
         case .catchHandlers(let immediate): return immediate
         case .catchHandlersEnd(let immediate): return immediate
+        case .brIfI32Eq(let immediate): return immediate
+        case .brIfI32Ne(let immediate): return immediate
+        case .brIfI32LtS(let immediate): return immediate
+        case .brIfI32LtU(let immediate): return immediate
+        case .brIfI32GtS(let immediate): return immediate
+        case .brIfI32GtU(let immediate): return immediate
+        case .brIfI32LeS(let immediate): return immediate
+        case .brIfI32LeU(let immediate): return immediate
+        case .brIfI32GeS(let immediate): return immediate
+        case .brIfI32GeU(let immediate): return immediate
+        case .brIfI64Eq(let immediate): return immediate
+        case .brIfI64Ne(let immediate): return immediate
+        case .brIfI64LtS(let immediate): return immediate
+        case .brIfI64LtU(let immediate): return immediate
+        case .brIfI64GtS(let immediate): return immediate
+        case .brIfI64GtU(let immediate): return immediate
+        case .brIfI64LeS(let immediate): return immediate
+        case .brIfI64LeU(let immediate): return immediate
+        case .brIfI64GeS(let immediate): return immediate
+        case .brIfI64GeU(let immediate): return immediate
         default: return nil
         }
     }
@@ -1750,6 +1863,26 @@ extension Instruction {
         case .throwRef(let immediate): immediate.emit(to: emit)
         case .catchHandlers(let immediate): immediate.emit(to: emit)
         case .catchHandlersEnd(let immediate): immediate.emit(to: emit)
+        case .brIfI32Eq(let immediate): immediate.emit(to: emit)
+        case .brIfI32Ne(let immediate): immediate.emit(to: emit)
+        case .brIfI32LtS(let immediate): immediate.emit(to: emit)
+        case .brIfI32LtU(let immediate): immediate.emit(to: emit)
+        case .brIfI32GtS(let immediate): immediate.emit(to: emit)
+        case .brIfI32GtU(let immediate): immediate.emit(to: emit)
+        case .brIfI32LeS(let immediate): immediate.emit(to: emit)
+        case .brIfI32LeU(let immediate): immediate.emit(to: emit)
+        case .brIfI32GeS(let immediate): immediate.emit(to: emit)
+        case .brIfI32GeU(let immediate): immediate.emit(to: emit)
+        case .brIfI64Eq(let immediate): immediate.emit(to: emit)
+        case .brIfI64Ne(let immediate): immediate.emit(to: emit)
+        case .brIfI64LtS(let immediate): immediate.emit(to: emit)
+        case .brIfI64LtU(let immediate): immediate.emit(to: emit)
+        case .brIfI64GtS(let immediate): immediate.emit(to: emit)
+        case .brIfI64GtU(let immediate): immediate.emit(to: emit)
+        case .brIfI64LeS(let immediate): immediate.emit(to: emit)
+        case .brIfI64LeU(let immediate): immediate.emit(to: emit)
+        case .brIfI64GeS(let immediate): immediate.emit(to: emit)
+        case .brIfI64GeU(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -2034,6 +2167,26 @@ extension Instruction {
         case .throwRef: return 271
         case .catchHandlers: return 272
         case .catchHandlersEnd: return 273
+        case .brIfI32Eq: return 274
+        case .brIfI32Ne: return 275
+        case .brIfI32LtS: return 276
+        case .brIfI32LtU: return 277
+        case .brIfI32GtS: return 278
+        case .brIfI32GtU: return 279
+        case .brIfI32LeS: return 280
+        case .brIfI32LeU: return 281
+        case .brIfI32GeS: return 282
+        case .brIfI32GeU: return 283
+        case .brIfI64Eq: return 284
+        case .brIfI64Ne: return 285
+        case .brIfI64LtS: return 286
+        case .brIfI64LtU: return 287
+        case .brIfI64GtS: return 288
+        case .brIfI64GtU: return 289
+        case .brIfI64LeS: return 290
+        case .brIfI64LeU: return 291
+        case .brIfI64GeS: return 292
+        case .brIfI64GeU: return 293
         }
     }
 }
@@ -2319,6 +2472,26 @@ extension Instruction {
         case 271: return .throwRef(Instruction.ThrowRefOperand.load(from: &pc))
         case 272: return .catchHandlers(Instruction.CatchHandlersOperand.load(from: &pc))
         case 273: return .catchHandlersEnd(Instruction.CatchHandlersEndOperand.load(from: &pc))
+        case 274: return .brIfI32Eq(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 275: return .brIfI32Ne(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 276: return .brIfI32LtS(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 277: return .brIfI32LtU(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 278: return .brIfI32GtS(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 279: return .brIfI32GtU(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 280: return .brIfI32LeS(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 281: return .brIfI32LeU(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 282: return .brIfI32GeS(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 283: return .brIfI32GeU(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 284: return .brIfI64Eq(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 285: return .brIfI64Ne(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 286: return .brIfI64LtS(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 287: return .brIfI64LtU(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 288: return .brIfI64GtS(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 289: return .brIfI64GtU(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 290: return .brIfI64LeS(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 291: return .brIfI64LeU(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 292: return .brIfI64GeS(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 293: return .brIfI64GeU(Instruction.BrIfCmpOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -2607,6 +2780,26 @@ extension Instruction {
         case 271: return "throwRef"
         case 272: return "catchHandlers"
         case 273: return "catchHandlersEnd"
+        case 274: return "brIfI32Eq"
+        case 275: return "brIfI32Ne"
+        case 276: return "brIfI32LtS"
+        case 277: return "brIfI32LtU"
+        case 278: return "brIfI32GtS"
+        case 279: return "brIfI32GtU"
+        case 280: return "brIfI32LeS"
+        case 281: return "brIfI32LeU"
+        case 282: return "brIfI32GeS"
+        case 283: return "brIfI32GeU"
+        case 284: return "brIfI64Eq"
+        case 285: return "brIfI64Ne"
+        case 286: return "brIfI64LtS"
+        case 287: return "brIfI64LtU"
+        case 288: return "brIfI64GtS"
+        case 289: return "brIfI64GtU"
+        case 290: return "brIfI64LeS"
+        case 291: return "brIfI64LeU"
+        case 292: return "brIfI64GeS"
+        case 293: return "brIfI64GeU"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
@@ -2638,6 +2831,26 @@ protocol NextInstructionPredictor: ~Copyable {
     mutating func predictNext_throwTag(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_throwRef(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_catchHandlers(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32Eq(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32Ne(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32LtS(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32LtU(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32GtS(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32GtU(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32LeS(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32LeU(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32GeS(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32GeU(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64Eq(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64Ne(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64LtS(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64LtU(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64GtS(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64GtU(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64LeS(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64LeU(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64GeS(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64GeU(operandPc: Pc, sp: Sp) -> [Pc]
 }
 
 extension Instruction {
@@ -2665,6 +2878,26 @@ extension Instruction {
         case 270: return predictor.predictNext_throwTag(operandPc: operandPc, sp: sp)
         case 271: return predictor.predictNext_throwRef(operandPc: operandPc, sp: sp)
         case 272: return predictor.predictNext_catchHandlers(operandPc: operandPc, sp: sp)
+        case 274: return predictor.predictNext_brIfI32Eq(operandPc: operandPc, sp: sp)
+        case 275: return predictor.predictNext_brIfI32Ne(operandPc: operandPc, sp: sp)
+        case 276: return predictor.predictNext_brIfI32LtS(operandPc: operandPc, sp: sp)
+        case 277: return predictor.predictNext_brIfI32LtU(operandPc: operandPc, sp: sp)
+        case 278: return predictor.predictNext_brIfI32GtS(operandPc: operandPc, sp: sp)
+        case 279: return predictor.predictNext_brIfI32GtU(operandPc: operandPc, sp: sp)
+        case 280: return predictor.predictNext_brIfI32LeS(operandPc: operandPc, sp: sp)
+        case 281: return predictor.predictNext_brIfI32LeU(operandPc: operandPc, sp: sp)
+        case 282: return predictor.predictNext_brIfI32GeS(operandPc: operandPc, sp: sp)
+        case 283: return predictor.predictNext_brIfI32GeU(operandPc: operandPc, sp: sp)
+        case 284: return predictor.predictNext_brIfI64Eq(operandPc: operandPc, sp: sp)
+        case 285: return predictor.predictNext_brIfI64Ne(operandPc: operandPc, sp: sp)
+        case 286: return predictor.predictNext_brIfI64LtS(operandPc: operandPc, sp: sp)
+        case 287: return predictor.predictNext_brIfI64LtU(operandPc: operandPc, sp: sp)
+        case 288: return predictor.predictNext_brIfI64GtS(operandPc: operandPc, sp: sp)
+        case 289: return predictor.predictNext_brIfI64GtU(operandPc: operandPc, sp: sp)
+        case 290: return predictor.predictNext_brIfI64LeS(operandPc: operandPc, sp: sp)
+        case 291: return predictor.predictNext_brIfI64LeU(operandPc: operandPc, sp: sp)
+        case 292: return predictor.predictNext_brIfI64GeS(operandPc: operandPc, sp: sp)
+        case 293: return predictor.predictNext_brIfI64GeU(operandPc: operandPc, sp: sp)
         default: return nil
         }
     }
@@ -2743,6 +2976,86 @@ extension Instruction {
             }
             do {
                 let inst = Instruction.catchHandlers(.init(rawBaseAddress: UInt64(0), count: UInt16(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32Eq(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32Ne(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32LtS(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32LtU(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32GtS(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32GtU(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32LeS(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32LeU(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32GeS(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32GeU(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64Eq(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64Ne(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64LtS(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64LtU(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64GtS(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64GtU(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64LeS(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64LeU(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64GeS(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64GeU(.init(lhs: VReg(0), rhs: VReg(0), offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
         return map

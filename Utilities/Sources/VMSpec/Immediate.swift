@@ -187,6 +187,14 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "offset", type: .Int32)
     }
 
+    /// Immediate layout of the fused integer compare + branch instructions
+    /// (`brIf{I32,I64}{Eq,Ne,...}`). Fits in a single 8-byte code slot.
+    static let brIfCmpOperand = Self(name: "BrIfCmpOperand") {
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "rhs", type: .VReg)
+        $0.field(name: "offset", type: .Int32)
+    }
+
     static let call = Self(name: "CallOperand") {
         $0.field(name: "rawCallee", type: .UInt64)
         $0.field(name: "spAddend", type: .VReg)

@@ -371,6 +371,9 @@ extension Instruction {
             func store(_ name: String, _ op: Instruction.StoreOperand) {
                 target.write("\(name) \(reg(op.pointer)) + \(offset(op.offset)), \(reg(op.value))")
             }
+            func brIfCmp(_ name: String, _ op: Instruction.BrIfCmpOperand) {
+                target.write("br_if.\(name) \(reg(op.lhs)), \(reg(op.rhs)), \(branchTarget(instructionOffset, Int(op.offset)))")
+            }
             switch instruction {
             case .unreachable:
                 target.write("unreachable")
@@ -444,6 +447,26 @@ extension Instruction {
                 target.write("br_if_not \(reg(op.condition)), \(branchTarget(instructionOffset, Int(op.offset)))")
             case .brIf(let op):
                 target.write("br_if \(reg(op.condition)), \(branchTarget(instructionOffset, Int(op.offset)))")
+            case .brIfI32Eq(let op): brIfCmp("i32.eq", op)
+            case .brIfI32Ne(let op): brIfCmp("i32.ne", op)
+            case .brIfI32LtS(let op): brIfCmp("i32.lt_s", op)
+            case .brIfI32LtU(let op): brIfCmp("i32.lt_u", op)
+            case .brIfI32GtS(let op): brIfCmp("i32.gt_s", op)
+            case .brIfI32GtU(let op): brIfCmp("i32.gt_u", op)
+            case .brIfI32LeS(let op): brIfCmp("i32.le_s", op)
+            case .brIfI32LeU(let op): brIfCmp("i32.le_u", op)
+            case .brIfI32GeS(let op): brIfCmp("i32.ge_s", op)
+            case .brIfI32GeU(let op): brIfCmp("i32.ge_u", op)
+            case .brIfI64Eq(let op): brIfCmp("i64.eq", op)
+            case .brIfI64Ne(let op): brIfCmp("i64.ne", op)
+            case .brIfI64LtS(let op): brIfCmp("i64.lt_s", op)
+            case .brIfI64LtU(let op): brIfCmp("i64.lt_u", op)
+            case .brIfI64GtS(let op): brIfCmp("i64.gt_s", op)
+            case .brIfI64GtU(let op): brIfCmp("i64.gt_u", op)
+            case .brIfI64LeS(let op): brIfCmp("i64.le_s", op)
+            case .brIfI64LeU(let op): brIfCmp("i64.le_u", op)
+            case .brIfI64GeS(let op): brIfCmp("i64.ge_s", op)
+            case .brIfI64GeU(let op): brIfCmp("i64.ge_u", op)
             case .br(let offset):
                 target.write("br \(branchTarget(instructionOffset, Int(offset)))")
             case .brTable(let table):

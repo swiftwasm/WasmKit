@@ -50,8 +50,9 @@ struct SpectestTests {
             arguments: try SpectestDiscovery(path: SpectestTests.testPaths).discover()
         )
         func runWithTokenThreading(test: TestCase) throws {
-            let defaultConfig = EngineConfiguration()
+            var defaultConfig = EngineConfiguration()
             guard defaultConfig.threadingModel != .token else { return }
+            defaultConfig.threadingModel = .token
             // Sanity check that non-default threading models work.
             let runner = try SpectestRunner(configuration: defaultConfig)
             try runner.run(test: test, reporter: NullSpectestProgressReporter())

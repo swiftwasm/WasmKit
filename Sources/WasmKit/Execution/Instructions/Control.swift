@@ -232,3 +232,197 @@ extension Execution {
         )
     }
 }
+
+// MARK: - Fused integer compare + branch
+//
+// These are the fused form of an integer comparison immediately followed by
+// `br_if`/`br_if_not`. The translator emits one of these instead of writing the
+// comparison result into a stack slot and reloading it in `brIf`, which removes
+// one dispatch, one store and one load per loop back-edge.
+//
+// Only integers are fused: the complement of an integer comparison is another
+// integer comparison (Eq<->Ne, LtS<->GeS, LtU<->GeU, GtS<->LeS, GtU<->LeU), so
+// `br_if_not` needs no dedicated opcodes. Float comparisons have no complement
+// because of NaN, so they are left unfused.
+extension Execution {
+    /// Fused `i32.eq` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32Eq(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs] == sp[i32: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.ne` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32Ne(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs] != sp[i32: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.lt_s` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32LtS(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs].signed < sp[i32: immediate.rhs].signed) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.lt_u` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32LtU(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs] < sp[i32: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.gt_s` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32GtS(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs].signed > sp[i32: immediate.rhs].signed) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.gt_u` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32GtU(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs] > sp[i32: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.le_s` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32LeS(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs].signed <= sp[i32: immediate.rhs].signed) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.le_u` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32LeU(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs] <= sp[i32: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.ge_s` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32GeS(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs].signed >= sp[i32: immediate.rhs].signed) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.ge_u` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32GeU(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs] >= sp[i32: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.eq` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64Eq(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs] == sp[i64: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.ne` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64Ne(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs] != sp[i64: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.lt_s` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64LtS(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs].signed < sp[i64: immediate.rhs].signed) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.lt_u` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64LtU(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs] < sp[i64: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.gt_s` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64GtS(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs].signed > sp[i64: immediate.rhs].signed) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.gt_u` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64GtU(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs] > sp[i64: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.le_s` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64LeS(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs].signed <= sp[i64: immediate.rhs].signed) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.le_u` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64LeU(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs] <= sp[i64: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.ge_s` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64GeS(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs].signed >= sp[i64: immediate.rhs].signed) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.ge_u` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64GeU(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs] >= sp[i64: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+}
