@@ -2440,7 +2440,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             // Skip actual code emission if validation-only mode
             return
         }
-        emit(.globalGet(Instruction.GlobalAndVRegOperand(reg: LLVReg(result), global: global)))
+        let operand = Instruction.GlobalAndVRegOperand(reg: LLVReg(result), global: global)
+        // The shape of a global never changes, so pick the handler here instead
+        // of testing the value's tag on every access.
+        emit(type == .v128 ? .globalGetV128(operand) : .globalGet(operand))
     }
     mutating func visitGlobalSet(globalIndex: UInt32) throws(WasmKitError) -> Output {
         let type = try module.globalType(globalIndex)
@@ -2450,7 +2453,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             return
         }
         try validator.validateGlobalSet(global.globalType)
-        emit(.globalSet(Instruction.GlobalAndVRegOperand(reg: LLVReg(value), global: global)))
+        let operand = Instruction.GlobalAndVRegOperand(reg: LLVReg(value), global: global)
+        emit(type == .v128 ? .globalSetV128(operand) : .globalSet(operand))
     }
 
     private mutating func pushEmit(

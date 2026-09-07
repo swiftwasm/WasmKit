@@ -461,8 +461,9 @@
         package func getGlobal(index: UInt) throws -> UInt64 {
             let globals = self.instance.handle.globals
             guard index < UInt(globals.count) else { throw Error.globalIndexOOB(index) }
-            switch globals[Int(index)].storage {
-            case .scalar(let untyped): return untyped.storage
+            let global = globals[Int(index)]
+            switch global.globalType.valueType {
+            case .i32, .i64, .f32, .f64, .ref: return global.rawStorage.lo
             case .v128: throw Error.globalUnsupportedType(index)  // 128-bit can't fit a single reply
             }
         }

@@ -1,30 +1,31 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/instructions.html#variable-instructions>
 extension Execution {
+    /// `global.get` on a global whose value fits a single 64-bit stack slot.
+    ///
+    /// The global's shape is fixed by its type, so the translator picks this
+    /// handler for every non-`v128` global and the handler is a plain slot copy:
+    /// no tag test and no type load. See `globalGetV128` for the wide form.
     mutating func globalGet(sp: Sp, immediate: Instruction.GlobalAndVRegOperand) {
         immediate.global.withValue {
-            switch $0.storage {
-            case .scalar(let raw):
-                sp[immediate.reg] = raw
-            case .v128(let v):
-                sp[immediate.reg] = UntypedValue(storage: v.lo)
-                let regHi = LLVReg(storage: immediate.reg.value + Int64(MemoryLayout<StackSlot>.size))
-                sp[regHi] = UntypedValue(storage: v.hi)
-            }
+            sp[immediate.reg] = UntypedValue(storage: $0.rawStorage.lo)
         }
     }
     mutating func globalSet(sp: Sp, immediate: Instruction.GlobalAndVRegOperand) {
         immediate.global.withValue {
-            switch $0.globalType.valueType {
-            case .v128:
-                let lo = sp[immediate.reg].i64
-                let regHi = LLVReg(storage: immediate.reg.value + Int64(MemoryLayout<StackSlot>.size))
-                let hi = sp[regHi].i64
-                $0.storage = .v128(V128Storage(lo: lo, hi: hi))
-            case .i32, .i64, .f32, .f64, .ref:
-                let value = sp[immediate.reg]
-                $0.storage = .scalar(value)
-            }
+            $0.rawStorage.lo = sp[immediate.reg].storage
+        }
+    }
+    mutating func globalGetV128(sp: Sp, immediate: Instruction.GlobalAndVRegOperand) {
+        immediate.global.withValue {
+            let raw = $0.rawStorage
+            sp[immediate.reg] = UntypedValue(storage: raw.lo)
+            sp[immediate.regHi] = UntypedValue(storage: raw.hi)
+        }
+    }
+    mutating func globalSetV128(sp: Sp, immediate: Instruction.GlobalAndVRegOperand) {
+        immediate.global.withValue {
+            $0.rawStorage = V128Storage(lo: sp[immediate.reg].storage, hi: sp[immediate.regHi].storage)
         }
     }
 

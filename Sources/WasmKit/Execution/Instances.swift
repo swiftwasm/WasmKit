@@ -943,40 +943,42 @@ extension Memory: GuestMemory {
 
 /// An entity representing a WebAssembly `global` instance storage.
 struct GlobalEntity /* : ~Copyable */ {
-    enum Storage {
-        case scalar(UntypedValue)
-        case v128(V128Storage)
-    }
+    /// The raw, untagged 16-byte storage of the global's value.
+    ///
+    /// Scalar values (`i32`, `i64`, `f32`, `f64` and references) live in `lo`
+    /// and leave `hi` zero; only `v128` uses both halves. The static type of a
+    /// global never changes, so the shape is known at translation time and the
+    /// `global.get`/`global.set` handlers are split by shape
+    /// (`globalGet`/`globalGetV128`) instead of testing a tag at run time.
+    var rawStorage: V128Storage
 
-    var storage: Storage
     var value: Value {
         get {
-            switch storage {
-            case .scalar(let raw):
-                return raw.cast(to: globalType.valueType)
-            case .v128(let v):
-                return .v128(v.value)
+            switch globalType.valueType {
+            case .v128:
+                return .v128(rawStorage.value)
+            case .i32, .i64, .f32, .f64, .ref:
+                return UntypedValue(storage: rawStorage.lo).cast(to: globalType.valueType)
             }
         }
         set {
-            switch newValue {
-            case .v128(let v):
-                storage = .v128(V128Storage(v))
-            case .i32, .i64, .f32, .f64, .ref:
-                storage = .scalar(UntypedValue(newValue))
-            }
+            rawStorage = GlobalEntity.rawStorage(of: newValue)
         }
     }
     let globalType: GlobalType
 
+    private static func rawStorage(of value: Value) -> V128Storage {
+        switch value {
+        case .v128(let v):
+            return V128Storage(v)
+        case .i32, .i64, .f32, .f64, .ref:
+            return V128Storage(lo: UntypedValue(value).storage, hi: 0)
+        }
+    }
+
     init(globalType: GlobalType, initialValue: Value) throws {
         try initialValue.checkType(globalType.valueType)
-        switch initialValue {
-        case .v128(let v):
-            storage = .v128(V128Storage(v))
-        case .i32, .i64, .f32, .f64, .ref:
-            storage = .scalar(UntypedValue(initialValue))
-        }
+        self.rawStorage = GlobalEntity.rawStorage(of: initialValue)
         self.globalType = globalType
     }
 }
@@ -1207,7 +1209,7 @@ extension InternalMemory {
 extension InternalGlobal {
     var value: Value { withValue { $0.value } }
     var globalType: GlobalType { withValue { $0.globalType } }
-    var storage: GlobalEntity.Storage { withValue { $0.storage } }
+    var rawStorage: V128Storage { withValue { $0.rawStorage } }
 }
 
 extension InternalElementSegment {
