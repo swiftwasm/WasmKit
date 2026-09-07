@@ -15,6 +15,16 @@ public final class Engine {
     let interceptor: EngineInterceptor?
     let funcTypeInterner: Interner<FunctionType>
 
+    /// The head slot of the `returnCrossInstance` handler under this engine's
+    /// threading model.
+    ///
+    /// `_return` hands a cross-instance return off by re-dispatching to that
+    /// handler. Looking the slot up from a handler would mean a call (the
+    /// handler table is a lazily initialised global), and a call means a
+    /// stack frame on the hottest return path, so it is computed once here
+    /// and read through the execution state instead.
+    let crossInstanceReturnSlot: CodeSlot
+
     /// Whether this engine has an interceptor which is unsafe to share with
     /// concurrently executing stores.
     package var hasInterceptor: Bool { interceptor != nil }
@@ -43,6 +53,9 @@ public final class Engine {
         self.configuration = configuration
         self.interceptor = interceptor
         self.funcTypeInterner = Interner()
+        self.crossInstanceReturnSlot = Instruction.returnCrossInstance.headSlot(
+            threadingModel: configuration.threadingModel
+        )
     }
 
     /// Migration aid for the old ``Runtime/instantiate(module:)``

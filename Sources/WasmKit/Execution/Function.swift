@@ -234,13 +234,12 @@ extension InternalFunction {
     ///   `compilingCall` rewrites itself to `internalCall` after compiling.
     func assumeCompiled() -> (
         InstructionSequence,
-        locals: Int,
         function: EntityHandle<WasmFunctionEntity>
     ) {
         let entity = self.wasm
         switch entity.code {
         case .compiled(let iseq), .debuggable(_, let iseq):
-            return (iseq, entity.numberOfNonParameterLocalSlots, entity)
+            return (iseq, entity)
         case .uncompiled:
             preconditionFailure()
         }
@@ -324,14 +323,18 @@ struct InstructionSequence {
     /// This height does not count the locals.
     let maxStackHeight: Int
 
-    /// The constant value pool associated with this instruction sequence.
-    /// See ``FrameHeaderLayout`` for how they are laid out on the stack.
-    let constants: UnsafeBufferPointer<UntypedValue>
+    /// The image a new frame's local and constant area starts out as: one zero
+    /// slot per non-parameter local slot, followed by the constant pool.
+    ///
+    /// The two halves are kept in one buffer so entering a function is a single
+    /// contiguous copy instead of a `memset` of the locals plus a `memcpy` of the
+    /// pool. See ``FrameHeaderLayout`` for how these land on the stack.
+    let frameInit: UnsafeBufferPointer<UntypedValue>
 
-    init(instructions: UnsafeMutableBufferPointer<CodeSlot>, maxStackHeight: Int, constants: UnsafeBufferPointer<UntypedValue>) {
+    init(instructions: UnsafeMutableBufferPointer<CodeSlot>, maxStackHeight: Int, frameInit: UnsafeBufferPointer<UntypedValue>) {
         self.instructions = instructions
         self.maxStackHeight = maxStackHeight
-        self.constants = constants
+        self.frameInit = frameInit
     }
 
     var baseAddress: UnsafeMutablePointer<CodeSlot> {

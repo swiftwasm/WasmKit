@@ -228,7 +228,7 @@ public struct Instance {
                     fatalError("Already compiled!?")
                 }
                 try function.wasm.ensureCompiled(store: StoreRef(store))
-                let (iseq, _, _) = function.assumeCompiled()
+                let (iseq, _) = function.assumeCompiled()
 
                 // Print slot space information
                 let localTypes = code.withValue { $0.locals }

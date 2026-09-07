@@ -349,6 +349,7 @@ extension Execution {
         case 293: return self.execute_brIfI64LeU(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 294: return self.execute_brIfI64GeS(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 295: return self.execute_brIfI64GeU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 296: return self.execute_returnCrossInstance(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -2680,6 +2681,12 @@ extension Execution {
         let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
         let next: CodeSlot
         (pc.pointee, next) = self.brIfI64GeU(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_returnCrossInstance") @inline(__always)
+    mutating func execute_returnCrossInstance(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let next: CodeSlot
+        (pc.pointee, next) = self.returnCrossInstance(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee)
         return next
     }
 }

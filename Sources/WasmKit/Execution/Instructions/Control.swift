@@ -44,10 +44,45 @@ extension Execution {
         return pc.advanced(by: Int(entry.offset)).next()
     }
 
+    /// Returns to the caller.
+    ///
+    /// This handler covers only the case where the caller runs in the same
+    /// instance as the frame being popped, which is every return inside a module
+    /// and therefore almost every return. `md`/`ms` still describe the right
+    /// memory, so the whole instruction is: load the two saved slots, check the
+    /// flag the call recorded in the saved PC, dispatch.
+    ///
+    /// The cross-instance case is handed off to ``returnCrossInstance`` instead of
+    /// being handled here, so that this handler contains no call at all. A single
+    /// call instruction anywhere in it (`bl` on arm64, `call` on x86-64) -- and
+    /// switching `md`/`ms` needs one, for `wasmkit_trap_guard_set_current_memory`
+    /// -- would cost a stack frame's worth of prologue and epilogue on *every*
+    /// return. As it stands the handler is 6 instructions on arm64 and 8 on
+    /// x86-64, with no frame, ending in an indirect branch to the next handler.
     @inline(__always)
     mutating func _return(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms) -> (Pc, CodeSlot) {
+        let oldSp = sp
+        let rawReturnPC = oldSp.rawReturnPC
+        guard _fastPath(rawReturnPC & Sp.returnPCNeedsMemoryRestore == 0) else {
+            // Re-dispatch with `sp`/`pc` untouched; `returnCrossInstance` pops.
+            // The slot is read through the engine: loads only, no call.
+            return (pc, store.value.engine.crossInstanceReturnSlot)
+        }
+        sp = oldSp.previousSP.unsafelyUnwrapped
+        // The flag bit is clear, so the slot is the return `Pc` as it stands.
+        let pc = Pc(bitPattern: UInt(rawReturnPC)).unsafelyUnwrapped
+        return pc.next()
+    }
+
+    /// Returns to a caller in a different instance, switching `md`/`ms` back.
+    ///
+    /// Never emitted by the translator: ``_return`` dispatches here when the frame
+    /// it is about to pop was entered across an instance boundary, so `sp` and `pc`
+    /// are still exactly what that `_return` was given.
+    @inline(__always)
+    mutating func returnCrossInstance(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms) -> (Pc, CodeSlot) {
         var pc = pc
-        popFrame(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        popFrameRestoringCurrentMemory(sp: &sp, pc: &pc, md: &md, ms: &ms)
         return pc.next()
     }
 
@@ -76,14 +111,15 @@ extension Execution {
         internalCallOperand: Instruction.CallOperand
     ) throws {
         // The callee is known to be a function defined within the same module, so we can
-        // skip updating the current instance.
-        let (iseq, locals, instance) = internalCallOperand.callee.assumeCompiled()
+        // skip updating the current instance -- and, by recording that in the frame,
+        // the matching `_return` can skip checking for it too.
+        let (iseq, instance) = internalCallOperand.callee.assumeCompiled()
         sp = try pushFrame(
             iseq: iseq,
             function: instance,
-            numberOfNonParameterLocalSlots: locals,
             sp: sp, returnPC: pc,
-            spAddend: internalCallOperand.spAddend
+            spAddend: internalCallOperand.spAddend,
+            needsMemoryRestoreOnReturn: false
         )
         pc = iseq.baseAddress
     }
