@@ -739,9 +739,14 @@
         }
 
         mutating func predictNext__return(operandPc: Pc, sp: Sp) -> [Pc] {
-            // returnPC is stored at sp[-2]
-            let returnPc = Pc(bitPattern: UInt(sp.advanced(by: -2).pointee))
-            return returnPc.map { [$0] } ?? []
+            // returnPC is stored at sp[-2], with a flag in its low bit.
+            return sp.returnPC.map { [$0] } ?? []
+        }
+
+        mutating func predictNext_returnCrossInstance(operandPc: Pc, sp: Sp) -> [Pc] {
+            // `returnCrossInstance` is only ever reached from `_return` and pops
+            // the same frame, so it lands in the same place.
+            predictNext__return(operandPc: operandPc, sp: sp)
         }
 
         /// Resolves a callee function from a table and returns its iseq base address.
