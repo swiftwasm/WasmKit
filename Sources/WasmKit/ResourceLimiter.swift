@@ -20,13 +20,15 @@ public protocol ResourceLimiter: AnyObject, Sendable {
 
 // By default, we don't limit resource growth.
 extension ResourceLimiter {
-    func limitMemoryGrowth(to desired: Int) throws -> Bool {
+    public func limitMemoryGrowth(to desired: Int) throws -> Bool {
         return true
     }
-    func limitTableGrowth(to desired: Int) throws -> Bool {
+    public func limitTableGrowth(to desired: Int) throws -> Bool {
         return true
     }
 }
 
-/// A default resource limiter that doesn't limit resource growth.
-final class DefaultResourceLimiter: ResourceLimiter {}
+/// A resource limiter that permits all growth.
+public final class DefaultResourceLimiter: ResourceLimiter {
+    public init() {}
+}

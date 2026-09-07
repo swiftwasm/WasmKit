@@ -1,6 +1,8 @@
 add_subdirectory(_CWasmKit)
+add_subdirectory(CWasmKitWASIThreads)
 add_subdirectory(WasmKit)
 add_subdirectory(WasmKitWASI)
+add_subdirectory(WasmKitWASIThreads)
 add_subdirectory(WASI)
 add_subdirectory(WasmTypes)
 add_subdirectory(WasmParser)

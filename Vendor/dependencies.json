@@ -9,6 +9,11 @@
     "revision": "f442fae1a214263aeeddb5395c0c50dc9403b7f8",
     "categories": ["default"]
   },
+  "wasi-threads": {
+    "repository": "https://github.com/WebAssembly/wasi-threads.git",
+    "revision": "f8ea03cc0ffbde143415e945497de112f6f9fd53",
+    "categories": ["default"]
+  },
   "wasm-c-api": {
     "repository": "https://github.com/WebAssembly/wasm-c-api.git",
     "revision": "2ce1367c9d1271c83fb63bef26d896a2f290cd23",

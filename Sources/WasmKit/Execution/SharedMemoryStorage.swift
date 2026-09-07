@@ -99,7 +99,8 @@
         /// Grow by `deltaPages`. Returns the old page count, or -1 on failure.
         /// Thread-safe: mutation is serialized by `growLock`.
         func grow(by deltaPages: Int, resourceLimiter: any ResourceLimiter) throws(Trap) -> Int {
-            growLock.withLock { _ in
+            guard deltaPages >= 0 else { return -1 }
+            return growLock.withLock { _ in
                 let oldBytes = currentByteCount.load(ordering: .acquiring)
                 let oldPages = oldBytes / MemoryEntity.pageSize
 

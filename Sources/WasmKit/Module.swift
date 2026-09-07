@@ -161,6 +161,17 @@ public struct Module: Sendable {
         Instance(handle: try self.instantiateHandle(store: store, imports: imports), store: store)
     }
 
+    /// Returns the type of an exported function, if it exists.
+    ///
+    /// This is metadata only; it does not instantiate the module.
+    /// TODO(yuta): Revisit Module API
+    package func exportedFunctionType(named name: String) -> FunctionType? {
+        guard let export = exports.first(where: { $0.name == name }),
+            case .function(let index) = export.descriptor
+        else { return nil }
+        return try? resolveFunctionType(index)
+    }
+
     #if WasmDebuggingSupport
         /// Instantiate this module with the given imports.
         ///

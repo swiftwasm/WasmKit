@@ -1,0 +1,4 @@
+module CWasmKitWASIThreads {
+  header "CWasmKitWASIThreads.h"
+  export *
+}

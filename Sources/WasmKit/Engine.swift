@@ -15,6 +15,10 @@ public final class Engine {
     let interceptor: EngineInterceptor?
     let funcTypeInterner: Interner<FunctionType>
 
+    /// Whether this engine has an interceptor which is unsafe to share with
+    /// concurrently executing stores.
+    package var hasInterceptor: Bool { interceptor != nil }
+
     /// Create a new execution engine.
     ///
     /// - Parameters:
@@ -45,6 +49,11 @@ public final class Engine {
     @available(*, unavailable, message: "Use ``Module/instantiate(store:imports:)`` instead")
     public func instantiate(module: Module) -> Instance { fatalError() }
 }
+
+// `configuration` is immutable and `funcTypeInterner` synchronizes its mutable
+// state. Concurrent clients must reject engines with interceptors, whose
+// implementations are not currently Sendable.
+extension Engine: @unchecked Sendable {}
 
 /// The configuration for the WebAssembly execution engine.
 public struct EngineConfiguration: Sendable {

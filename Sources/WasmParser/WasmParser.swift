@@ -141,29 +141,70 @@ public struct WasmFeatureSet: OptionSet, Sendable {
         self.rawValue = rawValue
     }
 
+    /// An individual WebAssembly proposal that a feature set can enable.
+    ///
+    /// This is the single source of truth for the proposals WasmKit knows
+    /// about: the flags below and ``WasmFeatureSet/all`` are derived from it,
+    /// and clients that present the proposals to users can enumerate them
+    /// without repeating the list.
+    public enum Feature: CaseIterable, Sendable {
+        /// The WebAssembly memory64 proposal
+        case memory64
+        /// The WebAssembly reference types proposal
+        case referenceTypes
+        /// The WebAssembly threads proposal
+        case threads
+        /// The WebAssembly tail-call proposal
+        case tailCall
+        /// The WebAssembly SIMD proposal
+        case simd
+        /// The WebAssembly exception handling proposal
+        case exceptionHandling
+
+        /// The bit this proposal occupies in a feature set. The values are part
+        /// of the stored representation, so they must stay stable.
+        @usableFromInline
+        var bit: Int {
+            switch self {
+            case .memory64: 0
+            case .referenceTypes: 1
+            case .threads: 2
+            case .tailCall: 3
+            case .simd: 4
+            case .exceptionHandling: 5
+            }
+        }
+    }
+
+    /// Initialize a feature set enabling exactly one proposal
+    @_alwaysEmitIntoClient
+    public init(_ feature: Feature) {
+        self.init(rawValue: 1 << feature.bit)
+    }
+
     /// The WebAssembly memory64 proposal
     @_alwaysEmitIntoClient
-    public static var memory64: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 0) }
+    public static var memory64: WasmFeatureSet { WasmFeatureSet(.memory64) }
     /// The WebAssembly reference types proposal
     @_alwaysEmitIntoClient
-    public static var referenceTypes: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 1) }
+    public static var referenceTypes: WasmFeatureSet { WasmFeatureSet(.referenceTypes) }
     /// The WebAssembly threads proposal
     @_alwaysEmitIntoClient
-    public static var threads: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 2) }
+    public static var threads: WasmFeatureSet { WasmFeatureSet(.threads) }
     /// The WebAssembly tail-call proposal
     @_alwaysEmitIntoClient
-    public static var tailCall: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 3) }
+    public static var tailCall: WasmFeatureSet { WasmFeatureSet(.tailCall) }
     /// The WebAssembly SIMD proposal
     @_alwaysEmitIntoClient
-    public static var simd: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 4) }
+    public static var simd: WasmFeatureSet { WasmFeatureSet(.simd) }
     /// The WebAssembly exception handling proposal
     @_alwaysEmitIntoClient
-    public static var exceptionHandling: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 5) }
+    public static var exceptionHandling: WasmFeatureSet { WasmFeatureSet(.exceptionHandling) }
 
     /// The default feature set
     public static let `default`: WasmFeatureSet = [.referenceTypes, .exceptionHandling]
     /// The feature set with all features enabled
-    public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads, .tailCall, .simd, .exceptionHandling]
+    public static let all: WasmFeatureSet = Feature.allCases.reduce(into: WasmFeatureSet()) { $0.insert(WasmFeatureSet($1)) }
 }
 
 /// > Note:

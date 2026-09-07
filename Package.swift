@@ -18,6 +18,7 @@ let cliCommandsTarget = Target.target(
         "WAT",
         "WasmKit",
         "WasmKitWASI",
+        "WasmKitWASIThreads",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
     ],
     exclude: ["CMakeLists.txt"],
@@ -45,6 +46,7 @@ let package = Package(
         .executable(name: "wasmkit-cli", targets: ["CLI"]),
         .library(name: "WasmKit", targets: ["WasmKit"]),
         .library(name: "WasmKitWASI", targets: ["WasmKitWASI"]),
+        .library(name: "WasmKitWASIThreads", targets: ["WasmKitWASIThreads"]),
         .library(name: "WASI", targets: ["WASI"]),
         .library(name: "WasmParser", targets: ["WasmParser"]),
         .library(name: "WAT", targets: ["WAT"]),
@@ -168,6 +170,19 @@ let package = Package(
             name: "WasmKitWASI",
             dependencies: ["WasmKit", "WASI"],
             exclude: ["CMakeLists.txt"],
+            swiftSettings: swiftSettings
+        ),
+        .target(name: "CWasmKitWASIThreads"),
+        .target(
+            name: "WasmKitWASIThreads",
+            dependencies: ["WasmKit", "CWasmKitWASIThreads"],
+            exclude: ["CMakeLists.txt"],
+            swiftSettings: swiftSettings
+        ),
+        .testTarget(
+            name: "WasmKitWASIThreadsTests",
+            dependencies: ["WasmKitWASIThreads", "WasmKit", "WAT", "CLICommands"],
+            exclude: ["Fixtures"],
             swiftSettings: swiftSettings
         ),
         .target(
