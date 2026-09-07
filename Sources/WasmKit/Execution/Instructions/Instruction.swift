@@ -657,6 +657,14 @@ enum Instruction: Equatable {
     /// stack frame. It receives the *unmodified* `sp`/`pc` of the `_return`
     /// that handed off to it.
     case returnCrossInstance
+    /// Conditional pc-relative branch if the 64-bit operand is zero
+    /// 
+    /// Fused form of `i64.eqz` followed by `br_if`.
+    case brIfI64Eqz(Instruction.BrIfOperand)
+    /// Conditional pc-relative branch if the 64-bit operand is not zero
+    /// 
+    /// Fused form of `i64.eqz` followed by `br_if_not`.
+    case brIfI64Nez(Instruction.BrIfOperand)
     /// Raise `Trap(.memoryOutOfBounds)`. Dispatched to by the memory handlers; never emitted.
     case memoryOutOfBoundsTrap
     /// Raise `Trap(.unalignedAtomic)`. Dispatched to by the atomic handlers; never emitted.
@@ -1604,6 +1612,8 @@ extension Instruction {
         case .brIfI64LeU(let immediate): return immediate
         case .brIfI64GeS(let immediate): return immediate
         case .brIfI64GeU(let immediate): return immediate
+        case .brIfI64Eqz(let immediate): return immediate
+        case .brIfI64Nez(let immediate): return immediate
         default: return nil
         }
     }
@@ -1903,6 +1913,8 @@ extension Instruction {
         case .brIfI64LeU(let immediate): immediate.emit(to: emit)
         case .brIfI64GeS(let immediate): immediate.emit(to: emit)
         case .brIfI64GeU(let immediate): immediate.emit(to: emit)
+        case .brIfI64Eqz(let immediate): immediate.emit(to: emit)
+        case .brIfI64Nez(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -2210,8 +2222,10 @@ extension Instruction {
         case .brIfI64GeS: return 294
         case .brIfI64GeU: return 295
         case .returnCrossInstance: return 296
-        case .memoryOutOfBoundsTrap: return 297
-        case .unalignedAtomicTrap: return 298
+        case .brIfI64Eqz: return 297
+        case .brIfI64Nez: return 298
+        case .memoryOutOfBoundsTrap: return 299
+        case .unalignedAtomicTrap: return 300
         }
     }
 }
@@ -2520,8 +2534,10 @@ extension Instruction {
         case 294: return .brIfI64GeS(Instruction.BrIfCmpOperand.load(from: &pc))
         case 295: return .brIfI64GeU(Instruction.BrIfCmpOperand.load(from: &pc))
         case 296: return .returnCrossInstance
-        case 297: return .memoryOutOfBoundsTrap
-        case 298: return .unalignedAtomicTrap
+        case 297: return .brIfI64Eqz(Instruction.BrIfOperand.load(from: &pc))
+        case 298: return .brIfI64Nez(Instruction.BrIfOperand.load(from: &pc))
+        case 299: return .memoryOutOfBoundsTrap
+        case 300: return .unalignedAtomicTrap
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -2833,8 +2849,10 @@ extension Instruction {
         case 294: return "brIfI64GeS"
         case 295: return "brIfI64GeU"
         case 296: return "returnCrossInstance"
-        case 297: return "memoryOutOfBoundsTrap"
-        case 298: return "unalignedAtomicTrap"
+        case 297: return "brIfI64Eqz"
+        case 298: return "brIfI64Nez"
+        case 299: return "memoryOutOfBoundsTrap"
+        case 300: return "unalignedAtomicTrap"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
@@ -2887,6 +2905,8 @@ protocol NextInstructionPredictor: ~Copyable {
     mutating func predictNext_brIfI64GeS(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_brIfI64GeU(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_returnCrossInstance(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64Eqz(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64Nez(operandPc: Pc, sp: Sp) -> [Pc]
 }
 
 extension Instruction {
@@ -2935,6 +2955,8 @@ extension Instruction {
         case 294: return predictor.predictNext_brIfI64GeS(operandPc: operandPc, sp: sp)
         case 295: return predictor.predictNext_brIfI64GeU(operandPc: operandPc, sp: sp)
         case 296: return predictor.predictNext_returnCrossInstance(operandPc: operandPc, sp: sp)
+        case 297: return predictor.predictNext_brIfI64Eqz(operandPc: operandPc, sp: sp)
+        case 298: return predictor.predictNext_brIfI64Nez(operandPc: operandPc, sp: sp)
         default: return nil
         }
     }
@@ -3097,6 +3119,14 @@ extension Instruction {
             }
             do {
                 let inst = Instruction.returnCrossInstance
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64Eqz(.init(condition: LVReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64Nez(.init(condition: LVReg(0), offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
         return map

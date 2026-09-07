@@ -350,8 +350,10 @@ extension Execution {
         case 294: return self.execute_brIfI64GeS(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 295: return self.execute_brIfI64GeU(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 296: return self.execute_returnCrossInstance(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 297: return try self.execute_memoryOutOfBoundsTrap(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 298: return try self.execute_unalignedAtomicTrap(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 297: return self.execute_brIfI64Eqz(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 298: return self.execute_brIfI64Nez(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 299: return try self.execute_memoryOutOfBoundsTrap(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 300: return try self.execute_unalignedAtomicTrap(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -3381,6 +3383,20 @@ extension Execution {
         (pc.pointee, next) = self.returnCrossInstance(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee)
         return next
     }
+    @_silgen_name("wasmkit_execute_brIfI64Eqz") @inline(__always)
+    mutating func execute_brIfI64Eqz(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64Eqz(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64Nez") @inline(__always)
+    mutating func execute_brIfI64Nez(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64Nez(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
     @_silgen_name("wasmkit_execute_memoryOutOfBoundsTrap") @inline(__always)
     mutating func execute_memoryOutOfBoundsTrap(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         try self.memoryOutOfBoundsTrap(sp: sp.pointee)
@@ -3424,7 +3440,7 @@ extension Instruction {
             #if os(WASI) || $Embedded
             fatalError("Direct threading is not supported on this platform")
             #else
-            return CodeSlot(wasmkit_tc_exec_handlers.297)
+            return CodeSlot(wasmkit_tc_exec_handlers.299)
             #endif
         }
         /// The direct-threaded head slot of the `unalignedAtomicTrap` pseudo-instruction.
@@ -3437,7 +3453,7 @@ extension Instruction {
             #if os(WASI) || $Embedded
             fatalError("Direct threading is not supported on this platform")
             #else
-            return CodeSlot(wasmkit_tc_exec_handlers.298)
+            return CodeSlot(wasmkit_tc_exec_handlers.300)
             #endif
         }
 }

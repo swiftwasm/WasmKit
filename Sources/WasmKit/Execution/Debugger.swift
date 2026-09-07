@@ -633,6 +633,15 @@
             predictNext_brIf(operandPc: operandPc, sp: sp)
         }
 
+        /// Fused `i64.eqz` + branch: same immediate layout as `brIf`.
+        mutating func predictNext_brIfI64Eqz(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIf(operandPc: operandPc, sp: sp)
+        }
+
+        mutating func predictNext_brIfI64Nez(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIf(operandPc: operandPc, sp: sp)
+        }
+
         /// Fused compare+branch: like `brIf`, both fall-through and the branch
         /// target are possible.
         private mutating func predictNext_brIfCmp(operandPc: Pc) -> [Pc] {

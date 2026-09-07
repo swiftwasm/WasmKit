@@ -1594,6 +1594,18 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_returnCrossInstance(Sp sp, Pc
     INLINE_CALL next = wasmkit_execute_returnCrossInstance(&sp, &pc, &md, &ms, state, &error);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
 }
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_brIfI64Eqz(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_brIfI64Eqz(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_brIfI64Eqz(&sp, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_brIfI64Nez(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_brIfI64Nez(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_brIfI64Nez(&sp, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
+}
 SWIFT_CC(swiftasync) static inline void wasmkit_tc_memoryOutOfBoundsTrap(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
     SWIFT_CC(swift) uint64_t wasmkit_execute_memoryOutOfBoundsTrap(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
     void * _Nullable error = NULL; uint64_t next;
@@ -1909,6 +1921,8 @@ static const uintptr_t wasmkit_tc_exec_handlers[] = {
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_brIfI64GeS),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_brIfI64GeU),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_returnCrossInstance),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_brIfI64Eqz),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_brIfI64Nez),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_memoryOutOfBoundsTrap),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_unalignedAtomicTrap),
 };

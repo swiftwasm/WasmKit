@@ -470,6 +470,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case vreg(VReg)
         case const(Int, ValueType)
         case local(LocalIndex)
+
+        /// The stack slot the value occupies, when it is a materialized
+        /// temporary rather than an alias of a local or a constant slot.
+        var stackRegister: VReg? {
+            guard case .vreg(let register) = self else { return nil }
+            return register
+        }
     }
 
     struct ValueStack {
@@ -705,6 +712,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case compare(kind: FusedCmpKind, lhs: VReg, rhs: VReg)
         /// `result = (input == 0)` for a 32-bit `input`
         case i32Eqz(input: VReg)
+        /// `result = (input == 0)` for a 64-bit `input`
+        case i64Eqz(input: VReg)
     }
 
     /// The last emission, positioned, when it is a fusion candidate.
@@ -766,9 +775,17 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             /// The insertion point right after the emitted instruction.
             let end: MetaProgramCounter
             let resultRelink: ResultRelink?
+            /// The register the emission writes its result to, when it has a
+            /// single relinkable result. ``relinkLastInstructionResult(from:to:)``
+            /// checks it against the value being relinked so that a stale last
+            /// emission can never be redirected by mistake.
+            let result: VReg?
             /// Set when the emission can be folded into a following conditional
             /// branch. See ``FusableCondition``.
             let fusable: (condition: FusableCondition, result: VReg)?
+            /// Set when the emission is a `copyStack`, for the inverse-copy
+            /// peephole in ``Translator/emitCopyStack(from:to:)``.
+            let copy: (source: VReg, dest: VReg)?
         }
 
         private var labels: [LabelEntry] = []
@@ -823,6 +840,24 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
         mutating func resetLastEmission() {
             lastEmission = nil
+        }
+
+        /// Drop the last emission only when it is the producer of `result`.
+        ///
+        /// Popping a value the last emission did not produce leaves that
+        /// emission a valid relink / fusion / inverse-copy candidate: the pop
+        /// itself emits nothing, so the instruction is still the last thing in
+        /// the buffer. `relinkLastInstructionResult(from:to:)` and
+        /// `fuseCompareIntoBranch` both check the register they are handed
+        /// against the recorded result, so keeping it cannot misfire.
+        ///
+        /// `result` is `nil` when the popped value lives in a local or a
+        /// constant slot rather than in a stack temporary; an emission with no
+        /// recorded result is dropped in that case, conservatively.
+        mutating func resetLastEmission(ifResultIs result: VReg?) {
+            if lastEmission?.result == result {
+                lastEmission = nil
+            }
         }
 
         /// The last emitted instruction if it can be fused with a conditional
@@ -894,14 +929,51 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             resetLastEmission()
         }
 
-        mutating func relinkLastInstructionResult(_ newResult: VReg) -> Bool {
+        /// Rewrite the last emitted instruction so that it writes its result
+        /// straight into `newResult` instead of `oldResult`, removing the copy
+        /// that would otherwise move it there.
+        ///
+        /// Refused unless all three hold:
+        /// - the last emission really is the producer of `oldResult` (so a
+        ///   stale emission left behind by a pop that did not reset can never
+        ///   be redirected);
+        /// - nothing has been emitted since (`emitWithLabel` bypasses the
+        ///   last-emission bookkeeping, so this also rejects "the last thing in
+        ///   the buffer is a branch"); anything in between could read the old
+        ///   result slot or write the new one;
+        /// - no label has been pinned after the producer. A pinned label means
+        ///   control can re-enter between the producer and here, and the
+        ///   producer would then not dominate the write to `newResult`.
+        mutating func relinkLastInstructionResult(from oldResult: VReg, to newResult: VReg) -> Bool {
             guard let lastEmission = self.lastEmission,
-                let resultRelink = lastEmission.resultRelink
+                let resultRelink = lastEmission.resultRelink,
+                lastEmission.result == oldResult,
+                lastEmission.end.offsetFromHead == insertingPC.offsetFromHead,
+                canRewind(to: lastEmission.position)
             else { return false }
             let newInstruction = resultRelink(newResult)
             assign(at: lastEmission.position.offsetFromHead, newInstruction)
             resetLastEmission()
             return true
+        }
+
+        /// The last emission when it is a `copyStack` the next copy can be
+        /// folded against, i.e. when the next instruction emitted is reachable
+        /// only by falling out of that copy.
+        ///
+        /// `nil` when:
+        /// - something has been emitted since. `emitWithLabel` appends slots
+        ///   without recording a last emission, so without this check a copy
+        ///   emitted before a `brIfNot` would be paired with one emitted in the
+        ///   branch's landing pad, or two `br_table` entries' copies with each
+        ///   other -- code on different paths.
+        /// - a label is pinned at the current insertion point: control could
+        ///   then arrive here without having executed the copy.
+        fileprivate var lastCopy: (source: VReg, dest: VReg)? {
+            guard let lastEmission, let copy = lastEmission.copy else { return nil }
+            guard lastEmission.end.offsetFromHead == insertingPC.offsetFromHead else { return nil }
+            guard highestPinnedLabelOffset < insertingPC.offsetFromHead else { return nil }
+            return copy
         }
 
         private mutating func emitSlot(_ codeSlot: CodeSlot) {
@@ -922,7 +994,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         mutating func emit(
             _ instruction: Instruction,
             resultRelink: ResultRelink? = nil,
-            fusable: (condition: FusableCondition, result: VReg)? = nil
+            result: VReg? = nil,
+            fusable: (condition: FusableCondition, result: VReg)? = nil,
+            copy: (source: VReg, dest: VReg)? = nil
         ) {
             let position = insertingPC
             trace("emitInstruction: \(instruction)")
@@ -932,7 +1006,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             for slot in slots { emitSlot(slot) }
             self.lastEmission = LastEmission(
                 position: position, end: insertingPC,
-                resultRelink: resultRelink, fusable: fusable
+                resultRelink: resultRelink, result: result,
+                fusable: fusable, copy: copy
             )
         }
 
@@ -1242,21 +1317,62 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         return stackLayout.localReg(index)
     }
 
-    private mutating func emit(
-        _ instruction: Instruction,
-        resultRelink: ISeqBuilder.ResultRelink? = nil,
-        fusable: (condition: FusableCondition, result: VReg)? = nil
-    ) {
+    /// The emission shapes, each outlined. Inlining `ISeqBuilder.emit` into
+    /// every specialization of the `pop*Emit` helpers multiplies translator
+    /// text; one overload per shape keeps the unused arguments out of each
+    /// call so that outlining stays cheap.
+    @inline(never)
+    private mutating func emit(_ instruction: Instruction) {
         let oldPC = iseqBuilder.insertingPC
-        iseqBuilder.emit(instruction, resultRelink: resultRelink, fusable: fusable)
+        iseqBuilder.emit(instruction)
         self.updateInstructionMapping(from: oldPC)
     }
 
+    @inline(never)
+    private mutating func emit(
+        _ instruction: Instruction,
+        resultRelink: ISeqBuilder.ResultRelink? = nil,
+        result: VReg?
+    ) {
+        let oldPC = iseqBuilder.insertingPC
+        iseqBuilder.emit(instruction, resultRelink: resultRelink, result: result)
+        self.updateInstructionMapping(from: oldPC)
+    }
+
+    @inline(never)
+    private mutating func emit(
+        _ instruction: Instruction,
+        resultRelink: ISeqBuilder.ResultRelink?,
+        result: VReg?,
+        fusable: (condition: FusableCondition, result: VReg)
+    ) {
+        let oldPC = iseqBuilder.insertingPC
+        iseqBuilder.emit(instruction, resultRelink: resultRelink, result: result, fusable: fusable)
+        self.updateInstructionMapping(from: oldPC)
+    }
+
+    /// Emit `dest = copy source`, unless the copy is provably a no-op.
+    ///
+    /// Two shapes are dropped here:
+    /// - `copy A <- A`, which never does anything;
+    /// - `copy B <- A` immediately followed by `copy A <- B`. The second copy
+    ///   writes back the value the first one just read, so `A` already holds
+    ///   it. `ISeqBuilder.lastCopy` only reports the previous copy when it is
+    ///   still the last thing in the buffer *and* no label is pinned between
+    ///   the two, i.e. when the first copy is guaranteed to have run.
+    ///
+    /// - Returns: whether an instruction was emitted.
     @discardableResult
     private mutating func emitCopyStack(from source: VReg, to dest: VReg) -> Bool {
         guard source != dest else { return false }
+        if let previous = iseqBuilder.lastCopy, previous.source == dest, previous.dest == source {
+            return false
+        }
         let oldPC = iseqBuilder.insertingPC
-        iseqBuilder.emit(.copyStack(Instruction.CopyStackOperand(source: LVReg(source), dest: LVReg(dest))))
+        iseqBuilder.emit(
+            .copyStack(Instruction.CopyStackOperand(source: LVReg(source), dest: LVReg(dest))),
+            copy: (source: source, dest: dest)
+        )
         self.updateInstructionMapping(from: oldPC)
         return true
     }
@@ -1381,8 +1497,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         guard try checkBeforePop(typeHint: type) else {
             return nil
         }
-        iseqBuilder.resetLastEmission()
-        return try valueStack.pop(type)
+        let source = try valueStack.pop(type)
+        // Only popping the last emission's own result closes the window. A pop
+        // emits nothing, so after popping anything else the emission is still
+        // the last instruction in the buffer and a legal relink / fusion /
+        // inverse-copy candidate.
+        iseqBuilder.resetLastEmission(ifResultIs: source.stackRegister)
+        return source
     }
 
     private mutating func popOnStackOperand(_ type: ValueType) throws(WasmKitError) -> VReg? {
@@ -1399,8 +1520,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         guard try checkBeforePop(typeHint: nil) else {
             return (.unknown, nil)
         }
-        iseqBuilder.resetLastEmission()
-        return try valueStack.pop()
+        let popped = try valueStack.pop()
+        // See `popOperand` for why this is conditional.
+        iseqBuilder.resetLastEmission(ifResultIs: popped.1.stackRegister)
+        return popped
     }
 
     @discardableResult
@@ -1646,10 +1769,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     mutating func visitLoop(blockType: WasmParser.BlockType) throws(WasmKitError) -> Output {
         let blockType = try module.resolveBlockType(blockType)
         preserveOnStack(depth: self.valueStack.valueHeight)
-        iseqBuilder.resetLastEmission()
         for param in blockType.parameters.reversed() {
             _ = try popOperand(param)
         }
+        // No reset needed before the loop header. Pinning it raises
+        // `highestPinnedLabelOffset` above anything emitted before the loop, so
+        // `relinkLastInstructionResult(from:to:)` and `canRewind` refuse to
+        // rewrite an instruction from outside the body, which runs once while
+        // the body runs many times.
         let headLabel = iseqBuilder.putLabel()
         let stackHeight = (valueHeight: self.valueStack.valueHeight, slotHeight: self.valueStack.slotHeight)
         for param in blockType.parameters {
@@ -1724,8 +1851,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
         preserveOnStack(depth: valueStack.valueHeight - frame.valueStackHeight)
         try controlStack.resetReachability()
-        iseqBuilder.resetLastEmission()
-
+        // No reset needed. The `br` emitted right below goes through
+        // `emitWithLabel`, which advances the insertion point without recording
+        // a last emission, so every consumer's "nothing emitted since" check
+        // fails; and `elseLabel` is pinned at the end of this function, above
+        // anything in the `then` arm.
         let oldPC = iseqBuilder.insertingPC
         iseqBuilder.emitWithLabel(Instruction.br, endLabel) { _, selfPC, endPC in
             let offset = endPC.offsetFromHead - selfPC.offsetFromHead
@@ -1756,6 +1886,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
     mutating func visitEnd() throws(WasmKitError) -> Output {
         let toBePopped = try controlStack.currentFrame()
+        // Ending a `loop` pins no label, so without this reset an instruction
+        // emitted inside the body would still look relinkable to a `local.set`
+        // *after* the loop. Redirecting it would make every iteration write
+        // that local, clobbering it for the reads earlier in the body.
         iseqBuilder.resetLastEmission()
         if case .block(root: true) = toBePopped.kind {
             try translateReturn()
@@ -1870,11 +2004,24 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case .i32Eqz(let input):
             // `eqz(x)` is non-zero exactly when `x` is zero, so the fused form
             // is just the plain branch with the opposite polarity on `x`.
+            // `brIf`/`brIfNot` test `sp[i32:]`, which is exactly the width of
+            // an `i32.eqz` input.
             factory = { polarity, offset in
                 let operand = Instruction.BrIfOperand(condition: LVReg(input), offset: offset)
                 switch polarity {
                 case .ifTrue: return Instruction.brIfNot(operand)
                 case .ifFalse: return Instruction.brIf(operand)
+                }
+            }
+        case .i64Eqz(let input):
+            // Same shape, but `brIf`/`brIfNot` would only look at the low 32
+            // bits of the slot (0x1_0000_0000 is not zero yet has a zero low
+            // half), so the 64-bit opcodes are used instead.
+            factory = { polarity, offset in
+                let operand = Instruction.BrIfOperand(condition: LVReg(input), offset: offset)
+                switch polarity {
+                case .ifTrue: return Instruction.brIfI64Eqz(operand)
+                case .ifFalse: return Instruction.brIfI64Nez(operand)
                 }
             }
         }
@@ -2445,8 +2592,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitDrop() throws(WasmKitError) -> Output {
+        // `popAnyOperand` closes the window when the dropped value is the last
+        // emission's result.
         _ = try popAnyOperand()
-        iseqBuilder.resetLastEmission()
     }
     mutating func visitSelect() throws(WasmKitError) -> Output {
         let condition = try popVRegOperand(.i32)
@@ -2498,10 +2646,17 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
     mutating func visitLocalGet(localIndex: UInt32) throws(WasmKitError) -> Output {
-        iseqBuilder.resetLastEmission()
+        // No reset needed: a following `local.set` or `br_if` cannot mistake the
+        // pushed local for the last emission's result.
+        // `relinkLastInstructionResult(from:to:)` and `fuseCompareIntoBranch`
+        // compare the register explicitly, and a local's slot is never a stack
+        // temporary (locals sit below `stackRegBase`), so the check never
+        // matches.
         try valueStack.pushLocal(localIndex, locals: &locals)
     }
-    mutating func visitLocalSetOrTee(localIndex: UInt32, isTee: Bool) throws(WasmKitError) {
+    /// Shared lowering of `local.set` and `local.tee`. `local.tee` differs
+    /// only in that its caller re-pushes the local afterwards.
+    mutating func visitLocalSetOrTee(localIndex: UInt32) throws(WasmKitError) {
         preserveLocalsOnStack(localIndex)
         let type = try locals.type(of: localIndex)
         let result = localReg(localIndex)
@@ -2523,17 +2678,37 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
         let value = ensureOnVReg(op)
         guard try controlStack.currentFrame().reachable else { return }
-        if type != .v128, !isTee, iseqBuilder.relinkLastInstructionResult(result) {
+        // Relink the producing instruction to write the local's slot directly,
+        // dropping the copy that would otherwise move the value there.
+        //
+        // `local.tee` is included: the value it leaves on the stack is pushed
+        // back as `.local(localIndex)` by `visitLocalTee`, i.e. it *already*
+        // aliases the local's slot whether the value got there by a copy or by
+        // the producer writing it. A later write to the same local before the
+        // tee'd value is consumed is handled by the existing
+        // `preserveLocalsOnStack` mechanism, exactly as it is for `local.get`.
+        //
+        // `v128` is included as well: a v128 producer writes both slots of its
+        // result from one base register (`sp.storeV128(_:at:)`), and a v128
+        // local owns two consecutive slots, so redirecting the base register is
+        // all that is needed -- there is nothing per-slot to relink.
+        //
+        // Note that when `preserveLocalsOnStack(localIndex)` above emitted
+        // copies, the relink is refused (those copies are the last emission,
+        // and they carry no `resultRelink`). That is load-bearing rather than
+        // accidental: those copies read the local's *old* value, and relinking
+        // would move the write of its new value before them.
+        if iseqBuilder.relinkLastInstructionResult(from: value, to: result) {
             // Good news, copyStack is optimized out :)
             return
         }
         emitCopyValueSlots(type, from: value, to: result)
     }
     mutating func visitLocalSet(localIndex: UInt32) throws(WasmKitError) -> Output {
-        try visitLocalSetOrTee(localIndex: localIndex, isTee: false)
+        try visitLocalSetOrTee(localIndex: localIndex)
     }
     mutating func visitLocalTee(localIndex: UInt32) throws(WasmKitError) -> Output {
-        try visitLocalSetOrTee(localIndex: localIndex, isTee: true)
+        try visitLocalSetOrTee(localIndex: localIndex)
         _ = try valueStack.pushLocal(localIndex, locals: &locals)
     }
     mutating func visitGlobalGet(globalIndex: UInt32) throws(WasmKitError) -> Output {
@@ -2569,7 +2744,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             instruction(register),
             resultRelink: { newResult in
                 instruction(newResult)
-            })
+            }, result: register)
     }
     private mutating func popPushEmit(
         _ pop: ValueType,
@@ -2583,7 +2758,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 instruction(value, result),
                 resultRelink: { newResult in
                     instruction(value, newResult)
-                })
+                }, result: result)
         }
     }
 
@@ -2629,9 +2804,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let result = valueStack.push(push)
         emit(
             instruction((pop1, pop2), result),
-            resultRelink: { result in
-                instruction((pop1, pop2), result)
-            })
+            resultRelink: { newResult in
+                instruction((pop1, pop2), newResult)
+            }, result: result)
     }
 
     private mutating func pop3PushEmit(
@@ -2646,9 +2821,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let result = valueStack.push(push)
         emit(
             instruction((pop1, pop2, pop3), result),
-            resultRelink: { result in
-                instruction((pop1, pop2, pop3), result)
-            })
+            resultRelink: { newResult in
+                instruction((pop1, pop2, pop3), newResult)
+            }, result: result)
     }
 
     private mutating func visitLoad(
@@ -3035,8 +3210,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     private mutating func visitConst(_ type: ValueType, _ value: Value) {
         // TODO: document this behavior
         if let constSlotIndex = constantSlots.allocate(value) {
+            // No reset needed, for the same reason as `visitLocalGet`: a
+            // constant slot is never a stack temporary, so it can never be
+            // mistaken for the last emission's result.
             valueStack.pushConst(constSlotIndex, type: type)
-            iseqBuilder.resetLastEmission()
             return
         }
         let value = UntypedValue(value)
@@ -3088,9 +3265,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         guard let lhs = lhs, let rhs = rhs else { return }
         emit(
             instruction(Instruction.BinaryOperand(result: LVReg(result), lhs: lhs, rhs: rhs)),
-            resultRelink: { result in
-                return instruction(Instruction.BinaryOperand(result: LVReg(result), lhs: lhs, rhs: rhs))
-            }
+            resultRelink: { newResult in
+                return instruction(Instruction.BinaryOperand(result: LVReg(newResult), lhs: lhs, rhs: rhs))
+            },
+            result: result
         )
     }
     /// Emits a comparison, recording it as a candidate for compare+branch fusion
@@ -3111,9 +3289,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         guard let lhs = lhs, let rhs = rhs else { return }
         emit(
             instruction(Instruction.BinaryOperand(result: LVReg(result), lhs: lhs, rhs: rhs)),
-            resultRelink: { result in
-                return instruction(Instruction.BinaryOperand(result: LVReg(result), lhs: lhs, rhs: rhs))
+            resultRelink: { newResult in
+                return instruction(Instruction.BinaryOperand(result: LVReg(newResult), lhs: lhs, rhs: rhs))
             },
+            result: result,
             fusable: (.compare(kind: fusedKind, lhs: lhs, rhs: rhs), result)
         )
     }
@@ -3131,6 +3310,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             resultRelink: { newResult in
                 .i32Eqz(Instruction.UnaryOperand(result: LVReg(newResult), input: LVReg(value)))
             },
+            result: result,
             fusable: (.i32Eqz(input: value), result)
         )
     }
@@ -3227,9 +3407,17 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         try visitBinary(operand, result, instruction)
     }
     mutating func visitI64Eqz() throws(WasmKitError) -> Output {
-        try popPushEmit(.i64, .i32) { value, result in
-            .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
-        }
+        let value = try popVRegOperand(.i64)
+        let result = valueStack.push(.i32)
+        guard let value = value else { return }
+        emit(
+            .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value))),
+            resultRelink: { newResult in
+                .i64Eqz(Instruction.UnaryOperand(result: LVReg(newResult), input: LVReg(value)))
+            },
+            result: result,
+            fusable: (.i64Eqz(input: value), result)
+        )
     }
     mutating func visitUnary(_ unary: WasmParser.Instruction.Unary) throws(WasmKitError) {
         let operand: ValueType
