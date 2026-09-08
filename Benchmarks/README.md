@@ -84,7 +84,7 @@ Or directly, which is more convenient while iterating because it takes a filter
 and engine-configuration flags:
 
 ```console
-$ swift build -c release --package-path . --product WasmiBenchmarks
+$ swift build -c release --package-path . --product WasmiBenchmarks --omit-frame-pointers
 $ ./.build/release/WasmiBenchmarks                    # everything
 $ ./.build/release/WasmiBenchmarks counter            # only cases matching "counter"
 $ ./.build/release/WasmiBenchmarks coremark

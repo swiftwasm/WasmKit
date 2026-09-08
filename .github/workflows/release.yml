@@ -47,7 +47,11 @@ jobs:
       - run: |
           VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')
           echo "WASMKIT_VERSION=${VERSION}" >> "$GITHUB_ENV"
-      - run: ./build-exec ./Utilities/build-release.py -o wasmkit-x86_64-swift-linux-musl.tar.gz  -s $WASMKIT_VERSION -- --swift-sdk x86_64-swift-linux-musl
+      # x86-64 only: By default, fp prologue/epilogue are emitted for VM instruction handlers even though
+      # they are "leaf" function (in LLVM, a function whose only call is a guaranteed tail call counts as
+      # leaf). The fp operations slows down the VM execution quite a bit, so we omit them for the x86-64 build.
+      - run: ./build-exec ./Utilities/build-release.py -o wasmkit-x86_64-swift-linux-musl.tar.gz  -s $WASMKIT_VERSION -- --swift-sdk x86_64-swift-linux-musl --omit-frame-pointers
+      # For aarch64, we don't need `--omit-frame-pointers` because clang by default omits them for leaf functions for aarch64.
       - run: ./build-exec ./Utilities/build-release.py -o wasmkit-aarch64-swift-linux-musl.tar.gz -s $WASMKIT_VERSION -- --swift-sdk aarch64-swift-linux-musl
       - uses: actions/upload-artifact@v7
         with:
