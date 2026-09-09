@@ -71,7 +71,9 @@
 
         private var md: Md = nil
         private var ms: Ms = 0
-        private var linearMemoryByteCount = 0
+
+        /// Bytes of linear memory the guest can see, zero before a stop has bound any.
+        package private(set) var linearMemoryByteCount = 0
 
         /// Starts of this instance's Wasm functions in the original binary, in ascending order,
         /// paired with their indices. Excludes imported functions: their addresses are offsets

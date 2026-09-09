@@ -17,14 +17,18 @@
     import WasmKit
     import WasmKitWASI
 
-    extension BinaryInteger {
+    extension FixedWidthInteger {
         init?(hexEncoded: Substring) {
-            var result = Self.zero
-            for (offset, element) in hexEncoded.reversed().enumerated() {
-                guard let digit = element.hexDigitValue else { return nil }
-                result += Self(digit) << (offset * 4)
-            }
+            guard !hexEncoded.isEmpty else { return nil }
 
+            var result = Self.zero
+            for element in hexEncoded {
+                guard let digit = element.hexDigitValue else { return nil }
+                let (shifted, shiftOverflowed) = result.multipliedReportingOverflow(by: 16)
+                let (sum, addOverflowed) = shifted.addingReportingOverflow(Self(digit))
+                guard !shiftOverflowed, !addOverflowed else { return nil }
+                result = sum
+            }
             self = result
         }
     }
@@ -101,6 +105,9 @@
         /// Generic error reply. `QEnableErrorStrings` is unsupported, so a bare code is
         /// the only way to refuse a request the target understands but cannot answer.
         private static let errorReply = GDBTargetResponse.Kind.error(0x45)
+
+        /// Error code for refused memory reads, matching debugserver.
+        private static let memoryReadFailed: UInt8 = 0x08
 
         /// Error code for refused memory writes, matching debugserver.
         private static let memoryWriteFailed: UInt8 = 0x09
@@ -419,13 +426,18 @@
                     let length = UInt(hexEncoded: argumentsArray[1])
                 else { throw Error.unknownReadMemoryArguments }
 
-                responseKind = .hexEncodedBinary(
-                    try self.memoryView.readMemory(
-                        debugger: self.debugger,
-                        addressInProtocolSpace: addressInProtocolSpace,
-                        length: length
+                do {
+                    responseKind = .hexEncodedBinary(
+                        try self.memoryView.readMemory(
+                            debugger: self.debugger,
+                            addressInProtocolSpace: addressInProtocolSpace,
+                            length: length
+                        )
                     )
-                )
+                } catch {
+                    logger.debug("memory read `\(command.arguments)` failed: \(error)")
+                    responseKind = .error(Self.memoryReadFailed)
+                }
 
             case .writeMemory:
                 do {
@@ -546,7 +558,29 @@
                 }
 
             case .memoryRegionInfo:
-                responseKind = .empty
+                // A host probes support by sending this query without an address.
+                if command.arguments.isEmpty {
+                    responseKind = .ok
+                } else if let addressInProtocolSpace = UInt64(hexEncoded: command.arguments[...]) {
+                    let region = self.memoryView.memoryRegion(
+                        debugger: self.debugger,
+                        containing: addressInProtocolSpace
+                    )
+                    var pairs = [
+                        ("start", String(region.start, radix: 16)),
+                        ("size", String(region.size, radix: 16)),
+                    ]
+                    if let permissions = region.permissions {
+                        pairs.append(("permissions", permissions))
+                    }
+                    if let name = region.name {
+                        pairs.append(("name", HexEncoding.encode(name.utf8)))
+                    }
+                    responseKind = .keyValuePairs(pairs)
+                } else {
+                    logger.debug("refusing a memory region query for `\(command.arguments)`")
+                    responseKind = Self.errorReply
+                }
 
             case .generalRegisters:
                 responseKind = .empty

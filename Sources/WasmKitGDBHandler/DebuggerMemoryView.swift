@@ -31,6 +31,9 @@
 
             /// The address exceeds the target's pointer width.
             case addressNotRepresentable(UInt64)
+
+            /// The address lies outside every mapped region.
+            case addressUnmapped(UInt64)
         }
 
         /// WebAssembly binary loaded into memory for execution
@@ -41,21 +44,35 @@
             self.wasmBinary = wasmBinary
         }
 
+        /// The bytes at `addressInProtocolSpace`, narrowed to the end of the region containing it.
         package func readMemory(
             debugger: borrowing Debugger,
             addressInProtocolSpace: UInt64,
             length: UInt
-        ) throws(Debugger.Error) -> [UInt8] {
+        ) throws -> [UInt8] {
+            // An empty read touches nothing, so it needs no mapping to answer.
+            guard length > 0 else { return [] }
+
             if addressInProtocolSpace >= Self.executableCodeOffset {
-                var length = Int(length)
-                let codeAddress = Int(addressInProtocolSpace - Self.executableCodeOffset)
-                if codeAddress + length > wasmBinary.count {
-                    length = wasmBinary.count - codeAddress
+                let codeAddress = addressInProtocolSpace - Self.executableCodeOffset
+                guard codeAddress < UInt64(wasmBinary.count) else {
+                    throw Error.addressUnmapped(addressInProtocolSpace)
                 }
 
-                return Array(wasmBinary[codeAddress..<(codeAddress + length)])
+                let start = Int(codeAddress)
+                let count = Int(min(UInt64(length), UInt64(wasmBinary.count - start)))
+                return Array(wasmBinary[start..<(start + count)])
             } else {
-                return try debugger.readLinearMemory(address: UInt(addressInProtocolSpace), length: length) {
+                guard let address = UInt(exactly: addressInProtocolSpace) else {
+                    throw Error.addressNotRepresentable(addressInProtocolSpace)
+                }
+
+                let mapped = UInt(debugger.linearMemoryByteCount)
+                guard address < mapped else {
+                    throw Error.addressUnmapped(addressInProtocolSpace)
+                }
+
+                return try debugger.readLinearMemory(address: address, length: min(length, mapped - address)) {
                     Array($0)
                 }
             }
@@ -75,6 +92,58 @@
             }
 
             try debugger.writeLinearMemory(address: address, bytes: bytes)
+        }
+
+        /// A range of the address space a debugger host sees, mapped or not.
+        package struct MemoryRegion {
+            package let start: UInt64
+            package let size: UInt64
+
+            /// Nil when unmapped: the protocol omits the key for unmapped regions.
+            package let permissions: String?
+            package let name: String?
+        }
+
+        /// Linear memory is bounded by what the guest can see, not the underlying reservation,
+        /// because access beyond it faults instead of trapping.
+        private func mappedRegions(debugger: borrowing Debugger) -> [MemoryRegion] {
+            [
+                MemoryRegion(
+                    start: 0,
+                    size: UInt64(debugger.linearMemoryByteCount),
+                    permissions: "rw",
+                    name: "memory"
+                ),
+                MemoryRegion(
+                    start: Self.executableCodeOffset,
+                    size: UInt64(self.wasmBinary.count),
+                    permissions: "rx",
+                    name: "module"
+                ),
+            ].filter { $0.size > 0 }
+        }
+
+        /// The region containing `addressInProtocolSpace`. Unmapped regions span to the next
+        /// mapped region or the top of the address space.
+        package func memoryRegion(
+            debugger: borrowing Debugger,
+            containing addressInProtocolSpace: UInt64
+        ) -> MemoryRegion {
+            let mapped = self.mappedRegions(debugger: debugger)
+
+            if let region = mapped.first(where: {
+                addressInProtocolSpace >= $0.start && addressInProtocolSpace - $0.start < $0.size
+            }) {
+                return region
+            }
+
+            let next = mapped.lazy.map(\.start).filter { $0 > addressInProtocolSpace }.min()
+            return MemoryRegion(
+                start: addressInProtocolSpace,
+                size: (next ?? UInt64.max) - addressInProtocolSpace,
+                permissions: nil,
+                name: nil
+            )
         }
     }
 
