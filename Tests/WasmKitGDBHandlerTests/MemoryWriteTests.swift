@@ -108,12 +108,14 @@
         }
 
         @Test
-        func aLengthThatOverflowsTheAddressSpaceIsRefused() throws {
+        func aLengthThatOverflowsTheAddressSpaceIsNarrowed() throws {
             try withHandler(debugging: Self.wat) { handler in
-                #expect(throws: Debugger.Error.self) {
-                    _ = try handler.handle(command: .init(kind: .readMemory, arguments: "0,ffffffffffffffff"))
+                let response = try handler.handle(command: .init(kind: .readMemory, arguments: "0,ffffffffffffffff"))
+                guard case .hexEncodedBinary(let bytes) = response.kind else {
+                    Issue.record("expected memory contents, got \(response.kind)")
+                    return
                 }
-                return
+                #expect(bytes.count == 0x1_0000)
             }
         }
     }
