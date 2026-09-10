@@ -838,9 +838,31 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             // Anything emitted after the candidate (e.g. `preserveOnStack`
             // copies) makes the fusion unsound.
             guard emission.end.offsetFromHead == insertingPC.offsetFromHead else { return false }
-            // A label pinned inside or after the candidate would move.
-            guard highestPinnedLabelOffset <= emission.position.offsetFromHead else { return false }
-            return true
+            return canRewind(to: emission.position)
+        }
+
+        /// Whether the buffer can be rewound to `position` without moving or
+        /// dangling a label that has already been pinned.
+        fileprivate func canRewind(to position: MetaProgramCounter) -> Bool {
+            guard position.offsetFromHead <= instructions.count else { return false }
+            // A label pinned strictly after `position` would be retargeted at
+            // whatever is emitted in place of the removed instructions. A label
+            // pinned exactly at `position` is fine: it keeps pointing at the
+            // start of the replacement.
+            return highestPinnedLabelOffset <= position.offsetFromHead
+        }
+
+        /// Drops every pending user of an unpinned label so the instructions
+        /// referring to it can be rewound away.
+        ///
+        /// The label must not have been pinned yet, and is never pinned
+        /// afterwards -- it simply disappears together with its only user.
+        fileprivate mutating func discardUnpinnedLabel(_ ref: LabelRef) {
+            guard case .unpinned = self.labels[ref] else {
+                preconditionFailure("Internal consistency error: Label (#\(ref)) is already pinned and cannot be discarded")
+            }
+            self.labels[ref] = .unpinned(users: [])
+            self.unpinnedLabels.remove(ref)
         }
 
         /// Drops every slot from `position` to the end of the buffer.
@@ -1663,11 +1685,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         guard let condition = condition else { return }
         // NOTE: `preserveOnStack` above may have emitted copies; when it did,
         // `canRewind` refuses and we fall back to the unfused form.
-        if let makeFused = fuseCompareIntoBranch(fusable, condition: condition, polarity: .ifFalse) {
+        if let makeFused = fuseCompareIntoBranch(fusable, condition: condition) {
             let oldPC = iseqBuilder.insertingPC
             iseqBuilder.emitBranchWithLabel(endLabel) { iseqBuilder, selfPC, endPC in
                 let targetPC = iseqBuilder.resolveLabel(elseLabel) ?? endPC
-                return makeFused(Int32(targetPC.offsetFromHead - selfPC.offsetFromHead))
+                return makeFused(.ifFalse, Int32(targetPC.offsetFromHead - selfPC.offsetFromHead))
             }
             self.updateInstructionMapping(from: oldPC)
             return
@@ -1800,6 +1822,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case ifFalse
     }
 
+    /// Builds a fused compare+branch for a given polarity and pc-relative offset.
+    ///
+    /// The polarity is supplied at emission time so that a branch already
+    /// emitted as `ifFalse` can be re-emitted as `ifTrue` if the landing pad it
+    /// skipped over turns out to be empty (see ``visitBrIf(relativeDepth:)``).
+    private typealias FusedBranchFactory = (_ polarity: FusedBranchPolarity, _ offset: Int32) -> Instruction
+
     /// Folds a just-emitted comparison into the conditional branch about to be
     /// emitted.
     ///
@@ -1817,28 +1846,27 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     /// ``ISeqBuilder/canRewind(to:)`` refuse).
     private mutating func fuseCompareIntoBranch(
         _ candidate: FusableEmission?,
-        condition: VReg,
-        polarity: FusedBranchPolarity
-    ) -> ((_ offset: Int32) -> Instruction)? {
+        condition: VReg
+    ) -> FusedBranchFactory? {
         guard let candidate, candidate.result == condition else { return nil }
         guard iseqBuilder.canRewind(to: candidate) else { return nil }
 
-        let factory: (Int32) -> Instruction
+        let factory: FusedBranchFactory
         switch candidate.condition {
         case .compare(let kind, let lhs, let rhs):
-            let fused = polarity == .ifTrue ? kind : kind.complement
-            let makeBrIf = fused.makeBrIf
-            factory = { offset in
-                makeBrIf(Instruction.BrIfCmpOperand(lhs: lhs, rhs: rhs, offset: offset))
+            factory = { polarity, offset in
+                let fused = polarity == .ifTrue ? kind : kind.complement
+                return fused.makeBrIf(Instruction.BrIfCmpOperand(lhs: lhs, rhs: rhs, offset: offset))
             }
         case .i32Eqz(let input):
             // `eqz(x)` is non-zero exactly when `x` is zero, so the fused form
             // is just the plain branch with the opposite polarity on `x`.
-            switch polarity {
-            case .ifTrue:
-                factory = { Instruction.brIfNot(Instruction.BrIfOperand(condition: LVReg(input), offset: $0)) }
-            case .ifFalse:
-                factory = { Instruction.brIf(Instruction.BrIfOperand(condition: LVReg(input), offset: $0)) }
+            factory = { polarity, offset in
+                let operand = Instruction.BrIfOperand(condition: LVReg(input), offset: offset)
+                switch polarity {
+                case .ifTrue: return Instruction.brIfNot(operand)
+                case .ifFalse: return Instruction.brIf(operand)
+                }
             }
         }
         iseqBuilder.rewind(to: candidate.position)
@@ -1908,10 +1936,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             guard let condition else { return }
             // Optimization where we don't need copying values when the branch taken
             // and no exception handlers need unwinding.
-            if let makeFused = fuseCompareIntoBranch(fusable, condition: condition, polarity: .ifTrue) {
+            if let makeFused = fuseCompareIntoBranch(fusable, condition: condition) {
                 let oldPC = iseqBuilder.insertingPC
                 iseqBuilder.emitBranchWithLabel(frame.continuation) { _, selfPC, continuation in
-                    makeFused(Int32(continuation.offsetFromHead - selfPC.offsetFromHead))
+                    makeFused(.ifTrue, Int32(continuation.offsetFromHead - selfPC.offsetFromHead))
                 }
                 self.updateInstructionMapping(from: oldPC)
                 return
@@ -1953,28 +1981,94 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             let onBranchNotTaken = iseqBuilder.allocLabel()
             // NOTE: `preserveOnStack` above may have emitted copies; when it did,
             // `canRewind` refuses and we fall back to the unfused form.
-            if let makeFused = fuseCompareIntoBranch(fusable, condition: condition, polarity: .ifFalse) {
-                let oldPC = iseqBuilder.insertingPC
+            let makeFused = fuseCompareIntoBranch(fusable, condition: condition)
+            let conditionCheckPC = iseqBuilder.insertingPC
+            if let makeFused {
                 iseqBuilder.emitBranchWithLabel(onBranchNotTaken) { _, conditionCheckAt, continuation in
-                    makeFused(Int32(continuation.offsetFromHead - conditionCheckAt.offsetFromHead))
+                    makeFused(.ifFalse, Int32(continuation.offsetFromHead - conditionCheckAt.offsetFromHead))
                 }
-                self.updateInstructionMapping(from: oldPC)
             } else {
-                let oldPC = iseqBuilder.insertingPC
                 iseqBuilder.emitWithLabel(Instruction.brIfNot, onBranchNotTaken) { _, conditionCheckAt, continuation in
                     let relativeOffset = continuation.offsetFromHead - conditionCheckAt.offsetFromHead
                     return Instruction.BrIfOperand(condition: LVReg(condition), offset: Int32(relativeOffset))
                 }
-                self.updateInstructionMapping(from: oldPC)
             }
+            self.updateInstructionMapping(from: conditionCheckPC)
+            let landingPadPC = iseqBuilder.insertingPC
             try copyOnBranch(targetFrame: frame)
-            if handlersToUnwind > 0 {
-                emit(.catchHandlersEnd(Instruction.CatchHandlersEndOperand(count: handlersToUnwind)))
+
+            // The landing pad only exists to run the copies (and the handler
+            // unwind) on the taken path. `frame.copySlotCount != 0` does *not*
+            // imply that any copy is emitted: for a `loop (param ...)`
+            // back-edge the operand usually already sits in the destination
+            // slot, so `copyOnBranch` emits nothing and the pad degenerates
+            // into two dispatches for one guest branch.
+            //
+            // (loop $continue (param i32) (result i32)
+            //   (i32.const 1)
+            //   (i32.sub)
+            //   (local.tee $n)
+            //   (local.get $n)
+            //   (br_if $continue) ---> back to the loop head
+            // )
+            //
+            // [0x02] (i32.sub reg:4, reg:0 -> reg:4)       <-----------+
+            // [0x04] (copy reg:4 -> local $n)                          |
+            // [0x06] (copy local $n -> reg:4)                          |
+            // [0x08] (br_if_not cond=local $n, offset=+2) --+          |
+            // [0x0a] (br offset=-10) -----------------------|----------+
+            // [0x0c] ...                        <-----------+
+            //
+            // Collapse that into a single conditional branch (fused, when
+            // the condition came from a comparison) straight to the real
+            // destination:
+            //
+            // [0x02] (i32.sub reg:4, reg:0 -> reg:4)       <-----------+
+            // [0x04] (copy reg:4 -> local $n)                          |
+            // [0x06] (copy local $n -> reg:4)                          |
+            // [0x08] (br_if cond=local $n, offset=-8) ------------------+
+            // [0x0a] ...
+            //
+            // Only the "no copy was emitted" case is collapsed. When copies
+            // *were* emitted they cannot be hoisted above the branch: they
+            // write the branch target's slots, which are below the current
+            // stack top and generally still live on the fall-through path (in
+            // the example above reg:0 must keep holding 42 when the branch is
+            // not taken). Proving those slots dead needs liveness information
+            // this single-pass translator does not have, so the copying case
+            // keeps the landing pad.
+            let collapseLandingPad =
+                handlersToUnwind == 0
+                && iseqBuilder.insertingPC.offsetFromHead == landingPadPC.offsetFromHead
+                && iseqBuilder.canRewind(to: conditionCheckPC)
+            if collapseLandingPad {
+                // The conditional branch just emitted is the only user of the
+                // landing pad's label, and it is about to be removed.
+                iseqBuilder.discardUnpinnedLabel(onBranchNotTaken)
+                iseqBuilder.rewind(to: conditionCheckPC)
+                self.rewindInstructionMapping(to: conditionCheckPC)
+                if let makeFused {
+                    iseqBuilder.emitBranchWithLabel(frame.continuation) { _, selfPC, continuation in
+                        makeFused(.ifTrue, Int32(continuation.offsetFromHead - selfPC.offsetFromHead))
+                    }
+                } else {
+                    iseqBuilder.emitWithLabel(Instruction.brIf, frame.continuation) { _, selfPC, continuation in
+                        let relativeOffset = continuation.offsetFromHead - selfPC.offsetFromHead
+                        return Instruction.BrIfOperand(
+                            condition: LVReg(condition), offset: Int32(relativeOffset)
+                        )
+                    }
+                }
+                self.updateInstructionMapping(from: conditionCheckPC)
+            } else {
+                if handlersToUnwind > 0 {
+                    emit(.catchHandlersEnd(Instruction.CatchHandlersEndOperand(count: handlersToUnwind)))
+                }
+                try emitBranch(Instruction.br, relativeDepth: relativeDepth) { offset, copyCount, popCount in
+                    return offset
+                }
+                try iseqBuilder.pinLabelHere(onBranchNotTaken)
             }
-            try emitBranch(Instruction.br, relativeDepth: relativeDepth) { offset, copyCount, popCount in
-                return offset
-            }
-            try iseqBuilder.pinLabelHere(onBranchNotTaken)
         }
         try popPushValues(frame.copyTypes)
     }
