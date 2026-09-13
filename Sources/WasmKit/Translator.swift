@@ -19,9 +19,13 @@ class ISeqAllocator {
         return buffer
     }
 
-    func allocateConstants(_ slots: [UntypedValue]) -> UnsafeBufferPointer<UntypedValue> {
-        let buffer = UnsafeMutableBufferPointer<UntypedValue>.allocate(capacity: slots.count)
-        _ = buffer.initialize(fromContentsOf: slots)
+    /// Allocates the frame-initialisation image of a function: `zeroSlots` zero
+    /// slots (the non-parameter locals, which the spec requires to start at zero)
+    /// followed by the constant pool.
+    func allocateFrameInit(zeroSlots: Int, constants: [UntypedValue]) -> UnsafeBufferPointer<UntypedValue> {
+        let buffer = UnsafeMutableBufferPointer<UntypedValue>.allocate(capacity: zeroSlots + constants.count)
+        buffer.initialize(repeating: UntypedValue.default)
+        _ = UnsafeMutableBufferPointer(rebasing: buffer[zeroSlots...]).initialize(fromContentsOf: constants)
         self.buffers.append(UnsafeMutableRawBufferPointer(buffer))
         return UnsafeBufferPointer(buffer)
     }
@@ -250,7 +254,7 @@ struct StackLayout {
     let constantSlotSize: Int
     let localTypes: [WasmTypes.ValueType]
     private let nonParameterLocalSlotOffsets: [Int]
-    private let numberOfNonParameterLocalSlots: Int
+    let numberOfNonParameterLocalSlots: Int
 
     var stackRegBase: VReg {
         return VReg(numberOfNonParameterLocalSlots + constantSlotSize)
@@ -327,8 +331,9 @@ struct StackLayout {
                 writeSlot(&target, VReg(localSlot), "Local \(i) (\(t))")
                 localSlot += t.stackSlotCount
             }
-            for i in 0..<iseq.constants.count {
-                writeSlot(&target, VReg(numberOfNonParameterLocalSlots + i), "Const \(i) = \(iseq.constants[i])")
+            for i in 0..<(iseq.frameInit.count - numberOfNonParameterLocalSlots) {
+                let value = iseq.frameInit[numberOfNonParameterLocalSlots + i]
+                writeSlot(&target, VReg(numberOfNonParameterLocalSlots + i), "Const \(i) = \(value)")
             }
         }
     #endif  // Disassembler
@@ -1155,6 +1160,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     /// Whether a call to this function should be intercepted
     let isIntercepting: Bool
     var constantSlots: ConstSlots
+
     let validator: InstructionValidator
 
     // Wasm debugging support.
@@ -1553,11 +1559,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             }
         #endif
 
-        let constants = allocator.allocateConstants(self.constantSlots.values)
+        let frameInit = allocator.allocateFrameInit(
+            zeroSlots: stackLayout.numberOfNonParameterLocalSlots,
+            constants: self.constantSlots.values
+        )
         return InstructionSequence(
             instructions: buffer,
             maxStackHeight: Int(valueStack.stackRegBase) + valueStack.maxSlotHeight,
-            constants: constants
+            frameInit: frameInit
         )
     }
 

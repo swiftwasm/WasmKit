@@ -866,6 +866,21 @@ extension VMGen {
         // Exception handling
         instructions += exceptionHandlingInsts
         instructions += brIfCmpInsts
+        instructions += [
+            Instruction(
+                name: "returnCrossInstance",
+                documentation: """
+                    Return from a function whose caller runs in another instance
+
+                    Never emitted by the translator. `_return` dispatches to this when the
+                    frame it pops was entered from a different instance, so that the common
+                    intra-module return handler contains no call and therefore needs no
+                    stack frame. It receives the *unmodified* `sp`/`pc` of the `_return`
+                    that handed off to it.
+                    """,
+                isControl: true, mayUpdateFrame: true, useCurrentMemory: .write
+            )
+        ]
         return instructions
     }
 

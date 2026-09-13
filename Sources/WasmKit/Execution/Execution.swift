@@ -110,47 +110,114 @@ struct Execution: ~Copyable {
         return Backtrace(symbols: symbols)
     }
 
-    private func initializeConstSlots(
-        sp: Sp, iseq: InstructionSequence,
-        numberOfNonParameterLocalSlots: Int
-    ) {
-        // Initialize the locals with zeros (all types of value have the same representation)
-        sp.initialize(repeating: UntypedValue.default.storage, count: numberOfNonParameterLocalSlots)
-        if let constants = iseq.constants.baseAddress {
-            let count = iseq.constants.count
-            sp.advanced(by: numberOfNonParameterLocalSlots).withMemoryRebound(to: UntypedValue.self, capacity: count) {
-                $0.initialize(from: constants, count: count)
+    /// Lays the callee's frame-initialisation image (zeroed locals followed by
+    /// the constant pool) over the new frame's local/constant area.
+    ///
+    /// The image is one contiguous buffer built at translation time, so this is a
+    /// single copy rather than a `memset` of the locals plus a `memcpy` of the
+    /// pool -- and small images are copied inline. That matters more than it
+    /// looks: even though the images are tiny for some trivial functions, a libc call
+    /// costs several times the copy itself.
+    @inline(__always)
+    private func initializeFrame(sp: Sp, iseq: InstructionSequence) {
+        let image = iseq.frameInit
+        guard let src = image.baseAddress else { return }
+        let count = image.count
+        let dst = UnsafeMutableRawPointer(sp).assumingMemoryBound(to: UntypedValue.self)
+        // Straight-line, overlapping head/tail copies. Written out rather than
+        // looped so that no loop remains for the optimizer to turn back into a
+        // `memcpy` call.
+        if count >= 8 {
+            if count > 16 {
+                // `copyMemory` rather than `update(from:count:)`: the latter emits
+                // an overlap check that is dead here (the image lives in the iseq
+                // allocation, never on the VM stack).
+                UnsafeMutableRawPointer(dst).copyMemory(
+                    from: UnsafeRawPointer(src), byteCount: count * MemoryLayout<UntypedValue>.stride
+                )
+                return
             }
+            Self.copy8(dst, src, 0)
+            Self.copy8(dst, src, count - 8)
+        } else if count >= 4 {
+            Self.copy4(dst, src, 0)
+            Self.copy4(dst, src, count - 4)
+        } else if count >= 2 {
+            Self.copyPair(dst, src, 0)
+            Self.copyPair(dst, src, count - 2)
+        } else if count == 1 {
+            dst[0] = src[0]
         }
     }
 
+    /// Copies two slots as one 16-byte unit, so this lowers to a single vector
+    /// load/store pair -- `ldr q`/`str q` on arm64, `movups` on x86-64 -- rather
+    /// than two scalar ones.
+    @inline(__always)
+    private static func copyPair(
+        _ dst: UnsafeMutablePointer<UntypedValue>, _ src: UnsafePointer<UntypedValue>, _ o: Int
+    ) {
+        let bytes = UnsafeRawPointer(src + o).loadUnaligned(as: SIMD2<UInt64>.self)
+        UnsafeMutableRawPointer(dst + o).storeBytes(of: bytes, as: SIMD2<UInt64>.self)
+    }
+
+    @inline(__always)
+    private static func copy4(
+        _ dst: UnsafeMutablePointer<UntypedValue>, _ src: UnsafePointer<UntypedValue>, _ o: Int
+    ) {
+        copyPair(dst, src, o)
+        copyPair(dst, src, o + 2)
+    }
+
+    @inline(__always)
+    private static func copy8(
+        _ dst: UnsafeMutablePointer<UntypedValue>, _ src: UnsafePointer<UntypedValue>, _ o: Int
+    ) {
+        copy4(dst, src, o)
+        copy4(dst, src, o + 4)
+    }
+
     /// Pushes a new call frame to the VM stack.
+    ///
+    /// - Parameter needsMemoryRestoreOnReturn: whether returning from this frame
+    ///   has to switch `md`/`ms` back, i.e. whether the callee runs in a different
+    ///   instance than the caller. See ``Sp/rawReturnPC``.
     @inline(__always)
     func pushFrame(
         iseq: InstructionSequence,
         function: EntityHandle<WasmFunctionEntity>,
-        numberOfNonParameterLocalSlots: Int,
         sp: Sp, returnPC: Pc,
-        spAddend: VReg
+        spAddend: VReg,
+        needsMemoryRestoreOnReturn: Bool
     ) throws -> Sp {
         let newSp = sp.advanced(by: Int(spAddend))
         try checkStackBoundary(newSp.advanced(by: iseq.maxStackHeight))
-        initializeConstSlots(sp: newSp, iseq: iseq, numberOfNonParameterLocalSlots: numberOfNonParameterLocalSlots)
+        initializeFrame(sp: newSp, iseq: iseq)
         newSp.previousSP = sp
-        newSp.returnPC = returnPC
+        newSp.setReturnPC(returnPC, needsMemoryRestore: needsMemoryRestoreOnReturn)
         newSp.currentFunction = function
         return newSp
     }
 
-    /// Pops the current frame from the VM stack.
+    /// Pops the current frame from the VM stack, restoring `md`/`ms` for the
+    /// caller's instance.
+    ///
+    /// Only the cross-instance return path (``Execution/returnCrossInstance``)
+    /// goes through here; the common intra-module return is ``Execution/_return``,
+    /// which does the same two loads without any of this.
     @inline(__always)
-    func popFrame(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) {
+    func popFrameRestoringCurrentMemory(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) {
         let oldSp = sp
+        let rawReturnPC = oldSp.rawReturnPC
         sp = oldSp.previousSP.unsafelyUnwrapped
-        pc = oldSp.returnPC.unsafelyUnwrapped
-        let toInstance = oldSp.currentInstance.unsafelyUnwrapped
-        let fromInstance = sp.currentInstance
-        CurrentMemory.mayUpdateCurrentInstance(instance: toInstance, from: fromInstance, md: &md, ms: &ms)
+        pc = Pc(bitPattern: UInt(rawReturnPC & ~Sp.returnPCNeedsMemoryRestore)).unsafelyUnwrapped
+        guard let instance = sp.currentInstance else {
+            // The root frame of an invocation has no function and no memory; the
+            // next instruction is `endOfExecution`.
+            CurrentMemory.assignNil(md: &md, ms: &ms)
+            return
+        }
+        CurrentMemory.mayUpdateCurrentInstance(instance: instance, md: &md, ms: &ms)
     }
 }
 
@@ -294,14 +361,35 @@ extension Sp {
         nonmutating set { self[-3] = UInt64(UInt(bitPattern: newValue?.bitPattern ?? 0)) }
     }
 
+    /// The bit of ``rawReturnPC`` that marks a frame whose return has to switch
+    /// `md`/`ms` back to the caller's instance.
+    ///
+    /// A `Pc` points into an instruction sequence of 8-byte `CodeSlot`s, so the
+    /// low three bits of the saved PC are always zero and free to carry a flag.
+    static var returnPCNeedsMemoryRestore: UInt64 { 1 }
+
+    /// The raw saved-PC slot of the current frame: the caller's `Pc` with
+    /// ``returnPCNeedsMemoryRestore`` possibly set. Only ``Execution/popFrame``
+    /// looks at the flag; everything else goes through ``returnPC``.
+    var rawReturnPC: UInt64 {
+        get { return self[-2] }
+        nonmutating set { self[-2] = newValue }
+    }
+
     /// The return program counter of the current frame.
-    fileprivate var returnPC: Pc? {
-        get { return Pc(bitPattern: UInt(self[-2])) }
+    var returnPC: Pc? {
+        get { return Pc(bitPattern: UInt(self[-2] & ~Sp.returnPCNeedsMemoryRestore)) }
         nonmutating set { self[-2] = UInt64(UInt(bitPattern: newValue)) }
     }
 
+    /// Records the caller's `Pc` together with whether returning to it has to
+    /// restore `md`/`ms`.
+    nonmutating func setReturnPC(_ pc: Pc, needsMemoryRestore: Bool) {
+        self[-2] = UInt64(UInt(bitPattern: pc)) | (needsMemoryRestore ? Sp.returnPCNeedsMemoryRestore : 0)
+    }
+
     /// The previous stack pointer of the current frame.
-    fileprivate var previousSP: Sp? {
+    var previousSP: Sp? {
         get { return Sp(bitPattern: UInt(self[-1])) }
         nonmutating set { self[-1] = UInt64(UInt(bitPattern: newValue)) }
     }
@@ -436,7 +524,7 @@ extension Execution {
 
         /// Assigns the current memory to nil.
         @inline(__always)
-        private static func assignNil(md: inout Md, ms: inout Ms) {
+        static func assignNil(md: inout Md, ms: inout Ms) {
             md = nil
             ms = 0
             wasmkit_trap_guard_set_current_memory(md, 0)
@@ -664,12 +752,18 @@ extension Execution {
         try checkStackBoundary(sp.advanced(by: iseq.maxStackHeight))
         sp.currentFunction = function
 
-        initializeConstSlots(sp: sp, iseq: iseq, numberOfNonParameterLocalSlots: function.numberOfNonParameterLocalSlots)
+        initializeFrame(sp: sp, iseq: iseq)
 
-        Execution.CurrentMemory.mayUpdateCurrentInstance(
-            instance: function.instance,
-            from: callerInstance, md: &md, ms: &ms
-        )
+        let calleeInstance = function.instance
+        if calleeInstance != callerInstance {
+            // The frame (and with it the saved PC of the *original* caller) is
+            // reused, so the "same instance" promise the original call recorded
+            // no longer holds: force the restore on return. Leaving the flag
+            // alone when the instance does not change keeps a chain of
+            // intra-module tail calls on the fast return path.
+            sp.rawReturnPC |= Sp.returnPCNeedsMemoryRestore
+            Execution.CurrentMemory.mayUpdateCurrentInstance(instance: calleeInstance, md: &md, ms: &ms)
+        }
         return (iseq.baseAddress, sp)
     }
 
@@ -683,18 +777,19 @@ extension Execution {
     ) throws -> (Pc, Sp) {
         let iseq = try function.ensureCompiled(store: store)
 
+        let calleeInstance = function.instance
+        let switchesInstance = calleeInstance != callerInstance
         let newSp = try pushFrame(
             iseq: iseq,
             function: function,
-            numberOfNonParameterLocalSlots: function.numberOfNonParameterLocalSlots,
             sp: sp,
             returnPC: pc,
-            spAddend: spAddend
+            spAddend: spAddend,
+            needsMemoryRestoreOnReturn: switchesInstance
         )
-        Execution.CurrentMemory.mayUpdateCurrentInstance(
-            instance: function.instance,
-            from: callerInstance, md: &md, ms: &ms
-        )
+        if switchesInstance {
+            Execution.CurrentMemory.mayUpdateCurrentInstance(instance: calleeInstance, md: &md, ms: &ms)
+        }
         return (iseq.baseAddress, newSp)
     }
 
