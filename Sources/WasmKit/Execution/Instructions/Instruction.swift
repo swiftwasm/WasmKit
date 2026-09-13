@@ -20,11 +20,11 @@ enum Instruction: Equatable {
     /// WebAssembly Core Instruction `call`
     case call(Instruction.CallOperand)
     /// Compile a callee function (if not compiled) and call it.
-    ///
+    /// 
     /// This instruction is replaced by `internalCall` after the callee is compiled.
     case compilingCall(Instruction.CallOperand)
     /// Call a function defined in the current module
-    ///
+    /// 
     /// This instruction can skip switching the current instance.
     case internalCall(Instruction.CallOperand)
     /// WebAssembly Core Instruction `call_indirect`
@@ -51,7 +51,7 @@ enum Instruction: Equatable {
     /// Return from a function
     case _return
     /// End the execution of the VM
-    ///
+    /// 
     /// This instruction is used to signal the end of the execution of the VM at
     /// the root frame.
     case endOfExecution
@@ -424,7 +424,7 @@ enum Instruction: Equatable {
     /// Intercept the exit of a function
     case onExit(Instruction.OnExitOperand)
     /// Stop the VM on this instruction as a breakpoint
-    ///
+    /// 
     /// This instruction is used in debugging scenarios.
     case breakpoint
     /// WebAssembly Core Instruction `i32.atomic.load`
@@ -570,93 +570,97 @@ enum Instruction: Equatable {
     /// Unregister exception handlers for a `try_table` block
     case catchHandlersEnd(Instruction.CatchHandlersEndOperand)
     /// Conditional pc-relative branch if `i32.eq` holds
-    ///
+    /// 
     /// Fused form of `i32.eq` followed by `br_if`.
     case brIfI32Eq(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i32.ne` holds
-    ///
+    /// 
     /// Fused form of `i32.ne` followed by `br_if`.
     case brIfI32Ne(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i32.lt_s` holds
-    ///
+    /// 
     /// Fused form of `i32.lt_s` followed by `br_if`.
     case brIfI32LtS(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i32.lt_u` holds
-    ///
+    /// 
     /// Fused form of `i32.lt_u` followed by `br_if`.
     case brIfI32LtU(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i32.gt_s` holds
-    ///
+    /// 
     /// Fused form of `i32.gt_s` followed by `br_if`.
     case brIfI32GtS(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i32.gt_u` holds
-    ///
+    /// 
     /// Fused form of `i32.gt_u` followed by `br_if`.
     case brIfI32GtU(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i32.le_s` holds
-    ///
+    /// 
     /// Fused form of `i32.le_s` followed by `br_if`.
     case brIfI32LeS(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i32.le_u` holds
-    ///
+    /// 
     /// Fused form of `i32.le_u` followed by `br_if`.
     case brIfI32LeU(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i32.ge_s` holds
-    ///
+    /// 
     /// Fused form of `i32.ge_s` followed by `br_if`.
     case brIfI32GeS(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i32.ge_u` holds
-    ///
+    /// 
     /// Fused form of `i32.ge_u` followed by `br_if`.
     case brIfI32GeU(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i64.eq` holds
-    ///
+    /// 
     /// Fused form of `i64.eq` followed by `br_if`.
     case brIfI64Eq(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i64.ne` holds
-    ///
+    /// 
     /// Fused form of `i64.ne` followed by `br_if`.
     case brIfI64Ne(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i64.lt_s` holds
-    ///
+    /// 
     /// Fused form of `i64.lt_s` followed by `br_if`.
     case brIfI64LtS(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i64.lt_u` holds
-    ///
+    /// 
     /// Fused form of `i64.lt_u` followed by `br_if`.
     case brIfI64LtU(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i64.gt_s` holds
-    ///
+    /// 
     /// Fused form of `i64.gt_s` followed by `br_if`.
     case brIfI64GtS(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i64.gt_u` holds
-    ///
+    /// 
     /// Fused form of `i64.gt_u` followed by `br_if`.
     case brIfI64GtU(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i64.le_s` holds
-    ///
+    /// 
     /// Fused form of `i64.le_s` followed by `br_if`.
     case brIfI64LeS(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i64.le_u` holds
-    ///
+    /// 
     /// Fused form of `i64.le_u` followed by `br_if`.
     case brIfI64LeU(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i64.ge_s` holds
-    ///
+    /// 
     /// Fused form of `i64.ge_s` followed by `br_if`.
     case brIfI64GeS(Instruction.BrIfCmpOperand)
     /// Conditional pc-relative branch if `i64.ge_u` holds
-    ///
+    /// 
     /// Fused form of `i64.ge_u` followed by `br_if`.
     case brIfI64GeU(Instruction.BrIfCmpOperand)
     /// Return from a function whose caller runs in another instance
-    ///
+    /// 
     /// Never emitted by the translator. `_return` dispatches to this when the
     /// frame it pops was entered from a different instance, so that the common
     /// intra-module return handler contains no call and therefore needs no
     /// stack frame. It receives the *unmodified* `sp`/`pc` of the `_return`
     /// that handed off to it.
     case returnCrossInstance
+    /// Raise `Trap(.memoryOutOfBounds)`. Dispatched to by the memory handlers; never emitted.
+    case memoryOutOfBoundsTrap
+    /// Raise `Trap(.unalignedAtomic)`. Dispatched to by the atomic handlers; never emitted.
+    case unalignedAtomicTrap
 }
 
 extension Instruction {
@@ -2206,6 +2210,8 @@ extension Instruction {
         case .brIfI64GeS: return 294
         case .brIfI64GeU: return 295
         case .returnCrossInstance: return 296
+        case .memoryOutOfBoundsTrap: return 297
+        case .unalignedAtomicTrap: return 298
         }
     }
 }
@@ -2514,6 +2520,8 @@ extension Instruction {
         case 294: return .brIfI64GeS(Instruction.BrIfCmpOperand.load(from: &pc))
         case 295: return .brIfI64GeU(Instruction.BrIfCmpOperand.load(from: &pc))
         case 296: return .returnCrossInstance
+        case 297: return .memoryOutOfBoundsTrap
+        case 298: return .unalignedAtomicTrap
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -2825,6 +2833,8 @@ extension Instruction {
         case 294: return "brIfI64GeS"
         case 295: return "brIfI64GeU"
         case 296: return "returnCrossInstance"
+        case 297: return "memoryOutOfBoundsTrap"
+        case 298: return "unalignedAtomicTrap"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
