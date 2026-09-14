@@ -3385,9 +3385,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let result = valueStack.push(result)
         guard let lhs = lhs, let rhs = rhs else { return }
         emit(
-            instruction(Instruction.BinaryOperand(result: LVReg(result), lhs: lhs, rhs: rhs)),
+            instruction(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(result))),
             resultRelink: { result in
-                return instruction(Instruction.BinaryOperand(result: LVReg(result), lhs: lhs, rhs: rhs))
+                return instruction(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(result)))
             }
         )
     }
@@ -3450,9 +3450,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
 
         emit(
-            instruction(Instruction.BinaryOperand(result: LVReg(result), lhs: lhs, rhs: rhs)),
+            instruction(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(result))),
             resultRelink: { newResult in
-                instruction(Instruction.BinaryOperand(result: LVReg(newResult), lhs: lhs, rhs: rhs))
+                instruction(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(newResult)))
             },
             floatBinary: FloatBinaryOperation(type: type, op: op, lhs: lhs, rhs: rhs, result: result)
         )
@@ -3471,9 +3471,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let result = valueStack.push(.i32)
         guard let lhs = lhs, let rhs = rhs else { return }
         emit(
-            instruction(Instruction.BinaryOperand(result: LVReg(result), lhs: lhs, rhs: rhs)),
+            instruction(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(result))),
             resultRelink: { result in
-                return instruction(Instruction.BinaryOperand(result: LVReg(result), lhs: lhs, rhs: rhs))
+                return instruction(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(result)))
             },
             fusable: (makeCondition(lhs, rhs), result, nil)
         )

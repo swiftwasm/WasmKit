@@ -524,12 +524,15 @@ enum VMGen {
 
         """
 
+        let wordDecodedLayouts = Set(
+            instructions.filter(\.readsNextHandlerUpFront).compactMap { $0.immediateLayout?.name }
+        )
         var emittedImmediateTypes = Set<String>()
         for inst in instructions {
             guard let layout = inst.immediateLayout else { continue }
             guard emittedImmediateTypes.insert(layout.name).inserted else { continue }
 
-            let definition = layout.buildDeclaration()
+            let definition = layout.buildDeclaration(decodesAsWords: wordDecodedLayouts.contains(layout.name))
             output += "\n"
             for line in definition.split(separator: "\n") {
                 output += "    " + line + "\n"
@@ -586,6 +589,15 @@ enum VMGen {
                         let next = pc.pointee.pointee
                         pc.pointee = pc.pointee.advanced(by: 1)
                         \(impl)
+
+                """
+            } else if inst.readsNextHandlerUpFront {
+                // Read the next head slot right after the immediate, so the two loads
+                // from `pc` are adjacent and can be combined.
+                output += """
+                        let next = pc.pointee.pointee
+                        pc.pointee = pc.pointee.advanced(by: 1)
+                        \(inlineImpls[inst.name] ?? call)
 
                 """
             } else {
