@@ -829,6 +829,36 @@
         mutating func predictNext_brIfNotAcc(operandPc: Pc, sp: Sp) -> [Pc] {
             predictNext_brIfAcc(operandPc: operandPc, sp: sp)
         }
+        mutating func predictNext_brIfF64EqAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfF64NeAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfF64LtAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfF64LeAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfF64GtAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfF64GeAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfNotF64LtAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfNotF64LeAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfNotF64GtAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfNotF64GeAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
 
         mutating func predictNext_brTable(operandPc: Pc, sp: Sp) -> [Pc] {
             var pc = operandPc

@@ -73,6 +73,7 @@ enum VMGen {
     static func wrapperParameters(of inst: Instruction) -> [ExecutionParameter] {
         var params: [ExecutionParameter] = [.sp, .pc, .md, .ms]
         if inst.useIreg != .none { params.append(.ireg) }
+        if inst.useFreg != .none { params.append(.freg) }
         return params
     }
 
@@ -94,7 +95,7 @@ enum VMGen {
                     switch opcode {
             """
 
-        for (opcode, inst) in instructions.enumerated() where inst.useIreg == .none {
+        for (opcode, inst) in instructions.enumerated() where !inst.usesAccumulator {
             let owner = owners[inst.name]!
             let tryPrefix = inst.mayThrow || inst.mayDispatchToTrap ? "try " : ""
             let prefix = inst.mayDispatchToTrap ? "executeToken_" : "execute_"
@@ -166,6 +167,42 @@ enum VMGen {
         }
         inlineImpls["globalGetToAcc"] = """
             ireg.pointee = immediate.global.withValue { $0.rawStorage.lo }
+            """
+        for op in floatAccBinOps {
+            let method = camelCase(pascalCase: op.op)
+            inlineImpls["f64\(op.op)ToAcc"] = """
+                freg.pointee = sp.pointee[f64: immediate.lhs].\(method)(sp.pointee[f64: immediate.rhs])
+                """
+            inlineImpls["f64\(op.op)FromAcc"] = """
+                sp.pointee[f64: immediate.result] = freg.pointee.\(method)(sp.pointee[f64: immediate.operand])
+                """
+            inlineImpls["f64\(op.op)InAcc"] = """
+                freg.pointee = freg.pointee.\(method)(sp.pointee[f64: immediate.operand])
+                """
+            inlineImpls["f64\(op.op)FromAccRev"] = """
+                sp.pointee[f64: immediate.result] = sp.pointee[f64: immediate.operand].\(method)(freg.pointee)
+                """
+            inlineImpls["f64\(op.op)InAccRev"] = """
+                freg.pointee = sp.pointee[f64: immediate.operand].\(method)(freg.pointee)
+                """
+        }
+        for op in floatBinBinOps where op.type == "f64" {
+            inlineImpls["\(op.name)ToAcc"] = """
+                let intermediate = sp.pointee[f64: immediate.x].\(camelCase(pascalCase: op.op1))(sp.pointee[f64: immediate.y])
+                        freg.pointee = intermediate.\(camelCase(pascalCase: op.op2))(sp.pointee[f64: immediate.z])
+                """
+        }
+        inlineImpls["f64SqrtToAcc"] = """
+            freg.pointee = sp.pointee[f64: immediate.operand].sqrt
+            """
+        inlineImpls["f64LoadToFAcc"] = """
+            if let trap = memoryLoadToFAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, freg: &freg.pointee, loadOperand: immediate) { %TRAP% }
+            """
+        inlineImpls["f64LoadFromAccToFAcc"] = """
+            if let trap = memoryLoadFromAccToFAcc(md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, freg: &freg.pointee, loadOperand: immediate) { %TRAP% }
+            """
+        inlineImpls["f64StoreFromFAcc"] = """
+            if let trap = memoryStoreFromFAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, freg: freg.pointee, storeOperand: immediate) { %TRAP% }
             """
         for op in intUnaryInsts + floatUnaryOps {
             inlineImpls[op.instruction.name] = """
@@ -689,7 +726,7 @@ enum VMGen {
     /// the trap from the dispatcher instead. The handler body itself is written once and
     /// inlined into both.
     static func generateTokenThreadedTrapWrappers(instructions: [Instruction], inlineImpls: [String: String]) -> String {
-        let wrapped = instructions.filter { $0.mayDispatchToTrap && $0.useIreg == .none }
+        let wrapped = instructions.filter { $0.mayDispatchToTrap && !$0.usesAccumulator }
         guard !wrapped.isEmpty else { return "" }
         var output = """
             extension Execution {
@@ -795,18 +832,20 @@ enum VMGen {
             if inst.mayThrow {
                 output += "    if (error) return wasmkit_execution_state_set_error(error, sp, state);\n"
             }
-            // The accumulator is only live between a producer and the handler
-            // right after it, so a handler that does not use it passes on an
+            // An accumulator is only live between a producer and the handler
+            // right after it, so a handler that does not use one passes on an
             // indeterminate value instead of preserving it across calls.
-            let accArg: String
-            if inst.useIreg != .none {
-                accArg = "ireg"
-            } else {
-                accArg = "dead_ireg"
-                output += "    WASMKIT_DEAD_ACCUMULATOR(dead_ireg);\n"
+            var accArgs: [String] = []
+            for (use, cType, label) in [(inst.useIreg, "uint64_t", "ireg"), (inst.useFreg, "double", "freg")] {
+                if use != .none {
+                    accArgs.append(label)
+                } else {
+                    accArgs.append("dead_\(label)")
+                    output += "    WASMKIT_DEAD_ACCUMULATOR(\(cType), dead_\(label));\n"
+                }
             }
             output += """
-                return ((wasmkit_tc_exec)next)(sp, pc, md, ms, \(accArg), state);
+                return ((wasmkit_tc_exec)next)(sp, pc, md, ms, \(accArgs.joined(separator: ", ")), state);
             }
 
             """
