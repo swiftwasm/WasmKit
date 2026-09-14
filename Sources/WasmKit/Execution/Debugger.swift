@@ -755,6 +755,81 @@
             predictNext_brIfCmp(operandPc: operandPc)
         }
 
+        // Accumulator branch forms: fall through, or take the offset.
+        private mutating func predictNext_brIfAccCmp(operandPc: Pc) -> [Pc] {
+            var pc = operandPc
+            let op = Instruction.BrIfAccCmpOperand.load(from: &pc)
+            return [pc, pc.advanced(by: Int(op.offset))]
+        }
+        mutating func predictNext_brIfI32EqAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32NeAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32LtSAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32LtUAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32GtSAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32GtUAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32LeSAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32LeUAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32GeSAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32GeUAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64EqAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64NeAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64LtSAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64LtUAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64GtSAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64GtUAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64LeSAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64LeUAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64GeSAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64GeUAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAccCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            var pc = operandPc
+            let op = Instruction.BrIfAccOperand.load(from: &pc)
+            return [pc, pc.advanced(by: Int(op.offset))]
+        }
+        mutating func predictNext_brIfNotAcc(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfAcc(operandPc: operandPc, sp: sp)
+        }
+
         mutating func predictNext_brTable(operandPc: Pc, sp: Sp) -> [Pc] {
             var pc = operandPc
             let op = Instruction.BrTableOperand.load(from: &pc)

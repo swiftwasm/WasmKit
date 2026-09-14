@@ -1103,6 +1103,360 @@ enum Instruction: Equatable {
     /// `i32.sub` that immediately consumes its result, keeping
     /// the intermediate in a register instead of a frame slot.
     case i32MulSubRev(Instruction.BinBinOperand)
+    /// `ireg = x add y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.add`.
+    case i32AddToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x sub y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.sub`.
+    case i32SubToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x mul y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.mul`.
+    case i32MulToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x and y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.and`.
+    case i32AndToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x or y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.or`.
+    case i32OrToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x xor y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.xor`.
+    case i32XorToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x shl y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.shl`.
+    case i32ShlToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x shr_s y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.shr_s`.
+    case i32ShrSToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x shr_u y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.shr_u`.
+    case i32ShrUToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x rotl y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.rotl`.
+    case i32RotlToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x rotr y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.rotr`.
+    case i32RotrToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x add y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.add`.
+    case i64AddToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x sub y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.sub`.
+    case i64SubToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x mul y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.mul`.
+    case i64MulToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x and y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.and`.
+    case i64AndToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x or y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.or`.
+    case i64OrToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x xor y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.xor`.
+    case i64XorToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x shl y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.shl`.
+    case i64ShlToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x shr_s y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.shr_s`.
+    case i64ShrSToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x shr_u y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.shr_u`.
+    case i64ShrUToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x rotl y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.rotl`.
+    case i64RotlToAcc(Instruction.AccBinaryOperand)
+    /// `ireg = x rotr y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.rotr`.
+    case i64RotrToAcc(Instruction.AccBinaryOperand)
+    /// `result = ireg add y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.add`.
+    case i32AddFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg sub y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.sub`.
+    case i32SubFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg mul y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.mul`.
+    case i32MulFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg and y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.and`.
+    case i32AndFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg or y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.or`.
+    case i32OrFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg xor y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.xor`.
+    case i32XorFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg shl y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.shl`.
+    case i32ShlFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg shr_s y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.shr_s`.
+    case i32ShrSFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg shr_u y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.shr_u`.
+    case i32ShrUFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg rotl y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.rotl`.
+    case i32RotlFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg rotr y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.rotr`.
+    case i32RotrFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg add y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.add`.
+    case i64AddFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg sub y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.sub`.
+    case i64SubFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg mul y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.mul`.
+    case i64MulFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg and y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.and`.
+    case i64AndFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg or y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.or`.
+    case i64OrFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg xor y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.xor`.
+    case i64XorFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg shl y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.shl`.
+    case i64ShlFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg shr_s y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.shr_s`.
+    case i64ShrSFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg shr_u y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.shr_u`.
+    case i64ShrUFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg rotl y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.rotl`.
+    case i64RotlFromAcc(Instruction.AccUnaryOperand)
+    /// `result = ireg rotr y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.rotr`.
+    case i64RotrFromAcc(Instruction.AccUnaryOperand)
+    /// `ireg = ireg add y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.add`.
+    case i32AddInAcc(Instruction.AccOperand)
+    /// `ireg = ireg sub y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.sub`.
+    case i32SubInAcc(Instruction.AccOperand)
+    /// `ireg = ireg mul y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.mul`.
+    case i32MulInAcc(Instruction.AccOperand)
+    /// `ireg = ireg and y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.and`.
+    case i32AndInAcc(Instruction.AccOperand)
+    /// `ireg = ireg or y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.or`.
+    case i32OrInAcc(Instruction.AccOperand)
+    /// `ireg = ireg xor y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.xor`.
+    case i32XorInAcc(Instruction.AccOperand)
+    /// `ireg = ireg shl y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.shl`.
+    case i32ShlInAcc(Instruction.AccOperand)
+    /// `ireg = ireg shr_s y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.shr_s`.
+    case i32ShrSInAcc(Instruction.AccOperand)
+    /// `ireg = ireg shr_u y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.shr_u`.
+    case i32ShrUInAcc(Instruction.AccOperand)
+    /// `ireg = ireg rotl y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.rotl`.
+    case i32RotlInAcc(Instruction.AccOperand)
+    /// `ireg = ireg rotr y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.rotr`.
+    case i32RotrInAcc(Instruction.AccOperand)
+    /// `ireg = ireg add y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.add`.
+    case i64AddInAcc(Instruction.AccOperand)
+    /// `ireg = ireg sub y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.sub`.
+    case i64SubInAcc(Instruction.AccOperand)
+    /// `ireg = ireg mul y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.mul`.
+    case i64MulInAcc(Instruction.AccOperand)
+    /// `ireg = ireg and y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.and`.
+    case i64AndInAcc(Instruction.AccOperand)
+    /// `ireg = ireg or y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.or`.
+    case i64OrInAcc(Instruction.AccOperand)
+    /// `ireg = ireg xor y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.xor`.
+    case i64XorInAcc(Instruction.AccOperand)
+    /// `ireg = ireg shl y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.shl`.
+    case i64ShlInAcc(Instruction.AccOperand)
+    /// `ireg = ireg shr_s y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.shr_s`.
+    case i64ShrSInAcc(Instruction.AccOperand)
+    /// `ireg = ireg shr_u y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.shr_u`.
+    case i64ShrUInAcc(Instruction.AccOperand)
+    /// `ireg = ireg rotl y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.rotl`.
+    case i64RotlInAcc(Instruction.AccOperand)
+    /// `ireg = ireg rotr y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.rotr`.
+    case i64RotrInAcc(Instruction.AccOperand)
+    /// Conditional pc-relative branch if `ireg eq y` holds for `i32` operands
+    /// 
+    /// The accumulator form of `brIfI32Eq`.
+    case brIfI32EqAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg ne y` holds for `i32` operands
+    /// 
+    /// The accumulator form of `brIfI32Ne`.
+    case brIfI32NeAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg lt_s y` holds for `i32` operands
+    /// 
+    /// The accumulator form of `brIfI32LtS`.
+    case brIfI32LtSAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg lt_u y` holds for `i32` operands
+    /// 
+    /// The accumulator form of `brIfI32LtU`.
+    case brIfI32LtUAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg gt_s y` holds for `i32` operands
+    /// 
+    /// The accumulator form of `brIfI32GtS`.
+    case brIfI32GtSAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg gt_u y` holds for `i32` operands
+    /// 
+    /// The accumulator form of `brIfI32GtU`.
+    case brIfI32GtUAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg le_s y` holds for `i32` operands
+    /// 
+    /// The accumulator form of `brIfI32LeS`.
+    case brIfI32LeSAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg le_u y` holds for `i32` operands
+    /// 
+    /// The accumulator form of `brIfI32LeU`.
+    case brIfI32LeUAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg ge_s y` holds for `i32` operands
+    /// 
+    /// The accumulator form of `brIfI32GeS`.
+    case brIfI32GeSAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg ge_u y` holds for `i32` operands
+    /// 
+    /// The accumulator form of `brIfI32GeU`.
+    case brIfI32GeUAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg eq y` holds for `i64` operands
+    /// 
+    /// The accumulator form of `brIfI64Eq`.
+    case brIfI64EqAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg ne y` holds for `i64` operands
+    /// 
+    /// The accumulator form of `brIfI64Ne`.
+    case brIfI64NeAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg lt_s y` holds for `i64` operands
+    /// 
+    /// The accumulator form of `brIfI64LtS`.
+    case brIfI64LtSAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg lt_u y` holds for `i64` operands
+    /// 
+    /// The accumulator form of `brIfI64LtU`.
+    case brIfI64LtUAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg gt_s y` holds for `i64` operands
+    /// 
+    /// The accumulator form of `brIfI64GtS`.
+    case brIfI64GtSAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg gt_u y` holds for `i64` operands
+    /// 
+    /// The accumulator form of `brIfI64GtU`.
+    case brIfI64GtUAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg le_s y` holds for `i64` operands
+    /// 
+    /// The accumulator form of `brIfI64LeS`.
+    case brIfI64LeSAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg le_u y` holds for `i64` operands
+    /// 
+    /// The accumulator form of `brIfI64LeU`.
+    case brIfI64LeUAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg ge_s y` holds for `i64` operands
+    /// 
+    /// The accumulator form of `brIfI64GeS`.
+    case brIfI64GeSAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `ireg ge_u y` holds for `i64` operands
+    /// 
+    /// The accumulator form of `brIfI64GeU`.
+    case brIfI64GeUAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if the low 32 bits of the accumulator are non-zero
+    /// 
+    /// The accumulator form of `brIf`.
+    case brIfAcc(Instruction.BrIfAccOperand)
+    /// Conditional pc-relative branch if the low 32 bits of the accumulator are zero
+    /// 
+    /// The accumulator form of `brIfNot`.
+    case brIfNotAcc(Instruction.BrIfAccOperand)
+    /// `global.get` for a scalar global, into the accumulator
+    case globalGetToAcc(Instruction.GlobalOperand)
 }
 
 extension Instruction {
@@ -1911,6 +2265,100 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.result, $0.x, $0.y, $0.z) as (VReg, VReg, VReg, VReg), to: CodeSlot.self) }
         }
     }
+
+    struct AccBinaryOperand: Equatable, InstructionImmediate {
+        var lhs: VReg
+        var rhs: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let lhs = VReg(byteOffset: Int16(truncatingIfNeeded: word0))
+                let rhs = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 16))
+                return Self(lhs: lhs, rhs: rhs)
+            #else
+                let (lhs, rhs, _, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
+                return Self(lhs: lhs, rhs: rhs)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.lhs, $0.rhs, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct AccUnaryOperand: Equatable, InstructionImmediate {
+        var operand: VReg
+        var result: LVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let operand = VReg(byteOffset: Int16(truncatingIfNeeded: word0))
+                let result = LVReg(storage: Int32(truncatingIfNeeded: word0 >> 32))
+                return Self(operand: operand, result: result)
+            #else
+                let (operand, result) = pc.read((VReg, LVReg).self)
+                return Self(operand: operand, result: result)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.operand, $0.result) as (VReg, LVReg), to: CodeSlot.self) }
+        }
+    }
+
+    struct AccOperand: Equatable, InstructionImmediate {
+        var operand: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let operand = VReg(byteOffset: Int16(truncatingIfNeeded: word0))
+                return Self(operand: operand)
+            #else
+                let (operand, _, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
+                return Self(operand: operand)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.operand, 0, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct BrIfAccCmpOperand: Equatable, InstructionImmediate {
+        var rhs: VReg
+        var offset: Int32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (rhs, offset) = pc.read((VReg, Int32).self)
+            return Self(rhs: rhs, offset: offset)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.rhs, $0.offset) as (VReg, Int32), to: CodeSlot.self) }
+        }
+    }
+
+    struct BrIfAccOperand: Equatable, InstructionImmediate {
+        var offset: Int32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (offset, _, _, _, _) = pc.read((Int32, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(offset: offset)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.offset, 0, 0, 0, 0) as (Int32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct GlobalOperand: Equatable, InstructionImmediate {
+        var rawGlobal: UInt64
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let rawGlobal = pc.read(UInt64.self)
+                return Self(rawGlobal: rawGlobal)
+            #else
+                let (rawGlobal) = pc.read((UInt64).self)
+                return Self(rawGlobal: rawGlobal)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.rawGlobal }
+        }
+    }
 }
 
 extension Instruction {
@@ -2273,6 +2721,95 @@ extension Instruction {
         case .i64XorMul(let immediate): return immediate
         case .i64XorShrU(let immediate): return immediate
         case .i32MulSubRev(let immediate): return immediate
+        case .i32AddToAcc(let immediate): return immediate
+        case .i32SubToAcc(let immediate): return immediate
+        case .i32MulToAcc(let immediate): return immediate
+        case .i32AndToAcc(let immediate): return immediate
+        case .i32OrToAcc(let immediate): return immediate
+        case .i32XorToAcc(let immediate): return immediate
+        case .i32ShlToAcc(let immediate): return immediate
+        case .i32ShrSToAcc(let immediate): return immediate
+        case .i32ShrUToAcc(let immediate): return immediate
+        case .i32RotlToAcc(let immediate): return immediate
+        case .i32RotrToAcc(let immediate): return immediate
+        case .i64AddToAcc(let immediate): return immediate
+        case .i64SubToAcc(let immediate): return immediate
+        case .i64MulToAcc(let immediate): return immediate
+        case .i64AndToAcc(let immediate): return immediate
+        case .i64OrToAcc(let immediate): return immediate
+        case .i64XorToAcc(let immediate): return immediate
+        case .i64ShlToAcc(let immediate): return immediate
+        case .i64ShrSToAcc(let immediate): return immediate
+        case .i64ShrUToAcc(let immediate): return immediate
+        case .i64RotlToAcc(let immediate): return immediate
+        case .i64RotrToAcc(let immediate): return immediate
+        case .i32AddFromAcc(let immediate): return immediate
+        case .i32SubFromAcc(let immediate): return immediate
+        case .i32MulFromAcc(let immediate): return immediate
+        case .i32AndFromAcc(let immediate): return immediate
+        case .i32OrFromAcc(let immediate): return immediate
+        case .i32XorFromAcc(let immediate): return immediate
+        case .i32ShlFromAcc(let immediate): return immediate
+        case .i32ShrSFromAcc(let immediate): return immediate
+        case .i32ShrUFromAcc(let immediate): return immediate
+        case .i32RotlFromAcc(let immediate): return immediate
+        case .i32RotrFromAcc(let immediate): return immediate
+        case .i64AddFromAcc(let immediate): return immediate
+        case .i64SubFromAcc(let immediate): return immediate
+        case .i64MulFromAcc(let immediate): return immediate
+        case .i64AndFromAcc(let immediate): return immediate
+        case .i64OrFromAcc(let immediate): return immediate
+        case .i64XorFromAcc(let immediate): return immediate
+        case .i64ShlFromAcc(let immediate): return immediate
+        case .i64ShrSFromAcc(let immediate): return immediate
+        case .i64ShrUFromAcc(let immediate): return immediate
+        case .i64RotlFromAcc(let immediate): return immediate
+        case .i64RotrFromAcc(let immediate): return immediate
+        case .i32AddInAcc(let immediate): return immediate
+        case .i32SubInAcc(let immediate): return immediate
+        case .i32MulInAcc(let immediate): return immediate
+        case .i32AndInAcc(let immediate): return immediate
+        case .i32OrInAcc(let immediate): return immediate
+        case .i32XorInAcc(let immediate): return immediate
+        case .i32ShlInAcc(let immediate): return immediate
+        case .i32ShrSInAcc(let immediate): return immediate
+        case .i32ShrUInAcc(let immediate): return immediate
+        case .i32RotlInAcc(let immediate): return immediate
+        case .i32RotrInAcc(let immediate): return immediate
+        case .i64AddInAcc(let immediate): return immediate
+        case .i64SubInAcc(let immediate): return immediate
+        case .i64MulInAcc(let immediate): return immediate
+        case .i64AndInAcc(let immediate): return immediate
+        case .i64OrInAcc(let immediate): return immediate
+        case .i64XorInAcc(let immediate): return immediate
+        case .i64ShlInAcc(let immediate): return immediate
+        case .i64ShrSInAcc(let immediate): return immediate
+        case .i64ShrUInAcc(let immediate): return immediate
+        case .i64RotlInAcc(let immediate): return immediate
+        case .i64RotrInAcc(let immediate): return immediate
+        case .brIfI32EqAcc(let immediate): return immediate
+        case .brIfI32NeAcc(let immediate): return immediate
+        case .brIfI32LtSAcc(let immediate): return immediate
+        case .brIfI32LtUAcc(let immediate): return immediate
+        case .brIfI32GtSAcc(let immediate): return immediate
+        case .brIfI32GtUAcc(let immediate): return immediate
+        case .brIfI32LeSAcc(let immediate): return immediate
+        case .brIfI32LeUAcc(let immediate): return immediate
+        case .brIfI32GeSAcc(let immediate): return immediate
+        case .brIfI32GeUAcc(let immediate): return immediate
+        case .brIfI64EqAcc(let immediate): return immediate
+        case .brIfI64NeAcc(let immediate): return immediate
+        case .brIfI64LtSAcc(let immediate): return immediate
+        case .brIfI64LtUAcc(let immediate): return immediate
+        case .brIfI64GtSAcc(let immediate): return immediate
+        case .brIfI64GtUAcc(let immediate): return immediate
+        case .brIfI64LeSAcc(let immediate): return immediate
+        case .brIfI64LeUAcc(let immediate): return immediate
+        case .brIfI64GeSAcc(let immediate): return immediate
+        case .brIfI64GeUAcc(let immediate): return immediate
+        case .brIfAcc(let immediate): return immediate
+        case .brIfNotAcc(let immediate): return immediate
+        case .globalGetToAcc(let immediate): return immediate
         default: return nil
         }
     }
@@ -2639,6 +3176,95 @@ extension Instruction {
         case .i64XorMul(let immediate): immediate.emit(to: emit)
         case .i64XorShrU(let immediate): immediate.emit(to: emit)
         case .i32MulSubRev(let immediate): immediate.emit(to: emit)
+        case .i32AddToAcc(let immediate): immediate.emit(to: emit)
+        case .i32SubToAcc(let immediate): immediate.emit(to: emit)
+        case .i32MulToAcc(let immediate): immediate.emit(to: emit)
+        case .i32AndToAcc(let immediate): immediate.emit(to: emit)
+        case .i32OrToAcc(let immediate): immediate.emit(to: emit)
+        case .i32XorToAcc(let immediate): immediate.emit(to: emit)
+        case .i32ShlToAcc(let immediate): immediate.emit(to: emit)
+        case .i32ShrSToAcc(let immediate): immediate.emit(to: emit)
+        case .i32ShrUToAcc(let immediate): immediate.emit(to: emit)
+        case .i32RotlToAcc(let immediate): immediate.emit(to: emit)
+        case .i32RotrToAcc(let immediate): immediate.emit(to: emit)
+        case .i64AddToAcc(let immediate): immediate.emit(to: emit)
+        case .i64SubToAcc(let immediate): immediate.emit(to: emit)
+        case .i64MulToAcc(let immediate): immediate.emit(to: emit)
+        case .i64AndToAcc(let immediate): immediate.emit(to: emit)
+        case .i64OrToAcc(let immediate): immediate.emit(to: emit)
+        case .i64XorToAcc(let immediate): immediate.emit(to: emit)
+        case .i64ShlToAcc(let immediate): immediate.emit(to: emit)
+        case .i64ShrSToAcc(let immediate): immediate.emit(to: emit)
+        case .i64ShrUToAcc(let immediate): immediate.emit(to: emit)
+        case .i64RotlToAcc(let immediate): immediate.emit(to: emit)
+        case .i64RotrToAcc(let immediate): immediate.emit(to: emit)
+        case .i32AddFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32SubFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32MulFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32AndFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32OrFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32XorFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32ShlFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32ShrSFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32ShrUFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32RotlFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32RotrFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64AddFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64SubFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64MulFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64AndFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64OrFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64XorFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64ShlFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64ShrSFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64ShrUFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64RotlFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64RotrFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32AddInAcc(let immediate): immediate.emit(to: emit)
+        case .i32SubInAcc(let immediate): immediate.emit(to: emit)
+        case .i32MulInAcc(let immediate): immediate.emit(to: emit)
+        case .i32AndInAcc(let immediate): immediate.emit(to: emit)
+        case .i32OrInAcc(let immediate): immediate.emit(to: emit)
+        case .i32XorInAcc(let immediate): immediate.emit(to: emit)
+        case .i32ShlInAcc(let immediate): immediate.emit(to: emit)
+        case .i32ShrSInAcc(let immediate): immediate.emit(to: emit)
+        case .i32ShrUInAcc(let immediate): immediate.emit(to: emit)
+        case .i32RotlInAcc(let immediate): immediate.emit(to: emit)
+        case .i32RotrInAcc(let immediate): immediate.emit(to: emit)
+        case .i64AddInAcc(let immediate): immediate.emit(to: emit)
+        case .i64SubInAcc(let immediate): immediate.emit(to: emit)
+        case .i64MulInAcc(let immediate): immediate.emit(to: emit)
+        case .i64AndInAcc(let immediate): immediate.emit(to: emit)
+        case .i64OrInAcc(let immediate): immediate.emit(to: emit)
+        case .i64XorInAcc(let immediate): immediate.emit(to: emit)
+        case .i64ShlInAcc(let immediate): immediate.emit(to: emit)
+        case .i64ShrSInAcc(let immediate): immediate.emit(to: emit)
+        case .i64ShrUInAcc(let immediate): immediate.emit(to: emit)
+        case .i64RotlInAcc(let immediate): immediate.emit(to: emit)
+        case .i64RotrInAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI32EqAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI32NeAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI32LtSAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI32LtUAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI32GtSAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI32GtUAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI32LeSAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI32LeUAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI32GeSAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI32GeUAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI64EqAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI64NeAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI64LtSAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI64LtUAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI64GtSAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI64GtUAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI64LeSAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI64LeUAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI64GeSAcc(let immediate): immediate.emit(to: emit)
+        case .brIfI64GeUAcc(let immediate): immediate.emit(to: emit)
+        case .brIfAcc(let immediate): immediate.emit(to: emit)
+        case .brIfNotAcc(let immediate): immediate.emit(to: emit)
+        case .globalGetToAcc(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -3015,6 +3641,95 @@ extension Instruction {
         case .i64XorMul: return 363
         case .i64XorShrU: return 364
         case .i32MulSubRev: return 365
+        case .i32AddToAcc: return 366
+        case .i32SubToAcc: return 367
+        case .i32MulToAcc: return 368
+        case .i32AndToAcc: return 369
+        case .i32OrToAcc: return 370
+        case .i32XorToAcc: return 371
+        case .i32ShlToAcc: return 372
+        case .i32ShrSToAcc: return 373
+        case .i32ShrUToAcc: return 374
+        case .i32RotlToAcc: return 375
+        case .i32RotrToAcc: return 376
+        case .i64AddToAcc: return 377
+        case .i64SubToAcc: return 378
+        case .i64MulToAcc: return 379
+        case .i64AndToAcc: return 380
+        case .i64OrToAcc: return 381
+        case .i64XorToAcc: return 382
+        case .i64ShlToAcc: return 383
+        case .i64ShrSToAcc: return 384
+        case .i64ShrUToAcc: return 385
+        case .i64RotlToAcc: return 386
+        case .i64RotrToAcc: return 387
+        case .i32AddFromAcc: return 388
+        case .i32SubFromAcc: return 389
+        case .i32MulFromAcc: return 390
+        case .i32AndFromAcc: return 391
+        case .i32OrFromAcc: return 392
+        case .i32XorFromAcc: return 393
+        case .i32ShlFromAcc: return 394
+        case .i32ShrSFromAcc: return 395
+        case .i32ShrUFromAcc: return 396
+        case .i32RotlFromAcc: return 397
+        case .i32RotrFromAcc: return 398
+        case .i64AddFromAcc: return 399
+        case .i64SubFromAcc: return 400
+        case .i64MulFromAcc: return 401
+        case .i64AndFromAcc: return 402
+        case .i64OrFromAcc: return 403
+        case .i64XorFromAcc: return 404
+        case .i64ShlFromAcc: return 405
+        case .i64ShrSFromAcc: return 406
+        case .i64ShrUFromAcc: return 407
+        case .i64RotlFromAcc: return 408
+        case .i64RotrFromAcc: return 409
+        case .i32AddInAcc: return 410
+        case .i32SubInAcc: return 411
+        case .i32MulInAcc: return 412
+        case .i32AndInAcc: return 413
+        case .i32OrInAcc: return 414
+        case .i32XorInAcc: return 415
+        case .i32ShlInAcc: return 416
+        case .i32ShrSInAcc: return 417
+        case .i32ShrUInAcc: return 418
+        case .i32RotlInAcc: return 419
+        case .i32RotrInAcc: return 420
+        case .i64AddInAcc: return 421
+        case .i64SubInAcc: return 422
+        case .i64MulInAcc: return 423
+        case .i64AndInAcc: return 424
+        case .i64OrInAcc: return 425
+        case .i64XorInAcc: return 426
+        case .i64ShlInAcc: return 427
+        case .i64ShrSInAcc: return 428
+        case .i64ShrUInAcc: return 429
+        case .i64RotlInAcc: return 430
+        case .i64RotrInAcc: return 431
+        case .brIfI32EqAcc: return 432
+        case .brIfI32NeAcc: return 433
+        case .brIfI32LtSAcc: return 434
+        case .brIfI32LtUAcc: return 435
+        case .brIfI32GtSAcc: return 436
+        case .brIfI32GtUAcc: return 437
+        case .brIfI32LeSAcc: return 438
+        case .brIfI32LeUAcc: return 439
+        case .brIfI32GeSAcc: return 440
+        case .brIfI32GeUAcc: return 441
+        case .brIfI64EqAcc: return 442
+        case .brIfI64NeAcc: return 443
+        case .brIfI64LtSAcc: return 444
+        case .brIfI64LtUAcc: return 445
+        case .brIfI64GtSAcc: return 446
+        case .brIfI64GtUAcc: return 447
+        case .brIfI64LeSAcc: return 448
+        case .brIfI64LeUAcc: return 449
+        case .brIfI64GeSAcc: return 450
+        case .brIfI64GeUAcc: return 451
+        case .brIfAcc: return 452
+        case .brIfNotAcc: return 453
+        case .globalGetToAcc: return 454
         }
     }
 }
@@ -3392,6 +4107,95 @@ extension Instruction {
         case 363: return .i64XorMul(Instruction.BinBinOperand.load(from: &pc))
         case 364: return .i64XorShrU(Instruction.BinBinOperand.load(from: &pc))
         case 365: return .i32MulSubRev(Instruction.BinBinOperand.load(from: &pc))
+        case 366: return .i32AddToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 367: return .i32SubToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 368: return .i32MulToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 369: return .i32AndToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 370: return .i32OrToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 371: return .i32XorToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 372: return .i32ShlToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 373: return .i32ShrSToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 374: return .i32ShrUToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 375: return .i32RotlToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 376: return .i32RotrToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 377: return .i64AddToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 378: return .i64SubToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 379: return .i64MulToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 380: return .i64AndToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 381: return .i64OrToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 382: return .i64XorToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 383: return .i64ShlToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 384: return .i64ShrSToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 385: return .i64ShrUToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 386: return .i64RotlToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 387: return .i64RotrToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 388: return .i32AddFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 389: return .i32SubFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 390: return .i32MulFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 391: return .i32AndFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 392: return .i32OrFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 393: return .i32XorFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 394: return .i32ShlFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 395: return .i32ShrSFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 396: return .i32ShrUFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 397: return .i32RotlFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 398: return .i32RotrFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 399: return .i64AddFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 400: return .i64SubFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 401: return .i64MulFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 402: return .i64AndFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 403: return .i64OrFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 404: return .i64XorFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 405: return .i64ShlFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 406: return .i64ShrSFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 407: return .i64ShrUFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 408: return .i64RotlFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 409: return .i64RotrFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 410: return .i32AddInAcc(Instruction.AccOperand.load(from: &pc))
+        case 411: return .i32SubInAcc(Instruction.AccOperand.load(from: &pc))
+        case 412: return .i32MulInAcc(Instruction.AccOperand.load(from: &pc))
+        case 413: return .i32AndInAcc(Instruction.AccOperand.load(from: &pc))
+        case 414: return .i32OrInAcc(Instruction.AccOperand.load(from: &pc))
+        case 415: return .i32XorInAcc(Instruction.AccOperand.load(from: &pc))
+        case 416: return .i32ShlInAcc(Instruction.AccOperand.load(from: &pc))
+        case 417: return .i32ShrSInAcc(Instruction.AccOperand.load(from: &pc))
+        case 418: return .i32ShrUInAcc(Instruction.AccOperand.load(from: &pc))
+        case 419: return .i32RotlInAcc(Instruction.AccOperand.load(from: &pc))
+        case 420: return .i32RotrInAcc(Instruction.AccOperand.load(from: &pc))
+        case 421: return .i64AddInAcc(Instruction.AccOperand.load(from: &pc))
+        case 422: return .i64SubInAcc(Instruction.AccOperand.load(from: &pc))
+        case 423: return .i64MulInAcc(Instruction.AccOperand.load(from: &pc))
+        case 424: return .i64AndInAcc(Instruction.AccOperand.load(from: &pc))
+        case 425: return .i64OrInAcc(Instruction.AccOperand.load(from: &pc))
+        case 426: return .i64XorInAcc(Instruction.AccOperand.load(from: &pc))
+        case 427: return .i64ShlInAcc(Instruction.AccOperand.load(from: &pc))
+        case 428: return .i64ShrSInAcc(Instruction.AccOperand.load(from: &pc))
+        case 429: return .i64ShrUInAcc(Instruction.AccOperand.load(from: &pc))
+        case 430: return .i64RotlInAcc(Instruction.AccOperand.load(from: &pc))
+        case 431: return .i64RotrInAcc(Instruction.AccOperand.load(from: &pc))
+        case 432: return .brIfI32EqAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 433: return .brIfI32NeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 434: return .brIfI32LtSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 435: return .brIfI32LtUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 436: return .brIfI32GtSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 437: return .brIfI32GtUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 438: return .brIfI32LeSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 439: return .brIfI32LeUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 440: return .brIfI32GeSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 441: return .brIfI32GeUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 442: return .brIfI64EqAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 443: return .brIfI64NeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 444: return .brIfI64LtSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 445: return .brIfI64LtUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 446: return .brIfI64GtSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 447: return .brIfI64GtUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 448: return .brIfI64LeSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 449: return .brIfI64LeUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 450: return .brIfI64GeSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 451: return .brIfI64GeUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 452: return .brIfAcc(Instruction.BrIfAccOperand.load(from: &pc))
+        case 453: return .brIfNotAcc(Instruction.BrIfAccOperand.load(from: &pc))
+        case 454: return .globalGetToAcc(Instruction.GlobalOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -3772,6 +4576,95 @@ extension Instruction {
         case 363: return "i64XorMul"
         case 364: return "i64XorShrU"
         case 365: return "i32MulSubRev"
+        case 366: return "i32AddToAcc"
+        case 367: return "i32SubToAcc"
+        case 368: return "i32MulToAcc"
+        case 369: return "i32AndToAcc"
+        case 370: return "i32OrToAcc"
+        case 371: return "i32XorToAcc"
+        case 372: return "i32ShlToAcc"
+        case 373: return "i32ShrSToAcc"
+        case 374: return "i32ShrUToAcc"
+        case 375: return "i32RotlToAcc"
+        case 376: return "i32RotrToAcc"
+        case 377: return "i64AddToAcc"
+        case 378: return "i64SubToAcc"
+        case 379: return "i64MulToAcc"
+        case 380: return "i64AndToAcc"
+        case 381: return "i64OrToAcc"
+        case 382: return "i64XorToAcc"
+        case 383: return "i64ShlToAcc"
+        case 384: return "i64ShrSToAcc"
+        case 385: return "i64ShrUToAcc"
+        case 386: return "i64RotlToAcc"
+        case 387: return "i64RotrToAcc"
+        case 388: return "i32AddFromAcc"
+        case 389: return "i32SubFromAcc"
+        case 390: return "i32MulFromAcc"
+        case 391: return "i32AndFromAcc"
+        case 392: return "i32OrFromAcc"
+        case 393: return "i32XorFromAcc"
+        case 394: return "i32ShlFromAcc"
+        case 395: return "i32ShrSFromAcc"
+        case 396: return "i32ShrUFromAcc"
+        case 397: return "i32RotlFromAcc"
+        case 398: return "i32RotrFromAcc"
+        case 399: return "i64AddFromAcc"
+        case 400: return "i64SubFromAcc"
+        case 401: return "i64MulFromAcc"
+        case 402: return "i64AndFromAcc"
+        case 403: return "i64OrFromAcc"
+        case 404: return "i64XorFromAcc"
+        case 405: return "i64ShlFromAcc"
+        case 406: return "i64ShrSFromAcc"
+        case 407: return "i64ShrUFromAcc"
+        case 408: return "i64RotlFromAcc"
+        case 409: return "i64RotrFromAcc"
+        case 410: return "i32AddInAcc"
+        case 411: return "i32SubInAcc"
+        case 412: return "i32MulInAcc"
+        case 413: return "i32AndInAcc"
+        case 414: return "i32OrInAcc"
+        case 415: return "i32XorInAcc"
+        case 416: return "i32ShlInAcc"
+        case 417: return "i32ShrSInAcc"
+        case 418: return "i32ShrUInAcc"
+        case 419: return "i32RotlInAcc"
+        case 420: return "i32RotrInAcc"
+        case 421: return "i64AddInAcc"
+        case 422: return "i64SubInAcc"
+        case 423: return "i64MulInAcc"
+        case 424: return "i64AndInAcc"
+        case 425: return "i64OrInAcc"
+        case 426: return "i64XorInAcc"
+        case 427: return "i64ShlInAcc"
+        case 428: return "i64ShrSInAcc"
+        case 429: return "i64ShrUInAcc"
+        case 430: return "i64RotlInAcc"
+        case 431: return "i64RotrInAcc"
+        case 432: return "brIfI32EqAcc"
+        case 433: return "brIfI32NeAcc"
+        case 434: return "brIfI32LtSAcc"
+        case 435: return "brIfI32LtUAcc"
+        case 436: return "brIfI32GtSAcc"
+        case 437: return "brIfI32GtUAcc"
+        case 438: return "brIfI32LeSAcc"
+        case 439: return "brIfI32LeUAcc"
+        case 440: return "brIfI32GeSAcc"
+        case 441: return "brIfI32GeUAcc"
+        case 442: return "brIfI64EqAcc"
+        case 443: return "brIfI64NeAcc"
+        case 444: return "brIfI64LtSAcc"
+        case 445: return "brIfI64LtUAcc"
+        case 446: return "brIfI64GtSAcc"
+        case 447: return "brIfI64GtUAcc"
+        case 448: return "brIfI64LeSAcc"
+        case 449: return "brIfI64LeUAcc"
+        case 450: return "brIfI64GeSAcc"
+        case 451: return "brIfI64GeUAcc"
+        case 452: return "brIfAcc"
+        case 453: return "brIfNotAcc"
+        case 454: return "globalGetToAcc"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
@@ -3840,6 +4733,28 @@ protocol NextInstructionPredictor: ~Copyable {
     mutating func predictNext_brIfNotI32And(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_brIfI64And(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_brIfNotI64And(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32EqAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32NeAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32LtSAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32LtUAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32GtSAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32GtUAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32LeSAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32LeUAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32GeSAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32GeUAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64EqAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64NeAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64LtSAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64LtUAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64GtSAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64GtUAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64LeSAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64LeUAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64GeSAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64GeUAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfNotAcc(operandPc: Pc, sp: Sp) -> [Pc]
 }
 
 extension Instruction {
@@ -3904,6 +4819,28 @@ extension Instruction {
         case 330: return predictor.predictNext_brIfNotI32And(operandPc: operandPc, sp: sp)
         case 331: return predictor.predictNext_brIfI64And(operandPc: operandPc, sp: sp)
         case 332: return predictor.predictNext_brIfNotI64And(operandPc: operandPc, sp: sp)
+        case 432: return predictor.predictNext_brIfI32EqAcc(operandPc: operandPc, sp: sp)
+        case 433: return predictor.predictNext_brIfI32NeAcc(operandPc: operandPc, sp: sp)
+        case 434: return predictor.predictNext_brIfI32LtSAcc(operandPc: operandPc, sp: sp)
+        case 435: return predictor.predictNext_brIfI32LtUAcc(operandPc: operandPc, sp: sp)
+        case 436: return predictor.predictNext_brIfI32GtSAcc(operandPc: operandPc, sp: sp)
+        case 437: return predictor.predictNext_brIfI32GtUAcc(operandPc: operandPc, sp: sp)
+        case 438: return predictor.predictNext_brIfI32LeSAcc(operandPc: operandPc, sp: sp)
+        case 439: return predictor.predictNext_brIfI32LeUAcc(operandPc: operandPc, sp: sp)
+        case 440: return predictor.predictNext_brIfI32GeSAcc(operandPc: operandPc, sp: sp)
+        case 441: return predictor.predictNext_brIfI32GeUAcc(operandPc: operandPc, sp: sp)
+        case 442: return predictor.predictNext_brIfI64EqAcc(operandPc: operandPc, sp: sp)
+        case 443: return predictor.predictNext_brIfI64NeAcc(operandPc: operandPc, sp: sp)
+        case 444: return predictor.predictNext_brIfI64LtSAcc(operandPc: operandPc, sp: sp)
+        case 445: return predictor.predictNext_brIfI64LtUAcc(operandPc: operandPc, sp: sp)
+        case 446: return predictor.predictNext_brIfI64GtSAcc(operandPc: operandPc, sp: sp)
+        case 447: return predictor.predictNext_brIfI64GtUAcc(operandPc: operandPc, sp: sp)
+        case 448: return predictor.predictNext_brIfI64LeSAcc(operandPc: operandPc, sp: sp)
+        case 449: return predictor.predictNext_brIfI64LeUAcc(operandPc: operandPc, sp: sp)
+        case 450: return predictor.predictNext_brIfI64GeSAcc(operandPc: operandPc, sp: sp)
+        case 451: return predictor.predictNext_brIfI64GeUAcc(operandPc: operandPc, sp: sp)
+        case 452: return predictor.predictNext_brIfAcc(operandPc: operandPc, sp: sp)
+        case 453: return predictor.predictNext_brIfNotAcc(operandPc: operandPc, sp: sp)
         default: return nil
         }
     }
@@ -4130,6 +5067,94 @@ extension Instruction {
             }
             do {
                 let inst = Instruction.brIfNotI64And(.init(lhs: VReg.zero, rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32EqAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32NeAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32LtSAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32LtUAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32GtSAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32GtUAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32LeSAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32LeUAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32GeSAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32GeUAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64EqAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64NeAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64LtSAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64LtUAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64GtSAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64GtUAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64LeSAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64LeUAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64GeSAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64GeUAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfAcc(.init(offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfNotAcc(.init(offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
         return map

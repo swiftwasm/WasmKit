@@ -76,8 +76,22 @@ typedef uintptr_t Ms;
 ///
 /// See https://clang.llvm.org/docs/AttributeReference.html#swiftasynccall for
 /// more information about `swiftasynccall`.
+///
+/// `ireg` is the integer accumulator. It is live only between the handler that
+/// produces a value into it and the handler right after it.
 typedef SWIFT_CC(swiftasync) void (* WASMKIT_NONNULL wasmkit_tc_exec)(
-    uint64_t *WASMKIT_NONNULL sp, Pc, Md, Ms, SWIFT_CONTEXT void *WASMKIT_NULLABLE state);
+    uint64_t *WASMKIT_NONNULL sp, Pc, Md, Ms, uint64_t ireg,
+    SWIFT_CONTEXT void *WASMKIT_NULLABLE state);
+
+/// Declares an accumulator value that the next handler never reads, for a
+/// handler that does not use the accumulator. Leaving it indeterminate lets a
+/// handler with a call in it pass on whatever the register holds instead of
+/// preserving the incoming value across the call.
+#define WASMKIT_DEAD_ACCUMULATOR(name)                      \
+    _Pragma("clang diagnostic push")                        \
+    _Pragma("clang diagnostic ignored \"-Wuninitialized\"") \
+    uint64_t name = name;                                   \
+    _Pragma("clang diagnostic pop")
 
 /// The entry point for executing a direct-threaded interpreter loop.
 /// The interpreter loop is implemented as a tail-recursive function that
@@ -91,7 +105,7 @@ typedef SWIFT_CC(swiftasync) void (* WASMKIT_NONNULL wasmkit_tc_exec)(
 static inline void wasmkit_tc_start(
     wasmkit_tc_exec exec, Sp sp, Pc pc, Md md, Ms ms, void *WASMKIT_NULLABLE state
 ) {
-  exec(sp, pc, md, ms, state);
+  exec(sp, pc, md, ms, 0, state);
 }
 #endif
 

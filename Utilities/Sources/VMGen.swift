@@ -67,11 +67,23 @@ enum VMGen {
         return owners
     }
 
+    /// The execution parameters the `execute_*` wrapper of `inst` takes. The
+    /// accumulator is passed only to a handler that uses it; otherwise the
+    /// trampoline would have to materialize it to take its address.
+    static func wrapperParameters(of inst: Instruction) -> [ExecutionParameter] {
+        var params: [ExecutionParameter] = [.sp, .pc, .md, .ms]
+        if inst.useIreg != .none { params.append(.ireg) }
+        return params
+    }
+
     static func generateDispatcher(instructions: [Instruction]) -> String {
         let owners = canonicalHandlerOwners(instructions: instructions)
+        // The translator emits accumulator forms only under direct threading,
+        // so the token-threaded dispatcher has neither the accumulator nor cases
+        // for them.
         let doExecuteParams: [Instruction.Parameter] =
             [("opcode", "OpcodeID", false)]
-            + ExecutionParameter.allCases.map { ($0.label, $0.type, true) }
+            + [ExecutionParameter.sp, .pc, .md, .ms].map { ($0.label, $0.type, true) }
         var output = """
             extension Execution {
 
@@ -82,11 +94,11 @@ enum VMGen {
                     switch opcode {
             """
 
-        for (opcode, inst) in instructions.enumerated() {
+        for (opcode, inst) in instructions.enumerated() where inst.useIreg == .none {
             let owner = owners[inst.name]!
             let tryPrefix = inst.mayThrow || inst.mayDispatchToTrap ? "try " : ""
             let prefix = inst.mayDispatchToTrap ? "executeToken_" : "execute_"
-            let args = ExecutionParameter.allCases.map { "\($0.label): &\($0.label)" }
+            let args = wrapperParameters(of: owner).map { "\($0.label): &\($0.label)" }
             if owner.name != inst.name {
                 output += """
 
@@ -136,6 +148,25 @@ enum VMGen {
                         sp.pointee[\(op.type): immediate.result] = \(second)
                 """
         }
+        for op in intAccBinOps {
+            let load = op.type == "i32" ? "UInt32(truncatingIfNeeded: ireg.pointee)" : "ireg.pointee"
+            func store(_ expression: String) -> String {
+                op.type == "i32" ? "UInt64(\(expression))" : expression
+            }
+            let method = camelCase(pascalCase: op.op)
+            inlineImpls[op.toAccName] = """
+                ireg.pointee = \(store("sp.pointee[\(op.type): immediate.lhs].\(method)(sp.pointee[\(op.type): immediate.rhs])"))
+                """
+            inlineImpls[op.fromAccName] = """
+                sp.pointee[\(op.type): immediate.result] = \(load).\(method)(sp.pointee[\(op.type): immediate.operand])
+                """
+            inlineImpls[op.inAccName] = """
+                ireg.pointee = \(store("\(load).\(method)(sp.pointee[\(op.type): immediate.operand])"))
+                """
+        }
+        inlineImpls["globalGetToAcc"] = """
+            ireg.pointee = immediate.global.withValue { $0.rawStorage.lo }
+            """
         for op in intUnaryInsts + floatUnaryOps {
             inlineImpls[op.instruction.name] = """
             sp.pointee[\(op.resultType): immediate.result] = \(op.mayThrow ? "try " : "")sp.pointee[\(op.inputType): immediate.input].\(camelCase(pascalCase: op.op))
@@ -572,7 +603,7 @@ enum VMGen {
             output += """
 
                 @_silgen_name("wasmkit_execute_\(inst.name)") @inline(__always)
-                mutating func execute_\(inst.name)(\(ExecutionParameter.allCases.map { "\($0.label): UnsafeMutablePointer<\($0.type)>" }.joined(separator: ", ")))\(throwsKwd) -> CodeSlot {
+                mutating func execute_\(inst.name)(\(wrapperParameters(of: inst).map { "\($0.label): UnsafeMutablePointer<\($0.type)>" }.joined(separator: ", ")))\(throwsKwd) -> CodeSlot {
 
             """
             if let immediate = inst.immediate {
@@ -659,7 +690,7 @@ enum VMGen {
             output += """
 
                 @inline(__always)
-                mutating func executeToken_\(inst.name)(\(ExecutionParameter.allCases.map { "\($0.label): UnsafeMutablePointer<\($0.type)>" }.joined(separator: ", "))) throws -> CodeSlot {
+                mutating func executeToken_\(inst.name)(\(wrapperParameters(of: inst).map { "\($0.label): UnsafeMutablePointer<\($0.type)>" }.joined(separator: ", "))) throws -> CodeSlot {
 
             """
             if let immediate = inst.immediate {
@@ -735,17 +766,28 @@ enum VMGen {
 
         for inst in emittedHandlers {
             let params = ExecutionParameter.allCases
+            let bodyParams = wrapperParameters(of: inst)
             output += """
-            SWIFT_CC(swiftasync) static inline void \(handlerName(inst))(\(params.map { "\($0.type) \($0.label)" }.joined(separator: ", ")), SWIFT_CONTEXT void *state) {
-                SWIFT_CC(swift) uint64_t wasmkit_execute_\(inst.name)(\(params.map { "\($0.type) *\($0.label)" }.joined(separator: ", ")), SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+            SWIFT_CC(swiftasync) static inline void \(handlerName(inst))(\(params.map { "\($0.cType) \($0.label)" }.joined(separator: ", ")), SWIFT_CONTEXT void *state) {
+                SWIFT_CC(swift) uint64_t wasmkit_execute_\(inst.name)(\(bodyParams.map { "\($0.cType) *\($0.label)" }.joined(separator: ", ")), SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
                 void * _Nullable error = NULL; uint64_t next;
-                INLINE_CALL next = wasmkit_execute_\(inst.name)(\(params.map { "&\($0.label)" }.joined(separator: ", ")), state, &error);\n
+                INLINE_CALL next = wasmkit_execute_\(inst.name)(\(bodyParams.map { "&\($0.label)" }.joined(separator: ", ")), state, &error);\n
             """
             if inst.mayThrow {
                 output += "    if (error) return wasmkit_execution_state_set_error(error, sp, state);\n"
             }
+            // The accumulator is only live between a producer and the handler
+            // right after it, so a handler that does not use it passes on an
+            // indeterminate value instead of preserving it across calls.
+            let accArg: String
+            if inst.useIreg != .none {
+                accArg = "ireg"
+            } else {
+                accArg = "dead_ireg"
+                output += "    WASMKIT_DEAD_ACCUMULATOR(dead_ireg);\n"
+            }
             output += """
-                return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
+                return ((wasmkit_tc_exec)next)(sp, pc, md, ms, \(accArg), state);
             }
 
             """

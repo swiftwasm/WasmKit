@@ -258,6 +258,36 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "z", type: .VReg)
     }
 
+    /// `ireg = sp[lhs] <op> sp[rhs]`.
+    static let accBinary = Self(name: "AccBinaryOperand") {
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "rhs", type: .VReg)
+    }
+
+    /// `sp[result] = ireg <op> sp[operand]`.
+    static let accUnary = Self(name: "AccUnaryOperand") {
+        $0.field(name: "operand", type: .VReg)
+        $0.field(name: "result", type: .LVReg)
+    }
+
+    /// `ireg = ireg <op> sp[operand]`.
+    static let acc = Self(name: "AccOperand") {
+        $0.field(name: "operand", type: .VReg)
+    }
+
+    static let brIfAccCmpOperand = Self(name: "BrIfAccCmpOperand") {
+        $0.field(name: "rhs", type: .VReg)
+        $0.field(name: "offset", type: .Int32)
+    }
+
+    static let brIfAccOperand = Self(name: "BrIfAccOperand") {
+        $0.field(name: "offset", type: .Int32)
+    }
+
+    static let globalOperand = Self(name: "GlobalOperand") {
+        $0.field(name: "rawGlobal", type: .UInt64)
+    }
+
     static let call = Self(name: "CallOperand") {
         $0.field(name: "rawCallee", type: .UInt64)
         $0.field(name: "spAddend", type: .VReg)
