@@ -126,6 +126,16 @@ enum VMGen {
                         sp.pointee[\(op.type): immediate.result] = intermediate.\(camelCase(pascalCase: op.op2))(sp.pointee[\(op.type): immediate.z])
                 """
         }
+        for op in intBinBinOps {
+            let second =
+                op.reversed
+                ? "sp.pointee[\(op.type): immediate.z].\(camelCase(pascalCase: op.op2))(intermediate)"
+                : "intermediate.\(camelCase(pascalCase: op.op2))(sp.pointee[\(op.type): immediate.z])"
+            inlineImpls[op.instruction.name] = """
+                let intermediate = sp.pointee[\(op.type): immediate.x].\(camelCase(pascalCase: op.op1))(sp.pointee[\(op.type): immediate.y])
+                        sp.pointee[\(op.type): immediate.result] = \(second)
+                """
+        }
         for op in intUnaryInsts + floatUnaryOps {
             inlineImpls[op.instruction.name] = """
             sp.pointee[\(op.resultType): immediate.result] = \(op.mayThrow ? "try " : "")sp.pointee[\(op.inputType): immediate.input].\(camelCase(pascalCase: op.op))

@@ -242,15 +242,16 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "offset", type: .Int32)
     }
 
-    /// Immediate layout of the two-operation float superinstructions
-    /// (`f64MulAdd` and friends): `result = (x <op1> y) <op2> z`.
+    /// Immediate layout of the two-operation superinstructions (`f64MulAdd`,
+    /// `i32ShlAdd` and friends): `result = (x <op1> y) <op2> z`, or
+    /// `result = z <op2> (x <op1> y)` for the reversed forms.
     ///
     /// Four registers at two bytes each fill one 8-byte code slot exactly, so
     /// the superinstruction is two code slots where the two instructions it
     /// replaces are four. `result` is a plain pre-shifted ``VReg`` rather than
-    /// an ``LVReg``; nothing is lost, since a 64-bit float store folds the
-    /// scale into its addressing mode either way.
-    static let floatBinBin = Self(name: "FloatBinBinOperand") {
+    /// an ``LVReg``; nothing is lost, since a store into a 64-bit slot folds
+    /// the scale into its addressing mode either way.
+    static let binBin = Self(name: "BinBinOperand") {
         $0.field(name: "result", type: .VReg)
         $0.field(name: "x", type: .VReg)
         $0.field(name: "y", type: .VReg)

@@ -788,6 +788,17 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     fileprivate enum FusedAndWidth {
         case i32, i64
 
+        /// The width of the bit test `op` offers a following branch, or `nil`
+        /// when `op` is not a bit test.
+        init?(type: ValueType, op: BinBinOp) {
+            guard case .and = op else { return nil }
+            switch type {
+            case .i32: self = .i32
+            case .i64: self = .i64
+            default: return nil
+            }
+        }
+
         /// The fused branch for this width at the given branch polarity.
         func makeBrIf(
             polarity: FusedBranchPolarity, lhs: VReg, rhs: VReg, offset: Int32
@@ -802,67 +813,146 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
 
-    /// A float binary operation that has two-operation superinstruction forms
-    /// (`f64MulAdd` and friends).
-    fileprivate enum FloatBinOp {
+    /// A binary operation that takes part in the two-operation
+    /// superinstructions (`f64MulAdd`, `i32ShlAdd` and friends).
+    fileprivate enum BinBinOp {
         case add, sub, mul
+        case and, or, xor, shl, shrS, shrU, rotl, rotr
 
         /// Whether `a op b` and `b op a` are the same operation.
         ///
         /// Used when the intermediate is the *right* operand of the consumer:
-        /// the superinstruction always computes `(x op1 y) op2 z`, so a
-        /// `z op2 (x op1 y)` can only be expressed by swapping, which is valid
-        /// exactly when `op2` commutes. IEEE-754 addition and multiplication
-        /// commute (including for signed zeroes and infinities; a NaN result is
-        /// nondeterministic in Wasm, so the payload is free either way).
-        /// Subtraction does not, so `z - (x op1 y)` is left unfused.
-        var isCommutative: Bool { self != .sub }
-    }
-
-    /// The superinstruction computing `result = (x op1 y) op2 z` for `type`.
-    fileprivate static func floatBinBinInstruction(
-        _ type: ValueType, _ op1: FloatBinOp, _ op2: FloatBinOp
-    ) -> (Instruction.FloatBinBinOperand) -> Instruction {
-        switch (type, op1, op2) {
-        case (.f32, .add, .add): return Instruction.f32AddAdd
-        case (.f32, .add, .sub): return Instruction.f32AddSub
-        case (.f32, .add, .mul): return Instruction.f32AddMul
-        case (.f32, .sub, .add): return Instruction.f32SubAdd
-        case (.f32, .sub, .sub): return Instruction.f32SubSub
-        case (.f32, .sub, .mul): return Instruction.f32SubMul
-        case (.f32, .mul, .add): return Instruction.f32MulAdd
-        case (.f32, .mul, .sub): return Instruction.f32MulSub
-        case (.f32, .mul, .mul): return Instruction.f32MulMul
-        case (.f64, .add, .add): return Instruction.f64AddAdd
-        case (.f64, .add, .sub): return Instruction.f64AddSub
-        case (.f64, .add, .mul): return Instruction.f64AddMul
-        case (.f64, .sub, .add): return Instruction.f64SubAdd
-        case (.f64, .sub, .sub): return Instruction.f64SubSub
-        case (.f64, .sub, .mul): return Instruction.f64SubMul
-        case (.f64, .mul, .add): return Instruction.f64MulAdd
-        case (.f64, .mul, .sub): return Instruction.f64MulSub
-        case (.f64, .mul, .mul): return Instruction.f64MulMul
-        default:
-            preconditionFailure("Internal consistency error: no float superinstruction for \(type) \(op1)/\(op2)")
+        /// `z op2 (x op1 y)` can reuse the `(x op1 y) op2 z` opcode exactly
+        /// when `op2` commutes. IEEE-754 addition and multiplication commute
+        /// (a NaN result is nondeterministic in Wasm, so the payload is free
+        /// either way), and so do the integer `add`/`mul`/`and`/`or`/`xor`.
+        var isCommutative: Bool {
+            switch self {
+            case .add, .mul, .and, .or, .xor: return true
+            case .sub, .shl, .shrS, .shrU, .rotl, .rotr: return false
+            }
         }
     }
 
-    /// A float `add`/`sub`/`mul` as recorded on its emission, for folding into
-    /// the float operation that consumes its result.
-    fileprivate struct FloatBinaryOperation {
+    /// The plain opcode computing `result = lhs <op> rhs` for `type`.
+    ///
+    /// A table rather than a closure parameter of `visitFusableBinary`, which
+    /// would otherwise be specialized once per call site.
+    fileprivate static func plainBinaryInstruction(
+        _ type: ValueType, _ op: BinBinOp
+    ) -> (Instruction.BinaryOperand) -> Instruction {
+        switch (type, op) {
+        case (.f32, .add): return Instruction.f32Add
+        case (.f32, .sub): return Instruction.f32Sub
+        case (.f32, .mul): return Instruction.f32Mul
+        case (.f64, .add): return Instruction.f64Add
+        case (.f64, .sub): return Instruction.f64Sub
+        case (.f64, .mul): return Instruction.f64Mul
+        case (.i32, .add): return Instruction.i32Add
+        case (.i32, .sub): return Instruction.i32Sub
+        case (.i32, .mul): return Instruction.i32Mul
+        case (.i32, .and): return Instruction.i32And
+        case (.i32, .or): return Instruction.i32Or
+        case (.i32, .xor): return Instruction.i32Xor
+        case (.i32, .shl): return Instruction.i32Shl
+        case (.i32, .shrS): return Instruction.i32ShrS
+        case (.i32, .shrU): return Instruction.i32ShrU
+        case (.i32, .rotl): return Instruction.i32Rotl
+        case (.i32, .rotr): return Instruction.i32Rotr
+        case (.i64, .add): return Instruction.i64Add
+        case (.i64, .sub): return Instruction.i64Sub
+        case (.i64, .mul): return Instruction.i64Mul
+        case (.i64, .and): return Instruction.i64And
+        case (.i64, .or): return Instruction.i64Or
+        case (.i64, .xor): return Instruction.i64Xor
+        case (.i64, .shl): return Instruction.i64Shl
+        case (.i64, .shrS): return Instruction.i64ShrS
+        case (.i64, .shrU): return Instruction.i64ShrU
+        case (.i64, .rotl): return Instruction.i64Rotl
+        case (.i64, .rotr): return Instruction.i64Rotr
+        default:
+            preconditionFailure("Internal consistency error: no binary opcode for \(type) \(op)")
+        }
+    }
+
+    /// The superinstruction computing `result = (x op1 y) op2 z` for `type`,
+    /// or `result = z op2 (x op1 y)` when `reversed` is set. `nil` when there
+    /// is no opcode for the pair.
+    fileprivate static func binBinInstruction(
+        _ type: ValueType, _ op1: BinBinOp, _ op2: BinBinOp, reversed: Bool
+    ) -> ((Instruction.BinBinOperand) -> Instruction)? {
+        switch (type, op1, op2, reversed) {
+        case (.f32, .add, .add, false): return Instruction.f32AddAdd
+        case (.f32, .add, .sub, false): return Instruction.f32AddSub
+        case (.f32, .add, .mul, false): return Instruction.f32AddMul
+        case (.f32, .sub, .add, false): return Instruction.f32SubAdd
+        case (.f32, .sub, .sub, false): return Instruction.f32SubSub
+        case (.f32, .sub, .mul, false): return Instruction.f32SubMul
+        case (.f32, .mul, .add, false): return Instruction.f32MulAdd
+        case (.f32, .mul, .sub, false): return Instruction.f32MulSub
+        case (.f32, .mul, .mul, false): return Instruction.f32MulMul
+        case (.f64, .add, .add, false): return Instruction.f64AddAdd
+        case (.f64, .add, .sub, false): return Instruction.f64AddSub
+        case (.f64, .add, .mul, false): return Instruction.f64AddMul
+        case (.f64, .sub, .add, false): return Instruction.f64SubAdd
+        case (.f64, .sub, .sub, false): return Instruction.f64SubSub
+        case (.f64, .sub, .mul, false): return Instruction.f64SubMul
+        case (.f64, .mul, .add, false): return Instruction.f64MulAdd
+        case (.f64, .mul, .sub, false): return Instruction.f64MulSub
+        case (.f64, .mul, .mul, false): return Instruction.f64MulMul
+        case (.i32, .shl, .add, false): return Instruction.i32ShlAdd
+        case (.i32, .mul, .add, false): return Instruction.i32MulAdd
+        case (.i32, .add, .add, false): return Instruction.i32AddAdd
+        case (.i32, .and, .add, false): return Instruction.i32AndAdd
+        case (.i32, .shrU, .and, false): return Instruction.i32ShrUAnd
+        case (.i32, .or, .and, false): return Instruction.i32OrAnd
+        case (.i32, .shrU, .add, false): return Instruction.i32ShrUAdd
+        case (.i32, .sub, .and, false): return Instruction.i32SubAnd
+        case (.i32, .shl, .or, false): return Instruction.i32ShlOr
+        case (.i32, .add, .and, false): return Instruction.i32AddAnd
+        case (.i32, .shrU, .or, false): return Instruction.i32ShrUOr
+        case (.i32, .xor, .shrU, false): return Instruction.i32XorShrU
+        case (.i32, .add, .sub, false): return Instruction.i32AddSub
+        case (.i32, .xor, .shl, false): return Instruction.i32XorShl
+        case (.i32, .sub, .add, false): return Instruction.i32SubAdd
+        case (.i32, .and, .shl, false): return Instruction.i32AndShl
+        case (.i32, .mul, .sub, true): return Instruction.i32MulSubRev
+        case (.i64, .xor, .rotl, false): return Instruction.i64XorRotl
+        case (.i64, .mul, .add, false): return Instruction.i64MulAdd
+        case (.i64, .shl, .and, false): return Instruction.i64ShlAnd
+        case (.i64, .and, .mul, false): return Instruction.i64AndMul
+        case (.i64, .shl, .or, false): return Instruction.i64ShlOr
+        case (.i64, .xor, .and, false): return Instruction.i64XorAnd
+        case (.i64, .mul, .xor, false): return Instruction.i64MulXor
+        case (.i64, .and, .xor, false): return Instruction.i64AndXor
+        case (.i64, .rotl, .xor, false): return Instruction.i64RotlXor
+        case (.i64, .sub, .and, false): return Instruction.i64SubAnd
+        case (.i64, .xor, .xor, false): return Instruction.i64XorXor
+        case (.i64, .or, .or, false): return Instruction.i64OrOr
+        case (.i64, .shrU, .and, false): return Instruction.i64ShrUAnd
+        case (.i64, .and, .and, false): return Instruction.i64AndAnd
+        case (.i64, .xor, .mul, false): return Instruction.i64XorMul
+        case (.i64, .xor, .shrU, false): return Instruction.i64XorShrU
+        default: return nil
+        }
+    }
+
+    /// A binary operation as recorded on its emission, for folding into the
+    /// operation that consumes its result.
+    fileprivate struct BinaryOperation {
         let type: ValueType
-        let op: FloatBinOp
+        let op: BinBinOp
         let lhs: VReg
         let rhs: VReg
         let result: VReg
     }
 
-    /// A just-emitted float binary operation whose result can be kept in a
-    /// register by folding it into the float operation that consumes it.
-    fileprivate struct FloatBinaryEmission {
+    /// A just-emitted binary operation whose result can be kept in a register
+    /// by folding it into the operation that consumes it.
+    fileprivate struct BinaryEmission {
         let position: MetaProgramCounter
         let end: MetaProgramCounter
-        let operation: FloatBinaryOperation
+        let operation: BinaryOperation
     }
 
     /// A just-emitted instruction whose result feeds a following conditional
@@ -955,10 +1045,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             /// instruction already computed (`<cmp>` + `i32.eqz`), in which
             /// case both instructions are replaced by the fused branch.
             let fusable: (condition: FusableCondition, result: VReg, start: MetaProgramCounter)?
-            /// Set when the emission is a float `add`/`sub`/`mul` whose result
-            /// can be folded into a following float operation. See
-            /// ``FloatBinaryEmission``.
-            let floatBinary: FloatBinaryOperation?
+            /// Set when the emission is a binary operation whose result can be
+            /// folded into the operation that consumes it. See
+            /// ``BinaryEmission``.
+            let binary: BinaryOperation?
         }
 
         private var labels: [LabelEntry] = []
@@ -1027,7 +1117,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             guard let emission = lastEmission else { return }
             lastEmission = LastEmission(
                 position: emission.position, end: emission.end, resultRelink: nil,
-                fusable: emission.fusable, floatBinary: emission.floatBinary
+                fusable: emission.fusable, binary: emission.binary
             )
         }
 
@@ -1043,19 +1133,18 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             )
         }
 
-        /// The last emitted instruction when it is a float binary operation
-        /// whose result a following float operation can consume from a
-        /// register.
-        fileprivate var floatBinaryEmission: FloatBinaryEmission? {
-            guard let lastEmission, let float = lastEmission.floatBinary else { return nil }
-            return FloatBinaryEmission(
-                position: lastEmission.position, end: lastEmission.end, operation: float
+        /// The last emitted instruction when it is a binary operation whose
+        /// result a following operation can consume from a register.
+        fileprivate var binaryEmission: BinaryEmission? {
+            guard let lastEmission, let binary = lastEmission.binary else { return nil }
+            return BinaryEmission(
+                position: lastEmission.position, end: lastEmission.end, operation: binary
             )
         }
 
         /// Whether `emission` is still the last thing in the buffer and can be
         /// replaced by a two-operation superinstruction.
-        fileprivate func canRewind(to emission: FloatBinaryEmission) -> Bool {
+        fileprivate func canRewind(to emission: BinaryEmission) -> Bool {
             guard emission.end.offsetFromHead == insertingPC.offsetFromHead else { return false }
             return canRewind(to: emission.position)
         }
@@ -1149,7 +1238,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             _ instruction: Instruction,
             resultRelink: ResultRelink? = nil,
             fusable: (condition: FusableCondition, result: VReg, start: MetaProgramCounter?)? = nil,
-            floatBinary: FloatBinaryOperation? = nil
+            binary: BinaryOperation? = nil
         ) {
             let position = insertingPC
             trace("emitInstruction: \(instruction)")
@@ -1161,7 +1250,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 position: position, end: insertingPC,
                 resultRelink: resultRelink,
                 fusable: fusable.map { ($0.condition, $0.result, $0.start ?? position) },
-                floatBinary: floatBinary
+                binary: binary
             )
         }
 
@@ -1484,10 +1573,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         _ instruction: Instruction,
         resultRelink: ISeqBuilder.ResultRelink? = nil,
         fusable: (condition: FusableCondition, result: VReg, start: MetaProgramCounter?)? = nil,
-        floatBinary: FloatBinaryOperation? = nil
+        binary: BinaryOperation? = nil
     ) {
         let oldPC = iseqBuilder.insertingPC
-        iseqBuilder.emit(instruction, resultRelink: resultRelink, fusable: fusable, floatBinary: floatBinary)
+        iseqBuilder.emit(instruction, resultRelink: resultRelink, fusable: fusable, binary: binary)
         self.updateInstructionMapping(from: oldPC)
     }
 
@@ -3400,13 +3489,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             return instruction(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
-    /// `makeCondition`, when given, records the operation as a candidate for
-    /// fusion into the conditional branch that pops its result.
     private mutating func visitBinary(
         _ operand: ValueType,
         _ result: ValueType,
-        _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction,
-        fusableCondition makeCondition: ((_ lhs: VReg, _ rhs: VReg) -> FusableCondition)? = nil
+        _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction
     ) throws(WasmKitError) {
         let rhs = try popVRegOperand(operand)
         let lhs = try popVRegOperand(operand)
@@ -3416,33 +3502,32 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             instruction(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(result))),
             resultRelink: { result in
                 return instruction(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(result)))
-            },
-            fusable: makeCondition.map { ($0(lhs, rhs), result, nil) }
+            }
         )
     }
-    /// Emits a float `add`/`sub`/`mul`, folding it with the float operation
-    /// that produced one of its operands whenever that is possible.
+    /// Emits a binary operation, folding it with the operation that produced
+    /// one of its operands whenever there is a superinstruction for the pair.
     ///
-    /// The fold applies when the previous instruction is a float `add`/`sub`/
-    /// `mul` of the same type, is still the last thing in the instruction
-    /// buffer, and its result is exactly one of this operation's two operands.
-    /// That result is a value-stack temporary this operation pops, so nothing
-    /// else can read it and the write to its slot can simply disappear -- the
-    /// same argument (and the same ``ISeqBuilder/canRewind(to:)`` guards) as
-    /// the compare+branch fusion.
+    /// The fold applies when the previous instruction is a binary operation
+    /// of the same type, is still the last thing in the instruction buffer,
+    /// and its result is exactly one of this operation's two operands. That
+    /// result is a value-stack temporary this operation pops, so nothing else
+    /// can read it and the write to its slot can simply disappear.
     ///
-    /// Both operand positions are covered:
-    /// - intermediate as the **left** operand, for all nine `(op1, op2)` pairs;
-    /// - intermediate as the **right** operand, only when `op2` commutes
-    ///   (`add`, `mul`), because the superinstruction always evaluates
-    ///   `(x op1 y) op2 z`. `z - (x op1 y)` has no encoding and stays unfused.
-    private mutating func visitFloatBinary(
+    /// The intermediate may be the left operand, the right operand of a
+    /// commutative consumer (operands swapped), or the right operand of a
+    /// consumer with a reversed opcode.
+    ///
+    /// An integer `and` also records a fusable condition for a following
+    /// conditional branch. A fused emission records none, since the branch
+    /// fusion would have to re-materialize the absorbed producer.
+    @inline(never)
+    private mutating func visitFusableBinary(
         _ type: ValueType,
-        _ op: FloatBinOp,
-        _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction
+        _ op: BinBinOp
     ) throws(WasmKitError) {
         // Captured before `popVRegOperand`, which resets the last emission.
-        let candidate = iseqBuilder.floatBinaryEmission
+        let candidate = iseqBuilder.binaryEmission
         let rhs = try popVRegOperand(type)
         let lhs = try popVRegOperand(type)
         let result = valueStack.push(type)
@@ -3451,39 +3536,44 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         if let candidate, candidate.operation.type == type, iseqBuilder.canRewind(to: candidate) {
             let produced = candidate.operation
             // `z` must not be the intermediate itself: its slot is no longer
-            // written once the producer is rewound away. (`t op t` cannot arise
-            // from a well-formed operand stack, but the check is cheap and
-            // keeps the argument local.)
-            let z: VReg?
-            if produced.result == lhs, produced.result != rhs {
-                z = rhs
-            } else if produced.result == rhs, produced.result != lhs, op.isCommutative {
-                z = lhs
-            } else {
-                z = nil
+            // written once the producer is rewound away.
+            var fused: (make: (Instruction.BinBinOperand) -> Instruction, z: VReg)?
+            if produced.result == lhs, produced.result != rhs,
+                let make = Self.binBinInstruction(type, produced.op, op, reversed: false)
+            {
+                fused = (make, rhs)
+            } else if produced.result == rhs, produced.result != lhs {
+                if op.isCommutative,
+                    let make = Self.binBinInstruction(type, produced.op, op, reversed: false)
+                {
+                    fused = (make, lhs)
+                } else if let make = Self.binBinInstruction(type, produced.op, op, reversed: true) {
+                    fused = (make, lhs)
+                }
             }
-            if let z {
-                let make = Self.floatBinBinInstruction(type, produced.op, op)
+            if let (make, z) = fused {
                 let x = produced.lhs
                 let y = produced.rhs
                 iseqBuilder.rewind(to: candidate.position)
                 self.rewindInstructionMapping(to: candidate.position)
                 emit(
-                    make(Instruction.FloatBinBinOperand(result: result, x: x, y: y, z: z)),
+                    make(Instruction.BinBinOperand(result: result, x: x, y: y, z: z)),
                     resultRelink: { newResult in
-                        make(Instruction.FloatBinBinOperand(result: newResult, x: x, y: y, z: z))
+                        make(Instruction.BinBinOperand(result: newResult, x: x, y: y, z: z))
                     }
                 )
                 return
             }
         }
 
+        let instruction = Self.plainBinaryInstruction(type, op)
         emit(
             instruction(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(result))),
             resultRelink: { newResult in
                 instruction(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(newResult)))
             },
-            floatBinary: FloatBinaryOperation(type: type, op: op, lhs: lhs, rhs: rhs, result: result)
+            fusable: FusedAndWidth(type: type, op: op).map { (.and(width: $0, lhs: lhs, rhs: rhs), result, nil) },
+            binary: BinaryOperation(type: type, op: op, lhs: lhs, rhs: rhs, result: result)
         )
     }
 
@@ -3589,20 +3679,37 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         try visitCmp(operand, makeCondition, instruction)
     }
     public mutating func visitBinary(_ binary: WasmParser.Instruction.Binary) throws(WasmKitError) {
-        // The float `add`/`sub`/`mul` forms go through `visitFloatBinary`,
-        // which folds adjacent pairs into a two-operation superinstruction.
+        // Operations with a superinstruction form go through
+        // `visitFusableBinary`, which folds adjacent pairs.
         switch binary {
-        case .f32Add: return try visitFloatBinary(.f32, .add, Instruction.f32Add)
-        case .f32Sub: return try visitFloatBinary(.f32, .sub, Instruction.f32Sub)
-        case .f32Mul: return try visitFloatBinary(.f32, .mul, Instruction.f32Mul)
-        case .f64Add: return try visitFloatBinary(.f64, .add, Instruction.f64Add)
-        case .f64Sub: return try visitFloatBinary(.f64, .sub, Instruction.f64Sub)
-        case .f64Mul: return try visitFloatBinary(.f64, .mul, Instruction.f64Mul)
-        // A bit test popped by a conditional branch fuses into it.
-        case .i32And:
-            return try visitBinary(.i32, .i32, Instruction.i32And) { .and(width: .i32, lhs: $0, rhs: $1) }
-        case .i64And:
-            return try visitBinary(.i64, .i64, Instruction.i64And) { .and(width: .i64, lhs: $0, rhs: $1) }
+        case .f32Add: return try visitFusableBinary(.f32, .add)
+        case .f32Sub: return try visitFusableBinary(.f32, .sub)
+        case .f32Mul: return try visitFusableBinary(.f32, .mul)
+        case .f64Add: return try visitFusableBinary(.f64, .add)
+        case .f64Sub: return try visitFusableBinary(.f64, .sub)
+        case .f64Mul: return try visitFusableBinary(.f64, .mul)
+        case .i32Add: return try visitFusableBinary(.i32, .add)
+        case .i32Sub: return try visitFusableBinary(.i32, .sub)
+        case .i32Mul: return try visitFusableBinary(.i32, .mul)
+        case .i32And: return try visitFusableBinary(.i32, .and)
+        case .i32Or: return try visitFusableBinary(.i32, .or)
+        case .i32Xor: return try visitFusableBinary(.i32, .xor)
+        case .i32Shl: return try visitFusableBinary(.i32, .shl)
+        case .i32ShrS: return try visitFusableBinary(.i32, .shrS)
+        case .i32ShrU: return try visitFusableBinary(.i32, .shrU)
+        case .i32Rotl: return try visitFusableBinary(.i32, .rotl)
+        case .i32Rotr: return try visitFusableBinary(.i32, .rotr)
+        case .i64Add: return try visitFusableBinary(.i64, .add)
+        case .i64Sub: return try visitFusableBinary(.i64, .sub)
+        case .i64Mul: return try visitFusableBinary(.i64, .mul)
+        case .i64And: return try visitFusableBinary(.i64, .and)
+        case .i64Or: return try visitFusableBinary(.i64, .or)
+        case .i64Xor: return try visitFusableBinary(.i64, .xor)
+        case .i64Shl: return try visitFusableBinary(.i64, .shl)
+        case .i64ShrS: return try visitFusableBinary(.i64, .shrS)
+        case .i64ShrU: return try visitFusableBinary(.i64, .shrU)
+        case .i64Rotl: return try visitFusableBinary(.i64, .rotl)
+        case .i64Rotr: return try visitFusableBinary(.i64, .rotr)
         default: break
         }
         let operand: ValueType
