@@ -771,6 +771,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             /// Set when the emission can be folded into a following conditional
             /// branch. See ``FusableCondition``.
             let fusable: (condition: FusableCondition, result: VReg)?
+            /// Set when the emission is a `copyStack`, for the inverse-copy
+            /// peephole in ``Translator/emitCopyStack(from:to:)``.
+            let copy: (source: VReg, dest: VReg)?
         }
 
         private var labels: [LabelEntry] = []
@@ -906,6 +909,25 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             return true
         }
 
+        /// The last emission when it is a `copyStack` the next copy can be
+        /// folded against, i.e. when the next instruction emitted is reachable
+        /// only by falling out of that copy.
+        ///
+        /// `nil` when:
+        /// - something has been emitted since. `emitWithLabel` appends slots
+        ///   without recording a last emission, so without this check a copy
+        ///   emitted before a `brIfNot` would be paired with one emitted in the
+        ///   branch's landing pad, or two `br_table` entries' copies with each
+        ///   other -- code on different paths.
+        /// - a label is pinned at the current insertion point: control could
+        ///   then arrive here without having executed the copy.
+        fileprivate var lastCopy: (source: VReg, dest: VReg)? {
+            guard let lastEmission, let copy = lastEmission.copy else { return nil }
+            guard lastEmission.end.offsetFromHead == insertingPC.offsetFromHead else { return nil }
+            guard highestPinnedLabelOffset < insertingPC.offsetFromHead else { return nil }
+            return copy
+        }
+
         private mutating func emitSlot(_ codeSlot: CodeSlot) {
             trace("emitSlot[\(instructions.count)]: 0x\(String(codeSlot, radix: 16))")
             self.instructions.append(codeSlot)
@@ -924,7 +946,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         mutating func emit(
             _ instruction: Instruction,
             resultRelink: ResultRelink? = nil,
-            fusable: (condition: FusableCondition, result: VReg)? = nil
+            fusable: (condition: FusableCondition, result: VReg)? = nil,
+            copy: (source: VReg, dest: VReg)? = nil
         ) {
             let position = insertingPC
             trace("emitInstruction: \(instruction)")
@@ -934,7 +957,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             for slot in slots { emitSlot(slot) }
             self.lastEmission = LastEmission(
                 position: position, end: insertingPC,
-                resultRelink: resultRelink, fusable: fusable
+                resultRelink: resultRelink, fusable: fusable, copy: copy
             )
         }
 
@@ -1254,11 +1277,28 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         self.updateInstructionMapping(from: oldPC)
     }
 
+    /// Emit `dest = copy source`, unless the copy is provably a no-op.
+    ///
+    /// Two shapes are dropped here:
+    /// - `copy A <- A`, which never does anything;
+    /// - `copy B <- A` immediately followed by `copy A <- B`. The second copy
+    ///   writes back the value the first one just read, so `A` already holds
+    ///   it. `ISeqBuilder.lastCopy` only reports the previous copy when it is
+    ///   still the last thing in the buffer *and* no label is pinned between
+    ///   the two, i.e. when the first copy is guaranteed to have run.
+    ///
+    /// - Returns: whether an instruction was emitted.
     @discardableResult
     private mutating func emitCopyStack(from source: VReg, to dest: VReg) -> Bool {
         guard source != dest else { return false }
+        if let previous = iseqBuilder.lastCopy, previous.source == dest, previous.dest == source {
+            return false
+        }
         let oldPC = iseqBuilder.insertingPC
-        iseqBuilder.emit(.copyStack(Instruction.CopyStackOperand(source: LVReg(source), dest: LVReg(dest))))
+        iseqBuilder.emit(
+            .copyStack(Instruction.CopyStackOperand(source: LVReg(source), dest: LVReg(dest))),
+            copy: (source: source, dest: dest)
+        )
         self.updateInstructionMapping(from: oldPC)
         return true
     }
