@@ -701,6 +701,45 @@
             predictNext_brIfCmp(operandPc: operandPc)
         }
 
+        // Fused float compare+branch (both polarities). Same immediate layout
+        // as the integer forms, so the same predictor applies.
+        mutating func predictNext_brIfF32Eq(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfF32Ne(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfF32Lt(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfF32Le(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfNotF32Lt(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfNotF32Le(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfF64Eq(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfF64Ne(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfF64Lt(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfF64Le(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfNotF64Lt(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfNotF64Le(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmp(operandPc: operandPc)
+        }
+
         mutating func predictNext_brTable(operandPc: Pc, sp: Sp) -> [Pc] {
             var pc = operandPc
             let op = Instruction.BrTableOperand.load(from: &pc)

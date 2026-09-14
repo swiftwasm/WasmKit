@@ -790,6 +790,138 @@ extension VMGen {
 
     static let brIfCmpInsts: [Instruction] = buildBrIfCmpInsts()
 
+    // MARK: - Fused float compare + branch instructions
+
+    /// The fused float compare+branch opcodes, as `(suffix, predicate)` pairs.
+    ///
+    /// The branch polarity is part of the opcode rather than something the
+    /// translator derives by flipping the predicate: NaN makes `!(a < b)`
+    /// different from `a >= b`, so a `br_if_not` on `f64.lt` cannot be
+    /// expressed as a `br_if` on any float comparison.
+    ///
+    /// Six per float type, not twelve, because two of the twelve are exact
+    /// duplicates of another entry rather than genuinely new predicates:
+    ///
+    /// - `ne` **is** the exact complement of `eq`, NaN included, so the
+    ///   `ifFalse` polarity of `eq` is `brIf*Ne` and the `ifFalse` polarity of
+    ///   `ne` is `brIf*Eq`. Spelling those as separate `brIfNot*Eq` /
+    ///   `brIfNot*Ne` opcodes would give two pairs of bit-identical handler
+    ///   bodies, which LLVM's function merging pass folds into a `b <other>`
+    ///   thunk -- one extra taken branch per dispatch (see
+    ///   ``Instruction/handlerIdentity``). Control instructions
+    ///   must not share a handler, so the duplicates are simply not created.
+    /// - `gt`/`ge` are `lt`/`le` with the operands swapped (`a > b` is `b < a`
+    ///   for IEEE-754, and both are false when either operand is NaN).
+    static let brIfFCmpOps: [(suffix: String, predicate: String)] = [
+        ("Eq", "a == b"),
+        ("Ne", "a != b"),
+        ("Lt", "a < b"),
+        ("Le", "a <= b"),
+        ("NotLt", "!(a < b)"),
+        ("NotLe", "!(a <= b)"),
+    ]
+
+    /// The opcode name of a fused float compare+branch.
+    ///
+    /// `NotLt`/`NotLe` are spelled `brIfNot<T>Lt` / `brIfNot<T>Le` so that the
+    /// name says "branch if not less than" rather than "branch if not-less-than".
+    static func brIfFCmpName(type: String, suffix: String) -> String {
+        let typeName = type.uppercased()
+        if suffix.hasPrefix("Not") {
+            return "brIfNot\(typeName)\(suffix.dropFirst(3))"
+        }
+        return "brIf\(typeName)\(suffix)"
+    }
+
+    static func buildBrIfFCmpInsts() -> [Instruction] {
+        var results: [Instruction] = []
+        for type in floatValueTypes {
+            for (suffix, predicate) in brIfFCmpOps {
+                results.append(
+                    Instruction(
+                        name: brIfFCmpName(type: type, suffix: suffix),
+                        documentation: """
+                            Conditional pc-relative branch if `\(predicate)` holds for `\(type)` operands
+
+                            Fused form of a `\(type)` comparison followed by a conditional
+                            branch. NaN falls on the side the polarity in the opcode name
+                            says: an unordered comparison is false, so `\(predicate)` is
+                            \(predicate.hasPrefix("!") || suffix == "Ne" ? "true" : "false") when either operand is NaN.
+                            """,
+                        isControl: true, mayUpdateFrame: false,
+                        immediateLayout: .brIfCmpOperand
+                    )
+                )
+            }
+        }
+        return results
+    }
+
+    static let brIfFCmpInsts: [Instruction] = buildBrIfFCmpInsts()
+
+    // MARK: - Two-operation float superinstructions
+
+    /// One of the two-operation float superinstructions: `result = (x op1 y) op2 z`.
+    ///
+    /// A serial float dependency chain (`z = z*z + c`) routes every link
+    /// through a frame slot in a 3-address operand model: each handler ends by
+    /// storing its result to a slot and the next begins by loading the same
+    /// slot, paying a store-to-load-forwarding round trip where a register
+    /// hand-off would pay nothing. These opcodes keep the intermediate of two
+    /// adjacent float operations in a `d` register.
+    ///
+    /// **The two operations must be rounded separately.** WebAssembly forbids
+    /// contracting `(a * b) + c` into a fused multiply-add: `fmadd` keeps the
+    /// product at infinite precision, which gives a different result from
+    /// `fmul` followed by `fadd` for a great many inputs. Swift does not
+    /// contract by default, and the generated body binds the intermediate to a
+    /// `let` and uses the ordinary `+`/`-`/`*`, so the emitted code is a
+    /// separate multiply and add (`fmul` + `fadd` on arm64, never `fmadd`).
+    struct FloatBinBinOpInfo {
+        /// `f32` or `f64`.
+        let type: String
+        /// The first operation, in `Add`/`Sub`/`Mul` spelling.
+        let op1: String
+        /// The second operation.
+        let op2: String
+
+        var name: String { "\(type)\(op1)\(op2)" }
+
+        var instruction: Instruction {
+            Instruction(
+                name: name,
+                documentation: """
+                    `result = (x \(VMGen.snakeCase(pascalCase: op1)) y) \(VMGen.snakeCase(pascalCase: op2)) z`, on `\(type)` operands
+
+                    Superinstruction fusing `\(type).\(VMGen.snakeCase(pascalCase: op1))` with the
+                    `\(type).\(VMGen.snakeCase(pascalCase: op2))` that immediately consumes its result, keeping
+                    the intermediate in a register instead of a frame slot. Each
+                    operation rounds separately -- this is **not** a fused
+                    multiply-add.
+                    """,
+                immediateLayout: .floatBinBin
+            )
+        }
+    }
+
+    /// The nine `(op1, op2)` combinations over `{add, sub, mul}`, for both
+    /// float types.
+    ///
+    /// `div`, `min`, `max` and `copysign` are left out: they do not appear as
+    /// the producer/consumer pair of a serial chain in the suite's float
+    /// workloads, and each one added costs two more handlers.
+    static let floatBinBinOps: [FloatBinBinOpInfo] = {
+        var results: [FloatBinBinOpInfo] = []
+        for type in floatValueTypes {
+            for op1 in ["Add", "Sub", "Mul"] {
+                for op2 in ["Add", "Sub", "Mul"] {
+                    results.append(FloatBinBinOpInfo(type: type, op1: op1, op2: op2))
+                }
+            }
+        }
+        return results
+    }()
+
     // MARK: - Instruction generation
 
     static func buildInstructions() -> [Instruction] {
@@ -919,6 +1051,8 @@ extension VMGen {
             )
         ]
         instructions += memoryTrapInsts
+        instructions += brIfFCmpInsts
+        instructions += floatBinBinOps.map(\.instruction)
         return instructions
     }
 

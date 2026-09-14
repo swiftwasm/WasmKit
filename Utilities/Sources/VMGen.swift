@@ -116,6 +116,16 @@ enum VMGen {
             sp.pointee[\(op.resultType): immediate.result] = \(op.mayThrow ? "try " : "")sp.pointee[\(op.lhsType): immediate.lhs].\(camelCase(pascalCase: op.op))(sp.pointee[\(op.rhsType): immediate.rhs])
             """
         }
+        for op in floatBinBinOps {
+            // The intermediate is bound to a `let` and both operations use the
+            // ordinary `+`/`-`/`*`, so LLVM rounds each one separately: Wasm
+            // forbids contracting this into a fused multiply-add (on arm64 the
+            // handlers are `fmul` + `fadd`, never `fmadd`).
+            inlineImpls[op.instruction.name] = """
+                let intermediate = sp.pointee[\(op.type): immediate.x].\(camelCase(pascalCase: op.op1))(sp.pointee[\(op.type): immediate.y])
+                        sp.pointee[\(op.type): immediate.result] = intermediate.\(camelCase(pascalCase: op.op2))(sp.pointee[\(op.type): immediate.z])
+                """
+        }
         for op in intUnaryInsts + floatUnaryOps {
             inlineImpls[op.instruction.name] = """
             sp.pointee[\(op.resultType): immediate.result] = \(op.mayThrow ? "try " : "")sp.pointee[\(op.inputType): immediate.input].\(camelCase(pascalCase: op.op))
