@@ -666,6 +666,10 @@ extension Execution {
     /// Be careful when modifying this function as it is performance-critical.
     @inline(__always)
     mutating func runTokenThreaded(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
+        if let control = store.value.executionControl {
+            try runDispatchGroups(control: control, sp: &sp, pc: &pc, md: &md, ms: &ms)
+            return
+        }
         #if EngineStats
             var stats = StatsCollector()
             defer { stats.dump() }
@@ -680,6 +684,56 @@ extension Execution {
                     opcode = try doExecute(opcode, sp: &sp, pc: &pc, md: &md, ms: &ms)
                 }
             } catch let exception as WasmKitException {
+                try store.value.executionControl?.check()
+                if handleException(exception, sp: &sp, pc: &pc, md: &md, ms: &ms) {
+                    opcode = pc.read(OpcodeID.self)
+                    continue
+                }
+                throw exception
+            } catch let trap as Trap {
+                throw trap.withBacktrace(Self.captureBacktrace(sp: sp, store: store.value))
+            }
+        }
+    }
+
+    /// Polls between dispatch groups while keeping their remaining count local to this execution.
+    ///
+    /// The final partial group checks completion before exported calls or debugger resumes can
+    /// interpret EndOfExecution as a successful result.
+    ///
+    /// - Parameters:
+    ///   - control: The store's immutable group policy and independently writable signal.
+    ///   - sp: The stack position maintained by guest calls and returns.
+    ///   - pc: The next instruction position maintained by dispatch and branches.
+    ///   - md: The cached base of the current guest linear memory.
+    ///   - ms: The cached linear-memory bound in bytes.
+    /// - Throws: Requested termination, guest traps, or uncaught host and guest failures.
+    private mutating func runDispatchGroups(
+        control: ExecutionControl, sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms
+    ) throws {
+        #if EngineStats
+            var stats = StatsCollector()
+            defer { stats.dump() }
+        #endif
+        var opcode = pc.read(OpcodeID.self)
+        while true {
+            do {
+                while true {
+                    try control.check()
+                    var remaining = control.pollingInterval
+                    repeat {
+                        #if EngineStats
+                            stats.track(opcode)
+                        #endif
+                        opcode = try doExecute(opcode, sp: &sp, pc: &pc, md: &md, ms: &ms)
+                        remaining -= 1
+                    } while remaining != 0
+                }
+            } catch let end as EndOfExecution {
+                try control.check()
+                throw end
+            } catch let exception as WasmKitException {
+                try control.check()
                 if handleException(exception, sp: &sp, pc: &pc, md: &md, ms: &ms) {
                     opcode = pc.read(OpcodeID.self)
                     continue
@@ -803,10 +857,17 @@ extension Execution {
         return (iseq.baseAddress, newSp)
     }
 
-    /// Executes the given host function.
+    /// Invokes a host import without moving the calling frame or its program counter.
     ///
-    /// Note that this function does not modify neither the positions of the
-    /// stack pointer nor the program counter.
+    /// A requested interruption takes precedence over the native result or a thrown host error.
+    /// A live store preserves the original host failure.
+    ///
+    /// - Parameters:
+    ///   - function: The imported host entity whose signature determines argument and result slots.
+    ///   - sp: The stack pointer of the calling WebAssembly frame.
+    ///   - spAddend: The byte displacement from that frame to this call's arguments and results,
+    ///     represented by a register aligned to the stack slot size.
+    /// - Throws: Requested termination, the original host failure, or a result-signature mismatch.
     @inline(never)
     private func invokeHostFunction(function: EntityHandle<HostFunctionEntity>, sp: Sp, spAddend: VReg) throws {
         let resolvedType = store.value.engine.resolveType(function.type)
@@ -823,7 +884,14 @@ extension Execution {
             store: store.value,
             sp: sp
         )
-        let results = try function.implementation(caller, Array(parameters))
+        let results: [Value]
+        do {
+            results = try function.implementation(caller, Array(parameters))
+        } catch {
+            try store.value.executionControl?.check()
+            throw error
+        }
+        try store.value.executionControl?.check()
         guard resolvedType.results.count == results.count else {
             throw Trap(.resultTypesMismatch(expected: resolvedType.results, got: results))
         }

@@ -79,35 +79,39 @@ public struct Function: Equatable {
         store.allocator.funcTypeInterner.resolve(handle.type)
     }
 
-    /// Invokes a function of the given address with the given parameters.
+    /// Invokes the function synchronously on its owning store.
+    ///
+    /// A controlled store checks its permanent stop signal before invocation and successful
+    /// completion. After a host implementation returns or throws, a requested stop takes
+    /// precedence over host errors and result validation failures. Interruption cannot preempt
+    /// native work.
     ///
     /// - Parameters:
-    ///   - arguments: The arguments to pass to the function.
-    /// - Throws: A trap if the function invocation fails.
-    /// - Returns: The results of the function invocation.
+    ///   - arguments: Values in the function signature's parameter order.
+    /// - Throws: A requested execution termination, a guest trap, or a host function failure.
+    /// - Returns: Values in the function signature's result order.
     @discardableResult
     public func invoke(_ arguments: [Value] = []) throws -> [Value] {
         return try handle.invoke(arguments, store: store)
     }
 
-    /// Invokes a function of the given address with the given parameters.
+    /// Invokes the function through the same store and interruption checks as ``invoke(_:)``.
     ///
-    /// - Parameter
-    ///   - arguments: The arguments to pass to the function.
-    /// - Throws: A trap if the function invocation fails.
-    /// - Returns: The results of the function invocation.
+    /// - Parameter arguments: Values in the function signature's parameter order.
+    /// - Throws: A requested execution termination, a guest trap, or a host function failure.
+    /// - Returns: Values in the function signature's result order.
     @discardableResult
     public func callAsFunction(_ arguments: [Value] = []) throws -> [Value] {
         return try invoke(arguments)
     }
 
-    /// Invokes a function of the given address with the given parameters.
+    /// Invokes the function through its owning store for callers of the deprecated runtime API.
     ///
     /// - Parameters:
-    ///   - arguments: The arguments to pass to the function.
-    ///   - runtime: The runtime to use for the function invocation.
-    /// - Throws: A trap if the function invocation fails.
-    /// - Returns: The results of the function invocation.
+    ///   - arguments: Values in the function signature's parameter order.
+    ///   - runtime: The unused legacy runtime. The function retains its own store and engine.
+    /// - Throws: A requested execution termination, a guest trap, or a host function failure.
+    /// - Returns: Values in the function signature's result order.
     @available(*, deprecated, renamed: "invoke(_:)")
     @discardableResult
     public func invoke(_ arguments: [Value] = [], runtime: Runtime) throws -> [Value] {
@@ -166,12 +170,21 @@ extension InternalFunction: ValidatableEntity {
 }
 
 extension InternalFunction {
+    /// Invokes an export while checking native host completion before result validation.
+    ///
+    /// - Parameters:
+    ///   - arguments: Values in the resolved function signature's parameter order.
+    ///   - store: The function's owning store, kept alive through every invocation boundary.
+    /// - Returns: The validated results while no requested termination prevents completion.
+    /// - Throws: Requested termination, a signature mismatch, or an ordinary guest or host failure.
     func invoke(_ arguments: [Value], store: Store) throws -> [Value] {
+        try store.executionControl?.check()
+        let results: [Value]
         if isWasm {
             let entity = wasm
             let resolvedType = store.engine.resolveType(entity.type)
             try check(functionType: resolvedType, parameters: arguments)
-            return try executeWasm(
+            results = try executeWasm(
                 store: store,
                 function: self,
                 type: resolvedType,
@@ -182,10 +195,17 @@ extension InternalFunction {
             let resolvedType = store.engine.resolveType(entity.type)
             try check(functionType: resolvedType, parameters: arguments)
             let caller = Caller(instanceHandle: nil, store: store)
-            let results = try entity.implementation(caller, arguments)
+            do {
+                results = try entity.implementation(caller, arguments)
+            } catch {
+                try store.executionControl?.check()
+                throw error
+            }
+            try store.executionControl?.check()
             try check(functionType: resolvedType, results: results)
-            return results
         }
+        try store.executionControl?.check()
+        return results
     }
 
     private func check(expectedTypes: [ValueType], values: [Value]) -> Bool {

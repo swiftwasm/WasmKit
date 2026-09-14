@@ -119,7 +119,22 @@ class WASTRunContext {
 }
 
 extension TestCase {
-    func run(spectestModule: Module, configuration: EngineConfiguration, handler: @escaping (TestCase, Location, Result) -> Void) throws {
+    /// Runs the script with a fresh store shared by all of its directives.
+    ///
+    /// - Parameters:
+    ///   - spectestModule: The support module instantiated in the script's store before directives run.
+    ///   - configuration: The engine settings. The script's directory supplies its feature set.
+    ///   - executionControl: An unclaimed controller for this script, or nil for an ordinary store.
+    ///     A controller requires token threading and cannot be reused after the store claims it,
+    ///     including when setup or a directive fails.
+    ///   - handler: The synchronous receiver of each directive result and located parsing failure.
+    /// - Throws: Invalid controller configuration, support-module instantiation failure, or a script
+    ///   parsing failure that has no source location to report through the handler.
+    func run(
+        spectestModule: Module, configuration: EngineConfiguration,
+        executionControl: ExecutionControl? = nil,
+        handler: @escaping (TestCase, Location, Result) -> Void
+    ) throws {
         guard let data = FileManager.default.contents(atPath: path) else {
             assertionFailure("failed to load \(path)")
             return
@@ -130,7 +145,12 @@ extension TestCase {
         configuration.features = features
 
         let engine = Engine(configuration: configuration)
-        let store = Store(engine: engine)
+        let store =
+            if let executionControl {
+                try Store(engine: engine, executionControl: executionControl)
+            } else {
+                Store(engine: engine)
+            }
         let spectestInstance = try spectestModule.instantiate(store: store)
 
         var content = try parseWAST(String(data: data, encoding: .utf8)!, features: features)
