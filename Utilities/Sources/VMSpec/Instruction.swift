@@ -12,14 +12,26 @@ extension VMGen {
         let label: String
         /// The type of the parameter.
         let type: String
+        /// The type of the parameter in the generated C trampoline.
+        let cType: String
+
+        init(label: String, type: String, cType: String? = nil) {
+            self.label = label
+            self.type = type
+            self.cType = cType ?? type
+        }
 
         static let sp = Self(label: "sp", type: "Sp")
         static let pc = Self(label: "pc", type: "Pc")
         static let md = Self(label: "md", type: "Md")
         static let ms = Self(label: "ms", type: "Ms")
+        /// The integer accumulator: a value handed from the instruction that
+        /// produces it straight to the instruction right after it, instead of
+        /// through a frame slot. It is dead everywhere else.
+        static let ireg = Self(label: "ireg", type: "UInt64", cType: "uint64_t")
 
         /// All cases of `ExecParam`.
-        static var allCases = [sp, pc, md, ms]
+        static var allCases = [sp, pc, md, ms, ireg]
     }
 
     /// An immediate operand of an instruction.
@@ -95,6 +107,12 @@ extension VMGen {
         /// generator gives each one a constant-foldable head-slot accessor so that a
         /// handler's cold path can reach it without materialising an `Instruction`.
         var isTrapPseudoInstruction: Bool = false
+
+        /// How this instruction's handler uses the integer accumulator.
+        ///
+        /// A handler that does not use it hands an indeterminate value to the
+        /// next handler, which never reads it.
+        var useIreg: RegisterUse = .none
 
         var mayUpdatePc: Bool {
             self.isControl
@@ -208,6 +226,11 @@ extension VMGen {
                 vregs += [(.md, false), (.ms, false)]
             case .write:
                 vregs += [(.md, true), (.ms, true)]
+            }
+            switch useIreg {
+            case .none: break
+            case .read: vregs += [(.ireg, false)]
+            case .write: vregs += [(.ireg, true)]
             }
             var parameters: [Parameter] = vregs.map { ($0.reg.label, $0.reg.type, $0.isInout) }
             if let immediate = self.immediate {
@@ -1033,6 +1056,116 @@ extension VMGen {
         return results
     }()
 
+    // MARK: - Integer accumulator forms
+
+    /// The three accumulator forms of one non-trapping integer binary operation.
+    ///
+    /// | form | meaning |
+    /// |---|---|
+    /// | `<op>ToAcc` | `ireg = x op y` |
+    /// | `<op>FromAcc` | `result = ireg op y` |
+    /// | `<op>InAcc` | `ireg = ireg op y` |
+    ///
+    /// `ireg` holds the slot representation: an `i32` is zero-extended as
+    /// `sp[i32:]` stores it.
+    struct IntAccBinOpInfo {
+        /// `i32` or `i64`.
+        let type: String
+        /// The operation, in `Add`/`ShrU`/... spelling.
+        let op: String
+
+        var toAccName: String { "\(type)\(op)ToAcc" }
+        var fromAccName: String { "\(type)\(op)FromAcc" }
+        var inAccName: String { "\(type)\(op)InAcc" }
+
+        private func instruction(_ name: String, _ expression: String, _ layout: ImmediateLayout, _ use: RegisterUse) -> Instruction {
+            var inst = Instruction(
+                name: name,
+                documentation: """
+                    `\(expression)`, on `\(type)` operands
+
+                    An accumulator form of `\(type).\(VMGen.snakeCase(pascalCase: op))`.
+                    """,
+                immediateLayout: layout
+            )
+            inst.useIreg = use
+            return inst
+        }
+
+        var toAcc: Instruction {
+            instruction(toAccName, "ireg = x \(VMGen.snakeCase(pascalCase: op)) y", .accBinary, .write)
+        }
+        var fromAcc: Instruction {
+            instruction(fromAccName, "result = ireg \(VMGen.snakeCase(pascalCase: op)) y", .accUnary, .read)
+        }
+        var inAcc: Instruction {
+            instruction(inAccName, "ireg = ireg \(VMGen.snakeCase(pascalCase: op)) y", .acc, .write)
+        }
+    }
+
+    static let intAccBinOps: [IntAccBinOpInfo] = {
+        let ops = ["Add", "Sub", "Mul", "And", "Or", "Xor", "Shl", "ShrS", "ShrU", "Rotl", "Rotr"]
+        return intValueTypes.flatMap { type in ops.map { IntAccBinOpInfo(type: type, op: $0) } }
+    }()
+
+    /// Fused compare+branch forms whose left operand is the accumulator. A
+    /// value arriving as the right operand swaps the comparison instead.
+    static func buildBrIfAccCmpInsts() -> [Instruction] {
+        var results: [Instruction] = []
+        for type in intValueTypes {
+            for op in brIfCmpOps {
+                let typeName = type.uppercased()
+                var inst = Instruction(
+                    name: "brIf\(typeName)\(op)Acc",
+                    documentation: """
+                        Conditional pc-relative branch if `ireg \(VMGen.snakeCase(pascalCase: op)) y` holds for `\(type)` operands
+
+                        The accumulator form of `brIf\(typeName)\(op)`.
+                        """,
+                    isControl: true, mayUpdateFrame: false,
+                    immediateLayout: .brIfAccCmpOperand
+                )
+                inst.useIreg = .read
+                results.append(inst)
+            }
+        }
+        return results
+    }
+
+    static let brIfAccCmpInsts: [Instruction] = buildBrIfAccCmpInsts()
+
+    static let accMiscInsts: [Instruction] = {
+        var brIfAcc = Instruction(
+            name: "brIfAcc",
+            documentation: """
+                Conditional pc-relative branch if the low 32 bits of the accumulator are non-zero
+
+                The accumulator form of `brIf`.
+                """,
+            isControl: true, mayUpdateFrame: false,
+            immediateLayout: .brIfAccOperand
+        )
+        brIfAcc.useIreg = .read
+        var brIfNotAcc = Instruction(
+            name: "brIfNotAcc",
+            documentation: """
+                Conditional pc-relative branch if the low 32 bits of the accumulator are zero
+
+                The accumulator form of `brIfNot`.
+                """,
+            isControl: true, mayUpdateFrame: false,
+            immediateLayout: .brIfAccOperand
+        )
+        brIfNotAcc.useIreg = .read
+        var globalGetToAcc = Instruction(
+            name: "globalGetToAcc",
+            documentation: "`global.get` for a scalar global, into the accumulator",
+            immediateLayout: .globalOperand
+        )
+        globalGetToAcc.useIreg = .write
+        return [brIfAcc, brIfNotAcc, globalGetToAcc]
+    }()
+
     // MARK: - Instruction generation
 
     static func buildInstructions() -> [Instruction] {
@@ -1166,6 +1299,11 @@ extension VMGen {
         instructions += floatBinBinOps.map(\.instruction)
         instructions += brIfAndInsts
         instructions += intBinBinOps.map(\.instruction)
+        instructions += intAccBinOps.map(\.toAcc)
+        instructions += intAccBinOps.map(\.fromAcc)
+        instructions += intAccBinOps.map(\.inAcc)
+        instructions += brIfAccCmpInsts
+        instructions += accMiscInsts
         return instructions
     }
 
