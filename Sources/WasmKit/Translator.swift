@@ -705,6 +705,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case compare(kind: FusedCmpKind, lhs: VReg, rhs: VReg)
         /// `result = (input == 0)` for a 32-bit `input`
         case i32Eqz(input: VReg)
+        /// `result = (input == 0)` for a 64-bit `input`
+        case i64Eqz(input: VReg)
     }
 
     /// The last emission, positioned, when it is a fusion candidate.
@@ -1870,11 +1872,24 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case .i32Eqz(let input):
             // `eqz(x)` is non-zero exactly when `x` is zero, so the fused form
             // is just the plain branch with the opposite polarity on `x`.
+            // `brIf`/`brIfNot` test `sp[i32:]`, which is exactly the width of
+            // an `i32.eqz` input.
             factory = { polarity, offset in
                 let operand = Instruction.BrIfOperand(condition: LVReg(input), offset: offset)
                 switch polarity {
                 case .ifTrue: return Instruction.brIfNot(operand)
                 case .ifFalse: return Instruction.brIf(operand)
+                }
+            }
+        case .i64Eqz(let input):
+            // Same shape, but `brIf`/`brIfNot` would only look at the low 32
+            // bits of the slot (0x1_0000_0000 is not zero yet has a zero low
+            // half), so the 64-bit opcodes are used instead.
+            factory = { polarity, offset in
+                let operand = Instruction.BrIfOperand(condition: LVReg(input), offset: offset)
+                switch polarity {
+                case .ifTrue: return Instruction.brIfI64Eqz(operand)
+                case .ifFalse: return Instruction.brIfI64Nez(operand)
                 }
             }
         }
@@ -3249,9 +3264,16 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         try visitBinary(operand, result, instruction)
     }
     mutating func visitI64Eqz() throws(WasmKitError) -> Output {
-        try popPushEmit(.i64, .i32) { value, result in
-            .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
-        }
+        let value = try popVRegOperand(.i64)
+        let result = valueStack.push(.i32)
+        guard let value = value else { return }
+        emit(
+            .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value))),
+            resultRelink: { newResult in
+                .i64Eqz(Instruction.UnaryOperand(result: LVReg(newResult), input: LVReg(value)))
+            },
+            fusable: (.i64Eqz(input: value), result)
+        )
     }
     mutating func visitUnary(_ unary: WasmParser.Instruction.Unary) throws(WasmKitError) {
         let operand: ValueType

@@ -915,7 +915,31 @@ extension VMGen {
                     that handed off to it.
                     """,
                 isControl: true, mayUpdateFrame: true, useCurrentMemory: .write
-            )
+            ),
+            // `i64.eqz` folded into the branch that consumes its result.
+            //
+            // `brIf`/`brIfNot` read only the low 32 bits of the condition slot
+            // (`sp[i32:]`), so they cannot stand in for a 64-bit zero test: a
+            // value like 0x1_0000_0000 has a zero low half but is not zero.
+            // These two read the full 64-bit slot instead.
+            Instruction(
+                name: "brIfI64Eqz",
+                documentation: """
+                    Conditional pc-relative branch if the 64-bit operand is zero
+
+                    Fused form of `i64.eqz` followed by `br_if`.
+                    """,
+                isControl: true, mayUpdateFrame: false, immediateLayout: .brIfOperand
+            ),
+            Instruction(
+                name: "brIfI64Nez",
+                documentation: """
+                    Conditional pc-relative branch if the 64-bit operand is not zero
+
+                    Fused form of `i64.eqz` followed by `br_if_not`.
+                    """,
+                isControl: true, mayUpdateFrame: false, immediateLayout: .brIfOperand
+            ),
         ]
         instructions += memoryTrapInsts
         return instructions

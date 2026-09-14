@@ -475,6 +475,10 @@ extension Instruction {
             case .brIfI64LeU(let op): brIfCmp("i64.le_u", op)
             case .brIfI64GeS(let op): brIfCmp("i64.ge_s", op)
             case .brIfI64GeU(let op): brIfCmp("i64.ge_u", op)
+            case .brIfI64Eqz(let op):
+                target.write("br_if.i64.eqz \(reg(op.condition)), \(branchTarget(instructionOffset, Int(op.offset)))")
+            case .brIfI64Nez(let op):
+                target.write("br_if.i64.nez \(reg(op.condition)), \(branchTarget(instructionOffset, Int(op.offset)))")
             case .br(let offset):
                 target.write("br \(branchTarget(instructionOffset, Int(offset)))")
             case .brTable(let table):

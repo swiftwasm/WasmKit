@@ -37,6 +37,26 @@ extension Execution {
         }
         return pc.advanced(by: Int(immediate.offset)).next()
     }
+    /// `i64.eqz x` followed by `br_if`: branch when `x == 0`.
+    ///
+    /// `brIf`/`brIfNot` test only the low 32 bits of the condition slot, which
+    /// is wrong for a 64-bit zero test (`0x1_0000_0000` has a zero low half), so
+    /// this and `brIfI64Nez` read the whole slot.
+    mutating func brIfI64Eqz(sp: Sp, pc: Pc, immediate: Instruction.BrIfOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for the rationale.
+        guard _fastPath(sp[i64: immediate.condition] == 0) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// `i64.eqz x` followed by `br_if_not`: branch when `x != 0`.
+    mutating func brIfI64Nez(sp: Sp, pc: Pc, immediate: Instruction.BrIfOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for the rationale.
+        guard _fastPath(sp[i64: immediate.condition] != 0) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
     mutating func brTable(sp: Sp, pc: Pc, immediate: Instruction.BrTableOperand) -> (Pc, CodeSlot) {
         let index = sp[i32: immediate.index]
         let normalizedOffset = min(Int(index), Int(immediate.count - 1))
