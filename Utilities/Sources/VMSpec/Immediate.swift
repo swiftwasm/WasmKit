@@ -275,6 +275,13 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "operand", type: .VReg)
     }
 
+    /// `freg = (sp[x] <op1> sp[y]) <op2> sp[z]`.
+    static let accBinBin = Self(name: "AccBinBinOperand") {
+        $0.field(name: "x", type: .VReg)
+        $0.field(name: "y", type: .VReg)
+        $0.field(name: "z", type: .VReg)
+    }
+
     /// `ireg = load(sp[pointer] + offset)` and `store(sp[pointer] + offset) = ireg`,
     /// on a 32-bit memory.
     static let accMemoryPointer = Self(name: "AccMemoryPointerOperand") {

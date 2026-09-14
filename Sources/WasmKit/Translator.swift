@@ -801,6 +801,50 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case f32Eq, f32Ne, f32Lt, f32Gt, f32Le, f32Ge
         case f64Eq, f64Ne, f64Lt, f64Gt, f64Le, f64Ge
 
+        /// The comparison that holds exactly when this one does with its
+        /// operands exchanged (`a < b` is `b > a`), which is exact under NaN.
+        var swapped: FusedFCmpKind {
+            switch self {
+            case .f32Eq: return .f32Eq
+            case .f32Ne: return .f32Ne
+            case .f32Lt: return .f32Gt
+            case .f32Gt: return .f32Lt
+            case .f32Le: return .f32Ge
+            case .f32Ge: return .f32Le
+            case .f64Eq: return .f64Eq
+            case .f64Ne: return .f64Ne
+            case .f64Lt: return .f64Gt
+            case .f64Gt: return .f64Lt
+            case .f64Le: return .f64Ge
+            case .f64Ge: return .f64Le
+            }
+        }
+
+        var operandType: ValueType {
+            switch self {
+            case .f32Eq, .f32Ne, .f32Lt, .f32Gt, .f32Le, .f32Ge: return .f32
+            case .f64Eq, .f64Ne, .f64Lt, .f64Gt, .f64Le, .f64Ge: return .f64
+            }
+        }
+
+        /// The fused branch whose left operand is the float accumulator, or
+        /// `nil` for `f32`.
+        func makeBrIfAcc(polarity: FusedBranchPolarity) -> ((Instruction.BrIfAccCmpOperand) -> Instruction)? {
+            switch (self, polarity) {
+            case (.f64Eq, .ifTrue), (.f64Ne, .ifFalse): return Instruction.brIfF64EqAcc
+            case (.f64Eq, .ifFalse), (.f64Ne, .ifTrue): return Instruction.brIfF64NeAcc
+            case (.f64Lt, .ifTrue): return Instruction.brIfF64LtAcc
+            case (.f64Lt, .ifFalse): return Instruction.brIfNotF64LtAcc
+            case (.f64Le, .ifTrue): return Instruction.brIfF64LeAcc
+            case (.f64Le, .ifFalse): return Instruction.brIfNotF64LeAcc
+            case (.f64Gt, .ifTrue): return Instruction.brIfF64GtAcc
+            case (.f64Gt, .ifFalse): return Instruction.brIfNotF64GtAcc
+            case (.f64Ge, .ifTrue): return Instruction.brIfF64GeAcc
+            case (.f64Ge, .ifFalse): return Instruction.brIfNotF64GeAcc
+            case (.f32Eq, _), (.f32Ne, _), (.f32Lt, _), (.f32Gt, _), (.f32Le, _), (.f32Ge, _): return nil
+            }
+        }
+
         /// The fused branch for this comparison at the given branch polarity.
         ///
         /// Three rewrites happen here, all of them exact under NaN:
@@ -879,6 +923,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     /// superinstructions (`f64MulAdd`, `i32ShlAdd` and friends).
     fileprivate enum BinBinOp {
         case add, sub, mul
+        /// Float division, which pairs with no superinstruction.
+        case div
         case and, or, xor, shl, shrS, shrU, rotl, rotr
 
         /// Whether `a op b` and `b op a` are the same operation.
@@ -891,7 +937,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         var isCommutative: Bool {
             switch self {
             case .add, .mul, .and, .or, .xor: return true
-            case .sub, .shl, .shrS, .shrU, .rotl, .rotr: return false
+            case .sub, .div, .shl, .shrS, .shrU, .rotl, .rotr: return false
             }
         }
     }
@@ -907,9 +953,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case (.f32, .add): return Instruction.f32Add
         case (.f32, .sub): return Instruction.f32Sub
         case (.f32, .mul): return Instruction.f32Mul
+        case (.f32, .div): return Instruction.f32Div
         case (.f64, .add): return Instruction.f64Add
         case (.f64, .sub): return Instruction.f64Sub
         case (.f64, .mul): return Instruction.f64Mul
+        case (.f64, .div): return Instruction.f64Div
         case (.i32, .add): return Instruction.i32Add
         case (.i32, .sub): return Instruction.i32Sub
         case (.i32, .mul): return Instruction.i32Mul
@@ -1081,6 +1129,58 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
 
+    /// The float accumulator forms of an `f64` binary operation. The reversed
+    /// forms, where the accumulated value is the right operand, exist only for
+    /// the non-commutative `sub` and `div`.
+    fileprivate struct FloatAccBinaryForms {
+        let toAcc: (Instruction.AccBinaryOperand) -> Instruction
+        let fromAcc: (Instruction.AccUnaryOperand) -> Instruction
+        let inAcc: (Instruction.AccOperand) -> Instruction
+        let fromAccRev: ((Instruction.AccUnaryOperand) -> Instruction)?
+        let inAccRev: ((Instruction.AccOperand) -> Instruction)?
+    }
+
+    fileprivate static func floatAccBinaryForms(_ type: ValueType, _ op: BinBinOp) -> FloatAccBinaryForms? {
+        switch (type, op) {
+        case (.f64, .add):
+            return FloatAccBinaryForms(
+                toAcc: Instruction.f64AddToAcc, fromAcc: Instruction.f64AddFromAcc, inAcc: Instruction.f64AddInAcc,
+                fromAccRev: nil, inAccRev: nil)
+        case (.f64, .mul):
+            return FloatAccBinaryForms(
+                toAcc: Instruction.f64MulToAcc, fromAcc: Instruction.f64MulFromAcc, inAcc: Instruction.f64MulInAcc,
+                fromAccRev: nil, inAccRev: nil)
+        case (.f64, .sub):
+            return FloatAccBinaryForms(
+                toAcc: Instruction.f64SubToAcc, fromAcc: Instruction.f64SubFromAcc, inAcc: Instruction.f64SubInAcc,
+                fromAccRev: Instruction.f64SubFromAccRev, inAccRev: Instruction.f64SubInAccRev)
+        case (.f64, .div):
+            return FloatAccBinaryForms(
+                toAcc: Instruction.f64DivToAcc, fromAcc: Instruction.f64DivFromAcc, inAcc: Instruction.f64DivInAcc,
+                fromAccRev: Instruction.f64DivFromAccRev, inAccRev: Instruction.f64DivInAccRev)
+        default: return nil
+        }
+    }
+
+    /// The `f64` two-operation superinstruction producing into the float
+    /// accumulator.
+    fileprivate static func floatBinBinAccInstruction(
+        _ type: ValueType, _ op1: BinBinOp, _ op2: BinBinOp
+    ) -> ((Instruction.AccBinBinOperand) -> Instruction)? {
+        switch (type, op1, op2) {
+        case (.f64, .add, .add): return Instruction.f64AddAddToAcc
+        case (.f64, .add, .sub): return Instruction.f64AddSubToAcc
+        case (.f64, .add, .mul): return Instruction.f64AddMulToAcc
+        case (.f64, .sub, .add): return Instruction.f64SubAddToAcc
+        case (.f64, .sub, .sub): return Instruction.f64SubSubToAcc
+        case (.f64, .sub, .mul): return Instruction.f64SubMulToAcc
+        case (.f64, .mul, .add): return Instruction.f64MulAddToAcc
+        case (.f64, .mul, .sub): return Instruction.f64MulSubToAcc
+        case (.f64, .mul, .mul): return Instruction.f64MulMulToAcc
+        default: return nil
+        }
+    }
+
     /// A load and its accumulator forms, on a 32-bit memory.
     fileprivate struct AccLoadForms {
         let plain: (Instruction.LoadOperand) -> Instruction
@@ -1190,8 +1290,16 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let result: VReg
     }
 
-    /// An instruction whose single integer result can be produced into the
-    /// accumulator instead of a frame slot.
+    /// The two accumulator registers.
+    fileprivate enum AccRegister {
+        /// `ireg`, which holds an integer or a raw 64-bit slot value.
+        case integer
+        /// `freg`, which holds an `f64`.
+        case float
+    }
+
+    /// An instruction whose single result can be produced into an accumulator
+    /// instead of a frame slot.
     ///
     /// Recorded as operands rather than as `Instruction` values, which would
     /// make the `~Copyable` builder's layout expensive to analyze.
@@ -1200,6 +1308,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case binary(type: ValueType, op: BinBinOp, lhs: VReg, rhs: VReg, result: VReg)
         /// `result = ireg <op> operand`
         case fromAcc(type: ValueType, op: BinBinOp, operand: VReg, result: VReg)
+        /// `result = freg <op> operand`, or `operand <op> freg` when reversed
+        case fromFloatAcc(op: BinBinOp, operand: VReg, reversed: Bool, result: VReg)
+        /// `result = (x <op1> y) <op2> z` on `f64`
+        case floatBinBin(op1: BinBinOp, op2: BinBinOp, x: VReg, y: VReg, z: VReg, result: VReg)
+        /// `result = sqrt(operand)` on `f64`
+        case sqrt(operand: VReg, result: VReg)
         /// `result = <global>`
         case globalGet(type: ValueType, global: InternalGlobal, result: VReg)
         /// `result = load(pointer + offset)`
@@ -1210,6 +1324,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         var type: ValueType {
             switch self {
             case .binary(let type, _, _, _, _), .fromAcc(let type, _, _, _), .globalGet(let type, _, _): return type
+            case .fromFloatAcc, .floatBinBin, .sqrt: return .f64
             case .load(let load, _, _, _), .loadFromAcc(let load, _, _): return load.type
             }
         }
@@ -1217,23 +1332,40 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         var result: VReg {
             switch self {
             case .binary(_, _, _, _, let result), .fromAcc(_, _, _, let result), .globalGet(_, _, let result): return result
+            case .fromFloatAcc(_, _, _, let result), .floatBinBin(_, _, _, _, _, let result), .sqrt(_, let result): return result
             case .load(_, _, _, let result), .loadFromAcc(_, _, let result): return result
             }
         }
 
-        /// The same operation, producing into the accumulator.
-        var toAcc: Instruction {
-            switch self {
-            case .binary(let type, let op, let lhs, let rhs, _):
-                return accBinaryForms(type, op)!.toAcc(Instruction.AccBinaryOperand(lhs: lhs, rhs: rhs))
-            case .fromAcc(let type, let op, let operand, _):
-                return accBinaryForms(type, op)!.inAcc(Instruction.AccOperand(operand: operand))
-            case .globalGet(_, let global, _):
+        /// The same operation producing into `register`, or `nil` when it has
+        /// no such form.
+        func producing(into register: AccRegister) -> Instruction? {
+            switch (self, register) {
+            case (.binary(let type, let op, let lhs, let rhs, _), .integer):
+                return accBinaryForms(type, op)?.toAcc(Instruction.AccBinaryOperand(lhs: lhs, rhs: rhs))
+            case (.binary(let type, let op, let lhs, let rhs, _), .float):
+                return floatAccBinaryForms(type, op)?.toAcc(Instruction.AccBinaryOperand(lhs: lhs, rhs: rhs))
+            case (.fromAcc(let type, let op, let operand, _), .integer):
+                return accBinaryForms(type, op)?.inAcc(Instruction.AccOperand(operand: operand))
+            case (.fromFloatAcc(let op, let operand, let reversed, _), .float):
+                let forms = floatAccBinaryForms(.f64, op)!
+                return (reversed ? forms.inAccRev! : forms.inAcc)(Instruction.AccOperand(operand: operand))
+            case (.floatBinBin(let op1, let op2, let x, let y, let z, _), .float):
+                return floatBinBinAccInstruction(.f64, op1, op2)?(Instruction.AccBinBinOperand(x: x, y: y, z: z))
+            case (.sqrt(let operand, _), .float):
+                return .f64SqrtToAcc(Instruction.AccOperand(operand: operand))
+            case (.globalGet(_, let global, _), .integer):
                 return .globalGetToAcc(Instruction.GlobalOperand(global: global))
-            case .load(let load, let pointer, let offset, _):
+            case (.load(let load, let pointer, let offset, _), .integer):
                 return accLoadForms(load)!.toAcc(Instruction.AccMemoryPointerOperand(pointer: pointer, offset: offset))
-            case .loadFromAcc(let load, let offset, _):
+            case (.load(.f64Load, let pointer, let offset, _), .float):
+                return .f64LoadToFAcc(Instruction.AccMemoryPointerOperand(pointer: pointer, offset: offset))
+            case (.loadFromAcc(let load, let offset, _), .integer):
                 return accLoadForms(load)!.inAcc(Instruction.AccMemoryOffsetOperand(offset: offset))
+            case (.loadFromAcc(.f64Load, let offset, _), .float):
+                return .f64LoadFromAccToFAcc(Instruction.AccMemoryOffsetOperand(offset: offset))
+            default:
+                return nil
             }
         }
 
@@ -1244,6 +1376,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 return plainBinaryInstruction(type, op)(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(result)))
             case .fromAcc(let type, let op, let operand, let result):
                 return accBinaryForms(type, op)!.fromAcc(Instruction.AccUnaryOperand(operand: operand, result: LVReg(result)))
+            case .fromFloatAcc(let op, let operand, let reversed, let result):
+                let forms = floatAccBinaryForms(.f64, op)!
+                return (reversed ? forms.fromAccRev! : forms.fromAcc)(Instruction.AccUnaryOperand(operand: operand, result: LVReg(result)))
+            case .floatBinBin(let op1, let op2, let x, let y, let z, let result):
+                return binBinInstruction(.f64, op1, op2, reversed: false)!(Instruction.BinBinOperand(result: result, x: x, y: y, z: z))
+            case .sqrt(let operand, let result):
+                return .f64Sqrt(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(operand)))
             case .globalGet(_, let global, let result):
                 return .globalGet(Instruction.GlobalAndVRegOperand(reg: LLVReg(result), global: global))
             case .load(let load, let pointer, let offset, let result):
@@ -1266,12 +1405,36 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     /// right before it, so that a branch fusing the comparison can take that
     /// operand from the accumulator.
     fileprivate struct AccCompare {
+        enum Kind {
+            case integer(FusedCmpKind)
+            case float(FusedFCmpKind)
+        }
         /// The predicate with the accumulator as its left operand.
-        let kind: FusedCmpKind
+        let kind: Kind
         /// The operand that stays in a slot.
         let rhs: VReg
+        /// Set when an `eqz` negates the comparison.
+        var negated = false
         let producerPosition: MetaProgramCounter
         let producer: AccProducerForm
+
+        var register: AccRegister {
+            switch kind {
+            case .integer: return .integer
+            case .float: return .float
+            }
+        }
+
+        func makeBranch(polarity: FusedBranchPolarity, offset: Int32) -> Instruction {
+            let polarity = negated ? polarity.flipped : polarity
+            let operand = Instruction.BrIfAccCmpOperand(rhs: rhs, offset: offset)
+            switch kind {
+            case .integer(let kind):
+                return (polarity == .ifTrue ? kind : kind.complement).makeBrIfAcc(operand)
+            case .float(let kind):
+                return kind.makeBrIfAcc(polarity: polarity)!(operand)
+            }
+        }
     }
 
     /// A just-emitted binary operation whose result can be kept in a register
@@ -2614,16 +2777,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
         // When the comparison's operand was produced right before it, rewind
         // both and take that operand from the accumulator.
-        if let acc = candidate.accCompare, iseqBuilder.canRewind(to: acc.producerPosition) {
-            let kind = acc.kind
-            let rhs = acc.rhs
+        if let acc = candidate.accCompare, iseqBuilder.canRewind(to: acc.producerPosition),
+            let producer = acc.producer.producing(into: acc.register)
+        {
             iseqBuilder.rewind(to: acc.producerPosition)
             self.rewindInstructionMapping(to: acc.producerPosition)
-            emit(acc.producer.toAcc)
-            return { polarity, offset in
-                let fused = polarity == .ifTrue ? kind : kind.complement
-                return fused.makeBrIfAcc(Instruction.BrIfAccCmpOperand(rhs: rhs, offset: offset))
-            }
+            emit(producer)
+            return { polarity, offset in acc.makeBranch(polarity: polarity, offset: offset) }
         }
 
         let factory = Self.fusedBranchFactory(for: candidate.condition)
@@ -2729,17 +2889,18 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     /// `i32` condition from the accumulator.
     private func accConditionProducer(_ candidate: AccProducer?, condition: VReg) -> AccProducer? {
         guard let candidate, candidate.form.type == .i32, candidate.form.result == condition,
-            iseqBuilder.canRewind(to: candidate)
+            candidate.form.producing(into: .integer) != nil, iseqBuilder.canRewind(to: candidate)
         else { return nil }
         return candidate
     }
 
-    /// Replaces `producer` with its accumulator-producing form. The caller must
-    /// emit the instruction that reads the accumulator right after.
-    private mutating func rewindProducerIntoAccumulator(_ producer: AccProducer) {
+    /// Replaces `producer` with its form producing into `register`, which it
+    /// must have. The caller must emit the instruction that reads the
+    /// accumulator right after.
+    private mutating func rewindProducerIntoAccumulator(_ producer: AccProducer, _ register: AccRegister = .integer) {
         iseqBuilder.rewind(to: producer.position)
         self.rewindInstructionMapping(to: producer.position)
-        emit(producer.form.toAcc)
+        emit(producer.form.producing(into: register)!)
     }
 
     mutating func visitBrIf(relativeDepth: UInt32) throws(WasmKitError) -> Output {
@@ -3544,7 +3705,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let result = valueStack.push(load.type)
         guard let pointer else { return }
         if let accCandidate, accCandidate.form.type == .i32, accCandidate.form.result == pointer,
-            iseqBuilder.canRewind(to: accCandidate)
+            accCandidate.form.producing(into: .integer) != nil, iseqBuilder.canRewind(to: accCandidate)
         {
             rewindProducerIntoAccumulator(accCandidate)
             emit(
@@ -3579,11 +3740,23 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         if let accCandidate, iseqBuilder.canRewind(to: accCandidate) {
             let accResult = accCandidate.form.result
             if accResult == value, value != pointer, accCandidate.form.type == store.type {
-                rewindProducerIntoAccumulator(accCandidate)
-                emit(forms.fromAcc(Instruction.AccMemoryPointerOperand(pointer: pointer, offset: offset)))
-                return
+                // A raw copy through `ireg` serves any producer that has an
+                // integer form, `f64.load` included; `freg` serves float
+                // arithmetic.
+                if accCandidate.form.producing(into: .integer) != nil {
+                    rewindProducerIntoAccumulator(accCandidate)
+                    emit(forms.fromAcc(Instruction.AccMemoryPointerOperand(pointer: pointer, offset: offset)))
+                    return
+                }
+                if store == .f64Store, accCandidate.form.producing(into: .float) != nil {
+                    rewindProducerIntoAccumulator(accCandidate, .float)
+                    emit(.f64StoreFromFAcc(Instruction.AccMemoryPointerOperand(pointer: pointer, offset: offset)))
+                    return
+                }
             }
-            if accResult == pointer, pointer != value, accCandidate.form.type == .i32 {
+            if accResult == pointer, pointer != value, accCandidate.form.type == .i32,
+                accCandidate.form.producing(into: .integer) != nil
+            {
                 rewindProducerIntoAccumulator(accCandidate)
                 emit(forms.addrFromAcc(Instruction.AccMemoryValueOperand(value: value, offset: offset)))
                 return
@@ -4089,6 +4262,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                         make(Instruction.BinBinOperand(result: newResult, x: x, y: y, z: z))
                     }
                 )
+                if type == .f64 {
+                    iseqBuilder.recordAcc(
+                        AccRecords(producer: .floatBinBin(op1: produced.op, op2: op, x: x, y: y, z: z, result: result)))
+                }
                 return
             }
         }
@@ -4097,7 +4274,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // Without a superinstruction, hand the operand over in the accumulator.
         // The value must be exactly one of the two operands; a commutative
         // operation takes it on either side.
-        if let accCandidate, let accForms, accCandidate.form.type == type, iseqBuilder.canRewind(to: accCandidate) {
+        if let accCandidate, let accForms, accCandidate.form.type == type,
+            accCandidate.form.producing(into: .integer) != nil, iseqBuilder.canRewind(to: accCandidate)
+        {
             let accResult = accCandidate.form.result
             var operand: VReg?
             if accResult == lhs, accResult != rhs {
@@ -4126,6 +4305,40 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             }
         }
 
+        // The same for `f64`, through the float accumulator. A value arriving
+        // as the right operand of `sub` or `div` uses a reversed form.
+        let floatAccForms = Self.floatAccBinaryForms(type, op)
+        if let accCandidate, let floatAccForms, accCandidate.form.producing(into: .float) != nil,
+            iseqBuilder.canRewind(to: accCandidate)
+        {
+            let accResult = accCandidate.form.result
+            var choice: (operand: VReg, reversed: Bool)?
+            if accResult == lhs, accResult != rhs {
+                choice = (rhs, false)
+            } else if accResult == rhs, accResult != lhs {
+                choice = op.isCommutative ? (lhs, false) : (lhs, true)
+            }
+            if let (operand, reversed) = choice {
+                rewindProducerIntoAccumulator(accCandidate, .float)
+                let make = reversed ? floatAccForms.fromAccRev! : floatAccForms.fromAcc
+                emit(
+                    make(Instruction.AccUnaryOperand(operand: operand, result: LVReg(result))),
+                    resultRelink: { newResult in
+                        make(Instruction.AccUnaryOperand(operand: operand, result: LVReg(newResult)))
+                    },
+                    // In source operand order: every shape above computes
+                    // `lhs <op> rhs`, and a superinstruction built on it reads
+                    // the slots in the same order as the unfolded translation.
+                    binary: BinaryOperation(type: type, op: op, lhs: lhs, rhs: rhs, result: result)
+                )
+                iseqBuilder.recordAcc(
+                    AccRecords(
+                        producer: .fromFloatAcc(op: op, operand: operand, reversed: reversed, result: result),
+                        prefix: (accCandidate.position, accCandidate.form)))
+                return
+            }
+        }
+
         let instruction = Self.plainBinaryInstruction(type, op)
         let plain = instruction(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(result)))
         emit(
@@ -4136,7 +4349,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             fusable: FusedAndWidth(type: type, op: op).map { (.and(width: $0, lhs: lhs, rhs: rhs), result, nil) },
             binary: BinaryOperation(type: type, op: op, lhs: lhs, rhs: rhs, result: result)
         )
-        if accForms != nil {
+        if accForms != nil || floatAccForms != nil {
             iseqBuilder.recordAcc(AccRecords(producer: .binary(type: type, op: op, lhs: lhs, rhs: rhs, result: result)))
         }
     }
@@ -4159,16 +4372,32 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // Record whether a branch fusing this comparison can also take one
         // operand from the accumulator. A right operand swaps the predicate.
         var accCompare: AccCompare?
-        if let accCandidate, case .compare(let kind, _, _) = condition, accCandidate.form.type == kind.operandType,
-            iseqBuilder.canRewind(to: accCandidate)
-        {
+        if let accCandidate, iseqBuilder.canRewind(to: accCandidate) {
             let accResult = accCandidate.form.result
+            let slot: (rhs: VReg, swapped: Bool)?
             if accResult == lhs, accResult != rhs {
-                accCompare = AccCompare(
-                    kind: kind, rhs: rhs, producerPosition: accCandidate.position, producer: accCandidate.form)
+                slot = (rhs, false)
             } else if accResult == rhs, accResult != lhs {
+                slot = (lhs, true)
+            } else {
+                slot = nil
+            }
+            var kind: AccCompare.Kind?
+            switch condition {
+            case .compare(let cmp, _, _)
+            where accCandidate.form.type == cmp.operandType
+                && accCandidate.form.producing(into: .integer) != nil:
+                kind = slot.map { .integer($0.swapped ? cmp.swapped : cmp) }
+            case .floatCompare(let cmp, _, _)
+            where cmp.operandType == .f64
+                && accCandidate.form.producing(into: .float) != nil:
+                kind = slot.map { .float($0.swapped ? cmp.swapped : cmp) }
+            default:
+                kind = nil
+            }
+            if let kind, let slot {
                 accCompare = AccCompare(
-                    kind: kind.swapped, rhs: lhs, producerPosition: accCandidate.position, producer: accCandidate.form)
+                    kind: kind, rhs: slot.rhs, producerPosition: accCandidate.position, producer: accCandidate.form)
             }
         }
         emit(
@@ -4202,9 +4431,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // the boolean.
         let fusable: (condition: FusableCondition, result: VReg, start: MetaProgramCounter?)
         var prefix: (position: MetaProgramCounter, producer: AccProducerForm)?
+        var accCompare: AccCompare?
         if let candidate, candidate.result == value, iseqBuilder.canRewind(to: candidate) {
             fusable = (.negated(candidate.condition), result, candidate.position)
             prefix = candidate.prefix.map { (candidate.position, $0) }
+            accCompare = candidate.accCompare
+            accCompare?.negated.toggle()
         } else {
             fusable = (.i32Eqz(input: value), result, nil)
         }
@@ -4215,8 +4447,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             },
             fusable: fusable
         )
-        if let prefix {
-            iseqBuilder.recordAcc(AccRecords(prefix: prefix))
+        if prefix != nil || accCompare != nil {
+            iseqBuilder.recordAcc(AccRecords(compare: accCompare, prefix: prefix))
         }
     }
     mutating func visitCmp(_ cmp: WasmParser.Instruction.Cmp) throws(WasmKitError) {
@@ -4275,9 +4507,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case .f32Add: return try visitFusableBinary(.f32, .add)
         case .f32Sub: return try visitFusableBinary(.f32, .sub)
         case .f32Mul: return try visitFusableBinary(.f32, .mul)
+        case .f32Div: return try visitFusableBinary(.f32, .div)
         case .f64Add: return try visitFusableBinary(.f64, .add)
         case .f64Sub: return try visitFusableBinary(.f64, .sub)
         case .f64Mul: return try visitFusableBinary(.f64, .mul)
+        case .f64Div: return try visitFusableBinary(.f64, .div)
         case .i32Add: return try visitFusableBinary(.i32, .add)
         case .i32Sub: return try visitFusableBinary(.i32, .sub)
         case .i32Mul: return try visitFusableBinary(.i32, .mul)
@@ -4363,9 +4597,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // that bit test negated, so a following branch can replace both.
         var fusable: (condition: FusableCondition, result: VReg, start: MetaProgramCounter?)?
         var prefix: (position: MetaProgramCounter, producer: AccProducerForm)?
+        var accCompare: AccCompare?
         if let candidate, candidate.result == value, iseqBuilder.canRewind(to: candidate) {
             fusable = (.negated(candidate.condition), result, candidate.position)
             prefix = candidate.prefix.map { (candidate.position, $0) }
+            accCompare = candidate.accCompare
+            accCompare?.negated.toggle()
         }
         emit(
             .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value))),
@@ -4374,9 +4611,22 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             },
             fusable: fusable
         )
-        if let prefix {
-            iseqBuilder.recordAcc(AccRecords(prefix: prefix))
+        if prefix != nil || accCompare != nil {
+            iseqBuilder.recordAcc(AccRecords(compare: accCompare, prefix: prefix))
         }
+    }
+    /// `f64.sqrt`, which can produce its result into the float accumulator.
+    private mutating func visitF64Sqrt() throws(WasmKitError) {
+        let value = try popVRegOperand(.f64)
+        let result = valueStack.push(.f64)
+        guard let value else { return }
+        emit(
+            .f64Sqrt(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value))),
+            resultRelink: { newResult in
+                .f64Sqrt(Instruction.UnaryOperand(result: LVReg(newResult), input: LVReg(value)))
+            }
+        )
+        iseqBuilder.recordAcc(AccRecords(producer: .sqrt(operand: value, result: result)))
     }
     mutating func visitUnary(_ unary: WasmParser.Instruction.Unary) throws(WasmKitError) {
         let operand: ValueType
@@ -4401,7 +4651,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case .f64Floor: (operand, instruction) = (.f64, Instruction.f64Floor)
         case .f64Trunc: (operand, instruction) = (.f64, Instruction.f64Trunc)
         case .f64Nearest: (operand, instruction) = (.f64, Instruction.f64Nearest)
-        case .f64Sqrt: (operand, instruction) = (.f64, Instruction.f64Sqrt)
+        case .f64Sqrt: return try visitF64Sqrt()
         case .i32Extend8S: (operand, instruction) = (.i32, Instruction.i32Extend8S)
         case .i32Extend16S: (operand, instruction) = (.i32, Instruction.i32Extend16S)
         case .i64Extend8S: (operand, instruction) = (.i64, Instruction.i64Extend8S)

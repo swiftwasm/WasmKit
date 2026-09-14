@@ -29,9 +29,11 @@ extension VMGen {
         /// produces it straight to the instruction right after it, instead of
         /// through a frame slot. It is dead everywhere else.
         static let ireg = Self(label: "ireg", type: "UInt64", cType: "uint64_t")
+        /// The float accumulator, the `f64` counterpart of ``ireg``.
+        static let freg = Self(label: "freg", type: "Double", cType: "double")
 
         /// All cases of `ExecParam`.
-        static var allCases = [sp, pc, md, ms, ireg]
+        static var allCases = [sp, pc, md, ms, ireg, freg]
     }
 
     /// An immediate operand of an instruction.
@@ -113,6 +115,11 @@ extension VMGen {
         /// A handler that does not use it hands an indeterminate value to the
         /// next handler, which never reads it.
         var useIreg: RegisterUse = .none
+        /// How this instruction's handler uses the float accumulator.
+        var useFreg: RegisterUse = .none
+
+        /// Whether the handler uses either accumulator.
+        var usesAccumulator: Bool { useIreg != .none || useFreg != .none }
 
         var mayUpdatePc: Bool {
             self.isControl
@@ -231,6 +238,11 @@ extension VMGen {
             case .none: break
             case .read: vregs += [(.ireg, false)]
             case .write: vregs += [(.ireg, true)]
+            }
+            switch useFreg {
+            case .none: break
+            case .read: vregs += [(.freg, false)]
+            case .write: vregs += [(.freg, true)]
             }
             var parameters: [Parameter] = vregs.map { ($0.reg.label, $0.reg.type, $0.isInout) }
             if let immediate = self.immediate {
@@ -1217,6 +1229,126 @@ extension VMGen {
         return [brIfAcc, brIfNotAcc, globalGetToAcc]
     }()
 
+    // MARK: - Float accumulator forms
+
+    /// The accumulator forms of one `f64` binary operation. `sub` and `div`
+    /// also have reversed forms, where the accumulated value is the right
+    /// operand; `add` and `mul` swap their operands instead.
+    ///
+    /// | form | meaning |
+    /// |---|---|
+    /// | `<op>ToAcc` | `freg = x op y` |
+    /// | `<op>FromAcc` | `result = freg op y` |
+    /// | `<op>InAcc` | `freg = freg op y` |
+    /// | `<op>FromAccRev` | `result = y op freg` |
+    /// | `<op>InAccRev` | `freg = y op freg` |
+    struct FloatAccBinOpInfo {
+        let op: String
+
+        var isCommutative: Bool { ["Add", "Mul"].contains(op) }
+
+        private func instruction(_ suffix: String, _ expression: String, _ layout: ImmediateLayout, _ use: RegisterUse) -> Instruction {
+            var inst = Instruction(
+                name: "f64\(op)\(suffix)",
+                documentation: """
+                    `\(expression)`, on `f64` operands
+
+                    An accumulator form of `f64.\(VMGen.snakeCase(pascalCase: op))`.
+                    """,
+                immediateLayout: layout
+            )
+            inst.useFreg = use
+            return inst
+        }
+
+        var instructions: [Instruction] {
+            let name = VMGen.snakeCase(pascalCase: op)
+            var results = [
+                instruction("ToAcc", "freg = x \(name) y", .accBinary, .write),
+                instruction("FromAcc", "result = freg \(name) y", .accUnary, .read),
+                instruction("InAcc", "freg = freg \(name) y", .acc, .write),
+            ]
+            if !isCommutative {
+                results += [
+                    instruction("FromAccRev", "result = y \(name) freg", .accUnary, .read),
+                    instruction("InAccRev", "freg = y \(name) freg", .acc, .write),
+                ]
+            }
+            return results
+        }
+    }
+
+    static let floatAccBinOps: [FloatAccBinOpInfo] = ["Add", "Sub", "Mul", "Div"].map { FloatAccBinOpInfo(op: $0) }
+
+    /// The `f64` two-operation superinstructions producing into the float
+    /// accumulator.
+    static let floatBinBinAccInsts: [Instruction] = floatBinBinOps.filter { $0.type == "f64" }.map { op in
+        var inst = Instruction(
+            name: "\(op.name)ToAcc",
+            documentation: """
+                `freg = (x \(VMGen.snakeCase(pascalCase: op.op1)) y) \(VMGen.snakeCase(pascalCase: op.op2)) z`, on `f64` operands
+
+                The accumulator form of `\(op.name)`.
+                """,
+            immediateLayout: .accBinBin
+        )
+        inst.useFreg = .write
+        return inst
+    }
+
+    /// Fused `f64` compare+branch forms whose left operand is the float
+    /// accumulator. With the operand order fixed, `gt` and `ge` need opcodes of
+    /// their own; `eq` and `ne` are exact complements and cover both polarities.
+    static let brIfFAccCmpInsts: [Instruction] = [
+        ("brIfF64EqAcc", "freg == y"), ("brIfF64NeAcc", "freg != y"),
+        ("brIfF64LtAcc", "freg < y"), ("brIfF64LeAcc", "freg <= y"),
+        ("brIfF64GtAcc", "freg > y"), ("brIfF64GeAcc", "freg >= y"),
+        ("brIfNotF64LtAcc", "!(freg < y)"), ("brIfNotF64LeAcc", "!(freg <= y)"),
+        ("brIfNotF64GtAcc", "!(freg > y)"), ("brIfNotF64GeAcc", "!(freg >= y)"),
+    ].map { name, taken in
+        var inst = Instruction(
+            name: name,
+            documentation: """
+                Conditional pc-relative branch if `\(taken)` holds for `f64` operands
+
+                A fused float compare+branch whose left operand is the float accumulator.
+                """,
+            isControl: true, mayUpdateFrame: false,
+            immediateLayout: .brIfAccCmpOperand
+        )
+        inst.useFreg = .read
+        return inst
+    }
+
+    static let floatAccMiscInsts: [Instruction] = {
+        var sqrt = Instruction(
+            name: "f64SqrtToAcc",
+            documentation: "`freg = sqrt(operand)`",
+            immediateLayout: .acc
+        )
+        sqrt.useFreg = .write
+        var loadToFAcc = Instruction(
+            name: "f64LoadToFAcc",
+            documentation: "`freg = load(sp[pointer] + offset)`, on a 32-bit memory",
+            mayThrow: false, useCurrentMemory: .read, immediateLayout: .accMemoryPointer)
+        loadToFAcc.mayDispatchToTrap = true
+        loadToFAcc.useFreg = .write
+        var loadFromAccToFAcc = Instruction(
+            name: "f64LoadFromAccToFAcc",
+            documentation: "`freg = load(ireg + offset)`, on a 32-bit memory",
+            mayThrow: false, useCurrentMemory: .read, immediateLayout: .accMemoryOffset)
+        loadFromAccToFAcc.mayDispatchToTrap = true
+        loadFromAccToFAcc.useIreg = .read
+        loadFromAccToFAcc.useFreg = .write
+        var storeFromFAcc = Instruction(
+            name: "f64StoreFromFAcc",
+            documentation: "`store(sp[pointer] + offset) = freg`, on a 32-bit memory",
+            mayThrow: false, useCurrentMemory: .read, immediateLayout: .accMemoryPointer)
+        storeFromFAcc.mayDispatchToTrap = true
+        storeFromFAcc.useFreg = .read
+        return [sqrt, loadToFAcc, loadFromAccToFAcc, storeFromFAcc]
+    }()
+
     // MARK: - Instruction generation
 
     static func buildInstructions() -> [Instruction] {
@@ -1356,6 +1488,10 @@ extension VMGen {
         instructions += brIfAccCmpInsts
         instructions += accMiscInsts
         instructions += memoryAccInsts
+        instructions += floatAccBinOps.flatMap(\.instructions)
+        instructions += floatBinBinAccInsts
+        instructions += brIfFAccCmpInsts
+        instructions += floatAccMiscInsts
         return instructions
     }
 
