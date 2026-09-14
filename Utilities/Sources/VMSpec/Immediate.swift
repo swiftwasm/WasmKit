@@ -60,22 +60,33 @@ extension VMGen {
             return slots
         }
 
+        /// The expression that extracts `field`, placed `byteOffset` bytes into its
+        /// code slot, out of the slot read as the 64-bit word `word` on a
+        /// little-endian host.
+        private static func wordExtraction(of field: ImmediateField, at byteOffset: Int, from word: String) -> String {
+            let shifted = byteOffset == 0 ? word : "\(word) >> \(byteOffset * 8)"
+            switch field.type.name {
+            case "VReg": return "VReg(byteOffset: Int16(truncatingIfNeeded: \(shifted)))"
+            case "LVReg": return "LVReg(storage: Int32(truncatingIfNeeded: \(shifted)))"
+            case "LLVReg": return "LLVReg(storage: Int64(truncatingIfNeeded: \(shifted)))"
+            case "UntypedValue": return "UntypedValue(storage: \(shifted))"
+            default: return "\(field.type.name)(truncatingIfNeeded: \(shifted))"
+            }
+        }
+
         /// Builds the type declaration derived from the layout.
-        func buildDeclaration() -> String {
+        ///
+        /// With `decodesAsWords`, `load(from:)` reads each code slot as one 64-bit
+        /// word and extracts the fields with shifts instead of reading every field
+        /// separately. A handler that reads the next handler pointer right after its
+        /// immediate can then have both loads combined into one.
+        func buildDeclaration(decodesAsWords: Bool) -> String {
             let fieldDeclarations = fields.map { field in
                 "    var \(field.name): \(field.type.name)"
             }.joined(separator: "\n")
             var output = """
             struct \(name): Equatable, InstructionImmediate {
             \(fieldDeclarations)
-
-            """
-
-            // Emit `load` method
-
-            output += """
-
-                @inline(__always) static func load(from pc: inout Pc) -> Self {
 
             """
 
@@ -94,18 +105,52 @@ extension VMGen {
                 return ("(" + elemenets.map { $0.type }.joined(separator: ", ") + ")", elemenets)
             }
 
-            for slot in slots {
-                let (tupleTy, elements) = makeSlotTupleType(slot: slot)
-                output += """
-                        let (\(elements.map { $0.name ?? "_" }.joined(separator: ", "))) = pc.read(\(tupleTy).self)
-
-                """
+            func typedReads(indent: String) -> String {
+                slots.map { slot in
+                    let (tupleTy, elements) = makeSlotTupleType(slot: slot)
+                    return "\(indent)let (\(elements.map { $0.name ?? "_" }.joined(separator: ", "))) = pc.read(\(tupleTy).self)\n"
+                }.joined()
             }
 
-            output += """
-                    return Self(\(fields.map { "\($0.name): \($0.name)" }.joined(separator: ", ")))
-                }
-            """
+            func wordReads(indent: String) -> String {
+                slots.enumerated().map { index, slot in
+                    if slot.count == 1, slot[0].type.size == VMGen.CodeSlotSize {
+                        return "\(indent)let \(slot[0].name) = pc.read(\(slot[0].type.name).self)\n"
+                    }
+                    let word = "word\(index)"
+                    var output = "\(indent)let \(word) = pc.read(UInt64.self)\n"
+                    var byteOffset = 0
+                    for field in slot {
+                        byteOffset = VMGen.alignUp(byteOffset, to: field.type.alignment)
+                        output += "\(indent)let \(field.name) = \(Self.wordExtraction(of: field, at: byteOffset, from: word))\n"
+                        byteOffset += field.type.size
+                    }
+                    return output
+                }.joined()
+            }
+
+            // Emit `load` method
+
+            let construct = "return Self(\(fields.map { "\($0.name): \($0.name)" }.joined(separator: ", ")))"
+            if decodesAsWords {
+                output += """
+
+                    @inline(__always) static func load(from pc: inout Pc) -> Self {
+                        #if _endian(little)
+                \(wordReads(indent: "            "))            \(construct)
+                        #else
+                \(typedReads(indent: "            "))            \(construct)
+                        #endif
+                    }
+                """
+            } else {
+                output += """
+
+                    @inline(__always) static func load(from pc: inout Pc) -> Self {
+                \(typedReads(indent: "        "))        \(construct)
+                    }
+                """
+            }
 
             // Emit `emit` method
 
@@ -155,9 +200,11 @@ extension VMGen {
 
 extension VMGen.ImmediateLayout {
     static let binary = Self(name: "BinaryOperand") {
-        $0.field(name: "result", type: .LVReg)
+        // `result` is kept away from byte 0: decoded from there, its sign extension
+        // folds into the store address, which slows down serial float chains.
         $0.field(name: "lhs", type: .VReg)
         $0.field(name: "rhs", type: .VReg)
+        $0.field(name: "result", type: .LVReg)
     }
 
     static let unary = Self(name: "UnaryOperand") {

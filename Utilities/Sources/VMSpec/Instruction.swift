@@ -100,6 +100,17 @@ extension VMGen {
             self.isControl
         }
 
+        /// Whether the generated handler reads the next instruction's head slot right
+        /// after its immediate instead of after its body, so that the two loads from
+        /// `pc` sit next to each other.
+        ///
+        /// Control and throwing handlers, and memory handlers (which already read it
+        /// up front), are left alone. The immediate layout of a handler that does this
+        /// is decoded as whole words; see `ImmediateLayout.buildDeclaration`.
+        var readsNextHandlerUpFront: Bool {
+            immediate != nil && !mayUpdatePc && !mayDispatchToTrap && !mayThrow
+        }
+
         private init(
             name: String,
             documentation: String?,
