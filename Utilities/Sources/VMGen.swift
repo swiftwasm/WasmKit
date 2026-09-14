@@ -820,18 +820,33 @@ enum VMGen {
                 + generateDirectThreadedCode(instructions: instructions, inlineImpls: inlineImpls)
                 + """
 
+                #if !(os(WASI) || $Embedded)
+                /// A copy of the direct-threading handler table, made once per process.
+                ///
+                /// Swift imports the C array as a tuple value, so taking its address
+                /// materializes the whole table on the stack. Doing that for every
+                /// emitted instruction dominated translation. Reading the table through
+                /// a C accessor instead would keep the handler bodies from inlining into
+                /// their trampolines.
+                nonisolated(unsafe) private let wasmkitExecHandlerTable: UnsafePointer<UInt> = {
+                    let count = MemoryLayout.size(ofValue: wasmkit_tc_exec_handlers) / MemoryLayout<wasmkit_tc_exec>.size
+                    let table = UnsafeMutablePointer<UInt>.allocate(capacity: count)
+                    withUnsafePointer(to: wasmkit_tc_exec_handlers) {
+                        $0.withMemoryRebound(to: UInt.self, capacity: count) {
+                            table.update(from: $0, count: count)
+                        }
+                    }
+                    return UnsafePointer(table)
+                }()
+                #endif
+
                 extension Instruction {
                     /// The tail-calling execution handler for the instruction.
                     var handler: UInt {
                         #if os(WASI) || $Embedded
                         fatalError("Direct threading is not supported on this platform")
                         #else
-                        return withUnsafePointer(to: wasmkit_tc_exec_handlers) {
-                            let count = MemoryLayout.size(ofValue: wasmkit_tc_exec_handlers) / MemoryLayout<wasmkit_tc_exec>.size
-                            return $0.withMemoryRebound(to: UInt.self, capacity: count) {
-                                $0[Int(self.opcodeID)]
-                            }
-                        }
+                        return wasmkitExecHandlerTable[Int(self.opcodeID)]
                         #endif
                     }
                 }
