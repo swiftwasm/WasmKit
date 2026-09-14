@@ -2501,7 +2501,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         iseqBuilder.resetLastEmission()
         try valueStack.pushLocal(localIndex, locals: &locals)
     }
-    mutating func visitLocalSetOrTee(localIndex: UInt32, isTee: Bool) throws(WasmKitError) {
+    /// Shared lowering of `local.set` and `local.tee`. `local.tee` differs
+    /// only in that its caller re-pushes the local afterwards.
+    mutating func visitLocalSetOrTee(localIndex: UInt32) throws(WasmKitError) {
         preserveLocalsOnStack(localIndex)
         let type = try locals.type(of: localIndex)
         let result = localReg(localIndex)
@@ -2523,17 +2525,37 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
         let value = ensureOnVReg(op)
         guard try controlStack.currentFrame().reachable else { return }
-        if type != .v128, !isTee, iseqBuilder.relinkLastInstructionResult(result) {
+        // Relink the producing instruction to write the local's slot directly,
+        // dropping the copy that would otherwise move the value there.
+        //
+        // `local.tee` is included: the value it leaves on the stack is pushed
+        // back as `.local(localIndex)` by `visitLocalTee`, i.e. it *already*
+        // aliases the local's slot whether the value got there by a copy or by
+        // the producer writing it. A later write to the same local before the
+        // tee'd value is consumed is handled by the existing
+        // `preserveLocalsOnStack` mechanism, exactly as it is for `local.get`.
+        //
+        // `v128` is included as well: a v128 producer writes both slots of its
+        // result from one base register (`sp.storeV128(_:at:)`), and a v128
+        // local owns two consecutive slots, so redirecting the base register is
+        // all that is needed -- there is nothing per-slot to relink.
+        //
+        // Note that when `preserveLocalsOnStack(localIndex)` above emitted
+        // copies, the relink is refused (those copies are the last emission,
+        // and they carry no `resultRelink`). That is load-bearing rather than
+        // accidental: those copies read the local's *old* value, and relinking
+        // would move the write of its new value before them.
+        if iseqBuilder.relinkLastInstructionResult(result) {
             // Good news, copyStack is optimized out :)
             return
         }
         emitCopyValueSlots(type, from: value, to: result)
     }
     mutating func visitLocalSet(localIndex: UInt32) throws(WasmKitError) -> Output {
-        try visitLocalSetOrTee(localIndex: localIndex, isTee: false)
+        try visitLocalSetOrTee(localIndex: localIndex)
     }
     mutating func visitLocalTee(localIndex: UInt32) throws(WasmKitError) -> Output {
-        try visitLocalSetOrTee(localIndex: localIndex, isTee: true)
+        try visitLocalSetOrTee(localIndex: localIndex)
         _ = try valueStack.pushLocal(localIndex, locals: &locals)
     }
     mutating func visitGlobalGet(globalIndex: UInt32) throws(WasmKitError) -> Output {
