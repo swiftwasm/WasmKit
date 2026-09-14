@@ -386,6 +386,39 @@ extension Execution {
         case 330: return self.execute_brIfNotI32And(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 331: return self.execute_brIfI64And(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 332: return self.execute_brIfNotI64And(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 333: return self.execute_i32ShlAdd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 334: return self.execute_i32MulAdd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 335: return self.execute_i32AddAdd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 336: return self.execute_i32AndAdd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 337: return self.execute_i32ShrUAnd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 338: return self.execute_i32OrAnd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 339: return self.execute_i32ShrUAdd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 340: return self.execute_i32SubAnd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 341: return self.execute_i32ShlOr(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 342: return self.execute_i32AddAnd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 343: return self.execute_i32ShrUOr(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 344: return self.execute_i32XorShrU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 345: return self.execute_i32AddSub(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 346: return self.execute_i32XorShl(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 347: return self.execute_i32SubAdd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 348: return self.execute_i32AndShl(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 349: return self.execute_i64XorRotl(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 350: return self.execute_i64MulAdd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 351: return self.execute_i64ShlAnd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 352: return self.execute_i64AndMul(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 353: return self.execute_i64ShlOr(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 354: return self.execute_i64XorAnd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 355: return self.execute_i64MulXor(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 356: return self.execute_i64AndXor(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 357: return self.execute_i64RotlXor(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 358: return self.execute_i64SubAnd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 359: return self.execute_i64XorXor(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 360: return self.execute_i64OrOr(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 361: return self.execute_i64ShrUAnd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 362: return self.execute_i64AndAnd(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 363: return self.execute_i64XorMul(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 364: return self.execute_i64XorShrU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 365: return self.execute_i32MulSubRev(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -3515,7 +3548,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f32AddAdd") @inline(__always)
     mutating func execute_f32AddAdd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f32: immediate.x].add(sp.pointee[f32: immediate.y])
@@ -3524,7 +3557,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f32AddSub") @inline(__always)
     mutating func execute_f32AddSub(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f32: immediate.x].add(sp.pointee[f32: immediate.y])
@@ -3533,7 +3566,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f32AddMul") @inline(__always)
     mutating func execute_f32AddMul(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f32: immediate.x].add(sp.pointee[f32: immediate.y])
@@ -3542,7 +3575,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f32SubAdd") @inline(__always)
     mutating func execute_f32SubAdd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f32: immediate.x].sub(sp.pointee[f32: immediate.y])
@@ -3551,7 +3584,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f32SubSub") @inline(__always)
     mutating func execute_f32SubSub(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f32: immediate.x].sub(sp.pointee[f32: immediate.y])
@@ -3560,7 +3593,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f32SubMul") @inline(__always)
     mutating func execute_f32SubMul(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f32: immediate.x].sub(sp.pointee[f32: immediate.y])
@@ -3569,7 +3602,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f32MulAdd") @inline(__always)
     mutating func execute_f32MulAdd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f32: immediate.x].mul(sp.pointee[f32: immediate.y])
@@ -3578,7 +3611,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f32MulSub") @inline(__always)
     mutating func execute_f32MulSub(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f32: immediate.x].mul(sp.pointee[f32: immediate.y])
@@ -3587,7 +3620,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f32MulMul") @inline(__always)
     mutating func execute_f32MulMul(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f32: immediate.x].mul(sp.pointee[f32: immediate.y])
@@ -3596,7 +3629,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f64AddAdd") @inline(__always)
     mutating func execute_f64AddAdd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f64: immediate.x].add(sp.pointee[f64: immediate.y])
@@ -3605,7 +3638,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f64AddSub") @inline(__always)
     mutating func execute_f64AddSub(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f64: immediate.x].add(sp.pointee[f64: immediate.y])
@@ -3614,7 +3647,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f64AddMul") @inline(__always)
     mutating func execute_f64AddMul(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f64: immediate.x].add(sp.pointee[f64: immediate.y])
@@ -3623,7 +3656,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f64SubAdd") @inline(__always)
     mutating func execute_f64SubAdd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f64: immediate.x].sub(sp.pointee[f64: immediate.y])
@@ -3632,7 +3665,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f64SubSub") @inline(__always)
     mutating func execute_f64SubSub(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f64: immediate.x].sub(sp.pointee[f64: immediate.y])
@@ -3641,7 +3674,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f64SubMul") @inline(__always)
     mutating func execute_f64SubMul(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f64: immediate.x].sub(sp.pointee[f64: immediate.y])
@@ -3650,7 +3683,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f64MulAdd") @inline(__always)
     mutating func execute_f64MulAdd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f64: immediate.x].mul(sp.pointee[f64: immediate.y])
@@ -3659,7 +3692,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f64MulSub") @inline(__always)
     mutating func execute_f64MulSub(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f64: immediate.x].mul(sp.pointee[f64: immediate.y])
@@ -3668,7 +3701,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_f64MulMul") @inline(__always)
     mutating func execute_f64MulMul(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.FloatBinBinOperand.load(from: &pc.pointee)
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         let intermediate = sp.pointee[f64: immediate.x].mul(sp.pointee[f64: immediate.y])
@@ -3701,6 +3734,303 @@ extension Execution {
         let immediate = Instruction.BrIfCmpOperand.load(from: &pc.pointee)
         let next: CodeSlot
         (pc.pointee, next) = self.brIfNotI64And(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32ShlAdd") @inline(__always)
+    mutating func execute_i32ShlAdd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].shl(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = intermediate.add(sp.pointee[i32: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32MulAdd") @inline(__always)
+    mutating func execute_i32MulAdd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].mul(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = intermediate.add(sp.pointee[i32: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32AddAdd") @inline(__always)
+    mutating func execute_i32AddAdd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].add(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = intermediate.add(sp.pointee[i32: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32AndAdd") @inline(__always)
+    mutating func execute_i32AndAdd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].and(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = intermediate.add(sp.pointee[i32: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32ShrUAnd") @inline(__always)
+    mutating func execute_i32ShrUAnd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].shrU(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = intermediate.and(sp.pointee[i32: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32OrAnd") @inline(__always)
+    mutating func execute_i32OrAnd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].or(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = intermediate.and(sp.pointee[i32: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32ShrUAdd") @inline(__always)
+    mutating func execute_i32ShrUAdd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].shrU(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = intermediate.add(sp.pointee[i32: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32SubAnd") @inline(__always)
+    mutating func execute_i32SubAnd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].sub(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = intermediate.and(sp.pointee[i32: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32ShlOr") @inline(__always)
+    mutating func execute_i32ShlOr(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].shl(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = intermediate.or(sp.pointee[i32: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32AddAnd") @inline(__always)
+    mutating func execute_i32AddAnd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].add(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = intermediate.and(sp.pointee[i32: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32ShrUOr") @inline(__always)
+    mutating func execute_i32ShrUOr(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].shrU(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = intermediate.or(sp.pointee[i32: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32XorShrU") @inline(__always)
+    mutating func execute_i32XorShrU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].xor(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = intermediate.shrU(sp.pointee[i32: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32AddSub") @inline(__always)
+    mutating func execute_i32AddSub(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].add(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = intermediate.sub(sp.pointee[i32: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32XorShl") @inline(__always)
+    mutating func execute_i32XorShl(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].xor(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = intermediate.shl(sp.pointee[i32: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32SubAdd") @inline(__always)
+    mutating func execute_i32SubAdd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].sub(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = intermediate.add(sp.pointee[i32: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32AndShl") @inline(__always)
+    mutating func execute_i32AndShl(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].and(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = intermediate.shl(sp.pointee[i32: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64XorRotl") @inline(__always)
+    mutating func execute_i64XorRotl(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i64: immediate.x].xor(sp.pointee[i64: immediate.y])
+        sp.pointee[i64: immediate.result] = intermediate.rotl(sp.pointee[i64: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64MulAdd") @inline(__always)
+    mutating func execute_i64MulAdd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i64: immediate.x].mul(sp.pointee[i64: immediate.y])
+        sp.pointee[i64: immediate.result] = intermediate.add(sp.pointee[i64: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64ShlAnd") @inline(__always)
+    mutating func execute_i64ShlAnd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i64: immediate.x].shl(sp.pointee[i64: immediate.y])
+        sp.pointee[i64: immediate.result] = intermediate.and(sp.pointee[i64: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64AndMul") @inline(__always)
+    mutating func execute_i64AndMul(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i64: immediate.x].and(sp.pointee[i64: immediate.y])
+        sp.pointee[i64: immediate.result] = intermediate.mul(sp.pointee[i64: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64ShlOr") @inline(__always)
+    mutating func execute_i64ShlOr(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i64: immediate.x].shl(sp.pointee[i64: immediate.y])
+        sp.pointee[i64: immediate.result] = intermediate.or(sp.pointee[i64: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64XorAnd") @inline(__always)
+    mutating func execute_i64XorAnd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i64: immediate.x].xor(sp.pointee[i64: immediate.y])
+        sp.pointee[i64: immediate.result] = intermediate.and(sp.pointee[i64: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64MulXor") @inline(__always)
+    mutating func execute_i64MulXor(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i64: immediate.x].mul(sp.pointee[i64: immediate.y])
+        sp.pointee[i64: immediate.result] = intermediate.xor(sp.pointee[i64: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64AndXor") @inline(__always)
+    mutating func execute_i64AndXor(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i64: immediate.x].and(sp.pointee[i64: immediate.y])
+        sp.pointee[i64: immediate.result] = intermediate.xor(sp.pointee[i64: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64RotlXor") @inline(__always)
+    mutating func execute_i64RotlXor(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i64: immediate.x].rotl(sp.pointee[i64: immediate.y])
+        sp.pointee[i64: immediate.result] = intermediate.xor(sp.pointee[i64: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64SubAnd") @inline(__always)
+    mutating func execute_i64SubAnd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i64: immediate.x].sub(sp.pointee[i64: immediate.y])
+        sp.pointee[i64: immediate.result] = intermediate.and(sp.pointee[i64: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64XorXor") @inline(__always)
+    mutating func execute_i64XorXor(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i64: immediate.x].xor(sp.pointee[i64: immediate.y])
+        sp.pointee[i64: immediate.result] = intermediate.xor(sp.pointee[i64: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64OrOr") @inline(__always)
+    mutating func execute_i64OrOr(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i64: immediate.x].or(sp.pointee[i64: immediate.y])
+        sp.pointee[i64: immediate.result] = intermediate.or(sp.pointee[i64: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64ShrUAnd") @inline(__always)
+    mutating func execute_i64ShrUAnd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i64: immediate.x].shrU(sp.pointee[i64: immediate.y])
+        sp.pointee[i64: immediate.result] = intermediate.and(sp.pointee[i64: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64AndAnd") @inline(__always)
+    mutating func execute_i64AndAnd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i64: immediate.x].and(sp.pointee[i64: immediate.y])
+        sp.pointee[i64: immediate.result] = intermediate.and(sp.pointee[i64: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64XorMul") @inline(__always)
+    mutating func execute_i64XorMul(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i64: immediate.x].xor(sp.pointee[i64: immediate.y])
+        sp.pointee[i64: immediate.result] = intermediate.mul(sp.pointee[i64: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64XorShrU") @inline(__always)
+    mutating func execute_i64XorShrU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i64: immediate.x].xor(sp.pointee[i64: immediate.y])
+        sp.pointee[i64: immediate.result] = intermediate.shrU(sp.pointee[i64: immediate.z])
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32MulSubRev") @inline(__always)
+    mutating func execute_i32MulSubRev(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinBinOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let intermediate = sp.pointee[i32: immediate.x].mul(sp.pointee[i32: immediate.y])
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.z].sub(intermediate)
         return next
     }
 }
