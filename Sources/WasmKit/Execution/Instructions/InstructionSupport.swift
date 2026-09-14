@@ -469,6 +469,21 @@ extension Instruction {
             func binBin(_ name: String, _ op: Instruction.BinBinOperand) {
                 target.write("\(reg(op.result)) = \(name) \(reg(op.x)), \(reg(op.y)), \(reg(op.z))")
             }
+            func loadToAcc(_ name: String, _ op: Instruction.AccMemoryPointerOperand) {
+                target.write("acc = \(name) \(reg(op.pointer)), \(offset(UInt64(op.offset)))")
+            }
+            func loadFromAcc(_ name: String, _ op: Instruction.AccMemoryResultOperand) {
+                target.write("\(reg(op.result)) = \(name) acc, \(offset(UInt64(op.offset)))")
+            }
+            func loadInAcc(_ name: String, _ op: Instruction.AccMemoryOffsetOperand) {
+                target.write("acc = \(name) acc, \(offset(UInt64(op.offset)))")
+            }
+            func storeFromAcc(_ name: String, _ op: Instruction.AccMemoryPointerOperand) {
+                target.write("\(name) \(reg(op.pointer)) + \(offset(UInt64(op.offset))), acc")
+            }
+            func storeAddrFromAcc(_ name: String, _ op: Instruction.AccMemoryValueOperand) {
+                target.write("\(name) acc + \(offset(UInt64(op.offset))), \(reg(op.value))")
+            }
             func toAcc(_ name: String, _ op: Instruction.AccBinaryOperand) {
                 target.write("acc = \(name) \(reg(op.lhs)), \(reg(op.rhs))")
             }
@@ -739,6 +754,66 @@ extension Instruction {
             case .brIfI64GeUAcc(let op): brIfAccCmp("i64.ge_u", op)
             case .brIfAcc(let op): target.write("br_if acc, \(branchTarget(instructionOffset, Int(op.offset)))")
             case .brIfNotAcc(let op): target.write("br_if_not acc, \(branchTarget(instructionOffset, Int(op.offset)))")
+            case .i32LoadToAcc(let op): loadToAcc("i32.load", op)
+            case .i32LoadFromAcc(let op): loadFromAcc("i32.load", op)
+            case .i32LoadInAcc(let op): loadInAcc("i32.load", op)
+            case .i64LoadToAcc(let op): loadToAcc("i64.load", op)
+            case .i64LoadFromAcc(let op): loadFromAcc("i64.load", op)
+            case .i64LoadInAcc(let op): loadInAcc("i64.load", op)
+            case .f32LoadToAcc(let op): loadToAcc("f32.load", op)
+            case .f32LoadFromAcc(let op): loadFromAcc("f32.load", op)
+            case .f32LoadInAcc(let op): loadInAcc("f32.load", op)
+            case .f64LoadToAcc(let op): loadToAcc("f64.load", op)
+            case .f64LoadFromAcc(let op): loadFromAcc("f64.load", op)
+            case .f64LoadInAcc(let op): loadInAcc("f64.load", op)
+            case .i32Load8SToAcc(let op): loadToAcc("i32.load8_s", op)
+            case .i32Load8SFromAcc(let op): loadFromAcc("i32.load8_s", op)
+            case .i32Load8SInAcc(let op): loadInAcc("i32.load8_s", op)
+            case .i32Load8UToAcc(let op): loadToAcc("i32.load8_u", op)
+            case .i32Load8UFromAcc(let op): loadFromAcc("i32.load8_u", op)
+            case .i32Load8UInAcc(let op): loadInAcc("i32.load8_u", op)
+            case .i32Load16SToAcc(let op): loadToAcc("i32.load16_s", op)
+            case .i32Load16SFromAcc(let op): loadFromAcc("i32.load16_s", op)
+            case .i32Load16SInAcc(let op): loadInAcc("i32.load16_s", op)
+            case .i32Load16UToAcc(let op): loadToAcc("i32.load16_u", op)
+            case .i32Load16UFromAcc(let op): loadFromAcc("i32.load16_u", op)
+            case .i32Load16UInAcc(let op): loadInAcc("i32.load16_u", op)
+            case .i64Load8SToAcc(let op): loadToAcc("i64.load8_s", op)
+            case .i64Load8SFromAcc(let op): loadFromAcc("i64.load8_s", op)
+            case .i64Load8SInAcc(let op): loadInAcc("i64.load8_s", op)
+            case .i64Load8UToAcc(let op): loadToAcc("i64.load8_u", op)
+            case .i64Load8UFromAcc(let op): loadFromAcc("i64.load8_u", op)
+            case .i64Load8UInAcc(let op): loadInAcc("i64.load8_u", op)
+            case .i64Load16SToAcc(let op): loadToAcc("i64.load16_s", op)
+            case .i64Load16SFromAcc(let op): loadFromAcc("i64.load16_s", op)
+            case .i64Load16SInAcc(let op): loadInAcc("i64.load16_s", op)
+            case .i64Load16UToAcc(let op): loadToAcc("i64.load16_u", op)
+            case .i64Load16UFromAcc(let op): loadFromAcc("i64.load16_u", op)
+            case .i64Load16UInAcc(let op): loadInAcc("i64.load16_u", op)
+            case .i64Load32SToAcc(let op): loadToAcc("i64.load32_s", op)
+            case .i64Load32SFromAcc(let op): loadFromAcc("i64.load32_s", op)
+            case .i64Load32SInAcc(let op): loadInAcc("i64.load32_s", op)
+            case .i64Load32UToAcc(let op): loadToAcc("i64.load32_u", op)
+            case .i64Load32UFromAcc(let op): loadFromAcc("i64.load32_u", op)
+            case .i64Load32UInAcc(let op): loadInAcc("i64.load32_u", op)
+            case .i32StoreFromAcc(let op): storeFromAcc("i32.store", op)
+            case .i32StoreAddrFromAcc(let op): storeAddrFromAcc("i32.store", op)
+            case .i64StoreFromAcc(let op): storeFromAcc("i64.store", op)
+            case .i64StoreAddrFromAcc(let op): storeAddrFromAcc("i64.store", op)
+            case .f32StoreFromAcc(let op): storeFromAcc("f32.store", op)
+            case .f32StoreAddrFromAcc(let op): storeAddrFromAcc("f32.store", op)
+            case .f64StoreFromAcc(let op): storeFromAcc("f64.store", op)
+            case .f64StoreAddrFromAcc(let op): storeAddrFromAcc("f64.store", op)
+            case .i32Store8FromAcc(let op): storeFromAcc("i32.store8", op)
+            case .i32Store8AddrFromAcc(let op): storeAddrFromAcc("i32.store8", op)
+            case .i32Store16FromAcc(let op): storeFromAcc("i32.store16", op)
+            case .i32Store16AddrFromAcc(let op): storeAddrFromAcc("i32.store16", op)
+            case .i64Store8FromAcc(let op): storeFromAcc("i64.store8", op)
+            case .i64Store8AddrFromAcc(let op): storeAddrFromAcc("i64.store8", op)
+            case .i64Store16FromAcc(let op): storeFromAcc("i64.store16", op)
+            case .i64Store16AddrFromAcc(let op): storeAddrFromAcc("i64.store16", op)
+            case .i64Store32FromAcc(let op): storeFromAcc("i64.store32", op)
+            case .i64Store32AddrFromAcc(let op): storeAddrFromAcc("i64.store32", op)
             case .globalGetToAcc(let op): target.write("acc = global.get \(global(op.global))")
             case .br(let offset):
                 target.write("br \(branchTarget(instructionOffset, Int(offset)))")

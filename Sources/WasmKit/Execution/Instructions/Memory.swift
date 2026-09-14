@@ -131,6 +131,93 @@ extension Execution {
             .bindMemory(to: T.self, capacity: 1).pointee = toStore.littleEndian
         return nil
     }
+    // Accumulator forms of the loads and stores, for a 32-bit memory. A guest
+    // address taken from the accumulator is the zero-extended `i32` an earlier
+    // instruction produced, exactly as its frame slot would have held it.
+
+    /// `ireg = load(sp[pointer] + offset)`
+    mutating func memoryLoadToAcc<T: FixedWidthInteger>(
+        sp: Sp, md: Md, ms: Ms, ireg: inout UInt64, loadOperand: Instruction.AccMemoryPointerOperand,
+        loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
+    ) -> MemoryAccessTrap? {
+        let length = UInt64(T.bitWidth) / 8
+        let offset = UInt64(loadOperand.offset)
+        let address = Execution.memoryAddress(offset: offset, index: sp[loadOperand.pointer].asAddressOffset())
+        if _slowPath(!Execution.isInBounds(address: address, offset: offset, length: length, ms: ms)) {
+            return .outOfBounds
+        }
+        let loaded = md.unsafelyUnwrapped.loadUnaligned(fromByteOffset: Execution.checkedByteOffset(address), as: T.self)
+        ireg = castToValue(loaded).storage
+        return nil
+    }
+
+    /// `sp[result] = load(ireg + offset)`
+    mutating func memoryLoadFromAcc<T: FixedWidthInteger>(
+        sp: Sp, md: Md, ms: Ms, ireg: UInt64, loadOperand: Instruction.AccMemoryResultOperand,
+        loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
+    ) -> MemoryAccessTrap? {
+        let length = UInt64(T.bitWidth) / 8
+        let offset = UInt64(loadOperand.offset)
+        let address = Execution.memoryAddress(offset: offset, index: ireg)
+        if _slowPath(!Execution.isInBounds(address: address, offset: offset, length: length, ms: ms)) {
+            return .outOfBounds
+        }
+        let loaded = md.unsafelyUnwrapped.loadUnaligned(fromByteOffset: Execution.checkedByteOffset(address), as: T.self)
+        sp[loadOperand.result] = castToValue(loaded)
+        return nil
+    }
+
+    /// `ireg = load(ireg + offset)`
+    mutating func memoryLoadInAcc<T: FixedWidthInteger>(
+        md: Md, ms: Ms, ireg: inout UInt64, loadOperand: Instruction.AccMemoryOffsetOperand,
+        loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
+    ) -> MemoryAccessTrap? {
+        let length = UInt64(T.bitWidth) / 8
+        let offset = UInt64(loadOperand.offset)
+        let address = Execution.memoryAddress(offset: offset, index: ireg)
+        if _slowPath(!Execution.isInBounds(address: address, offset: offset, length: length, ms: ms)) {
+            return .outOfBounds
+        }
+        let loaded = md.unsafelyUnwrapped.loadUnaligned(fromByteOffset: Execution.checkedByteOffset(address), as: T.self)
+        ireg = castToValue(loaded).storage
+        return nil
+    }
+
+    /// `store(sp[pointer] + offset) = ireg`
+    mutating func memoryStoreFromAcc<T: FixedWidthInteger>(
+        sp: Sp, md: Md, ms: Ms, ireg: UInt64, storeOperand: Instruction.AccMemoryPointerOperand,
+        castFromValue: (UntypedValue) -> T
+    ) -> MemoryAccessTrap? {
+        let length = UInt64(T.bitWidth) / 8
+        let offset = UInt64(storeOperand.offset)
+        let address = Execution.memoryAddress(offset: offset, index: sp[storeOperand.pointer].asAddressOffset())
+        if _slowPath(!Execution.isInBounds(address: address, offset: offset, length: length, ms: ms)) {
+            return .outOfBounds
+        }
+        let toStore = castFromValue(UntypedValue(storage: ireg))
+        md.unsafelyUnwrapped.advanced(by: Execution.checkedByteOffset(address))
+            .bindMemory(to: T.self, capacity: 1).pointee = toStore.littleEndian
+        return nil
+    }
+
+    /// `store(ireg + offset) = sp[value]`
+    mutating func memoryStoreAddrFromAcc<T: FixedWidthInteger>(
+        sp: Sp, md: Md, ms: Ms, ireg: UInt64, storeOperand: Instruction.AccMemoryValueOperand,
+        castFromValue: (UntypedValue) -> T
+    ) -> MemoryAccessTrap? {
+        let value = sp[storeOperand.value]
+        let length = UInt64(T.bitWidth) / 8
+        let offset = UInt64(storeOperand.offset)
+        let address = Execution.memoryAddress(offset: offset, index: ireg)
+        if _slowPath(!Execution.isInBounds(address: address, offset: offset, length: length, ms: ms)) {
+            return .outOfBounds
+        }
+        let toStore = castFromValue(value)
+        md.unsafelyUnwrapped.advanced(by: Execution.checkedByteOffset(address))
+            .bindMemory(to: T.self, capacity: 1).pointee = toStore.littleEndian
+        return nil
+    }
+
     mutating func memorySize(sp: Sp, immediate: Instruction.MemorySizeOperand) {
         let memory = currentInstance(sp: sp).memories[Int(immediate.memoryIndex)]
 

@@ -1081,6 +1081,105 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
 
+    /// A load and its accumulator forms, on a 32-bit memory.
+    fileprivate struct AccLoadForms {
+        let plain: (Instruction.LoadOperand) -> Instruction
+        /// `ireg = load(sp[pointer] + offset)`
+        let toAcc: (Instruction.AccMemoryPointerOperand) -> Instruction
+        /// `sp[result] = load(ireg + offset)`
+        let fromAcc: (Instruction.AccMemoryResultOperand) -> Instruction
+        /// `ireg = load(ireg + offset)`
+        let inAcc: (Instruction.AccMemoryOffsetOperand) -> Instruction
+    }
+
+    /// `nil` for the SIMD and atomic loads, which have no accumulator forms.
+    fileprivate static func accLoadForms(_ load: WasmParser.Instruction.Load) -> AccLoadForms? {
+        switch load {
+        case .i32Load:
+            return AccLoadForms(
+                plain: Instruction.i32Load, toAcc: Instruction.i32LoadToAcc, fromAcc: Instruction.i32LoadFromAcc,
+                inAcc: Instruction.i32LoadInAcc)
+        case .i64Load:
+            return AccLoadForms(
+                plain: Instruction.i64Load, toAcc: Instruction.i64LoadToAcc, fromAcc: Instruction.i64LoadFromAcc,
+                inAcc: Instruction.i64LoadInAcc)
+        case .f32Load:
+            return AccLoadForms(
+                plain: Instruction.f32Load, toAcc: Instruction.f32LoadToAcc, fromAcc: Instruction.f32LoadFromAcc,
+                inAcc: Instruction.f32LoadInAcc)
+        case .f64Load:
+            return AccLoadForms(
+                plain: Instruction.f64Load, toAcc: Instruction.f64LoadToAcc, fromAcc: Instruction.f64LoadFromAcc,
+                inAcc: Instruction.f64LoadInAcc)
+        case .i32Load8S:
+            return AccLoadForms(
+                plain: Instruction.i32Load8S, toAcc: Instruction.i32Load8SToAcc, fromAcc: Instruction.i32Load8SFromAcc,
+                inAcc: Instruction.i32Load8SInAcc)
+        case .i32Load8U:
+            return AccLoadForms(
+                plain: Instruction.i32Load8U, toAcc: Instruction.i32Load8UToAcc, fromAcc: Instruction.i32Load8UFromAcc,
+                inAcc: Instruction.i32Load8UInAcc)
+        case .i32Load16S:
+            return AccLoadForms(
+                plain: Instruction.i32Load16S, toAcc: Instruction.i32Load16SToAcc, fromAcc: Instruction.i32Load16SFromAcc,
+                inAcc: Instruction.i32Load16SInAcc)
+        case .i32Load16U:
+            return AccLoadForms(
+                plain: Instruction.i32Load16U, toAcc: Instruction.i32Load16UToAcc, fromAcc: Instruction.i32Load16UFromAcc,
+                inAcc: Instruction.i32Load16UInAcc)
+        case .i64Load8S:
+            return AccLoadForms(
+                plain: Instruction.i64Load8S, toAcc: Instruction.i64Load8SToAcc, fromAcc: Instruction.i64Load8SFromAcc,
+                inAcc: Instruction.i64Load8SInAcc)
+        case .i64Load8U:
+            return AccLoadForms(
+                plain: Instruction.i64Load8U, toAcc: Instruction.i64Load8UToAcc, fromAcc: Instruction.i64Load8UFromAcc,
+                inAcc: Instruction.i64Load8UInAcc)
+        case .i64Load16S:
+            return AccLoadForms(
+                plain: Instruction.i64Load16S, toAcc: Instruction.i64Load16SToAcc, fromAcc: Instruction.i64Load16SFromAcc,
+                inAcc: Instruction.i64Load16SInAcc)
+        case .i64Load16U:
+            return AccLoadForms(
+                plain: Instruction.i64Load16U, toAcc: Instruction.i64Load16UToAcc, fromAcc: Instruction.i64Load16UFromAcc,
+                inAcc: Instruction.i64Load16UInAcc)
+        case .i64Load32S:
+            return AccLoadForms(
+                plain: Instruction.i64Load32S, toAcc: Instruction.i64Load32SToAcc, fromAcc: Instruction.i64Load32SFromAcc,
+                inAcc: Instruction.i64Load32SInAcc)
+        case .i64Load32U:
+            return AccLoadForms(
+                plain: Instruction.i64Load32U, toAcc: Instruction.i64Load32UToAcc, fromAcc: Instruction.i64Load32UFromAcc,
+                inAcc: Instruction.i64Load32UInAcc)
+        default: return nil
+        }
+    }
+
+    /// The accumulator forms of a store, on a 32-bit memory.
+    fileprivate struct AccStoreForms {
+        let plain: (Instruction.StoreOperand) -> Instruction
+        /// `store(sp[pointer] + offset) = ireg`
+        let fromAcc: (Instruction.AccMemoryPointerOperand) -> Instruction
+        /// `store(ireg + offset) = sp[value]`
+        let addrFromAcc: (Instruction.AccMemoryValueOperand) -> Instruction
+    }
+
+    /// `nil` for the SIMD and atomic stores, which have no accumulator forms.
+    fileprivate static func accStoreForms(_ store: WasmParser.Instruction.Store) -> AccStoreForms? {
+        switch store {
+        case .i32Store: return AccStoreForms(plain: Instruction.i32Store, fromAcc: Instruction.i32StoreFromAcc, addrFromAcc: Instruction.i32StoreAddrFromAcc)
+        case .i64Store: return AccStoreForms(plain: Instruction.i64Store, fromAcc: Instruction.i64StoreFromAcc, addrFromAcc: Instruction.i64StoreAddrFromAcc)
+        case .f32Store: return AccStoreForms(plain: Instruction.f32Store, fromAcc: Instruction.f32StoreFromAcc, addrFromAcc: Instruction.f32StoreAddrFromAcc)
+        case .f64Store: return AccStoreForms(plain: Instruction.f64Store, fromAcc: Instruction.f64StoreFromAcc, addrFromAcc: Instruction.f64StoreAddrFromAcc)
+        case .i32Store8: return AccStoreForms(plain: Instruction.i32Store8, fromAcc: Instruction.i32Store8FromAcc, addrFromAcc: Instruction.i32Store8AddrFromAcc)
+        case .i32Store16: return AccStoreForms(plain: Instruction.i32Store16, fromAcc: Instruction.i32Store16FromAcc, addrFromAcc: Instruction.i32Store16AddrFromAcc)
+        case .i64Store8: return AccStoreForms(plain: Instruction.i64Store8, fromAcc: Instruction.i64Store8FromAcc, addrFromAcc: Instruction.i64Store8AddrFromAcc)
+        case .i64Store16: return AccStoreForms(plain: Instruction.i64Store16, fromAcc: Instruction.i64Store16FromAcc, addrFromAcc: Instruction.i64Store16AddrFromAcc)
+        case .i64Store32: return AccStoreForms(plain: Instruction.i64Store32, fromAcc: Instruction.i64Store32FromAcc, addrFromAcc: Instruction.i64Store32AddrFromAcc)
+        default: return nil
+        }
+    }
+
     /// A binary operation as recorded on its emission, for folding into the
     /// operation that consumes its result.
     fileprivate struct BinaryOperation {
@@ -1103,16 +1202,22 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case fromAcc(type: ValueType, op: BinBinOp, operand: VReg, result: VReg)
         /// `result = <global>`
         case globalGet(type: ValueType, global: InternalGlobal, result: VReg)
+        /// `result = load(pointer + offset)`
+        case load(WasmParser.Instruction.Load, pointer: VReg, offset: UInt32, result: VReg)
+        /// `result = load(ireg + offset)`
+        case loadFromAcc(WasmParser.Instruction.Load, offset: UInt32, result: VReg)
 
         var type: ValueType {
             switch self {
             case .binary(let type, _, _, _, _), .fromAcc(let type, _, _, _), .globalGet(let type, _, _): return type
+            case .load(let load, _, _, _), .loadFromAcc(let load, _, _): return load.type
             }
         }
 
         var result: VReg {
             switch self {
             case .binary(_, _, _, _, let result), .fromAcc(_, _, _, let result), .globalGet(_, _, let result): return result
+            case .load(_, _, _, let result), .loadFromAcc(_, _, let result): return result
             }
         }
 
@@ -1125,6 +1230,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 return accBinaryForms(type, op)!.inAcc(Instruction.AccOperand(operand: operand))
             case .globalGet(_, let global, _):
                 return .globalGetToAcc(Instruction.GlobalOperand(global: global))
+            case .load(let load, let pointer, let offset, _):
+                return accLoadForms(load)!.toAcc(Instruction.AccMemoryPointerOperand(pointer: pointer, offset: offset))
+            case .loadFromAcc(let load, let offset, _):
+                return accLoadForms(load)!.inAcc(Instruction.AccMemoryOffsetOperand(offset: offset))
             }
         }
 
@@ -1137,6 +1246,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 return accBinaryForms(type, op)!.fromAcc(Instruction.AccUnaryOperand(operand: operand, result: LVReg(result)))
             case .globalGet(_, let global, let result):
                 return .globalGet(Instruction.GlobalAndVRegOperand(reg: LLVReg(result), global: global))
+            case .load(let load, let pointer, let offset, let result):
+                return accLoadForms(load)!.plain(Instruction.LoadOperand(offset: UInt64(offset), pointer: pointer, result: result))
+            case .loadFromAcc(let load, let offset, let result):
+                return accLoadForms(load)!.fromAcc(Instruction.AccMemoryResultOperand(result: result, offset: offset))
             }
         }
     }
@@ -3419,6 +3532,67 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             return instruction(loadOperand)
         }
     }
+    /// A load on a 32-bit memory, which can take its guest address from the
+    /// accumulator and hand its result to the next instruction there.
+    private mutating func visitAccLoad(
+        _ load: WasmParser.Instruction.Load, _ forms: AccLoadForms, memarg: MemArg, offset: UInt32
+    ) throws(WasmKitError) {
+        try validator.validateMemArg(memarg, naturalAlignment: load.naturalAlignment)
+        // Captured before `popVRegOperand`, which resets the last emission.
+        let accCandidate = iseqBuilder.accProducer
+        let pointer = try popVRegOperand(.address(isMemory64: false))
+        let result = valueStack.push(load.type)
+        guard let pointer else { return }
+        if let accCandidate, accCandidate.form.type == .i32, accCandidate.form.result == pointer,
+            iseqBuilder.canRewind(to: accCandidate)
+        {
+            rewindProducerIntoAccumulator(accCandidate)
+            emit(
+                forms.fromAcc(Instruction.AccMemoryResultOperand(result: result, offset: offset)),
+                resultRelink: { newResult in
+                    forms.fromAcc(Instruction.AccMemoryResultOperand(result: newResult, offset: offset))
+                }
+            )
+            iseqBuilder.recordAcc(AccRecords(producer: .loadFromAcc(load, offset: offset, result: result)))
+            return
+        }
+        emit(
+            forms.plain(Instruction.LoadOperand(offset: UInt64(offset), pointer: pointer, result: result)),
+            resultRelink: { newResult in
+                forms.plain(Instruction.LoadOperand(offset: UInt64(offset), pointer: pointer, result: newResult))
+            }
+        )
+        iseqBuilder.recordAcc(AccRecords(producer: .load(load, pointer: pointer, offset: offset, result: result)))
+    }
+
+    /// A store on a 32-bit memory, which can take its value or its guest
+    /// address from the accumulator.
+    private mutating func visitAccStore(
+        _ store: WasmParser.Instruction.Store, _ forms: AccStoreForms, memarg: MemArg, offset: UInt32
+    ) throws(WasmKitError) {
+        try validator.validateMemArg(memarg, naturalAlignment: store.naturalAlignment)
+        // Captured before `popVRegOperand`, which resets the last emission.
+        let accCandidate = iseqBuilder.accProducer
+        let value = try popVRegOperand(store.type)
+        let pointer = try popVRegOperand(.address(isMemory64: false))
+        guard let value, let pointer else { return }
+        if let accCandidate, iseqBuilder.canRewind(to: accCandidate) {
+            let accResult = accCandidate.form.result
+            if accResult == value, value != pointer, accCandidate.form.type == store.type {
+                rewindProducerIntoAccumulator(accCandidate)
+                emit(forms.fromAcc(Instruction.AccMemoryPointerOperand(pointer: pointer, offset: offset)))
+                return
+            }
+            if accResult == pointer, pointer != value, accCandidate.form.type == .i32 {
+                rewindProducerIntoAccumulator(accCandidate)
+                emit(forms.addrFromAcc(Instruction.AccMemoryValueOperand(value: value, offset: offset)))
+                return
+            }
+        }
+        emit(
+            forms.plain(Instruction.StoreOperand(offset: UInt64(offset), pointer: pointer, value: value)))
+    }
+
     private mutating func visitStore(
         _ memarg: MemArg,
         _ type: ValueType,
@@ -3440,6 +3614,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitLoad(_ load: WasmParser.Instruction.Load, memarg: MemArg) throws(WasmKitError) {
+        if let forms = Self.accLoadForms(load), try !module.isMemory64(memoryIndex: 0),
+            let offset = UInt32(exactly: memarg.offset)
+        {
+            return try visitAccLoad(load, forms, memarg: memarg, offset: offset)
+        }
         let instruction: (Instruction.LoadOperand) -> Instruction
         switch load {
         case .i32Load: instruction = Instruction.i32Load
@@ -3489,6 +3668,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitStore(_ store: WasmParser.Instruction.Store, memarg: MemArg) throws(WasmKitError) {
+        if let forms = Self.accStoreForms(store), try !module.isMemory64(memoryIndex: 0),
+            let offset = UInt32(exactly: memarg.offset)
+        {
+            return try visitAccStore(store, forms, memarg: memarg, offset: offset)
+        }
         let instruction: (Instruction.StoreOperand) -> Instruction
         switch store {
         case .i32Store: instruction = Instruction.i32Store

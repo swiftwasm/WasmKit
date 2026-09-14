@@ -275,6 +275,30 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "operand", type: .VReg)
     }
 
+    /// `ireg = load(sp[pointer] + offset)` and `store(sp[pointer] + offset) = ireg`,
+    /// on a 32-bit memory.
+    static let accMemoryPointer = Self(name: "AccMemoryPointerOperand") {
+        $0.field(name: "pointer", type: .VReg)
+        $0.field(name: "offset", type: .UInt32)
+    }
+
+    /// `sp[result] = load(ireg + offset)`, on a 32-bit memory.
+    static let accMemoryResult = Self(name: "AccMemoryResultOperand") {
+        $0.field(name: "result", type: .VReg)
+        $0.field(name: "offset", type: .UInt32)
+    }
+
+    /// `store(ireg + offset) = sp[value]`, on a 32-bit memory.
+    static let accMemoryValue = Self(name: "AccMemoryValueOperand") {
+        $0.field(name: "value", type: .VReg)
+        $0.field(name: "offset", type: .UInt32)
+    }
+
+    /// `ireg = load(ireg + offset)`, on a 32-bit memory.
+    static let accMemoryOffset = Self(name: "AccMemoryOffsetOperand") {
+        $0.field(name: "offset", type: .UInt32)
+    }
+
     static let brIfAccCmpOperand = Self(name: "BrIfAccCmpOperand") {
         $0.field(name: "rhs", type: .VReg)
         $0.field(name: "offset", type: .Int32)

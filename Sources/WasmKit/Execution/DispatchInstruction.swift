@@ -4723,6 +4723,486 @@ extension Execution {
         ireg.pointee = immediate.global.withValue { $0.rawStorage.lo }
         return next
     }
+    @_silgen_name("wasmkit_execute_i32LoadToAcc") @inline(__always)
+    mutating func execute_i32LoadToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt32.self, castToValue: { .i32($0) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64LoadToAcc") @inline(__always)
+    mutating func execute_i64LoadToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt64.self, castToValue: { .i64($0) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_f32LoadToAcc") @inline(__always)
+    mutating func execute_f32LoadToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt32.self, castToValue: { .rawF32($0) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_f64LoadToAcc") @inline(__always)
+    mutating func execute_f64LoadToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt64.self, castToValue: { .rawF64($0) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32Load8SToAcc") @inline(__always)
+    mutating func execute_i32Load8SToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: Int8.self, castToValue: { .init(signed: Int32($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32Load8UToAcc") @inline(__always)
+    mutating func execute_i32Load8UToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt8.self, castToValue: { .i32(UInt32($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32Load16SToAcc") @inline(__always)
+    mutating func execute_i32Load16SToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: Int16.self, castToValue: { .init(signed: Int32($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32Load16UToAcc") @inline(__always)
+    mutating func execute_i32Load16UToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt16.self, castToValue: { .i32(UInt32($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load8SToAcc") @inline(__always)
+    mutating func execute_i64Load8SToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: Int8.self, castToValue: { .init(signed: Int64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load8UToAcc") @inline(__always)
+    mutating func execute_i64Load8UToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt8.self, castToValue: { .i64(UInt64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load16SToAcc") @inline(__always)
+    mutating func execute_i64Load16SToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: Int16.self, castToValue: { .init(signed: Int64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load16UToAcc") @inline(__always)
+    mutating func execute_i64Load16UToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt16.self, castToValue: { .i64(UInt64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load32SToAcc") @inline(__always)
+    mutating func execute_i64Load32SToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: Int32.self, castToValue: { .init(signed: Int64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load32UToAcc") @inline(__always)
+    mutating func execute_i64Load32UToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32LoadFromAcc") @inline(__always)
+    mutating func execute_i32LoadFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryResultOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, loadOperand: immediate, loadAs: UInt32.self, castToValue: { .i32($0) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64LoadFromAcc") @inline(__always)
+    mutating func execute_i64LoadFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryResultOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, loadOperand: immediate, loadAs: UInt64.self, castToValue: { .i64($0) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_f32LoadFromAcc") @inline(__always)
+    mutating func execute_f32LoadFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryResultOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, loadOperand: immediate, loadAs: UInt32.self, castToValue: { .rawF32($0) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_f64LoadFromAcc") @inline(__always)
+    mutating func execute_f64LoadFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryResultOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, loadOperand: immediate, loadAs: UInt64.self, castToValue: { .rawF64($0) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32Load8SFromAcc") @inline(__always)
+    mutating func execute_i32Load8SFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryResultOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, loadOperand: immediate, loadAs: Int8.self, castToValue: { .init(signed: Int32($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32Load8UFromAcc") @inline(__always)
+    mutating func execute_i32Load8UFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryResultOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, loadOperand: immediate, loadAs: UInt8.self, castToValue: { .i32(UInt32($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32Load16SFromAcc") @inline(__always)
+    mutating func execute_i32Load16SFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryResultOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, loadOperand: immediate, loadAs: Int16.self, castToValue: { .init(signed: Int32($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32Load16UFromAcc") @inline(__always)
+    mutating func execute_i32Load16UFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryResultOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, loadOperand: immediate, loadAs: UInt16.self, castToValue: { .i32(UInt32($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load8SFromAcc") @inline(__always)
+    mutating func execute_i64Load8SFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryResultOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, loadOperand: immediate, loadAs: Int8.self, castToValue: { .init(signed: Int64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load8UFromAcc") @inline(__always)
+    mutating func execute_i64Load8UFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryResultOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, loadOperand: immediate, loadAs: UInt8.self, castToValue: { .i64(UInt64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load16SFromAcc") @inline(__always)
+    mutating func execute_i64Load16SFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryResultOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, loadOperand: immediate, loadAs: Int16.self, castToValue: { .init(signed: Int64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load16UFromAcc") @inline(__always)
+    mutating func execute_i64Load16UFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryResultOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, loadOperand: immediate, loadAs: UInt16.self, castToValue: { .i64(UInt64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load32SFromAcc") @inline(__always)
+    mutating func execute_i64Load32SFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryResultOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, loadOperand: immediate, loadAs: Int32.self, castToValue: { .init(signed: Int64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load32UFromAcc") @inline(__always)
+    mutating func execute_i64Load32UFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryResultOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, loadOperand: immediate, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32LoadInAcc") @inline(__always)
+    mutating func execute_i32LoadInAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryOffsetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadInAcc(md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt32.self, castToValue: { .i32($0) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64LoadInAcc") @inline(__always)
+    mutating func execute_i64LoadInAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryOffsetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadInAcc(md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt64.self, castToValue: { .i64($0) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_f32LoadInAcc") @inline(__always)
+    mutating func execute_f32LoadInAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryOffsetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadInAcc(md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt32.self, castToValue: { .rawF32($0) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_f64LoadInAcc") @inline(__always)
+    mutating func execute_f64LoadInAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryOffsetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadInAcc(md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt64.self, castToValue: { .rawF64($0) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32Load8SInAcc") @inline(__always)
+    mutating func execute_i32Load8SInAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryOffsetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadInAcc(md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: Int8.self, castToValue: { .init(signed: Int32($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32Load8UInAcc") @inline(__always)
+    mutating func execute_i32Load8UInAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryOffsetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadInAcc(md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt8.self, castToValue: { .i32(UInt32($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32Load16SInAcc") @inline(__always)
+    mutating func execute_i32Load16SInAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryOffsetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadInAcc(md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: Int16.self, castToValue: { .init(signed: Int32($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32Load16UInAcc") @inline(__always)
+    mutating func execute_i32Load16UInAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryOffsetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadInAcc(md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt16.self, castToValue: { .i32(UInt32($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load8SInAcc") @inline(__always)
+    mutating func execute_i64Load8SInAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryOffsetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadInAcc(md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: Int8.self, castToValue: { .init(signed: Int64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load8UInAcc") @inline(__always)
+    mutating func execute_i64Load8UInAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryOffsetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadInAcc(md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt8.self, castToValue: { .i64(UInt64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load16SInAcc") @inline(__always)
+    mutating func execute_i64Load16SInAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryOffsetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadInAcc(md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: Int16.self, castToValue: { .init(signed: Int64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load16UInAcc") @inline(__always)
+    mutating func execute_i64Load16UInAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryOffsetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadInAcc(md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt16.self, castToValue: { .i64(UInt64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load32SInAcc") @inline(__always)
+    mutating func execute_i64Load32SInAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryOffsetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadInAcc(md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: Int32.self, castToValue: { .init(signed: Int64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Load32UInAcc") @inline(__always)
+    mutating func execute_i64Load32UInAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryOffsetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryLoadInAcc(md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32StoreFromAcc") @inline(__always)
+    mutating func execute_i32StoreFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { $0.i32 }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64StoreFromAcc") @inline(__always)
+    mutating func execute_i64StoreFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { $0.i64 }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_f32StoreFromAcc") @inline(__always)
+    mutating func execute_f32StoreFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { $0.rawF32 }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_f64StoreFromAcc") @inline(__always)
+    mutating func execute_f64StoreFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { $0.rawF64 }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32Store8FromAcc") @inline(__always)
+    mutating func execute_i32Store8FromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32Store16FromAcc") @inline(__always)
+    mutating func execute_i32Store16FromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Store8FromAcc") @inline(__always)
+    mutating func execute_i64Store8FromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Store16FromAcc") @inline(__always)
+    mutating func execute_i64Store16FromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Store32FromAcc") @inline(__always)
+    mutating func execute_i64Store32FromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32StoreAddrFromAcc") @inline(__always)
+    mutating func execute_i32StoreAddrFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryValueOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreAddrFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { $0.i32 }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64StoreAddrFromAcc") @inline(__always)
+    mutating func execute_i64StoreAddrFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryValueOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreAddrFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { $0.i64 }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_f32StoreAddrFromAcc") @inline(__always)
+    mutating func execute_f32StoreAddrFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryValueOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreAddrFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { $0.rawF32 }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_f64StoreAddrFromAcc") @inline(__always)
+    mutating func execute_f64StoreAddrFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryValueOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreAddrFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { $0.rawF64 }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32Store8AddrFromAcc") @inline(__always)
+    mutating func execute_i32Store8AddrFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryValueOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreAddrFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32Store16AddrFromAcc") @inline(__always)
+    mutating func execute_i32Store16AddrFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryValueOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreAddrFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Store8AddrFromAcc") @inline(__always)
+    mutating func execute_i64Store8AddrFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryValueOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreAddrFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Store16AddrFromAcc") @inline(__always)
+    mutating func execute_i64Store16AddrFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryValueOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreAddrFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64Store32AddrFromAcc") @inline(__always)
+    mutating func execute_i64Store32AddrFromAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryValueOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = memoryStoreAddrFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }) { return trap.directThreadedHeadSlot }
+        return next
+    }
 }
 
 #if !(os(WASI) || $Embedded)
