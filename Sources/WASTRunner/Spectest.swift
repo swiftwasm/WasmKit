@@ -92,10 +92,26 @@ package struct SpectestRunner {
         package var failures: [(Location, reason: String)] = []
     }
 
-    /// A failing assertion lands in ``Outcome/failures``; only a script that cannot be parsed throws.
-    package func evaluate(test: TestCase, reporter: SpectestProgressReporter) throws -> Outcome {
+    /// Evaluates one script in its own store and records assertion failures in the outcome.
+    ///
+    /// - Parameters:
+    ///   - test: The script whose directory determines its WebAssembly feature set.
+    ///   - reporter: The synchronous receiver of directive results.
+    ///   - executionControl: An unclaimed controller for this script, or nil for an ordinary store.
+    ///     A controller requires token threading and cannot be reused after the store claims it,
+    ///     even when evaluating the script fails.
+    /// - Returns: The assertion counts and recorded failures.
+    /// - Throws: Invalid controller configuration, host-module instantiation failure, or a script
+    ///   parsing failure that has no source location to record in the outcome.
+    package func evaluate(
+        test: TestCase, reporter: SpectestProgressReporter,
+        executionControl: ExecutionControl? = nil
+    ) throws -> Outcome {
         var outcome = Outcome()
-        try test.run(spectestModule: hostModule, configuration: configuration) { test, location, result in
+        try test.run(
+            spectestModule: hostModule, configuration: configuration,
+            executionControl: executionControl
+        ) { test, location, result in
             switch result {
             case .failed(let reason):
                 reporter.log("\(result.banner) \(reason)", path: test.path, location: location, verbose: false)
@@ -111,7 +127,19 @@ package struct SpectestRunner {
         return outcome
     }
 
-    package func run(test: TestCase, reporter: SpectestProgressReporter) throws {
+    /// Evaluates one script and throws when any assertion fails.
+    ///
+    /// - Parameters:
+    ///   - test: The script whose directory determines its WebAssembly feature set.
+    ///   - reporter: The synchronous receiver of progress and directive results.
+    ///   - executionControl: An unclaimed controller for this script, or nil for an ordinary store.
+    ///     A controller requires token threading and remains claimed if script execution fails.
+    /// - Throws: The failures reported by ``evaluate(test:reporter:executionControl:)`` or an
+    ///   aggregate error containing failed assertions.
+    package func run(
+        test: TestCase, reporter: SpectestProgressReporter,
+        executionControl: ExecutionControl? = nil
+    ) throws {
         let logDuration: () -> Void
         if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
             let start = ContinuousClock.now
@@ -124,7 +152,7 @@ package struct SpectestRunner {
             logDuration = {}
         }
         reporter.log("Testing  \(test.relativePath)", verbose: false)
-        let outcome = try evaluate(test: test, reporter: reporter)
+        let outcome = try evaluate(test: test, reporter: reporter, executionControl: executionControl)
         logDuration()
 
         if !outcome.failures.isEmpty {

@@ -151,12 +151,15 @@ public struct Module: Sendable {
         self.start = nil
     }
 
-    /// Instantiate this module in the given imports.
+    /// Instantiates this module and executes its optional start function on the supplied store.
     ///
     /// - Parameters:
     ///   - store: The ``Store`` to allocate the instance in.
     ///   - imports: The imports to use for instantiation. All imported entities
     ///     must be allocated in the given store.
+    /// - Returns: The instance after its start function and any requested eager compilation complete.
+    /// - Throws: Module validation, import, allocation, start-function, or eager-compilation failures. A start
+    ///   function also propagates termination requested through the store's execution controller.
     public func instantiate(store: Store, imports: Imports = [:]) throws -> Instance {
         Instance(handle: try self.instantiateHandle(store: store, imports: imports), store: store)
     }
@@ -173,7 +176,7 @@ public struct Module: Sendable {
     }
 
     #if WasmDebuggingSupport
-        /// Instantiate this module with the given imports.
+        /// Instantiates this module with optional debugging and executes its start function.
         ///
         /// - Parameters:
         ///   - store: The ``Store`` to allocate the instance in.
@@ -181,6 +184,9 @@ public struct Module: Sendable {
         ///     must be allocated in the given store.
         ///   - isDebuggable: Whether the module should support debugging actions
         ///     (breakpoints etc) after instantiation.
+        /// - Returns: The instance after its start function and any requested eager compilation complete.
+        /// - Throws: Module validation, import, allocation, start-function, or eager-compilation failures. A start
+        ///   function also propagates termination requested through the store's execution controller.
         public func instantiate(store: Store, imports: Imports = [:], isDebuggable: Bool) throws -> Instance {
             Instance(handle: try self.instantiateHandle(store: store, imports: imports, isDebuggable: isDebuggable), store: store)
         }

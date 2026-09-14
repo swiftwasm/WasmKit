@@ -77,6 +77,8 @@ extension WASIBridgeToHost {
     ///
     /// - Parameter instance: The WASI application instance.
     /// - Returns: The exit code returned by the WASI application.
+    /// - Throws: A missing entry point, a guest or native failure, or requested execution
+    ///   termination. Blocking native imports must return before interruption can be observed.
     public func start(_ instance: Instance) throws -> UInt32 {
         do {
             guard let start = instance.exports[function: "_start"] else {
@@ -95,6 +97,8 @@ extension WASIBridgeToHost {
     /// for more information about the WASI Preview 1 Application ABI.
     ///
     /// - Parameter instance: The WASI application instance.
+    /// - Throws: An initialization failure or requested execution termination. A reactor without
+    ///   an initialization export requires no guest invocation.
     public func initialize(_ instance: Instance) throws {
         if let initialize = instance.exports[function: "_initialize"] {
             // Call the optional `_initialize` function.
@@ -102,6 +106,13 @@ extension WASIBridgeToHost {
         }
     }
 
+    /// Starts a command through its instance's store for callers of the deprecated runtime API.
+    ///
+    /// - Parameters:
+    ///   - instance: The WASI command instance whose entry point should run.
+    ///   - runtime: The unused legacy runtime. The instance retains its own store and engine.
+    /// - Returns: The command's exit code.
+    /// - Throws: A missing entry point, a guest or native failure, or requested execution termination.
     @available(*, deprecated, message: "Use `Engine`-based API instead")
     public func start(_ instance: Instance, runtime: Runtime) throws -> UInt32 {
         return try start(instance)
