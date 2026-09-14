@@ -1457,6 +1457,246 @@ enum Instruction: Equatable {
     case brIfNotAcc(Instruction.BrIfAccOperand)
     /// `global.get` for a scalar global, into the accumulator
     case globalGetToAcc(Instruction.GlobalOperand)
+    /// `ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load`.
+    case i32LoadToAcc(Instruction.AccMemoryPointerOperand)
+    /// `ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load`.
+    case i64LoadToAcc(Instruction.AccMemoryPointerOperand)
+    /// `ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `f32.load`.
+    case f32LoadToAcc(Instruction.AccMemoryPointerOperand)
+    /// `ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `f64.load`.
+    case f64LoadToAcc(Instruction.AccMemoryPointerOperand)
+    /// `ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load8_s`.
+    case i32Load8SToAcc(Instruction.AccMemoryPointerOperand)
+    /// `ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load8_u`.
+    case i32Load8UToAcc(Instruction.AccMemoryPointerOperand)
+    /// `ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load16_s`.
+    case i32Load16SToAcc(Instruction.AccMemoryPointerOperand)
+    /// `ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load16_u`.
+    case i32Load16UToAcc(Instruction.AccMemoryPointerOperand)
+    /// `ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load8_s`.
+    case i64Load8SToAcc(Instruction.AccMemoryPointerOperand)
+    /// `ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load8_u`.
+    case i64Load8UToAcc(Instruction.AccMemoryPointerOperand)
+    /// `ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load16_s`.
+    case i64Load16SToAcc(Instruction.AccMemoryPointerOperand)
+    /// `ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load16_u`.
+    case i64Load16UToAcc(Instruction.AccMemoryPointerOperand)
+    /// `ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load32_s`.
+    case i64Load32SToAcc(Instruction.AccMemoryPointerOperand)
+    /// `ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load32_u`.
+    case i64Load32UToAcc(Instruction.AccMemoryPointerOperand)
+    /// `sp[result] = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load`.
+    case i32LoadFromAcc(Instruction.AccMemoryResultOperand)
+    /// `sp[result] = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load`.
+    case i64LoadFromAcc(Instruction.AccMemoryResultOperand)
+    /// `sp[result] = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `f32.load`.
+    case f32LoadFromAcc(Instruction.AccMemoryResultOperand)
+    /// `sp[result] = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `f64.load`.
+    case f64LoadFromAcc(Instruction.AccMemoryResultOperand)
+    /// `sp[result] = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load8_s`.
+    case i32Load8SFromAcc(Instruction.AccMemoryResultOperand)
+    /// `sp[result] = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load8_u`.
+    case i32Load8UFromAcc(Instruction.AccMemoryResultOperand)
+    /// `sp[result] = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load16_s`.
+    case i32Load16SFromAcc(Instruction.AccMemoryResultOperand)
+    /// `sp[result] = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load16_u`.
+    case i32Load16UFromAcc(Instruction.AccMemoryResultOperand)
+    /// `sp[result] = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load8_s`.
+    case i64Load8SFromAcc(Instruction.AccMemoryResultOperand)
+    /// `sp[result] = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load8_u`.
+    case i64Load8UFromAcc(Instruction.AccMemoryResultOperand)
+    /// `sp[result] = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load16_s`.
+    case i64Load16SFromAcc(Instruction.AccMemoryResultOperand)
+    /// `sp[result] = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load16_u`.
+    case i64Load16UFromAcc(Instruction.AccMemoryResultOperand)
+    /// `sp[result] = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load32_s`.
+    case i64Load32SFromAcc(Instruction.AccMemoryResultOperand)
+    /// `sp[result] = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load32_u`.
+    case i64Load32UFromAcc(Instruction.AccMemoryResultOperand)
+    /// `ireg = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load`.
+    case i32LoadInAcc(Instruction.AccMemoryOffsetOperand)
+    /// `ireg = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load`.
+    case i64LoadInAcc(Instruction.AccMemoryOffsetOperand)
+    /// `ireg = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `f32.load`.
+    case f32LoadInAcc(Instruction.AccMemoryOffsetOperand)
+    /// `ireg = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `f64.load`.
+    case f64LoadInAcc(Instruction.AccMemoryOffsetOperand)
+    /// `ireg = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load8_s`.
+    case i32Load8SInAcc(Instruction.AccMemoryOffsetOperand)
+    /// `ireg = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load8_u`.
+    case i32Load8UInAcc(Instruction.AccMemoryOffsetOperand)
+    /// `ireg = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load16_s`.
+    case i32Load16SInAcc(Instruction.AccMemoryOffsetOperand)
+    /// `ireg = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load16_u`.
+    case i32Load16UInAcc(Instruction.AccMemoryOffsetOperand)
+    /// `ireg = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load8_s`.
+    case i64Load8SInAcc(Instruction.AccMemoryOffsetOperand)
+    /// `ireg = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load8_u`.
+    case i64Load8UInAcc(Instruction.AccMemoryOffsetOperand)
+    /// `ireg = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load16_s`.
+    case i64Load16SInAcc(Instruction.AccMemoryOffsetOperand)
+    /// `ireg = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load16_u`.
+    case i64Load16UInAcc(Instruction.AccMemoryOffsetOperand)
+    /// `ireg = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load32_s`.
+    case i64Load32SInAcc(Instruction.AccMemoryOffsetOperand)
+    /// `ireg = load(ireg + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load32_u`.
+    case i64Load32UInAcc(Instruction.AccMemoryOffsetOperand)
+    /// `store(sp[pointer] + offset) = ireg`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.store`.
+    case i32StoreFromAcc(Instruction.AccMemoryPointerOperand)
+    /// `store(sp[pointer] + offset) = ireg`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.store`.
+    case i64StoreFromAcc(Instruction.AccMemoryPointerOperand)
+    /// `store(sp[pointer] + offset) = ireg`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `f32.store`.
+    case f32StoreFromAcc(Instruction.AccMemoryPointerOperand)
+    /// `store(sp[pointer] + offset) = ireg`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `f64.store`.
+    case f64StoreFromAcc(Instruction.AccMemoryPointerOperand)
+    /// `store(sp[pointer] + offset) = ireg`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.store8`.
+    case i32Store8FromAcc(Instruction.AccMemoryPointerOperand)
+    /// `store(sp[pointer] + offset) = ireg`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.store16`.
+    case i32Store16FromAcc(Instruction.AccMemoryPointerOperand)
+    /// `store(sp[pointer] + offset) = ireg`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.store8`.
+    case i64Store8FromAcc(Instruction.AccMemoryPointerOperand)
+    /// `store(sp[pointer] + offset) = ireg`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.store16`.
+    case i64Store16FromAcc(Instruction.AccMemoryPointerOperand)
+    /// `store(sp[pointer] + offset) = ireg`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.store32`.
+    case i64Store32FromAcc(Instruction.AccMemoryPointerOperand)
+    /// `store(ireg + offset) = sp[value]`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.store`.
+    case i32StoreAddrFromAcc(Instruction.AccMemoryValueOperand)
+    /// `store(ireg + offset) = sp[value]`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.store`.
+    case i64StoreAddrFromAcc(Instruction.AccMemoryValueOperand)
+    /// `store(ireg + offset) = sp[value]`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `f32.store`.
+    case f32StoreAddrFromAcc(Instruction.AccMemoryValueOperand)
+    /// `store(ireg + offset) = sp[value]`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `f64.store`.
+    case f64StoreAddrFromAcc(Instruction.AccMemoryValueOperand)
+    /// `store(ireg + offset) = sp[value]`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.store8`.
+    case i32Store8AddrFromAcc(Instruction.AccMemoryValueOperand)
+    /// `store(ireg + offset) = sp[value]`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.store16`.
+    case i32Store16AddrFromAcc(Instruction.AccMemoryValueOperand)
+    /// `store(ireg + offset) = sp[value]`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.store8`.
+    case i64Store8AddrFromAcc(Instruction.AccMemoryValueOperand)
+    /// `store(ireg + offset) = sp[value]`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.store16`.
+    case i64Store16AddrFromAcc(Instruction.AccMemoryValueOperand)
+    /// `store(ireg + offset) = sp[value]`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.store32`.
+    case i64Store32AddrFromAcc(Instruction.AccMemoryValueOperand)
 }
 
 extension Instruction {
@@ -2359,6 +2599,53 @@ extension Instruction {
             emitSlot { $0.rawGlobal }
         }
     }
+
+    struct AccMemoryPointerOperand: Equatable, InstructionImmediate {
+        var pointer: VReg
+        var offset: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (pointer, offset) = pc.read((VReg, UInt32).self)
+            return Self(pointer: pointer, offset: offset)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.pointer, $0.offset) as (VReg, UInt32), to: CodeSlot.self) }
+        }
+    }
+
+    struct AccMemoryResultOperand: Equatable, InstructionImmediate {
+        var result: VReg
+        var offset: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (result, offset) = pc.read((VReg, UInt32).self)
+            return Self(result: result, offset: offset)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.result, $0.offset) as (VReg, UInt32), to: CodeSlot.self) }
+        }
+    }
+
+    struct AccMemoryOffsetOperand: Equatable, InstructionImmediate {
+        var offset: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (offset, _, _, _, _) = pc.read((UInt32, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(offset: offset)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.offset, 0, 0, 0, 0) as (UInt32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct AccMemoryValueOperand: Equatable, InstructionImmediate {
+        var value: VReg
+        var offset: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (value, offset) = pc.read((VReg, UInt32).self)
+            return Self(value: value, offset: offset)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.value, $0.offset) as (VReg, UInt32), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -2810,6 +3097,66 @@ extension Instruction {
         case .brIfAcc(let immediate): return immediate
         case .brIfNotAcc(let immediate): return immediate
         case .globalGetToAcc(let immediate): return immediate
+        case .i32LoadToAcc(let immediate): return immediate
+        case .i64LoadToAcc(let immediate): return immediate
+        case .f32LoadToAcc(let immediate): return immediate
+        case .f64LoadToAcc(let immediate): return immediate
+        case .i32Load8SToAcc(let immediate): return immediate
+        case .i32Load8UToAcc(let immediate): return immediate
+        case .i32Load16SToAcc(let immediate): return immediate
+        case .i32Load16UToAcc(let immediate): return immediate
+        case .i64Load8SToAcc(let immediate): return immediate
+        case .i64Load8UToAcc(let immediate): return immediate
+        case .i64Load16SToAcc(let immediate): return immediate
+        case .i64Load16UToAcc(let immediate): return immediate
+        case .i64Load32SToAcc(let immediate): return immediate
+        case .i64Load32UToAcc(let immediate): return immediate
+        case .i32LoadFromAcc(let immediate): return immediate
+        case .i64LoadFromAcc(let immediate): return immediate
+        case .f32LoadFromAcc(let immediate): return immediate
+        case .f64LoadFromAcc(let immediate): return immediate
+        case .i32Load8SFromAcc(let immediate): return immediate
+        case .i32Load8UFromAcc(let immediate): return immediate
+        case .i32Load16SFromAcc(let immediate): return immediate
+        case .i32Load16UFromAcc(let immediate): return immediate
+        case .i64Load8SFromAcc(let immediate): return immediate
+        case .i64Load8UFromAcc(let immediate): return immediate
+        case .i64Load16SFromAcc(let immediate): return immediate
+        case .i64Load16UFromAcc(let immediate): return immediate
+        case .i64Load32SFromAcc(let immediate): return immediate
+        case .i64Load32UFromAcc(let immediate): return immediate
+        case .i32LoadInAcc(let immediate): return immediate
+        case .i64LoadInAcc(let immediate): return immediate
+        case .f32LoadInAcc(let immediate): return immediate
+        case .f64LoadInAcc(let immediate): return immediate
+        case .i32Load8SInAcc(let immediate): return immediate
+        case .i32Load8UInAcc(let immediate): return immediate
+        case .i32Load16SInAcc(let immediate): return immediate
+        case .i32Load16UInAcc(let immediate): return immediate
+        case .i64Load8SInAcc(let immediate): return immediate
+        case .i64Load8UInAcc(let immediate): return immediate
+        case .i64Load16SInAcc(let immediate): return immediate
+        case .i64Load16UInAcc(let immediate): return immediate
+        case .i64Load32SInAcc(let immediate): return immediate
+        case .i64Load32UInAcc(let immediate): return immediate
+        case .i32StoreFromAcc(let immediate): return immediate
+        case .i64StoreFromAcc(let immediate): return immediate
+        case .f32StoreFromAcc(let immediate): return immediate
+        case .f64StoreFromAcc(let immediate): return immediate
+        case .i32Store8FromAcc(let immediate): return immediate
+        case .i32Store16FromAcc(let immediate): return immediate
+        case .i64Store8FromAcc(let immediate): return immediate
+        case .i64Store16FromAcc(let immediate): return immediate
+        case .i64Store32FromAcc(let immediate): return immediate
+        case .i32StoreAddrFromAcc(let immediate): return immediate
+        case .i64StoreAddrFromAcc(let immediate): return immediate
+        case .f32StoreAddrFromAcc(let immediate): return immediate
+        case .f64StoreAddrFromAcc(let immediate): return immediate
+        case .i32Store8AddrFromAcc(let immediate): return immediate
+        case .i32Store16AddrFromAcc(let immediate): return immediate
+        case .i64Store8AddrFromAcc(let immediate): return immediate
+        case .i64Store16AddrFromAcc(let immediate): return immediate
+        case .i64Store32AddrFromAcc(let immediate): return immediate
         default: return nil
         }
     }
@@ -3265,6 +3612,66 @@ extension Instruction {
         case .brIfAcc(let immediate): immediate.emit(to: emit)
         case .brIfNotAcc(let immediate): immediate.emit(to: emit)
         case .globalGetToAcc(let immediate): immediate.emit(to: emit)
+        case .i32LoadToAcc(let immediate): immediate.emit(to: emit)
+        case .i64LoadToAcc(let immediate): immediate.emit(to: emit)
+        case .f32LoadToAcc(let immediate): immediate.emit(to: emit)
+        case .f64LoadToAcc(let immediate): immediate.emit(to: emit)
+        case .i32Load8SToAcc(let immediate): immediate.emit(to: emit)
+        case .i32Load8UToAcc(let immediate): immediate.emit(to: emit)
+        case .i32Load16SToAcc(let immediate): immediate.emit(to: emit)
+        case .i32Load16UToAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load8SToAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load8UToAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load16SToAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load16UToAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load32SToAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load32UToAcc(let immediate): immediate.emit(to: emit)
+        case .i32LoadFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64LoadFromAcc(let immediate): immediate.emit(to: emit)
+        case .f32LoadFromAcc(let immediate): immediate.emit(to: emit)
+        case .f64LoadFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32Load8SFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32Load8UFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32Load16SFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32Load16UFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load8SFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load8UFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load16SFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load16UFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load32SFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load32UFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32LoadInAcc(let immediate): immediate.emit(to: emit)
+        case .i64LoadInAcc(let immediate): immediate.emit(to: emit)
+        case .f32LoadInAcc(let immediate): immediate.emit(to: emit)
+        case .f64LoadInAcc(let immediate): immediate.emit(to: emit)
+        case .i32Load8SInAcc(let immediate): immediate.emit(to: emit)
+        case .i32Load8UInAcc(let immediate): immediate.emit(to: emit)
+        case .i32Load16SInAcc(let immediate): immediate.emit(to: emit)
+        case .i32Load16UInAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load8SInAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load8UInAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load16SInAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load16UInAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load32SInAcc(let immediate): immediate.emit(to: emit)
+        case .i64Load32UInAcc(let immediate): immediate.emit(to: emit)
+        case .i32StoreFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64StoreFromAcc(let immediate): immediate.emit(to: emit)
+        case .f32StoreFromAcc(let immediate): immediate.emit(to: emit)
+        case .f64StoreFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32Store8FromAcc(let immediate): immediate.emit(to: emit)
+        case .i32Store16FromAcc(let immediate): immediate.emit(to: emit)
+        case .i64Store8FromAcc(let immediate): immediate.emit(to: emit)
+        case .i64Store16FromAcc(let immediate): immediate.emit(to: emit)
+        case .i64Store32FromAcc(let immediate): immediate.emit(to: emit)
+        case .i32StoreAddrFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64StoreAddrFromAcc(let immediate): immediate.emit(to: emit)
+        case .f32StoreAddrFromAcc(let immediate): immediate.emit(to: emit)
+        case .f64StoreAddrFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32Store8AddrFromAcc(let immediate): immediate.emit(to: emit)
+        case .i32Store16AddrFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64Store8AddrFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64Store16AddrFromAcc(let immediate): immediate.emit(to: emit)
+        case .i64Store32AddrFromAcc(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -3730,6 +4137,66 @@ extension Instruction {
         case .brIfAcc: return 452
         case .brIfNotAcc: return 453
         case .globalGetToAcc: return 454
+        case .i32LoadToAcc: return 455
+        case .i64LoadToAcc: return 456
+        case .f32LoadToAcc: return 457
+        case .f64LoadToAcc: return 458
+        case .i32Load8SToAcc: return 459
+        case .i32Load8UToAcc: return 460
+        case .i32Load16SToAcc: return 461
+        case .i32Load16UToAcc: return 462
+        case .i64Load8SToAcc: return 463
+        case .i64Load8UToAcc: return 464
+        case .i64Load16SToAcc: return 465
+        case .i64Load16UToAcc: return 466
+        case .i64Load32SToAcc: return 467
+        case .i64Load32UToAcc: return 468
+        case .i32LoadFromAcc: return 469
+        case .i64LoadFromAcc: return 470
+        case .f32LoadFromAcc: return 471
+        case .f64LoadFromAcc: return 472
+        case .i32Load8SFromAcc: return 473
+        case .i32Load8UFromAcc: return 474
+        case .i32Load16SFromAcc: return 475
+        case .i32Load16UFromAcc: return 476
+        case .i64Load8SFromAcc: return 477
+        case .i64Load8UFromAcc: return 478
+        case .i64Load16SFromAcc: return 479
+        case .i64Load16UFromAcc: return 480
+        case .i64Load32SFromAcc: return 481
+        case .i64Load32UFromAcc: return 482
+        case .i32LoadInAcc: return 483
+        case .i64LoadInAcc: return 484
+        case .f32LoadInAcc: return 485
+        case .f64LoadInAcc: return 486
+        case .i32Load8SInAcc: return 487
+        case .i32Load8UInAcc: return 488
+        case .i32Load16SInAcc: return 489
+        case .i32Load16UInAcc: return 490
+        case .i64Load8SInAcc: return 491
+        case .i64Load8UInAcc: return 492
+        case .i64Load16SInAcc: return 493
+        case .i64Load16UInAcc: return 494
+        case .i64Load32SInAcc: return 495
+        case .i64Load32UInAcc: return 496
+        case .i32StoreFromAcc: return 497
+        case .i64StoreFromAcc: return 498
+        case .f32StoreFromAcc: return 499
+        case .f64StoreFromAcc: return 500
+        case .i32Store8FromAcc: return 501
+        case .i32Store16FromAcc: return 502
+        case .i64Store8FromAcc: return 503
+        case .i64Store16FromAcc: return 504
+        case .i64Store32FromAcc: return 505
+        case .i32StoreAddrFromAcc: return 506
+        case .i64StoreAddrFromAcc: return 507
+        case .f32StoreAddrFromAcc: return 508
+        case .f64StoreAddrFromAcc: return 509
+        case .i32Store8AddrFromAcc: return 510
+        case .i32Store16AddrFromAcc: return 511
+        case .i64Store8AddrFromAcc: return 512
+        case .i64Store16AddrFromAcc: return 513
+        case .i64Store32AddrFromAcc: return 514
         }
     }
 }
@@ -4196,6 +4663,66 @@ extension Instruction {
         case 452: return .brIfAcc(Instruction.BrIfAccOperand.load(from: &pc))
         case 453: return .brIfNotAcc(Instruction.BrIfAccOperand.load(from: &pc))
         case 454: return .globalGetToAcc(Instruction.GlobalOperand.load(from: &pc))
+        case 455: return .i32LoadToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 456: return .i64LoadToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 457: return .f32LoadToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 458: return .f64LoadToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 459: return .i32Load8SToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 460: return .i32Load8UToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 461: return .i32Load16SToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 462: return .i32Load16UToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 463: return .i64Load8SToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 464: return .i64Load8UToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 465: return .i64Load16SToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 466: return .i64Load16UToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 467: return .i64Load32SToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 468: return .i64Load32UToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 469: return .i32LoadFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 470: return .i64LoadFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 471: return .f32LoadFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 472: return .f64LoadFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 473: return .i32Load8SFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 474: return .i32Load8UFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 475: return .i32Load16SFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 476: return .i32Load16UFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 477: return .i64Load8SFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 478: return .i64Load8UFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 479: return .i64Load16SFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 480: return .i64Load16UFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 481: return .i64Load32SFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 482: return .i64Load32UFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 483: return .i32LoadInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 484: return .i64LoadInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 485: return .f32LoadInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 486: return .f64LoadInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 487: return .i32Load8SInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 488: return .i32Load8UInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 489: return .i32Load16SInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 490: return .i32Load16UInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 491: return .i64Load8SInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 492: return .i64Load8UInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 493: return .i64Load16SInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 494: return .i64Load16UInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 495: return .i64Load32SInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 496: return .i64Load32UInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 497: return .i32StoreFromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 498: return .i64StoreFromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 499: return .f32StoreFromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 500: return .f64StoreFromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 501: return .i32Store8FromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 502: return .i32Store16FromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 503: return .i64Store8FromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 504: return .i64Store16FromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 505: return .i64Store32FromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 506: return .i32StoreAddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 507: return .i64StoreAddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 508: return .f32StoreAddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 509: return .f64StoreAddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 510: return .i32Store8AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 511: return .i32Store16AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 512: return .i64Store8AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 513: return .i64Store16AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 514: return .i64Store32AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -4665,6 +5192,66 @@ extension Instruction {
         case 452: return "brIfAcc"
         case 453: return "brIfNotAcc"
         case 454: return "globalGetToAcc"
+        case 455: return "i32LoadToAcc"
+        case 456: return "i64LoadToAcc"
+        case 457: return "f32LoadToAcc"
+        case 458: return "f64LoadToAcc"
+        case 459: return "i32Load8SToAcc"
+        case 460: return "i32Load8UToAcc"
+        case 461: return "i32Load16SToAcc"
+        case 462: return "i32Load16UToAcc"
+        case 463: return "i64Load8SToAcc"
+        case 464: return "i64Load8UToAcc"
+        case 465: return "i64Load16SToAcc"
+        case 466: return "i64Load16UToAcc"
+        case 467: return "i64Load32SToAcc"
+        case 468: return "i64Load32UToAcc"
+        case 469: return "i32LoadFromAcc"
+        case 470: return "i64LoadFromAcc"
+        case 471: return "f32LoadFromAcc"
+        case 472: return "f64LoadFromAcc"
+        case 473: return "i32Load8SFromAcc"
+        case 474: return "i32Load8UFromAcc"
+        case 475: return "i32Load16SFromAcc"
+        case 476: return "i32Load16UFromAcc"
+        case 477: return "i64Load8SFromAcc"
+        case 478: return "i64Load8UFromAcc"
+        case 479: return "i64Load16SFromAcc"
+        case 480: return "i64Load16UFromAcc"
+        case 481: return "i64Load32SFromAcc"
+        case 482: return "i64Load32UFromAcc"
+        case 483: return "i32LoadInAcc"
+        case 484: return "i64LoadInAcc"
+        case 485: return "f32LoadInAcc"
+        case 486: return "f64LoadInAcc"
+        case 487: return "i32Load8SInAcc"
+        case 488: return "i32Load8UInAcc"
+        case 489: return "i32Load16SInAcc"
+        case 490: return "i32Load16UInAcc"
+        case 491: return "i64Load8SInAcc"
+        case 492: return "i64Load8UInAcc"
+        case 493: return "i64Load16SInAcc"
+        case 494: return "i64Load16UInAcc"
+        case 495: return "i64Load32SInAcc"
+        case 496: return "i64Load32UInAcc"
+        case 497: return "i32StoreFromAcc"
+        case 498: return "i64StoreFromAcc"
+        case 499: return "f32StoreFromAcc"
+        case 500: return "f64StoreFromAcc"
+        case 501: return "i32Store8FromAcc"
+        case 502: return "i32Store16FromAcc"
+        case 503: return "i64Store8FromAcc"
+        case 504: return "i64Store16FromAcc"
+        case 505: return "i64Store32FromAcc"
+        case 506: return "i32StoreAddrFromAcc"
+        case 507: return "i64StoreAddrFromAcc"
+        case 508: return "f32StoreAddrFromAcc"
+        case 509: return "f64StoreAddrFromAcc"
+        case 510: return "i32Store8AddrFromAcc"
+        case 511: return "i32Store16AddrFromAcc"
+        case 512: return "i64Store8AddrFromAcc"
+        case 513: return "i64Store16AddrFromAcc"
+        case 514: return "i64Store32AddrFromAcc"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
