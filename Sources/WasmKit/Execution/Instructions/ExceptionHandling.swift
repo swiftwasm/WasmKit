@@ -13,11 +13,11 @@ extension Execution {
         let tagType = store.value.engine.resolveType(tag.type)
         var payload: [Value] = []
         payload.reserveCapacity(tagType.parameters.count)
-        var slotOffset: VReg = 0
+        var slotOffset = VReg.zero
         for paramType in tagType.parameters {
             let value = UntypedValue(storage: sp[i64: immediate.payloadBase + slotOffset])
             payload.append(value.cast(to: paramType))
-            slotOffset += VReg(paramType.stackSlotCount)
+            slotOffset += VReg(slotIndex: paramType.stackSlotCount)
         }
         throw WasmKitException(tag: tag, payload: payload)
     }
@@ -97,10 +97,10 @@ extension Execution {
             // Write exception payload to the handler's target stack slots
             if let handlerTag = handler.tag {
                 let tagType = store.value.engine.resolveType(handlerTag.type)
-                var slotOffset: VReg = 0
+                var slotOffset = VReg.zero
                 for (i, paramType) in tagType.parameters.enumerated() {
                     sp[i64: handler.payloadRegBase + slotOffset] = UntypedValue(exception.payload[i]).storage
-                    slotOffset += VReg(paramType.stackSlotCount)
+                    slotOffset += VReg(slotIndex: paramType.stackSlotCount)
                 }
                 // For catch_ref, also write the exnref after the payload
                 if handler.isRef {

@@ -476,7 +476,7 @@ enum VMGen {
             let dummyExpr: String
             if let layout = inst.immediateLayout {
                 let fields = layout.fields.map { field in
-                    "\(field.name): \(field.type.name)(0)"
+                    "\(field.name): \(field.type.zeroLiteral)"
                 }.joined(separator: ", ")
                 dummyExpr = ".\(inst.name)(.init(\(fields)))"
             } else if let immediate = inst.immediate {

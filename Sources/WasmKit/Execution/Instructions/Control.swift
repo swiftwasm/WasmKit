@@ -239,7 +239,9 @@ extension Execution {
         //              |---------------------|\  |     Value Stack     |                   |
         //                                      \ |        ...          |                   |
         //                                       \|---------------------|                  -+
-        let newSp = sp.advanced(by: Int(immediate.delta))
+        let newSp = UnsafeMutableRawPointer(sp)
+            .advanced(by: Int(immediate.delta.byteOffset))
+            .assumingMemoryBound(to: StackSlot.self)
         try checkStackBoundary(newSp)
         let oldFrameHeader = sp.advanced(by: -FrameHeaderLayout.numberOfSavingSlots)
         let newFrameHeader = newSp.advanced(by: -FrameHeaderLayout.numberOfSavingSlots)

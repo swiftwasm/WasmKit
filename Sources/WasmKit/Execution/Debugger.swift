@@ -87,12 +87,12 @@
         private let headSlotToOpcodeID: [CodeSlot: OpcodeID]
 
         private static let callFamilyOpcodes: Set<OpcodeID> = [
-            Instruction.call(.init(rawCallee: UInt64(0), spAddend: VReg(0))).opcodeID,
-            Instruction.compilingCall(.init(rawCallee: UInt64(0), spAddend: VReg(0))).opcodeID,
-            Instruction.internalCall(.init(rawCallee: UInt64(0), spAddend: VReg(0))).opcodeID,
-            Instruction.callIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg(0), spAddend: VReg(0))).opcodeID,
+            Instruction.call(.init(rawCallee: UInt64(0), spAddend: VReg.zero)).opcodeID,
+            Instruction.compilingCall(.init(rawCallee: UInt64(0), spAddend: VReg.zero)).opcodeID,
+            Instruction.internalCall(.init(rawCallee: UInt64(0), spAddend: VReg.zero)).opcodeID,
+            Instruction.callIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg.zero, spAddend: VReg.zero)).opcodeID,
             Instruction.returnCall(.init(rawCallee: UInt64(0))).opcodeID,
-            Instruction.returnCallIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg(0))).opcodeID,
+            Instruction.returnCallIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg.zero)).opcodeID,
         ]
 
         /// Initializes a new debugger state instance.
@@ -294,7 +294,7 @@
                         let type = self.entrypointFunction.type
                         self.state = .entrypointReturned(
                             type.results.enumerated().map { (i, type) in
-                                end.sp[VReg(i)].cast(to: type)
+                                end.sp[VReg(slotIndex: i)].cast(to: type)
                             }
                         )
                     }

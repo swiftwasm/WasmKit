@@ -7,7 +7,7 @@ extension Execution {
     mutating func tableGet(sp: Sp, immediate: Instruction.TableGetOperand) throws {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
 
-        let elementIndex = try getElementIndex(sp: sp, VReg(immediate.index), table)
+        let elementIndex = try getElementIndex(sp: sp, immediate.index, table)
 
         let reference = table.elements[Int(elementIndex)]
         sp[immediate.result] = UntypedValue(.ref(reference))
@@ -15,8 +15,8 @@ extension Execution {
     mutating func tableSet(sp: Sp, immediate: Instruction.TableSetOperand) throws {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
 
-        let reference = sp.getReference(VReg(immediate.value), type: table.tableType)
-        let elementIndex = try getElementIndex(sp: sp, VReg(immediate.index), table)
+        let reference = sp.getReference(immediate.value, type: table.tableType)
+        let elementIndex = try getElementIndex(sp: sp, immediate.index, table)
         setTableElement(table: table, Int(elementIndex), reference)
     }
     mutating func tableSize(sp: Sp, immediate: Instruction.TableSizeOperand) {
@@ -28,7 +28,7 @@ extension Execution {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
 
         let growthSize = sp[immediate.delta].asAddressOffset(table.limits.isMemory64)
-        let growthValue = sp.getReference(VReg(immediate.value), type: table.tableType)
+        let growthValue = sp.getReference(immediate.value, type: table.tableType)
 
         let oldSize = table.elements.count
         guard try table.withValue({ try $0.grow(by: growthSize, value: growthValue, resourceLimiter: store.value.resourceLimiter) }) else {

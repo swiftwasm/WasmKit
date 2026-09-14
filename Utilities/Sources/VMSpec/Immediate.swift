@@ -258,6 +258,17 @@ extension VMGen.ImmediateLayout {
 }
 
 extension VMGen.PrimitiveType {
+    /// An expression that produces the zero value of this type, used for the
+    /// dummy instruction values the generator builds.
+    var zeroLiteral: String {
+        switch name {
+        // Register types are wrappers around a pre-shifted byte offset and take
+        // no integer literal.
+        case "VReg", "LVReg", "LLVReg": return "\(name).zero"
+        default: return "\(name)(0)"
+        }
+    }
+
     static let VReg = Self(name: "VReg", size: 2)
     static let LVReg = Self(name: "LVReg", size: 4)
     static let LLVReg = Self(name: "LLVReg", size: 8)
