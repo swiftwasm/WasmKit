@@ -514,6 +514,9 @@ extension Instruction {
             func brIfCmp(_ name: String, _ op: Instruction.BrIfCmpOperand) {
                 target.write("br_if.\(name) \(reg(op.lhs)), \(reg(op.rhs)), \(branchTarget(instructionOffset, Int(op.offset)))")
             }
+            func loadWithCopy(_ name: String, _ op: Instruction.LoadWithCopyOperand) {
+                target.write("\(reg(op.copyDest)) = copy \(reg(op.pointer)); \(reg(op.result)) = \(name) \(reg(op.pointer)), offset: \(op.offset)")
+            }
             switch instruction {
             case .unreachable:
                 target.write("unreachable")
@@ -523,6 +526,20 @@ extension Instruction {
                 target.write("\(reg(op.dest)) = copy \(reg(op.source))")
             case .copyStack2(let op):
                 target.write("\(reg(op.dest0)) = copy \(reg(op.source0)); \(reg(op.dest1)) = copy \(reg(op.source1))")
+            case .i32LoadWithCopy(let op): loadWithCopy("i32.load", op)
+            case .i64LoadWithCopy(let op): loadWithCopy("i64.load", op)
+            case .f32LoadWithCopy(let op): loadWithCopy("f32.load", op)
+            case .f64LoadWithCopy(let op): loadWithCopy("f64.load", op)
+            case .i32Load8SWithCopy(let op): loadWithCopy("i32.load8_s", op)
+            case .i32Load8UWithCopy(let op): loadWithCopy("i32.load8_u", op)
+            case .i32Load16SWithCopy(let op): loadWithCopy("i32.load16_s", op)
+            case .i32Load16UWithCopy(let op): loadWithCopy("i32.load16_u", op)
+            case .i64Load8SWithCopy(let op): loadWithCopy("i64.load8_s", op)
+            case .i64Load8UWithCopy(let op): loadWithCopy("i64.load8_u", op)
+            case .i64Load16SWithCopy(let op): loadWithCopy("i64.load16_s", op)
+            case .i64Load16UWithCopy(let op): loadWithCopy("i64.load16_u", op)
+            case .i64Load32SWithCopy(let op): loadWithCopy("i64.load32_s", op)
+            case .i64Load32UWithCopy(let op): loadWithCopy("i64.load32_u", op)
             case .selectAcc(let op):
                 target.write("\(reg(op.result)) = select acc, \(reg(op.onTrue)), \(reg(op.onFalse))")
             case .selectI32Eq(let op):

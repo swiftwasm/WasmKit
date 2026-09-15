@@ -270,6 +270,9 @@ enum VMGen {
             inlineImpls[op.toAccInstruction.name] = """
             if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) }) { %TRAP% }
             """
+            inlineImpls[op.withCopyInstruction.name] = """
+            if let trap = memoryLoadWithCopy(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) }) { %TRAP% }
+            """
             inlineImpls[op.toAccAndSlotInstruction.name] = """
             if let trap = memoryLoadToAccAndSlot(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) }) { %TRAP% }
             """
