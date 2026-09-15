@@ -1530,6 +1530,37 @@ extension VMGen {
         return inst
     }()
 
+    /// Predicates with a fused `select` over two slots. The others are
+    /// reached by exchanging the candidates or the comparison's operands.
+    static let selectCmpOps = ["Eq", "LtS", "LtU"]
+
+    /// Predicates with a fused `select` against a constant. The constant is
+    /// always the right operand, so only the candidates can be exchanged.
+    static let selectCmpImmOps = ["Eq", "LtS", "LtU", "GtS", "GtU"]
+
+    /// `select` whose condition is an integer comparison.
+    static let selectCmpInsts: [Instruction] = intValueTypes.flatMap { type in
+        let slotForms = selectCmpOps.map { op in
+            var inst = Instruction(
+                name: "select\(type.uppercased())\(op)",
+                documentation: "`select` whose condition is `\(type).\(VMGen.snakeCase(pascalCase: op))` of two slots",
+                immediateLayout: .selectCmp
+            )
+            inst.isDirectThreadedOnly = true
+            return inst
+        }
+        let immForms = selectCmpImmOps.map { op in
+            var inst = Instruction(
+                name: "select\(type.uppercased())\(op)Imm",
+                documentation: "`select` whose condition is `\(type).\(VMGen.snakeCase(pascalCase: op))` against a constant",
+                immediateLayout: .selectCmpImm
+            )
+            inst.isDirectThreadedOnly = true
+            return inst
+        }
+        return slotForms + immForms
+    }
+
     // MARK: - Instruction generation
 
     static func buildInstructions() -> [Instruction] {
@@ -1695,6 +1726,7 @@ extension VMGen {
         }
         copyStack2.isDirectThreadedOnly = true
         instructions += [copyStack2]
+        instructions += selectCmpInsts
         return instructions
     }
 

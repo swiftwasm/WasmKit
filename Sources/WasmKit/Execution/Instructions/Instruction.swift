@@ -2283,6 +2283,38 @@ enum Instruction: Equatable {
     case selectAcc(Instruction.SelectAccOperand)
     /// Two register copies, `sp[dest0] = sp[source0]` then `sp[dest1] = sp[source1]`, where the second does not read the first's destination
     case copyStack2(Instruction.CopyStack2Operand)
+    /// `select` whose condition is `i32.eq` of two slots
+    case selectI32Eq(Instruction.SelectCmpOperand)
+    /// `select` whose condition is `i32.lt_s` of two slots
+    case selectI32LtS(Instruction.SelectCmpOperand)
+    /// `select` whose condition is `i32.lt_u` of two slots
+    case selectI32LtU(Instruction.SelectCmpOperand)
+    /// `select` whose condition is `i32.eq` against a constant
+    case selectI32EqImm(Instruction.SelectCmpImmOperand)
+    /// `select` whose condition is `i32.lt_s` against a constant
+    case selectI32LtSImm(Instruction.SelectCmpImmOperand)
+    /// `select` whose condition is `i32.lt_u` against a constant
+    case selectI32LtUImm(Instruction.SelectCmpImmOperand)
+    /// `select` whose condition is `i32.gt_s` against a constant
+    case selectI32GtSImm(Instruction.SelectCmpImmOperand)
+    /// `select` whose condition is `i32.gt_u` against a constant
+    case selectI32GtUImm(Instruction.SelectCmpImmOperand)
+    /// `select` whose condition is `i64.eq` of two slots
+    case selectI64Eq(Instruction.SelectCmpOperand)
+    /// `select` whose condition is `i64.lt_s` of two slots
+    case selectI64LtS(Instruction.SelectCmpOperand)
+    /// `select` whose condition is `i64.lt_u` of two slots
+    case selectI64LtU(Instruction.SelectCmpOperand)
+    /// `select` whose condition is `i64.eq` against a constant
+    case selectI64EqImm(Instruction.SelectCmpImmOperand)
+    /// `select` whose condition is `i64.lt_s` against a constant
+    case selectI64LtSImm(Instruction.SelectCmpImmOperand)
+    /// `select` whose condition is `i64.lt_u` against a constant
+    case selectI64LtUImm(Instruction.SelectCmpImmOperand)
+    /// `select` whose condition is `i64.gt_s` against a constant
+    case selectI64GtSImm(Instruction.SelectCmpImmOperand)
+    /// `select` whose condition is `i64.gt_u` against a constant
+    case selectI64GtUImm(Instruction.SelectCmpImmOperand)
 }
 
 extension Instruction {
@@ -3386,6 +3418,62 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.source0, $0.dest0, $0.source1, $0.dest1) as (VReg, VReg, VReg, VReg), to: CodeSlot.self) }
         }
     }
+
+    struct SelectCmpOperand: Equatable, InstructionImmediate {
+        var result: VReg
+        var lhs: VReg
+        var rhs: VReg
+        var onTrue: VReg
+        var onFalse: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let result = VReg(byteOffset: Int16(truncatingIfNeeded: word0))
+                let lhs = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 16))
+                let rhs = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 32))
+                let onTrue = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 48))
+                let word1 = pc.read(UInt64.self)
+                let onFalse = VReg(byteOffset: Int16(truncatingIfNeeded: word1))
+                return Self(result: result, lhs: lhs, rhs: rhs, onTrue: onTrue, onFalse: onFalse)
+            #else
+                let (result, lhs, rhs, onTrue) = pc.read((VReg, VReg, VReg, VReg).self)
+                let (onFalse, _, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
+                return Self(result: result, lhs: lhs, rhs: rhs, onTrue: onTrue, onFalse: onFalse)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.result, $0.lhs, $0.rhs, $0.onTrue) as (VReg, VReg, VReg, VReg), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.onFalse, 0, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct SelectCmpImmOperand: Equatable, InstructionImmediate {
+        var result: VReg
+        var lhs: VReg
+        var imm: Int32
+        var onTrue: VReg
+        var onFalse: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let result = VReg(byteOffset: Int16(truncatingIfNeeded: word0))
+                let lhs = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 16))
+                let imm = Int32(truncatingIfNeeded: word0 >> 32)
+                let word1 = pc.read(UInt64.self)
+                let onTrue = VReg(byteOffset: Int16(truncatingIfNeeded: word1))
+                let onFalse = VReg(byteOffset: Int16(truncatingIfNeeded: word1 >> 16))
+                return Self(result: result, lhs: lhs, imm: imm, onTrue: onTrue, onFalse: onFalse)
+            #else
+                let (result, lhs, imm) = pc.read((VReg, VReg, Int32).self)
+                let (onTrue, onFalse, _, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
+                return Self(result: result, lhs: lhs, imm: imm, onTrue: onTrue, onFalse: onFalse)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.result, $0.lhs, $0.imm) as (VReg, VReg, Int32), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.onTrue, $0.onFalse, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -4079,6 +4167,22 @@ extension Instruction {
         case .copyStackAccToSlot(let immediate): return immediate
         case .selectAcc(let immediate): return immediate
         case .copyStack2(let immediate): return immediate
+        case .selectI32Eq(let immediate): return immediate
+        case .selectI32LtS(let immediate): return immediate
+        case .selectI32LtU(let immediate): return immediate
+        case .selectI32EqImm(let immediate): return immediate
+        case .selectI32LtSImm(let immediate): return immediate
+        case .selectI32LtUImm(let immediate): return immediate
+        case .selectI32GtSImm(let immediate): return immediate
+        case .selectI32GtUImm(let immediate): return immediate
+        case .selectI64Eq(let immediate): return immediate
+        case .selectI64LtS(let immediate): return immediate
+        case .selectI64LtU(let immediate): return immediate
+        case .selectI64EqImm(let immediate): return immediate
+        case .selectI64LtSImm(let immediate): return immediate
+        case .selectI64LtUImm(let immediate): return immediate
+        case .selectI64GtSImm(let immediate): return immediate
+        case .selectI64GtUImm(let immediate): return immediate
         default: return nil
         }
     }
@@ -4776,6 +4880,22 @@ extension Instruction {
         case .copyStackAccToSlot(let immediate): immediate.emit(to: emit)
         case .selectAcc(let immediate): immediate.emit(to: emit)
         case .copyStack2(let immediate): immediate.emit(to: emit)
+        case .selectI32Eq(let immediate): immediate.emit(to: emit)
+        case .selectI32LtS(let immediate): immediate.emit(to: emit)
+        case .selectI32LtU(let immediate): immediate.emit(to: emit)
+        case .selectI32EqImm(let immediate): immediate.emit(to: emit)
+        case .selectI32LtSImm(let immediate): immediate.emit(to: emit)
+        case .selectI32LtUImm(let immediate): immediate.emit(to: emit)
+        case .selectI32GtSImm(let immediate): immediate.emit(to: emit)
+        case .selectI32GtUImm(let immediate): immediate.emit(to: emit)
+        case .selectI64Eq(let immediate): immediate.emit(to: emit)
+        case .selectI64LtS(let immediate): immediate.emit(to: emit)
+        case .selectI64LtU(let immediate): immediate.emit(to: emit)
+        case .selectI64EqImm(let immediate): immediate.emit(to: emit)
+        case .selectI64LtSImm(let immediate): immediate.emit(to: emit)
+        case .selectI64LtUImm(let immediate): immediate.emit(to: emit)
+        case .selectI64GtSImm(let immediate): immediate.emit(to: emit)
+        case .selectI64GtUImm(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -5482,7 +5602,23 @@ extension Instruction {
         case .i64Load32UToAccAndSlot: return 693
         case .copyStackAccToSlot: return 694
         case .selectAcc: return 695
-        default: return 696  // .copyStack2
+        case .copyStack2: return 696
+        case .selectI32Eq: return 697
+        case .selectI32LtS: return 698
+        case .selectI32LtU: return 699
+        case .selectI32EqImm: return 700
+        case .selectI32LtSImm: return 701
+        case .selectI32LtUImm: return 702
+        case .selectI32GtSImm: return 703
+        case .selectI32GtUImm: return 704
+        case .selectI64Eq: return 705
+        case .selectI64LtS: return 706
+        case .selectI64LtU: return 707
+        case .selectI64EqImm: return 708
+        case .selectI64LtSImm: return 709
+        case .selectI64LtUImm: return 710
+        case .selectI64GtSImm: return 711
+        default: return 712  // .selectI64GtUImm
         }
     }
 }
@@ -6191,6 +6327,22 @@ extension Instruction {
         case 694: return .copyStackAccToSlot(Instruction.CopyStackAccToSlotOperand.load(from: &pc))
         case 695: return .selectAcc(Instruction.SelectAccOperand.load(from: &pc))
         case 696: return .copyStack2(Instruction.CopyStack2Operand.load(from: &pc))
+        case 697: return .selectI32Eq(Instruction.SelectCmpOperand.load(from: &pc))
+        case 698: return .selectI32LtS(Instruction.SelectCmpOperand.load(from: &pc))
+        case 699: return .selectI32LtU(Instruction.SelectCmpOperand.load(from: &pc))
+        case 700: return .selectI32EqImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 701: return .selectI32LtSImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 702: return .selectI32LtUImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 703: return .selectI32GtSImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 704: return .selectI32GtUImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 705: return .selectI64Eq(Instruction.SelectCmpOperand.load(from: &pc))
+        case 706: return .selectI64LtS(Instruction.SelectCmpOperand.load(from: &pc))
+        case 707: return .selectI64LtU(Instruction.SelectCmpOperand.load(from: &pc))
+        case 708: return .selectI64EqImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 709: return .selectI64LtSImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 710: return .selectI64LtUImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 711: return .selectI64GtSImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 712: return .selectI64GtUImm(Instruction.SelectCmpImmOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -6902,6 +7054,22 @@ extension Instruction {
         case 694: return "copyStackAccToSlot"
         case 695: return "selectAcc"
         case 696: return "copyStack2"
+        case 697: return "selectI32Eq"
+        case 698: return "selectI32LtS"
+        case 699: return "selectI32LtU"
+        case 700: return "selectI32EqImm"
+        case 701: return "selectI32LtSImm"
+        case 702: return "selectI32LtUImm"
+        case 703: return "selectI32GtSImm"
+        case 704: return "selectI32GtUImm"
+        case 705: return "selectI64Eq"
+        case 706: return "selectI64LtS"
+        case 707: return "selectI64LtU"
+        case 708: return "selectI64EqImm"
+        case 709: return "selectI64LtSImm"
+        case 710: return "selectI64LtUImm"
+        case 711: return "selectI64GtSImm"
+        case 712: return "selectI64GtUImm"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }

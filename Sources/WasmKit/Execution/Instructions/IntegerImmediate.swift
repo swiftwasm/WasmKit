@@ -15,3 +15,8 @@ extension Instruction.BrIfCmpImmOperand {
     @inline(__always) var i32: UInt32 { UInt32(bitPattern: imm) }
     @inline(__always) var i64: UInt64 { UInt64(bitPattern: Int64(imm)) }
 }
+
+extension Instruction.SelectCmpImmOperand {
+    @inline(__always) var i32: UInt32 { UInt32(bitPattern: imm) }
+    @inline(__always) var i64: UInt64 { UInt64(bitPattern: Int64(imm)) }
+}

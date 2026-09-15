@@ -175,6 +175,22 @@ enum VMGen {
                     let onFalse = sp.pointee[immediate.onFalse]
                     sp.pointee[immediate.result] = UInt32(truncatingIfNeeded: ireg.pointee) != 0 ? onTrue : onFalse
             """
+        for type in intValueTypes {
+            for op in selectCmpOps {
+                inlineImpls["select\(type.uppercased())\(op)"] = """
+                    let onTrue = sp.pointee[immediate.onTrue]
+                            let onFalse = sp.pointee[immediate.onFalse]
+                            sp.pointee[immediate.result] = sp.pointee[\(type): immediate.lhs].\(camelCase(pascalCase: op))(sp.pointee[\(type): immediate.rhs]) != 0 ? onTrue : onFalse
+                    """
+            }
+            for op in selectCmpImmOps {
+                inlineImpls["select\(type.uppercased())\(op)Imm"] = """
+                    let onTrue = sp.pointee[immediate.onTrue]
+                            let onFalse = sp.pointee[immediate.onFalse]
+                            sp.pointee[immediate.result] = sp.pointee[\(type): immediate.lhs].\(camelCase(pascalCase: op))(immediate.\(type)) != 0 ? onTrue : onFalse
+                    """
+            }
+        }
         inlineImpls["copyStackAccToSlot"] = """
             sp.pointee[immediate.dest] = sp.pointee[immediate.source]
                     sp.pointee[immediate.result] = UntypedValue(storage: ireg.pointee)

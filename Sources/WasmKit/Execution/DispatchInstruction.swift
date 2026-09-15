@@ -6721,6 +6721,166 @@ extension Execution {
         self.copyStack2(sp: sp.pointee, immediate: immediate)
         return next
     }
+    @_silgen_name("wasmkit_execute_selectI32Eq") @inline(__always)
+    mutating func execute_selectI32Eq(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectCmpOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = sp.pointee[i32: immediate.lhs].eq(sp.pointee[i32: immediate.rhs]) != 0 ? onTrue : onFalse
+        return next
+    }
+    @_silgen_name("wasmkit_execute_selectI32LtS") @inline(__always)
+    mutating func execute_selectI32LtS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectCmpOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = sp.pointee[i32: immediate.lhs].ltS(sp.pointee[i32: immediate.rhs]) != 0 ? onTrue : onFalse
+        return next
+    }
+    @_silgen_name("wasmkit_execute_selectI32LtU") @inline(__always)
+    mutating func execute_selectI32LtU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectCmpOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = sp.pointee[i32: immediate.lhs].ltU(sp.pointee[i32: immediate.rhs]) != 0 ? onTrue : onFalse
+        return next
+    }
+    @_silgen_name("wasmkit_execute_selectI32EqImm") @inline(__always)
+    mutating func execute_selectI32EqImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectCmpImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = sp.pointee[i32: immediate.lhs].eq(immediate.i32) != 0 ? onTrue : onFalse
+        return next
+    }
+    @_silgen_name("wasmkit_execute_selectI32LtSImm") @inline(__always)
+    mutating func execute_selectI32LtSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectCmpImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = sp.pointee[i32: immediate.lhs].ltS(immediate.i32) != 0 ? onTrue : onFalse
+        return next
+    }
+    @_silgen_name("wasmkit_execute_selectI32LtUImm") @inline(__always)
+    mutating func execute_selectI32LtUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectCmpImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = sp.pointee[i32: immediate.lhs].ltU(immediate.i32) != 0 ? onTrue : onFalse
+        return next
+    }
+    @_silgen_name("wasmkit_execute_selectI32GtSImm") @inline(__always)
+    mutating func execute_selectI32GtSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectCmpImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = sp.pointee[i32: immediate.lhs].gtS(immediate.i32) != 0 ? onTrue : onFalse
+        return next
+    }
+    @_silgen_name("wasmkit_execute_selectI32GtUImm") @inline(__always)
+    mutating func execute_selectI32GtUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectCmpImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = sp.pointee[i32: immediate.lhs].gtU(immediate.i32) != 0 ? onTrue : onFalse
+        return next
+    }
+    @_silgen_name("wasmkit_execute_selectI64Eq") @inline(__always)
+    mutating func execute_selectI64Eq(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectCmpOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = sp.pointee[i64: immediate.lhs].eq(sp.pointee[i64: immediate.rhs]) != 0 ? onTrue : onFalse
+        return next
+    }
+    @_silgen_name("wasmkit_execute_selectI64LtS") @inline(__always)
+    mutating func execute_selectI64LtS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectCmpOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = sp.pointee[i64: immediate.lhs].ltS(sp.pointee[i64: immediate.rhs]) != 0 ? onTrue : onFalse
+        return next
+    }
+    @_silgen_name("wasmkit_execute_selectI64LtU") @inline(__always)
+    mutating func execute_selectI64LtU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectCmpOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = sp.pointee[i64: immediate.lhs].ltU(sp.pointee[i64: immediate.rhs]) != 0 ? onTrue : onFalse
+        return next
+    }
+    @_silgen_name("wasmkit_execute_selectI64EqImm") @inline(__always)
+    mutating func execute_selectI64EqImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectCmpImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = sp.pointee[i64: immediate.lhs].eq(immediate.i64) != 0 ? onTrue : onFalse
+        return next
+    }
+    @_silgen_name("wasmkit_execute_selectI64LtSImm") @inline(__always)
+    mutating func execute_selectI64LtSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectCmpImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = sp.pointee[i64: immediate.lhs].ltS(immediate.i64) != 0 ? onTrue : onFalse
+        return next
+    }
+    @_silgen_name("wasmkit_execute_selectI64LtUImm") @inline(__always)
+    mutating func execute_selectI64LtUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectCmpImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = sp.pointee[i64: immediate.lhs].ltU(immediate.i64) != 0 ? onTrue : onFalse
+        return next
+    }
+    @_silgen_name("wasmkit_execute_selectI64GtSImm") @inline(__always)
+    mutating func execute_selectI64GtSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectCmpImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = sp.pointee[i64: immediate.lhs].gtS(immediate.i64) != 0 ? onTrue : onFalse
+        return next
+    }
+    @_silgen_name("wasmkit_execute_selectI64GtUImm") @inline(__always)
+    mutating func execute_selectI64GtUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectCmpImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = sp.pointee[i64: immediate.lhs].gtU(immediate.i64) != 0 ? onTrue : onFalse
+        return next
+    }
 }
 
 #if !(os(WASI) || $Embedded)
