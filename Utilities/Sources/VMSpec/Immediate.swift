@@ -297,6 +297,24 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "offset", type: .Int32)
     }
 
+    /// `sp[result] = (sp[lhs] <cmp> sp[rhs]) ? sp[onTrue] : sp[onFalse]`.
+    static let selectCmp = Self(name: "SelectCmpOperand") {
+        $0.field(name: "result", type: .VReg)
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "rhs", type: .VReg)
+        $0.field(name: "onTrue", type: .VReg)
+        $0.field(name: "onFalse", type: .VReg)
+    }
+
+    /// `sp[result] = (sp[lhs] <cmp> imm) ? sp[onTrue] : sp[onFalse]`.
+    static let selectCmpImm = Self(name: "SelectCmpImmOperand") {
+        $0.field(name: "result", type: .VReg)
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "imm", type: .Int32)
+        $0.field(name: "onTrue", type: .VReg)
+        $0.field(name: "onFalse", type: .VReg)
+    }
+
     /// `freg = (sp[x] <op1> sp[y]) <op2> sp[z]`.
     static let accBinBin = Self(name: "AccBinBinOperand") {
         $0.field(name: "x", type: .VReg)

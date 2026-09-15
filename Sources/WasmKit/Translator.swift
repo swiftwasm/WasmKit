@@ -751,6 +751,42 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             }
         }
 
+        /// The fused `select` on this comparison of two slots. Predicates
+        /// without an opcode exchange the candidates or the operands.
+        func makeSelect(lhs: VReg, rhs: VReg, onTrue: VReg, onFalse: VReg) -> (VReg) -> Instruction {
+            switch self {
+            case .i32Eq: return { .selectI32Eq(.init(result: $0, lhs: lhs, rhs: rhs, onTrue: onTrue, onFalse: onFalse)) }
+            case .i32LtS: return { .selectI32LtS(.init(result: $0, lhs: lhs, rhs: rhs, onTrue: onTrue, onFalse: onFalse)) }
+            case .i32LtU: return { .selectI32LtU(.init(result: $0, lhs: lhs, rhs: rhs, onTrue: onTrue, onFalse: onFalse)) }
+            case .i64Eq: return { .selectI64Eq(.init(result: $0, lhs: lhs, rhs: rhs, onTrue: onTrue, onFalse: onFalse)) }
+            case .i64LtS: return { .selectI64LtS(.init(result: $0, lhs: lhs, rhs: rhs, onTrue: onTrue, onFalse: onFalse)) }
+            case .i64LtU: return { .selectI64LtU(.init(result: $0, lhs: lhs, rhs: rhs, onTrue: onTrue, onFalse: onFalse)) }
+            case .i32GtS, .i32GtU, .i64GtS, .i64GtU:
+                return swapped.makeSelect(lhs: rhs, rhs: lhs, onTrue: onTrue, onFalse: onFalse)
+            case .i32Ne, .i32GeS, .i32GeU, .i32LeS, .i32LeU, .i64Ne, .i64GeS, .i64GeU, .i64LeS, .i64LeU:
+                return complement.makeSelect(lhs: lhs, rhs: rhs, onTrue: onFalse, onFalse: onTrue)
+            }
+        }
+
+        /// The fused `select` on this comparison against a constant.
+        /// Predicates without an opcode exchange the candidates.
+        func makeSelectImm(lhs: VReg, imm: Int32, onTrue: VReg, onFalse: VReg) -> (VReg) -> Instruction {
+            switch self {
+            case .i32Eq: return { .selectI32EqImm(.init(result: $0, lhs: lhs, imm: imm, onTrue: onTrue, onFalse: onFalse)) }
+            case .i32LtS: return { .selectI32LtSImm(.init(result: $0, lhs: lhs, imm: imm, onTrue: onTrue, onFalse: onFalse)) }
+            case .i32LtU: return { .selectI32LtUImm(.init(result: $0, lhs: lhs, imm: imm, onTrue: onTrue, onFalse: onFalse)) }
+            case .i32GtS: return { .selectI32GtSImm(.init(result: $0, lhs: lhs, imm: imm, onTrue: onTrue, onFalse: onFalse)) }
+            case .i32GtU: return { .selectI32GtUImm(.init(result: $0, lhs: lhs, imm: imm, onTrue: onTrue, onFalse: onFalse)) }
+            case .i64Eq: return { .selectI64EqImm(.init(result: $0, lhs: lhs, imm: imm, onTrue: onTrue, onFalse: onFalse)) }
+            case .i64LtS: return { .selectI64LtSImm(.init(result: $0, lhs: lhs, imm: imm, onTrue: onTrue, onFalse: onFalse)) }
+            case .i64LtU: return { .selectI64LtUImm(.init(result: $0, lhs: lhs, imm: imm, onTrue: onTrue, onFalse: onFalse)) }
+            case .i64GtS: return { .selectI64GtSImm(.init(result: $0, lhs: lhs, imm: imm, onTrue: onTrue, onFalse: onFalse)) }
+            case .i64GtU: return { .selectI64GtUImm(.init(result: $0, lhs: lhs, imm: imm, onTrue: onTrue, onFalse: onFalse)) }
+            case .i32Ne, .i32GeS, .i32GeU, .i32LeS, .i32LeU, .i64Ne, .i64GeS, .i64GeU, .i64LeS, .i64LeU:
+                return complement.makeSelectImm(lhs: lhs, imm: imm, onTrue: onFalse, onFalse: onTrue)
+            }
+        }
+
         /// The comparison against a constant.
         var makeCmpImm: (Instruction.BinaryImmOperand) -> Instruction {
             switch self {
@@ -3258,6 +3294,39 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         return candidate
     }
 
+    /// Removes the integer comparison computing `condition` when it is still
+    /// the last instruction, returning the fused `select` to emit in its place.
+    private mutating func fuseCompareIntoSelect(
+        _ candidate: FusableEmission?, condition: VReg, onTrue: VReg, onFalse: VReg
+    ) -> ((VReg) -> Instruction)? {
+        guard engineConfiguration.threadingModel == .direct,
+            let candidate, candidate.result == condition, candidate.prefix == nil, iseqBuilder.canRewind(to: candidate),
+            let factory = Self.selectCmpFactory(for: candidate.condition, onTrue: onTrue, onFalse: onFalse)
+        else { return nil }
+        iseqBuilder.rewind(to: candidate.position)
+        self.rewindInstructionMapping(to: candidate.position)
+        return factory
+    }
+
+    /// The fused `select` testing `condition`, or `nil` when it is not an
+    /// integer comparison. Bit tests reach `selectAcc` instead.
+    private static func selectCmpFactory(
+        for condition: FusableCondition, onTrue: VReg, onFalse: VReg
+    ) -> ((VReg) -> Instruction)? {
+        switch condition {
+        case .compare(let kind, let lhs, let rhs):
+            return kind.makeSelect(lhs: lhs, rhs: rhs, onTrue: onTrue, onFalse: onFalse)
+        case .compareImm(let kind, let lhs, let imm):
+            return kind.makeSelectImm(lhs: lhs, imm: imm, onTrue: onTrue, onFalse: onFalse)
+        case .i32Eqz(let input):
+            return FusedCmpKind.i32Eq.makeSelectImm(lhs: input, imm: 0, onTrue: onTrue, onFalse: onFalse)
+        case .negated(let inner):
+            return selectCmpFactory(for: inner, onTrue: onFalse, onFalse: onTrue)
+        case .floatCompare, .and, .andImm:
+            return nil
+        }
+    }
+
     /// Replaces `producer` with its form producing into `register`, which it
     /// must have. The caller must emit the instruction that reads the
     /// accumulator right after.
@@ -3809,6 +3878,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
     mutating func visitSelect() throws(WasmKitError) -> Output {
         // Captured before `popVRegOperand`, which resets the last emission.
+        let fusable = iseqBuilder.fusableEmission
         let accCandidate = iseqBuilder.accProducer
         let condition = try popVRegOperand(.i32)
         let (value1Type, value1) = try popAnyOperand()
@@ -3829,11 +3899,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             let onFalse = ensureOnVReg(value1)
             emitSelect(
                 result: result, condition: condition, onTrue: onTrue, onFalse: onFalse,
-                isV128: value1Type.concreteType == .v128, accCandidate: accCandidate)
+                isV128: value1Type.concreteType == .v128, fusable: fusable, accCandidate: accCandidate)
         }
     }
     mutating func visitTypedSelect(type: WasmTypes.ValueType) throws(WasmKitError) -> Output {
         // Captured before `popVRegOperand`, which resets the last emission.
+        let fusable = iseqBuilder.fusableEmission
         let accCandidate = iseqBuilder.accProducer
         let condition = try popVRegOperand(.i32)
         let (value1Type, value1) = try popAnyOperand()
@@ -3851,7 +3922,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             let onFalse = ensureOnVReg(value1)
             emitSelect(
                 result: result, condition: condition, onTrue: onTrue, onFalse: onFalse,
-                isV128: type == .v128, accCandidate: accCandidate)
+                isV128: type == .v128, fusable: fusable, accCandidate: accCandidate)
         }
     }
 
@@ -3860,11 +3931,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     /// before produced it.
     private mutating func emitSelect(
         result: VReg, condition: VReg, onTrue: VReg, onFalse: VReg,
-        isV128: Bool, accCandidate: AccProducer?
+        isV128: Bool, fusable: FusableEmission?, accCandidate: AccProducer?
     ) {
         if isV128 {
             emit(.select(.init(result: result, condition: condition, onTrue: onTrue, onFalse: onFalse)))
             emit(.select(.init(result: result.nextSlot, condition: condition, onTrue: onTrue.nextSlot, onFalse: onFalse.nextSlot)))
+            return
+        }
+        if let makeFused = fuseCompareIntoSelect(fusable, condition: condition, onTrue: onTrue, onFalse: onFalse) {
+            emit(makeFused(result), resultRelink: { newResult in makeFused(newResult) })
             return
         }
         if let producer = accConditionProducer(accCandidate, condition: condition), onTrue != condition, onFalse != condition {
