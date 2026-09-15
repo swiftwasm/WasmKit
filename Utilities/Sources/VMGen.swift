@@ -126,7 +126,7 @@ enum VMGen {
         var inlineImpls: [String: String] = [:]
         for op in intBinOps + floatBinOps {
             inlineImpls[op.instruction.name] = """
-            sp.pointee[\(op.resultType): immediate.result] = \(op.mayThrow ? "try " : "")sp.pointee[\(op.lhsType): immediate.lhs].\(camelCase(pascalCase: op.op))(sp.pointee[\(op.rhsType): immediate.rhs])
+            sp.pointee[\(op.resultSlot): immediate.result] = \(op.mayThrow ? "try " : "")sp.pointee[\(op.lhsSlot): immediate.lhs].\(camelCase(pascalCase: op.op))(sp.pointee[\(op.rhsSlot): immediate.rhs])
             """
         }
         for op in floatBinBinOps {
@@ -135,8 +135,8 @@ enum VMGen {
             // forbids contracting this into a fused multiply-add (on arm64 the
             // handlers are `fmul` + `fadd`, never `fmadd`).
             inlineImpls[op.instruction.name] = """
-                let intermediate = sp.pointee[\(op.type): immediate.x].\(camelCase(pascalCase: op.op1))(sp.pointee[\(op.type): immediate.y])
-                        sp.pointee[\(op.type): immediate.result] = intermediate.\(camelCase(pascalCase: op.op2))(sp.pointee[\(op.type): immediate.z])
+                let intermediate = sp.pointee[\(op.slot): immediate.x].\(camelCase(pascalCase: op.op1))(sp.pointee[\(op.slot): immediate.y])
+                        sp.pointee[\(op.slot): immediate.result] = intermediate.\(camelCase(pascalCase: op.op2))(sp.pointee[\(op.slot): immediate.z])
                 """
         }
         for op in intBinBinOps {
@@ -236,7 +236,7 @@ enum VMGen {
             """
         for op in intUnaryInsts + floatUnaryOps {
             inlineImpls[op.instruction.name] = """
-            sp.pointee[\(op.resultType): immediate.result] = \(op.mayThrow ? "try " : "")sp.pointee[\(op.inputType): immediate.input].\(camelCase(pascalCase: op.op))
+            sp.pointee[\(op.resultSlot): immediate.result] = \(op.mayThrow ? "try " : "")sp.pointee[\(op.inputSlot): immediate.input].\(camelCase(pascalCase: op.op))
             """
         }
 
