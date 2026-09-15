@@ -948,7 +948,7 @@ extension Execution {
                 let a = V128Lanes.extract(input, widthBits: 32, laneCount: 4)
                 let out = a.map { bits -> UInt64 in
                     let x = Float32(bitPattern: UInt32(truncatingIfNeeded: bits))
-                    let y: UInt32 = opcode == .i32x4TruncSatF32X4S ? (try! x.truncSatToI32S) : (try! x.truncSatToI32U)
+                    let y: UInt32 = opcode == .i32x4TruncSatF32X4S ? (x.truncSatToI32S) : (x.truncSatToI32U)
                     return UInt64(y)
                 }
                 return V128Lanes.pack(out, widthBits: 32, laneCount: 4)
@@ -987,7 +987,7 @@ extension Execution {
                 var out: [UInt64] = [0, 0, 0, 0]
                 for i in 0..<2 {
                     let x = Float64(bitPattern: a[i])
-                    let y: UInt32 = opcode == .i32x4TruncSatF64X2SZero ? (try! x.truncSatToI32S) : (try! x.truncSatToI32U)
+                    let y: UInt32 = opcode == .i32x4TruncSatF64X2SZero ? (x.truncSatToI32S) : (x.truncSatToI32U)
                     out[i] = UInt64(y)
                 }
                 return V128Lanes.pack(out, widthBits: 32, laneCount: 4)
@@ -1132,7 +1132,7 @@ extension Execution {
                 let a = V128Lanes.extract(input, widthBits: 32, laneCount: 4)
                 let out = a.map { bits -> UInt64 in
                     let x = Float32(bitPattern: UInt32(truncatingIfNeeded: bits))
-                    let y: UInt32 = opcode == .i32x4RelaxedTruncF32X4S ? (try! x.truncSatToI32S) : (try! x.truncSatToI32U)
+                    let y: UInt32 = opcode == .i32x4RelaxedTruncF32X4S ? (x.truncSatToI32S) : (x.truncSatToI32U)
                     return UInt64(y)
                 }
                 return V128Lanes.pack(out, widthBits: 32, laneCount: 4)
@@ -1144,7 +1144,7 @@ extension Execution {
                 var out: [UInt64] = [0, 0, 0, 0]
                 for i in 0..<2 {
                     let x = Float64(bitPattern: a[i])
-                    let y: UInt32 = opcode == .i32x4RelaxedTruncF64X2SZero ? (try! x.truncSatToI32S) : (try! x.truncSatToI32U)
+                    let y: UInt32 = opcode == .i32x4RelaxedTruncF64X2SZero ? (x.truncSatToI32S) : (x.truncSatToI32U)
                     out[i] = UInt64(y)
                 }
                 return V128Lanes.pack(out, widthBits: 32, laneCount: 4)

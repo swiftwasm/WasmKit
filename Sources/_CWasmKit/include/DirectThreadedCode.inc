@@ -926,7 +926,6 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32TruncSatF32S(Sp sp, Pc pc,
     SWIFT_CC(swift) uint64_t wasmkit_execute_i32TruncSatF32S(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
     void * _Nullable error = NULL; uint64_t next;
     INLINE_CALL next = wasmkit_execute_i32TruncSatF32S(&sp, &pc, &md, &ms, state, &error);
-    if (error) return wasmkit_execution_state_set_error(error, sp, state);
     WASMKIT_DEAD_ACCUMULATOR(uint64_t, dead_ireg);
     WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, dead_ireg, dead_freg, state);
@@ -935,7 +934,6 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32TruncSatF32U(Sp sp, Pc pc,
     SWIFT_CC(swift) uint64_t wasmkit_execute_i32TruncSatF32U(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
     void * _Nullable error = NULL; uint64_t next;
     INLINE_CALL next = wasmkit_execute_i32TruncSatF32U(&sp, &pc, &md, &ms, state, &error);
-    if (error) return wasmkit_execution_state_set_error(error, sp, state);
     WASMKIT_DEAD_ACCUMULATOR(uint64_t, dead_ireg);
     WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, dead_ireg, dead_freg, state);
@@ -962,7 +960,6 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32TruncSatF64S(Sp sp, Pc pc,
     SWIFT_CC(swift) uint64_t wasmkit_execute_i32TruncSatF64S(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
     void * _Nullable error = NULL; uint64_t next;
     INLINE_CALL next = wasmkit_execute_i32TruncSatF64S(&sp, &pc, &md, &ms, state, &error);
-    if (error) return wasmkit_execution_state_set_error(error, sp, state);
     WASMKIT_DEAD_ACCUMULATOR(uint64_t, dead_ireg);
     WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, dead_ireg, dead_freg, state);
@@ -971,7 +968,6 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32TruncSatF64U(Sp sp, Pc pc,
     SWIFT_CC(swift) uint64_t wasmkit_execute_i32TruncSatF64U(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
     void * _Nullable error = NULL; uint64_t next;
     INLINE_CALL next = wasmkit_execute_i32TruncSatF64U(&sp, &pc, &md, &ms, state, &error);
-    if (error) return wasmkit_execution_state_set_error(error, sp, state);
     WASMKIT_DEAD_ACCUMULATOR(uint64_t, dead_ireg);
     WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, dead_ireg, dead_freg, state);
@@ -998,7 +994,6 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64TruncSatF32S(Sp sp, Pc pc,
     SWIFT_CC(swift) uint64_t wasmkit_execute_i64TruncSatF32S(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
     void * _Nullable error = NULL; uint64_t next;
     INLINE_CALL next = wasmkit_execute_i64TruncSatF32S(&sp, &pc, &md, &ms, state, &error);
-    if (error) return wasmkit_execution_state_set_error(error, sp, state);
     WASMKIT_DEAD_ACCUMULATOR(uint64_t, dead_ireg);
     WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, dead_ireg, dead_freg, state);
@@ -1007,7 +1002,6 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64TruncSatF32U(Sp sp, Pc pc,
     SWIFT_CC(swift) uint64_t wasmkit_execute_i64TruncSatF32U(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
     void * _Nullable error = NULL; uint64_t next;
     INLINE_CALL next = wasmkit_execute_i64TruncSatF32U(&sp, &pc, &md, &ms, state, &error);
-    if (error) return wasmkit_execution_state_set_error(error, sp, state);
     WASMKIT_DEAD_ACCUMULATOR(uint64_t, dead_ireg);
     WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, dead_ireg, dead_freg, state);
@@ -1034,7 +1028,6 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64TruncSatF64S(Sp sp, Pc pc,
     SWIFT_CC(swift) uint64_t wasmkit_execute_i64TruncSatF64S(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
     void * _Nullable error = NULL; uint64_t next;
     INLINE_CALL next = wasmkit_execute_i64TruncSatF64S(&sp, &pc, &md, &ms, state, &error);
-    if (error) return wasmkit_execution_state_set_error(error, sp, state);
     WASMKIT_DEAD_ACCUMULATOR(uint64_t, dead_ireg);
     WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, dead_ireg, dead_freg, state);
@@ -1043,7 +1036,6 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64TruncSatF64U(Sp sp, Pc pc,
     SWIFT_CC(swift) uint64_t wasmkit_execute_i64TruncSatF64U(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
     void * _Nullable error = NULL; uint64_t next;
     INLINE_CALL next = wasmkit_execute_i64TruncSatF64U(&sp, &pc, &md, &ms, state, &error);
-    if (error) return wasmkit_execution_state_set_error(error, sp, state);
     WASMKIT_DEAD_ACCUMULATOR(uint64_t, dead_ireg);
     WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, dead_ireg, dead_freg, state);
