@@ -1544,11 +1544,13 @@ extension VMGen {
             Instruction(
                 name: "brIfNot", documentation: "Conditional pc-relative branch if the condition is false",
                 isControl: true, mayUpdateFrame: false, immediateLayout: .brIfOperand),
+            // `index` first keeps its frame access a plain `[base, index]`
+            // address; the table pointer second lets both slots load together.
             Instruction(name: "brTable", documentation: "WebAssembly Core Instruction `br_table`",
                         isControl: true, mayUpdateFrame: false) {
-                $0.field(name: "rawBaseAddress", type: .UInt64)
-                $0.field(name: "count", type: .UInt16)
                 $0.field(name: "index", type: .VReg)
+                $0.field(name: "lastIndex", type: .UInt16)
+                $0.field(name: "rawBaseAddress", type: .UInt64)
             },
             Instruction(name: "_return", documentation: "Return from a function",
                         isControl: true, mayUpdateFrame: true, useCurrentMemory: .write),
