@@ -1828,6 +1828,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// consumer resumes with a fresh accumulator, and a relinked producer
         /// reads as a separate guest instruction from the consumer.
         var tracksAccAndSlot = true
+        /// A copy emitted right after an accumulator producer, which hands
+        /// the accumulator on untouched once fused with a following write of
+        /// the producer's result.
+        private var copyAfterAcc: (producer: AccProducer, source: VReg, dest: VReg, end: MetaProgramCounter)?
         /// The highest offset any label has been pinned at.
         ///
         /// Rewinding the instruction buffer past a pinned label would silently
@@ -2009,6 +2013,24 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             instructions.removeLast(instructions.count - position.offsetFromHead)
             resetLastEmission()
             lastAccAndSlot = nil
+            copyAfterAcc = nil
+        }
+
+        /// Records that `source` was just copied to `dest` right after
+        /// `producer`.
+        mutating func recordCopy(after producer: AccProducer, source: VReg, dest: VReg) {
+            guard tracksAccAndSlot else { return }
+            copyAfterAcc = (producer, source, dest, insertingPC)
+        }
+
+        /// The producer of `value` and the copy between it and the insertion
+        /// point, when the copy neither reads nor writes `value`.
+        fileprivate func accProducerAcrossCopy(of value: VReg) -> (producer: AccProducer, source: VReg, dest: VReg)? {
+            guard let copy = copyAfterAcc, copy.end.offsetFromHead == insertingPC.offsetFromHead,
+                copy.producer.form.result == value, copy.source != value, copy.dest != value,
+                canRewind(to: copy.producer.position)
+            else { return nil }
+            return (copy.producer, copy.source, copy.dest)
         }
 
         mutating func relinkLastInstructionResult(_ newResult: VReg) -> Bool {
@@ -2405,9 +2427,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     @discardableResult
     private mutating func emitCopyStack(from source: VReg, to dest: VReg) -> Bool {
         guard source != dest else { return false }
+        let producer = iseqBuilder.accProducer
         let oldPC = iseqBuilder.insertingPC
         iseqBuilder.emit(.copyStack(Instruction.CopyStackOperand(source: LVReg(source), dest: LVReg(dest))))
         self.updateInstructionMapping(from: oldPC)
+        if let producer, !producer.keepsSlot, producer.end.offsetFromHead == oldPC.offsetFromHead,
+            producer.form.producing(into: .integer) != nil
+        {
+            iseqBuilder.recordCopy(after: producer, source: source, dest: dest)
+        }
         return true
     }
 
@@ -3850,6 +3878,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // would move the write of its new value before them.
         if iseqBuilder.relinkLastInstructionResult(result) {
             // Good news, copyStack is optimized out :)
+            return
+        }
+        // `t = <op>; a = copy b; x = copy t` keeps `t` in the accumulator
+        // across the copy and writes it to `x` with the copy.
+        if case .vreg = op, type == .i32 || type == .i64,
+            let across = iseqBuilder.accProducerAcrossCopy(of: value)
+        {
+            rewindProducerIntoAccumulator(across.producer)
+            emit(.copyStackAccToSlot(Instruction.CopyStackAccToSlotOperand(source: across.source, dest: across.dest, result: result)))
             return
         }
         emitCopyValueSlots(type, from: value, to: result)
