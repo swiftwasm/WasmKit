@@ -222,9 +222,12 @@ extension Instruction.BrTableOperand {
         var offset: Int32
     }
 
+    /// `count` includes the default entry, so it is never zero.
     init(baseAddress: UnsafePointer<Entry>, count: UInt16, index: VReg) {
-        self.init(rawBaseAddress: UInt64(UInt(bitPattern: baseAddress)), count: count, index: index)
+        self.init(index: index, lastIndex: count - 1, rawBaseAddress: UInt64(UInt(bitPattern: baseAddress)))
     }
+
+    var count: Int { Int(lastIndex) + 1 }
 
     var baseAddress: UnsafePointer<Entry> {
         UnsafePointer(bitPattern: UInt(rawBaseAddress)).unsafelyUnwrapped
