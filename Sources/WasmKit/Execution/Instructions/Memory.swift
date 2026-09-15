@@ -84,7 +84,10 @@ extension Execution {
     static func isInBounds(address: UInt64, offset: UInt64, length: UInt64, ms: Ms) -> Bool {
         let ms = UInt64(ms)
         let remaining = ms &- address
-        return remaining <= ms && address >= offset && remaining >= length
+        // Each operand of `&&` is its own branch until they are folded into
+        // one, and the folded branch combines their weights: without a weight on
+        // every operand it comes out near-even, and the trap path is placed first.
+        return _fastPath(remaining <= ms) && _fastPath(address >= offset) && _fastPath(remaining >= length)
     }
 
     /// The byte offset from `md` to use for an access already checked by ``isInBounds``.
