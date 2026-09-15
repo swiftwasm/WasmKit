@@ -740,6 +740,21 @@
             predictNext_brIfCmp(operandPc: operandPc)
         }
 
+        // Fused bit-test+branch (both polarities, both widths). Same immediate
+        // layout as the compare forms, so the same predictor applies.
+        mutating func predictNext_brIfI32And(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfNotI32And(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64And(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmp(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfNotI64And(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmp(operandPc: operandPc)
+        }
+
         mutating func predictNext_brTable(operandPc: Pc, sp: Sp) -> [Pc] {
             var pc = operandPc
             let op = Instruction.BrTableOperand.load(from: &pc)

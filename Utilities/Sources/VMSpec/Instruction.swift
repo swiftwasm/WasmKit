@@ -870,6 +870,39 @@ extension VMGen {
 
     static let brIfFCmpInsts: [Instruction] = buildBrIfFCmpInsts()
 
+    // MARK: - Fused bit-test + branch instructions
+
+    /// The fused `and`+branch opcodes: branch on `(lhs & rhs) != 0` / `== 0`.
+    ///
+    /// Both polarities are opcodes, since the complement of a bit test is not
+    /// another bit test. The 64-bit forms are needed because `brIf`/`brIfNot`
+    /// only read the low 32 bits of the condition slot.
+    static func buildBrIfAndInsts() -> [Instruction] {
+        var results: [Instruction] = []
+        for type in intValueTypes {
+            let typeName = type.uppercased()
+            for negated in [false, true] {
+                let predicate = negated ? "(lhs & rhs) == 0" : "(lhs & rhs) != 0"
+                results.append(
+                    Instruction(
+                        name: negated ? "brIfNot\(typeName)And" : "brIf\(typeName)And",
+                        documentation: """
+                            Conditional pc-relative branch if `\(predicate)` for `\(type)` operands
+
+                            Fused form of `\(type).and` followed by \
+                            `\(negated ? "br_if_not" : "br_if")`.
+                            """,
+                        isControl: true, mayUpdateFrame: false,
+                        immediateLayout: .brIfCmpOperand
+                    )
+                )
+            }
+        }
+        return results
+    }
+
+    static let brIfAndInsts: [Instruction] = buildBrIfAndInsts()
+
     // MARK: - Two-operation float superinstructions
 
     /// One of the two-operation float superinstructions: `result = (x op1 y) op2 z`.
@@ -1064,6 +1097,7 @@ extension VMGen {
         instructions += memoryTrapInsts
         instructions += brIfFCmpInsts
         instructions += floatBinBinOps.map(\.instruction)
+        instructions += brIfAndInsts
         return instructions
     }
 
