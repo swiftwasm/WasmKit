@@ -518,6 +518,8 @@ extension Instruction {
                 target.write("nop")
             case .copyStack(let op):
                 target.write("\(reg(op.dest)) = copy \(reg(op.source))")
+            case .copyStackAccToSlot(let op):
+                target.write("\(reg(op.dest)) = copy \(reg(op.source)); \(reg(op.result)) = acc")
             case .globalGet(let op):
                 target.write("\(reg(op.reg)) = global.get \(global(op.global))")
             case .globalSet(let op):

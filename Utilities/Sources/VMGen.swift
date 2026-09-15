@@ -170,6 +170,10 @@ enum VMGen {
                         ireg.pointee = \(store("value"))
                 """
         }
+        inlineImpls["copyStackAccToSlot"] = """
+            sp.pointee[immediate.dest] = sp.pointee[immediate.source]
+                    sp.pointee[immediate.result] = UntypedValue(storage: ireg.pointee)
+            """
         inlineImpls["globalGetToAcc"] = """
             ireg.pointee = immediate.global.withValue { $0.rawStorage.lo }
             """

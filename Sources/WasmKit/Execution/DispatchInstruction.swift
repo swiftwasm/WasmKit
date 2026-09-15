@@ -6694,6 +6694,15 @@ extension Execution {
         if let trap = memoryLoadToAccAndSlot(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) }) { return trap.directThreadedHeadSlot }
         return next
     }
+    @_silgen_name("wasmkit_execute_copyStackAccToSlot") @inline(__always)
+    mutating func execute_copyStackAccToSlot(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.CopyStackAccToSlotOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[immediate.dest] = sp.pointee[immediate.source]
+        sp.pointee[immediate.result] = UntypedValue(storage: ireg.pointee)
+        return next
+    }
 }
 
 #if !(os(WASI) || $Embedded)

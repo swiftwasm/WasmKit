@@ -2277,6 +2277,8 @@ enum Instruction: Equatable {
     /// 
     /// An accumulator form of `i64.load32_u`.
     case i64Load32UToAccAndSlot(Instruction.AccMemoryPointerResultOperand)
+    /// `sp[dest] = sp[source]`, then `sp[result] = ireg`
+    case copyStackAccToSlot(Instruction.CopyStackAccToSlotOperand)
 }
 
 extension Instruction {
@@ -3315,6 +3317,27 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.pointer, $0.result, $0.offset) as (VReg, VReg, UInt32), to: CodeSlot.self) }
         }
     }
+
+    struct CopyStackAccToSlotOperand: Equatable, InstructionImmediate {
+        var source: VReg
+        var dest: VReg
+        var result: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let source = VReg(byteOffset: Int16(truncatingIfNeeded: word0))
+                let dest = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 16))
+                let result = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 32))
+                return Self(source: source, dest: dest, result: result)
+            #else
+                let (source, dest, result, _, _) = pc.read((VReg, VReg, VReg, UInt8, UInt8).self)
+                return Self(source: source, dest: dest, result: result)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.source, $0.dest, $0.result, 0, 0) as (VReg, VReg, VReg, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -4005,6 +4028,7 @@ extension Instruction {
         case .i64Load16UToAccAndSlot(let immediate): return immediate
         case .i64Load32SToAccAndSlot(let immediate): return immediate
         case .i64Load32UToAccAndSlot(let immediate): return immediate
+        case .copyStackAccToSlot(let immediate): return immediate
         default: return nil
         }
     }
@@ -4699,6 +4723,7 @@ extension Instruction {
         case .i64Load16UToAccAndSlot(let immediate): immediate.emit(to: emit)
         case .i64Load32SToAccAndSlot(let immediate): immediate.emit(to: emit)
         case .i64Load32UToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .copyStackAccToSlot(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -5402,7 +5427,8 @@ extension Instruction {
         case .i64Load16SToAccAndSlot: return 690
         case .i64Load16UToAccAndSlot: return 691
         case .i64Load32SToAccAndSlot: return 692
-        default: return 693  // .i64Load32UToAccAndSlot
+        case .i64Load32UToAccAndSlot: return 693
+        default: return 694  // .copyStackAccToSlot
         }
     }
 }
@@ -6108,6 +6134,7 @@ extension Instruction {
         case 691: return .i64Load16UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
         case 692: return .i64Load32SToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
         case 693: return .i64Load32UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 694: return .copyStackAccToSlot(Instruction.CopyStackAccToSlotOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -6816,6 +6843,7 @@ extension Instruction {
         case 691: return "i64Load16UToAccAndSlot"
         case 692: return "i64Load32SToAccAndSlot"
         case 693: return "i64Load32UToAccAndSlot"
+        case 694: return "copyStackAccToSlot"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
