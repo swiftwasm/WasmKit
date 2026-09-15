@@ -195,6 +195,15 @@ extension Instruction.RefNullOperand {
     }
 }
 
+extension Instruction.GlobalOperand {
+    init(global: InternalGlobal) {
+        self.init(rawGlobal: UInt64(UInt(bitPattern: global.bitPattern)))
+    }
+    var global: InternalGlobal {
+        InternalGlobal(bitPattern: UInt(rawGlobal)).unsafelyUnwrapped
+    }
+}
+
 extension Instruction.GlobalAndVRegOperand {
     init(reg: LLVReg, global: InternalGlobal) {
         self.init(reg: reg, rawGlobal: UInt64(UInt(bitPattern: global.bitPattern)))
@@ -460,6 +469,18 @@ extension Instruction {
             func binBin(_ name: String, _ op: Instruction.BinBinOperand) {
                 target.write("\(reg(op.result)) = \(name) \(reg(op.x)), \(reg(op.y)), \(reg(op.z))")
             }
+            func toAcc(_ name: String, _ op: Instruction.AccBinaryOperand) {
+                target.write("acc = \(name) \(reg(op.lhs)), \(reg(op.rhs))")
+            }
+            func fromAcc(_ name: String, _ op: Instruction.AccUnaryOperand) {
+                target.write("\(reg(op.result)) = \(name) acc, \(reg(op.operand))")
+            }
+            func inAcc(_ name: String, _ op: Instruction.AccOperand) {
+                target.write("acc = \(name) acc, \(reg(op.operand))")
+            }
+            func brIfAccCmp(_ name: String, _ op: Instruction.BrIfAccCmpOperand) {
+                target.write("br_if.\(name) acc, \(reg(op.rhs)), \(branchTarget(instructionOffset, Int(op.offset)))")
+            }
             func binBinRev(_ name: String, _ op: Instruction.BinBinOperand) {
                 target.write("\(reg(op.result)) = \(name) \(reg(op.z)), (\(reg(op.x)), \(reg(op.y)))")
             }
@@ -630,6 +651,95 @@ extension Instruction {
             case .i64XorMul(let op): binBin("i64.xor.mul", op)
             case .i64XorShrU(let op): binBin("i64.xor.shr_u", op)
             case .i32MulSubRev(let op): binBinRev("i32.sub.mul", op)
+            case .i32AddToAcc(let op): toAcc("i32.add", op)
+            case .i32AddFromAcc(let op): fromAcc("i32.add", op)
+            case .i32AddInAcc(let op): inAcc("i32.add", op)
+            case .i32SubToAcc(let op): toAcc("i32.sub", op)
+            case .i32SubFromAcc(let op): fromAcc("i32.sub", op)
+            case .i32SubInAcc(let op): inAcc("i32.sub", op)
+            case .i32MulToAcc(let op): toAcc("i32.mul", op)
+            case .i32MulFromAcc(let op): fromAcc("i32.mul", op)
+            case .i32MulInAcc(let op): inAcc("i32.mul", op)
+            case .i32AndToAcc(let op): toAcc("i32.and", op)
+            case .i32AndFromAcc(let op): fromAcc("i32.and", op)
+            case .i32AndInAcc(let op): inAcc("i32.and", op)
+            case .i32OrToAcc(let op): toAcc("i32.or", op)
+            case .i32OrFromAcc(let op): fromAcc("i32.or", op)
+            case .i32OrInAcc(let op): inAcc("i32.or", op)
+            case .i32XorToAcc(let op): toAcc("i32.xor", op)
+            case .i32XorFromAcc(let op): fromAcc("i32.xor", op)
+            case .i32XorInAcc(let op): inAcc("i32.xor", op)
+            case .i32ShlToAcc(let op): toAcc("i32.shl", op)
+            case .i32ShlFromAcc(let op): fromAcc("i32.shl", op)
+            case .i32ShlInAcc(let op): inAcc("i32.shl", op)
+            case .i32ShrSToAcc(let op): toAcc("i32.shr_s", op)
+            case .i32ShrSFromAcc(let op): fromAcc("i32.shr_s", op)
+            case .i32ShrSInAcc(let op): inAcc("i32.shr_s", op)
+            case .i32ShrUToAcc(let op): toAcc("i32.shr_u", op)
+            case .i32ShrUFromAcc(let op): fromAcc("i32.shr_u", op)
+            case .i32ShrUInAcc(let op): inAcc("i32.shr_u", op)
+            case .i32RotlToAcc(let op): toAcc("i32.rotl", op)
+            case .i32RotlFromAcc(let op): fromAcc("i32.rotl", op)
+            case .i32RotlInAcc(let op): inAcc("i32.rotl", op)
+            case .i32RotrToAcc(let op): toAcc("i32.rotr", op)
+            case .i32RotrFromAcc(let op): fromAcc("i32.rotr", op)
+            case .i32RotrInAcc(let op): inAcc("i32.rotr", op)
+            case .i64AddToAcc(let op): toAcc("i64.add", op)
+            case .i64AddFromAcc(let op): fromAcc("i64.add", op)
+            case .i64AddInAcc(let op): inAcc("i64.add", op)
+            case .i64SubToAcc(let op): toAcc("i64.sub", op)
+            case .i64SubFromAcc(let op): fromAcc("i64.sub", op)
+            case .i64SubInAcc(let op): inAcc("i64.sub", op)
+            case .i64MulToAcc(let op): toAcc("i64.mul", op)
+            case .i64MulFromAcc(let op): fromAcc("i64.mul", op)
+            case .i64MulInAcc(let op): inAcc("i64.mul", op)
+            case .i64AndToAcc(let op): toAcc("i64.and", op)
+            case .i64AndFromAcc(let op): fromAcc("i64.and", op)
+            case .i64AndInAcc(let op): inAcc("i64.and", op)
+            case .i64OrToAcc(let op): toAcc("i64.or", op)
+            case .i64OrFromAcc(let op): fromAcc("i64.or", op)
+            case .i64OrInAcc(let op): inAcc("i64.or", op)
+            case .i64XorToAcc(let op): toAcc("i64.xor", op)
+            case .i64XorFromAcc(let op): fromAcc("i64.xor", op)
+            case .i64XorInAcc(let op): inAcc("i64.xor", op)
+            case .i64ShlToAcc(let op): toAcc("i64.shl", op)
+            case .i64ShlFromAcc(let op): fromAcc("i64.shl", op)
+            case .i64ShlInAcc(let op): inAcc("i64.shl", op)
+            case .i64ShrSToAcc(let op): toAcc("i64.shr_s", op)
+            case .i64ShrSFromAcc(let op): fromAcc("i64.shr_s", op)
+            case .i64ShrSInAcc(let op): inAcc("i64.shr_s", op)
+            case .i64ShrUToAcc(let op): toAcc("i64.shr_u", op)
+            case .i64ShrUFromAcc(let op): fromAcc("i64.shr_u", op)
+            case .i64ShrUInAcc(let op): inAcc("i64.shr_u", op)
+            case .i64RotlToAcc(let op): toAcc("i64.rotl", op)
+            case .i64RotlFromAcc(let op): fromAcc("i64.rotl", op)
+            case .i64RotlInAcc(let op): inAcc("i64.rotl", op)
+            case .i64RotrToAcc(let op): toAcc("i64.rotr", op)
+            case .i64RotrFromAcc(let op): fromAcc("i64.rotr", op)
+            case .i64RotrInAcc(let op): inAcc("i64.rotr", op)
+            case .brIfI32EqAcc(let op): brIfAccCmp("i32.eq", op)
+            case .brIfI32NeAcc(let op): brIfAccCmp("i32.ne", op)
+            case .brIfI32LtSAcc(let op): brIfAccCmp("i32.lt_s", op)
+            case .brIfI32LtUAcc(let op): brIfAccCmp("i32.lt_u", op)
+            case .brIfI32GtSAcc(let op): brIfAccCmp("i32.gt_s", op)
+            case .brIfI32GtUAcc(let op): brIfAccCmp("i32.gt_u", op)
+            case .brIfI32LeSAcc(let op): brIfAccCmp("i32.le_s", op)
+            case .brIfI32LeUAcc(let op): brIfAccCmp("i32.le_u", op)
+            case .brIfI32GeSAcc(let op): brIfAccCmp("i32.ge_s", op)
+            case .brIfI32GeUAcc(let op): brIfAccCmp("i32.ge_u", op)
+            case .brIfI64EqAcc(let op): brIfAccCmp("i64.eq", op)
+            case .brIfI64NeAcc(let op): brIfAccCmp("i64.ne", op)
+            case .brIfI64LtSAcc(let op): brIfAccCmp("i64.lt_s", op)
+            case .brIfI64LtUAcc(let op): brIfAccCmp("i64.lt_u", op)
+            case .brIfI64GtSAcc(let op): brIfAccCmp("i64.gt_s", op)
+            case .brIfI64GtUAcc(let op): brIfAccCmp("i64.gt_u", op)
+            case .brIfI64LeSAcc(let op): brIfAccCmp("i64.le_s", op)
+            case .brIfI64LeUAcc(let op): brIfAccCmp("i64.le_u", op)
+            case .brIfI64GeSAcc(let op): brIfAccCmp("i64.ge_s", op)
+            case .brIfI64GeUAcc(let op): brIfAccCmp("i64.ge_u", op)
+            case .brIfAcc(let op): target.write("br_if acc, \(branchTarget(instructionOffset, Int(op.offset)))")
+            case .brIfNotAcc(let op): target.write("br_if_not acc, \(branchTarget(instructionOffset, Int(op.offset)))")
+            case .globalGetToAcc(let op): target.write("acc = global.get \(global(op.global))")
             case .br(let offset):
                 target.write("br \(branchTarget(instructionOffset, Int(offset)))")
             case .brTable(let table):

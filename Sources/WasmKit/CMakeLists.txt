@@ -17,6 +17,7 @@ add_wasmkit_library(WasmKit
   Component/ComponentTypes.swift
   Execution/DebuggerInstructionMapping.swift
   Execution/Instructions/Control.swift
+  Execution/Instructions/ControlAccumulator.swift
   Execution/Instructions/ControlFusedAnd.swift
   Execution/Instructions/ControlFusedFloat.swift
   Execution/Instructions/ExceptionHandling.swift
