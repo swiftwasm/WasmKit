@@ -319,6 +319,27 @@ extension Sp {
         nonmutating set { write(shifted: index, .f64(newValue)) }
     }
 
+    /// An `f32` slot as the pair it holds: the value and the slot's zero high
+    /// half, which reads as `+0.0`. Only operations that map `+0.0` to `+0.0`
+    /// may write through it, so that the high half stays zero.
+    subscript<R: ShiftedVReg>(f32x2 index: R) -> SIMD2<Float32> {
+        get { return unsafeBitCast(read(shifted: index) as UInt64, to: SIMD2<Float32>.self) }
+        nonmutating set { write(shifted: index, UntypedValue(storage: unsafeBitCast(newValue, to: UInt64.self))) }
+    }
+
+    /// An `i32` slot as the pair it holds, for the `i32 -> f32` conversions.
+    subscript<R: ShiftedVReg>(i32x2 index: R) -> SIMD2<UInt32> {
+        get { return unsafeBitCast(read(shifted: index) as UInt64, to: SIMD2<UInt32>.self) }
+    }
+
+    /// An `f32` written together with an explicit zero high half.
+    subscript<R: ShiftedVReg>(f32v index: R) -> Float32 {
+        get { return Float32(bitPattern: read(shifted: index)) }
+        nonmutating set {
+            write(shifted: index, UntypedValue(storage: unsafeBitCast(SIMD2<UInt32>(newValue.bitPattern, 0), to: UInt64.self)))
+        }
+    }
+
     subscript<R: FixedWidthInteger>(i32 index: R) -> UInt32 {
         get { return read(index) }
         nonmutating set { write(index, .i32(newValue)) }

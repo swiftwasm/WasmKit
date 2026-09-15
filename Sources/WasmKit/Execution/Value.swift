@@ -211,33 +211,87 @@ extension UInt64 {
     }
 }
 
+// Wasm's `min`/`max` are IEEE 754-2019 `minimum`/`maximum` (a NaN operand gives a NaN,
+// and -0.0 orders below +0.0), and `trunc_sat` is `fptosi.sat`/`fptoui.sat` (NaN to zero,
+// out-of-range values clamped). Those are LLVM intrinsics with no Swift spelling, so they
+// are declared by name; the equivalent Swift keeps its comparisons and NaN checks.
+@_silgen_name("llvm.fptosi.sat.i32.f32") private func _llvmFPToSISatI32F32(_ a: Float32) -> Int32
+@_silgen_name("llvm.fptoui.sat.i32.f32") private func _llvmFPToUISatI32F32(_ a: Float32) -> UInt32
+@_silgen_name("llvm.fptosi.sat.i64.f32") private func _llvmFPToSISatI64F32(_ a: Float32) -> Int64
+@_silgen_name("llvm.fptoui.sat.i64.f32") private func _llvmFPToUISatI64F32(_ a: Float32) -> UInt64
+@_silgen_name("llvm.fptosi.sat.i32.f64") private func _llvmFPToSISatI32F64(_ a: Float64) -> Int32
+@_silgen_name("llvm.fptoui.sat.i32.f64") private func _llvmFPToUISatI32F64(_ a: Float64) -> UInt32
+@_silgen_name("llvm.fptosi.sat.i64.f64") private func _llvmFPToSISatI64F64(_ a: Float64) -> Int64
+@_silgen_name("llvm.fptoui.sat.i64.f64") private func _llvmFPToUISatI64F64(_ a: Float64) -> UInt64
+
+// `minimum`/`maximum` become instructions on arm64 and x86_64. Other targets may lower
+// them to `fminimum`/`fmaximum` calls, which not every C library provides.
+#if arch(arm64) || arch(x86_64)
+    @_silgen_name("llvm.minimum.f32") private func _llvmMinimumF32(_ a: Float32, _ b: Float32) -> Float32
+    @_silgen_name("llvm.maximum.f32") private func _llvmMaximumF32(_ a: Float32, _ b: Float32) -> Float32
+    @_silgen_name("llvm.minimum.f64") private func _llvmMinimumF64(_ a: Float64, _ b: Float64) -> Float64
+    @_silgen_name("llvm.maximum.f64") private func _llvmMaximumF64(_ a: Float64, _ b: Float64) -> Float64
+
+    extension Float32 {
+        func min(_ other: Float32) -> Float32 { _llvmMinimumF32(self, other) }
+        func max(_ other: Float32) -> Float32 { _llvmMaximumF32(self, other) }
+    }
+
+    extension Float64 {
+        func min(_ other: Float64) -> Float64 { _llvmMinimumF64(self, other) }
+        func max(_ other: Float64) -> Float64 { _llvmMaximumF64(self, other) }
+    }
+#else
+    extension FloatingPoint {
+        func min(_ other: Self) -> Self {
+            guard !isNaN && !other.isNaN else {
+                return .nan
+            }
+            // min(0.0, -0.0) returns 0.0 in Swift, but wasm expects to return -0.0
+            // spec: https://webassembly.github.io/spec/core/exec/numerics.html#op-fmin
+            if self.isZero, self == other {
+                return self.sign == .minus ? self : other
+            }
+            return Swift.min(self, other)
+        }
+        func max(_ other: Self) -> Self {
+            guard !isNaN && !other.isNaN else {
+                return .nan
+            }
+            //  max(-0.0, 0.0) returns -0.0 in Swift, but wasm expects to return 0.0
+            // spec: https://webassembly.github.io/spec/core/exec/numerics.html#op-fmax
+            if self.isZero, self == other {
+                return self.sign == .plus ? self : other
+            }
+            return Swift.max(self, other)
+        }
+    }
+#endif
+
+// `f32` operations on a whole slot, the value and a `+0.0` high half, for the
+// `f32x2` accessor. Each maps `+0.0` to `+0.0`, so the high half stays zero, and the
+// slot is loaded, computed and stored without moving the result out of FP registers.
+extension SIMD2 where Scalar == Float32 {
+    func add(_ other: Self) -> Self { self + other }
+    func sub(_ other: Self) -> Self { self - other }
+    func mul(_ other: Self) -> Self { self * other }
+    var sqrt: Self { self.squareRoot() }
+    var ceil: Self { self.rounded(.up) }
+    var floor: Self { self.rounded(.down) }
+    var trunc: Self { self.rounded(.towardZero) }
+    var nearest: Self { self.rounded(.toNearestOrEven) }
+}
+
+extension SIMD2 where Scalar == UInt32 {
+    var convertToF32S: SIMD2<Float32> { SIMD2<Float32>(SIMD2<Int32>(truncatingIfNeeded: self)) }
+    var convertToF32U: SIMD2<Float32> { SIMD2<Float32>(self) }
+}
+
 extension FloatingPoint {
     func add(_ other: Self) -> Self { self + other }
     func sub(_ other: Self) -> Self { self - other }
     func mul(_ other: Self) -> Self { self * other }
     func div(_ other: Self) -> Self { self / other }
-    func min(_ other: Self) -> Self {
-        guard !isNaN && !other.isNaN else {
-            return .nan
-        }
-        // min(0.0, -0.0) returns 0.0 in Swift, but wasm expects to return -0.0
-        // spec: https://webassembly.github.io/spec/core/exec/numerics.html#op-fmin
-        if self.isZero, self == other {
-            return self.sign == .minus ? self : other
-        }
-        return Swift.min(self, other)
-    }
-    func max(_ other: Self) -> Self {
-        guard !isNaN && !other.isNaN else {
-            return .nan
-        }
-        //  max(-0.0, 0.0) returns -0.0 in Swift, but wasm expects to return 0.0
-        // spec: https://webassembly.github.io/spec/core/exec/numerics.html#op-fmax
-        if self.isZero, self == other {
-            return self.sign == .plus ? self : other
-        }
-        return Swift.max(self, other)
-    }
     func copySign(_ other: Self) -> Self {
         return sign == other.sign ? self : -self
     }
@@ -269,19 +323,6 @@ extension FloatingPoint {
         }
         return rounding(self)
     }
-    @inline(__always)
-    fileprivate func truncSatTo<T: FixedWidthInteger>(
-        rounding: (Self) -> T,
-        max: Self, min: Self
-    ) throws -> T {
-        guard !self.isNaN else { return .zero }
-        if self <= min {
-            return .min
-        } else if self >= max {
-            return .max
-        }
-        return rounding(self)
-    }
 }
 
 extension Float32 {
@@ -305,26 +346,10 @@ extension Float32 {
             return try truncTo(rounding: { UInt64($0) }, max: 18446744073709551616.0, min: -1.0)
         }
     }
-    var truncSatToI32S: UInt32 {
-        get throws {
-            return try truncSatTo(rounding: { Int32($0) }, max: 2147483648.0, min: -2147483904.0).unsigned
-        }
-    }
-    var truncSatToI64S: UInt64 {
-        get throws {
-            return try truncSatTo(rounding: { Int64($0) }, max: 9223372036854775808.0, min: -9223373136366403584.0).unsigned
-        }
-    }
-    var truncSatToI32U: UInt32 {
-        get throws {
-            return try truncSatTo(rounding: { UInt32($0) }, max: 4294967296.0, min: -1.0)
-        }
-    }
-    var truncSatToI64U: UInt64 {
-        get throws {
-            return try truncSatTo(rounding: { UInt64($0) }, max: 18446744073709551616.0, min: -1.0)
-        }
-    }
+    var truncSatToI32S: UInt32 { UInt32(bitPattern: _llvmFPToSISatI32F32(self)) }
+    var truncSatToI64S: UInt64 { UInt64(bitPattern: _llvmFPToSISatI64F32(self)) }
+    var truncSatToI32U: UInt32 { _llvmFPToUISatI32F32(self) }
+    var truncSatToI64U: UInt64 { _llvmFPToUISatI64F32(self) }
     var promoteF32: Float64 { Float64(self) }
     var reinterpretToI32: UInt32 { bitPattern }
 }
@@ -349,26 +374,10 @@ extension Float64 {
             return try truncTo(rounding: { UInt64($0) }, max: 18446744073709551616.0, min: -1.0)
         }
     }
-    var truncSatToI32S: UInt32 {
-        get throws {
-            return try truncSatTo(rounding: { Int32($0) }, max: 2147483648.0, min: -2147483649.0).unsigned
-        }
-    }
-    var truncSatToI64S: UInt64 {
-        get throws {
-            return try truncSatTo(rounding: { Int64($0) }, max: 9223372036854775808.0, min: -9223372036854777856.0).unsigned
-        }
-    }
-    var truncSatToI32U: UInt32 {
-        get throws {
-            return try truncSatTo(rounding: { UInt32($0) }, max: 4294967296.0, min: -1.0)
-        }
-    }
-    var truncSatToI64U: UInt64 {
-        get throws {
-            return try truncSatTo(rounding: { UInt64($0) }, max: 18446744073709551616.0, min: -1.0)
-        }
-    }
+    var truncSatToI32S: UInt32 { UInt32(bitPattern: _llvmFPToSISatI32F64(self)) }
+    var truncSatToI64S: UInt64 { UInt64(bitPattern: _llvmFPToSISatI64F64(self)) }
+    var truncSatToI32U: UInt32 { _llvmFPToUISatI32F64(self) }
+    var truncSatToI64U: UInt64 { _llvmFPToUISatI64F64(self) }
     var demoteF64: Float32 { Float32(self) }
     var reinterpretToI64: UInt64 { bitPattern }
 }
