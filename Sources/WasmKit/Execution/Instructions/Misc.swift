@@ -82,10 +82,13 @@ extension Execution {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#parametric-instructions>
 extension Execution {
+    /// Loads both candidates and selects the value: selecting the register
+    /// instead makes the load depend on the condition.
+    @inline(__always)
     mutating func select(sp: Sp, immediate: Instruction.SelectOperand) {
         let flag = sp[i32: immediate.condition]
-        let selected = flag != 0 ? immediate.onTrue : immediate.onFalse
-        let value = sp[selected]
-        sp[immediate.result] = value
+        let onTrue = sp[immediate.onTrue]
+        let onFalse = sp[immediate.onFalse]
+        sp[immediate.result] = flag != 0 ? onTrue : onFalse
     }
 }
