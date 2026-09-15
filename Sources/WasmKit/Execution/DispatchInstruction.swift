@@ -6703,6 +6703,16 @@ extension Execution {
         sp.pointee[immediate.result] = UntypedValue(storage: ireg.pointee)
         return next
     }
+    @_silgen_name("wasmkit_execute_selectAcc") @inline(__always)
+    mutating func execute_selectAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.SelectAccOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let onTrue = sp.pointee[immediate.onTrue]
+        let onFalse = sp.pointee[immediate.onFalse]
+        sp.pointee[immediate.result] = UInt32(truncatingIfNeeded: ireg.pointee) != 0 ? onTrue : onFalse
+        return next
+    }
 }
 
 #if !(os(WASI) || $Embedded)

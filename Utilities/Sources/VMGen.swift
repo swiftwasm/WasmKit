@@ -170,6 +170,11 @@ enum VMGen {
                         ireg.pointee = \(store("value"))
                 """
         }
+        inlineImpls["selectAcc"] = """
+            let onTrue = sp.pointee[immediate.onTrue]
+                    let onFalse = sp.pointee[immediate.onFalse]
+                    sp.pointee[immediate.result] = UInt32(truncatingIfNeeded: ireg.pointee) != 0 ? onTrue : onFalse
+            """
         inlineImpls["copyStackAccToSlot"] = """
             sp.pointee[immediate.dest] = sp.pointee[immediate.source]
                     sp.pointee[immediate.result] = UntypedValue(storage: ireg.pointee)

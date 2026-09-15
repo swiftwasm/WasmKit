@@ -1471,6 +1471,20 @@ extension VMGen {
         return inst
     }()
 
+    /// `select` whose condition arrives in the integer accumulator.
+    static let selectAcc: Instruction = {
+        var inst = Instruction(
+            name: "selectAcc",
+            documentation: "`select` testing the low 32 bits of the integer accumulator"
+        ) {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "onTrue", type: .VReg)
+            $0.field(name: "onFalse", type: .VReg)
+        }
+        inst.useIreg = .read
+        return inst
+    }()
+
     // MARK: - Instruction generation
 
     static func buildInstructions() -> [Instruction] {
@@ -1624,7 +1638,7 @@ extension VMGen {
         instructions += intAccBinOps.map(\.toAccAndSlot)
         instructions += intBinImmInsts.map(\.toAccAndSlot)
         instructions += memoryLoadOps.map(\.toAccAndSlotInstruction)
-        instructions += [copyStackAccToSlot]
+        instructions += [copyStackAccToSlot, selectAcc]
         return instructions
     }
 
