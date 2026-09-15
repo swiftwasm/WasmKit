@@ -1697,6 +1697,154 @@ enum Instruction: Equatable {
     /// 
     /// An accumulator form of `i64.store32`.
     case i64Store32AddrFromAcc(Instruction.AccMemoryValueOperand)
+    /// `freg = x add y`, on `f64` operands
+    /// 
+    /// An accumulator form of `f64.add`.
+    case f64AddToAcc(Instruction.AccBinaryOperand)
+    /// `result = freg add y`, on `f64` operands
+    /// 
+    /// An accumulator form of `f64.add`.
+    case f64AddFromAcc(Instruction.AccUnaryOperand)
+    /// `freg = freg add y`, on `f64` operands
+    /// 
+    /// An accumulator form of `f64.add`.
+    case f64AddInAcc(Instruction.AccOperand)
+    /// `freg = x sub y`, on `f64` operands
+    /// 
+    /// An accumulator form of `f64.sub`.
+    case f64SubToAcc(Instruction.AccBinaryOperand)
+    /// `result = freg sub y`, on `f64` operands
+    /// 
+    /// An accumulator form of `f64.sub`.
+    case f64SubFromAcc(Instruction.AccUnaryOperand)
+    /// `freg = freg sub y`, on `f64` operands
+    /// 
+    /// An accumulator form of `f64.sub`.
+    case f64SubInAcc(Instruction.AccOperand)
+    /// `result = y sub freg`, on `f64` operands
+    /// 
+    /// An accumulator form of `f64.sub`.
+    case f64SubFromAccRev(Instruction.AccUnaryOperand)
+    /// `freg = y sub freg`, on `f64` operands
+    /// 
+    /// An accumulator form of `f64.sub`.
+    case f64SubInAccRev(Instruction.AccOperand)
+    /// `freg = x mul y`, on `f64` operands
+    /// 
+    /// An accumulator form of `f64.mul`.
+    case f64MulToAcc(Instruction.AccBinaryOperand)
+    /// `result = freg mul y`, on `f64` operands
+    /// 
+    /// An accumulator form of `f64.mul`.
+    case f64MulFromAcc(Instruction.AccUnaryOperand)
+    /// `freg = freg mul y`, on `f64` operands
+    /// 
+    /// An accumulator form of `f64.mul`.
+    case f64MulInAcc(Instruction.AccOperand)
+    /// `freg = x div y`, on `f64` operands
+    /// 
+    /// An accumulator form of `f64.div`.
+    case f64DivToAcc(Instruction.AccBinaryOperand)
+    /// `result = freg div y`, on `f64` operands
+    /// 
+    /// An accumulator form of `f64.div`.
+    case f64DivFromAcc(Instruction.AccUnaryOperand)
+    /// `freg = freg div y`, on `f64` operands
+    /// 
+    /// An accumulator form of `f64.div`.
+    case f64DivInAcc(Instruction.AccOperand)
+    /// `result = y div freg`, on `f64` operands
+    /// 
+    /// An accumulator form of `f64.div`.
+    case f64DivFromAccRev(Instruction.AccUnaryOperand)
+    /// `freg = y div freg`, on `f64` operands
+    /// 
+    /// An accumulator form of `f64.div`.
+    case f64DivInAccRev(Instruction.AccOperand)
+    /// `freg = (x add y) add z`, on `f64` operands
+    /// 
+    /// The accumulator form of `f64AddAdd`.
+    case f64AddAddToAcc(Instruction.AccBinBinOperand)
+    /// `freg = (x add y) sub z`, on `f64` operands
+    /// 
+    /// The accumulator form of `f64AddSub`.
+    case f64AddSubToAcc(Instruction.AccBinBinOperand)
+    /// `freg = (x add y) mul z`, on `f64` operands
+    /// 
+    /// The accumulator form of `f64AddMul`.
+    case f64AddMulToAcc(Instruction.AccBinBinOperand)
+    /// `freg = (x sub y) add z`, on `f64` operands
+    /// 
+    /// The accumulator form of `f64SubAdd`.
+    case f64SubAddToAcc(Instruction.AccBinBinOperand)
+    /// `freg = (x sub y) sub z`, on `f64` operands
+    /// 
+    /// The accumulator form of `f64SubSub`.
+    case f64SubSubToAcc(Instruction.AccBinBinOperand)
+    /// `freg = (x sub y) mul z`, on `f64` operands
+    /// 
+    /// The accumulator form of `f64SubMul`.
+    case f64SubMulToAcc(Instruction.AccBinBinOperand)
+    /// `freg = (x mul y) add z`, on `f64` operands
+    /// 
+    /// The accumulator form of `f64MulAdd`.
+    case f64MulAddToAcc(Instruction.AccBinBinOperand)
+    /// `freg = (x mul y) sub z`, on `f64` operands
+    /// 
+    /// The accumulator form of `f64MulSub`.
+    case f64MulSubToAcc(Instruction.AccBinBinOperand)
+    /// `freg = (x mul y) mul z`, on `f64` operands
+    /// 
+    /// The accumulator form of `f64MulMul`.
+    case f64MulMulToAcc(Instruction.AccBinBinOperand)
+    /// Conditional pc-relative branch if `freg == y` holds for `f64` operands
+    /// 
+    /// A fused float compare+branch whose left operand is the float accumulator.
+    case brIfF64EqAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `freg != y` holds for `f64` operands
+    /// 
+    /// A fused float compare+branch whose left operand is the float accumulator.
+    case brIfF64NeAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `freg < y` holds for `f64` operands
+    /// 
+    /// A fused float compare+branch whose left operand is the float accumulator.
+    case brIfF64LtAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `freg <= y` holds for `f64` operands
+    /// 
+    /// A fused float compare+branch whose left operand is the float accumulator.
+    case brIfF64LeAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `freg > y` holds for `f64` operands
+    /// 
+    /// A fused float compare+branch whose left operand is the float accumulator.
+    case brIfF64GtAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `freg >= y` holds for `f64` operands
+    /// 
+    /// A fused float compare+branch whose left operand is the float accumulator.
+    case brIfF64GeAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `!(freg < y)` holds for `f64` operands
+    /// 
+    /// A fused float compare+branch whose left operand is the float accumulator.
+    case brIfNotF64LtAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `!(freg <= y)` holds for `f64` operands
+    /// 
+    /// A fused float compare+branch whose left operand is the float accumulator.
+    case brIfNotF64LeAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `!(freg > y)` holds for `f64` operands
+    /// 
+    /// A fused float compare+branch whose left operand is the float accumulator.
+    case brIfNotF64GtAcc(Instruction.BrIfAccCmpOperand)
+    /// Conditional pc-relative branch if `!(freg >= y)` holds for `f64` operands
+    /// 
+    /// A fused float compare+branch whose left operand is the float accumulator.
+    case brIfNotF64GeAcc(Instruction.BrIfAccCmpOperand)
+    /// `freg = sqrt(operand)`
+    case f64SqrtToAcc(Instruction.AccOperand)
+    /// `freg = load(sp[pointer] + offset)`, on a 32-bit memory
+    case f64LoadToFAcc(Instruction.AccMemoryPointerOperand)
+    /// `freg = load(ireg + offset)`, on a 32-bit memory
+    case f64LoadFromAccToFAcc(Instruction.AccMemoryOffsetOperand)
+    /// `store(sp[pointer] + offset) = freg`, on a 32-bit memory
+    case f64StoreFromFAcc(Instruction.AccMemoryPointerOperand)
 }
 
 extension Instruction {
@@ -2646,6 +2794,27 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.value, $0.offset) as (VReg, UInt32), to: CodeSlot.self) }
         }
     }
+
+    struct AccBinBinOperand: Equatable, InstructionImmediate {
+        var x: VReg
+        var y: VReg
+        var z: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let x = VReg(byteOffset: Int16(truncatingIfNeeded: word0))
+                let y = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 16))
+                let z = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 32))
+                return Self(x: x, y: y, z: z)
+            #else
+                let (x, y, z, _, _) = pc.read((VReg, VReg, VReg, UInt8, UInt8).self)
+                return Self(x: x, y: y, z: z)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.x, $0.y, $0.z, 0, 0) as (VReg, VReg, VReg, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -3157,6 +3326,45 @@ extension Instruction {
         case .i64Store8AddrFromAcc(let immediate): return immediate
         case .i64Store16AddrFromAcc(let immediate): return immediate
         case .i64Store32AddrFromAcc(let immediate): return immediate
+        case .f64AddToAcc(let immediate): return immediate
+        case .f64AddFromAcc(let immediate): return immediate
+        case .f64AddInAcc(let immediate): return immediate
+        case .f64SubToAcc(let immediate): return immediate
+        case .f64SubFromAcc(let immediate): return immediate
+        case .f64SubInAcc(let immediate): return immediate
+        case .f64SubFromAccRev(let immediate): return immediate
+        case .f64SubInAccRev(let immediate): return immediate
+        case .f64MulToAcc(let immediate): return immediate
+        case .f64MulFromAcc(let immediate): return immediate
+        case .f64MulInAcc(let immediate): return immediate
+        case .f64DivToAcc(let immediate): return immediate
+        case .f64DivFromAcc(let immediate): return immediate
+        case .f64DivInAcc(let immediate): return immediate
+        case .f64DivFromAccRev(let immediate): return immediate
+        case .f64DivInAccRev(let immediate): return immediate
+        case .f64AddAddToAcc(let immediate): return immediate
+        case .f64AddSubToAcc(let immediate): return immediate
+        case .f64AddMulToAcc(let immediate): return immediate
+        case .f64SubAddToAcc(let immediate): return immediate
+        case .f64SubSubToAcc(let immediate): return immediate
+        case .f64SubMulToAcc(let immediate): return immediate
+        case .f64MulAddToAcc(let immediate): return immediate
+        case .f64MulSubToAcc(let immediate): return immediate
+        case .f64MulMulToAcc(let immediate): return immediate
+        case .brIfF64EqAcc(let immediate): return immediate
+        case .brIfF64NeAcc(let immediate): return immediate
+        case .brIfF64LtAcc(let immediate): return immediate
+        case .brIfF64LeAcc(let immediate): return immediate
+        case .brIfF64GtAcc(let immediate): return immediate
+        case .brIfF64GeAcc(let immediate): return immediate
+        case .brIfNotF64LtAcc(let immediate): return immediate
+        case .brIfNotF64LeAcc(let immediate): return immediate
+        case .brIfNotF64GtAcc(let immediate): return immediate
+        case .brIfNotF64GeAcc(let immediate): return immediate
+        case .f64SqrtToAcc(let immediate): return immediate
+        case .f64LoadToFAcc(let immediate): return immediate
+        case .f64LoadFromAccToFAcc(let immediate): return immediate
+        case .f64StoreFromFAcc(let immediate): return immediate
         default: return nil
         }
     }
@@ -3672,6 +3880,45 @@ extension Instruction {
         case .i64Store8AddrFromAcc(let immediate): immediate.emit(to: emit)
         case .i64Store16AddrFromAcc(let immediate): immediate.emit(to: emit)
         case .i64Store32AddrFromAcc(let immediate): immediate.emit(to: emit)
+        case .f64AddToAcc(let immediate): immediate.emit(to: emit)
+        case .f64AddFromAcc(let immediate): immediate.emit(to: emit)
+        case .f64AddInAcc(let immediate): immediate.emit(to: emit)
+        case .f64SubToAcc(let immediate): immediate.emit(to: emit)
+        case .f64SubFromAcc(let immediate): immediate.emit(to: emit)
+        case .f64SubInAcc(let immediate): immediate.emit(to: emit)
+        case .f64SubFromAccRev(let immediate): immediate.emit(to: emit)
+        case .f64SubInAccRev(let immediate): immediate.emit(to: emit)
+        case .f64MulToAcc(let immediate): immediate.emit(to: emit)
+        case .f64MulFromAcc(let immediate): immediate.emit(to: emit)
+        case .f64MulInAcc(let immediate): immediate.emit(to: emit)
+        case .f64DivToAcc(let immediate): immediate.emit(to: emit)
+        case .f64DivFromAcc(let immediate): immediate.emit(to: emit)
+        case .f64DivInAcc(let immediate): immediate.emit(to: emit)
+        case .f64DivFromAccRev(let immediate): immediate.emit(to: emit)
+        case .f64DivInAccRev(let immediate): immediate.emit(to: emit)
+        case .f64AddAddToAcc(let immediate): immediate.emit(to: emit)
+        case .f64AddSubToAcc(let immediate): immediate.emit(to: emit)
+        case .f64AddMulToAcc(let immediate): immediate.emit(to: emit)
+        case .f64SubAddToAcc(let immediate): immediate.emit(to: emit)
+        case .f64SubSubToAcc(let immediate): immediate.emit(to: emit)
+        case .f64SubMulToAcc(let immediate): immediate.emit(to: emit)
+        case .f64MulAddToAcc(let immediate): immediate.emit(to: emit)
+        case .f64MulSubToAcc(let immediate): immediate.emit(to: emit)
+        case .f64MulMulToAcc(let immediate): immediate.emit(to: emit)
+        case .brIfF64EqAcc(let immediate): immediate.emit(to: emit)
+        case .brIfF64NeAcc(let immediate): immediate.emit(to: emit)
+        case .brIfF64LtAcc(let immediate): immediate.emit(to: emit)
+        case .brIfF64LeAcc(let immediate): immediate.emit(to: emit)
+        case .brIfF64GtAcc(let immediate): immediate.emit(to: emit)
+        case .brIfF64GeAcc(let immediate): immediate.emit(to: emit)
+        case .brIfNotF64LtAcc(let immediate): immediate.emit(to: emit)
+        case .brIfNotF64LeAcc(let immediate): immediate.emit(to: emit)
+        case .brIfNotF64GtAcc(let immediate): immediate.emit(to: emit)
+        case .brIfNotF64GeAcc(let immediate): immediate.emit(to: emit)
+        case .f64SqrtToAcc(let immediate): immediate.emit(to: emit)
+        case .f64LoadToFAcc(let immediate): immediate.emit(to: emit)
+        case .f64LoadFromAccToFAcc(let immediate): immediate.emit(to: emit)
+        case .f64StoreFromFAcc(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -4197,6 +4444,45 @@ extension Instruction {
         case .i64Store8AddrFromAcc: return 512
         case .i64Store16AddrFromAcc: return 513
         case .i64Store32AddrFromAcc: return 514
+        case .f64AddToAcc: return 515
+        case .f64AddFromAcc: return 516
+        case .f64AddInAcc: return 517
+        case .f64SubToAcc: return 518
+        case .f64SubFromAcc: return 519
+        case .f64SubInAcc: return 520
+        case .f64SubFromAccRev: return 521
+        case .f64SubInAccRev: return 522
+        case .f64MulToAcc: return 523
+        case .f64MulFromAcc: return 524
+        case .f64MulInAcc: return 525
+        case .f64DivToAcc: return 526
+        case .f64DivFromAcc: return 527
+        case .f64DivInAcc: return 528
+        case .f64DivFromAccRev: return 529
+        case .f64DivInAccRev: return 530
+        case .f64AddAddToAcc: return 531
+        case .f64AddSubToAcc: return 532
+        case .f64AddMulToAcc: return 533
+        case .f64SubAddToAcc: return 534
+        case .f64SubSubToAcc: return 535
+        case .f64SubMulToAcc: return 536
+        case .f64MulAddToAcc: return 537
+        case .f64MulSubToAcc: return 538
+        case .f64MulMulToAcc: return 539
+        case .brIfF64EqAcc: return 540
+        case .brIfF64NeAcc: return 541
+        case .brIfF64LtAcc: return 542
+        case .brIfF64LeAcc: return 543
+        case .brIfF64GtAcc: return 544
+        case .brIfF64GeAcc: return 545
+        case .brIfNotF64LtAcc: return 546
+        case .brIfNotF64LeAcc: return 547
+        case .brIfNotF64GtAcc: return 548
+        case .brIfNotF64GeAcc: return 549
+        case .f64SqrtToAcc: return 550
+        case .f64LoadToFAcc: return 551
+        case .f64LoadFromAccToFAcc: return 552
+        case .f64StoreFromFAcc: return 553
         }
     }
 }
@@ -4723,6 +5009,45 @@ extension Instruction {
         case 512: return .i64Store8AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
         case 513: return .i64Store16AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
         case 514: return .i64Store32AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 515: return .f64AddToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 516: return .f64AddFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 517: return .f64AddInAcc(Instruction.AccOperand.load(from: &pc))
+        case 518: return .f64SubToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 519: return .f64SubFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 520: return .f64SubInAcc(Instruction.AccOperand.load(from: &pc))
+        case 521: return .f64SubFromAccRev(Instruction.AccUnaryOperand.load(from: &pc))
+        case 522: return .f64SubInAccRev(Instruction.AccOperand.load(from: &pc))
+        case 523: return .f64MulToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 524: return .f64MulFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 525: return .f64MulInAcc(Instruction.AccOperand.load(from: &pc))
+        case 526: return .f64DivToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 527: return .f64DivFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 528: return .f64DivInAcc(Instruction.AccOperand.load(from: &pc))
+        case 529: return .f64DivFromAccRev(Instruction.AccUnaryOperand.load(from: &pc))
+        case 530: return .f64DivInAccRev(Instruction.AccOperand.load(from: &pc))
+        case 531: return .f64AddAddToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 532: return .f64AddSubToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 533: return .f64AddMulToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 534: return .f64SubAddToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 535: return .f64SubSubToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 536: return .f64SubMulToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 537: return .f64MulAddToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 538: return .f64MulSubToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 539: return .f64MulMulToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 540: return .brIfF64EqAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 541: return .brIfF64NeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 542: return .brIfF64LtAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 543: return .brIfF64LeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 544: return .brIfF64GtAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 545: return .brIfF64GeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 546: return .brIfNotF64LtAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 547: return .brIfNotF64LeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 548: return .brIfNotF64GtAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 549: return .brIfNotF64GeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 550: return .f64SqrtToAcc(Instruction.AccOperand.load(from: &pc))
+        case 551: return .f64LoadToFAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 552: return .f64LoadFromAccToFAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 553: return .f64StoreFromFAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -5252,6 +5577,45 @@ extension Instruction {
         case 512: return "i64Store8AddrFromAcc"
         case 513: return "i64Store16AddrFromAcc"
         case 514: return "i64Store32AddrFromAcc"
+        case 515: return "f64AddToAcc"
+        case 516: return "f64AddFromAcc"
+        case 517: return "f64AddInAcc"
+        case 518: return "f64SubToAcc"
+        case 519: return "f64SubFromAcc"
+        case 520: return "f64SubInAcc"
+        case 521: return "f64SubFromAccRev"
+        case 522: return "f64SubInAccRev"
+        case 523: return "f64MulToAcc"
+        case 524: return "f64MulFromAcc"
+        case 525: return "f64MulInAcc"
+        case 526: return "f64DivToAcc"
+        case 527: return "f64DivFromAcc"
+        case 528: return "f64DivInAcc"
+        case 529: return "f64DivFromAccRev"
+        case 530: return "f64DivInAccRev"
+        case 531: return "f64AddAddToAcc"
+        case 532: return "f64AddSubToAcc"
+        case 533: return "f64AddMulToAcc"
+        case 534: return "f64SubAddToAcc"
+        case 535: return "f64SubSubToAcc"
+        case 536: return "f64SubMulToAcc"
+        case 537: return "f64MulAddToAcc"
+        case 538: return "f64MulSubToAcc"
+        case 539: return "f64MulMulToAcc"
+        case 540: return "brIfF64EqAcc"
+        case 541: return "brIfF64NeAcc"
+        case 542: return "brIfF64LtAcc"
+        case 543: return "brIfF64LeAcc"
+        case 544: return "brIfF64GtAcc"
+        case 545: return "brIfF64GeAcc"
+        case 546: return "brIfNotF64LtAcc"
+        case 547: return "brIfNotF64LeAcc"
+        case 548: return "brIfNotF64GtAcc"
+        case 549: return "brIfNotF64GeAcc"
+        case 550: return "f64SqrtToAcc"
+        case 551: return "f64LoadToFAcc"
+        case 552: return "f64LoadFromAccToFAcc"
+        case 553: return "f64StoreFromFAcc"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
@@ -5342,6 +5706,16 @@ protocol NextInstructionPredictor: ~Copyable {
     mutating func predictNext_brIfI64GeUAcc(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_brIfAcc(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_brIfNotAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfF64EqAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfF64NeAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfF64LtAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfF64LeAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfF64GtAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfF64GeAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfNotF64LtAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfNotF64LeAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfNotF64GtAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfNotF64GeAcc(operandPc: Pc, sp: Sp) -> [Pc]
 }
 
 extension Instruction {
@@ -5428,6 +5802,16 @@ extension Instruction {
         case 451: return predictor.predictNext_brIfI64GeUAcc(operandPc: operandPc, sp: sp)
         case 452: return predictor.predictNext_brIfAcc(operandPc: operandPc, sp: sp)
         case 453: return predictor.predictNext_brIfNotAcc(operandPc: operandPc, sp: sp)
+        case 540: return predictor.predictNext_brIfF64EqAcc(operandPc: operandPc, sp: sp)
+        case 541: return predictor.predictNext_brIfF64NeAcc(operandPc: operandPc, sp: sp)
+        case 542: return predictor.predictNext_brIfF64LtAcc(operandPc: operandPc, sp: sp)
+        case 543: return predictor.predictNext_brIfF64LeAcc(operandPc: operandPc, sp: sp)
+        case 544: return predictor.predictNext_brIfF64GtAcc(operandPc: operandPc, sp: sp)
+        case 545: return predictor.predictNext_brIfF64GeAcc(operandPc: operandPc, sp: sp)
+        case 546: return predictor.predictNext_brIfNotF64LtAcc(operandPc: operandPc, sp: sp)
+        case 547: return predictor.predictNext_brIfNotF64LeAcc(operandPc: operandPc, sp: sp)
+        case 548: return predictor.predictNext_brIfNotF64GtAcc(operandPc: operandPc, sp: sp)
+        case 549: return predictor.predictNext_brIfNotF64GeAcc(operandPc: operandPc, sp: sp)
         default: return nil
         }
     }
@@ -5742,6 +6126,46 @@ extension Instruction {
             }
             do {
                 let inst = Instruction.brIfNotAcc(.init(offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfF64EqAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfF64NeAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfF64LtAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfF64LeAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfF64GtAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfF64GeAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfNotF64LtAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfNotF64LeAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfNotF64GtAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfNotF64GeAcc(.init(rhs: VReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
         return map

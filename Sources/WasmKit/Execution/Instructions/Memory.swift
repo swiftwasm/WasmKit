@@ -218,6 +218,46 @@ extension Execution {
         return nil
     }
 
+    /// `freg = f64.load(sp[pointer] + offset)`
+    mutating func memoryLoadToFAcc(
+        sp: Sp, md: Md, ms: Ms, freg: inout Double, loadOperand: Instruction.AccMemoryPointerOperand
+    ) -> MemoryAccessTrap? {
+        let offset = UInt64(loadOperand.offset)
+        let address = Execution.memoryAddress(offset: offset, index: sp[loadOperand.pointer].asAddressOffset())
+        if _slowPath(!Execution.isInBounds(address: address, offset: offset, length: 8, ms: ms)) {
+            return .outOfBounds
+        }
+        freg = Double(bitPattern: md.unsafelyUnwrapped.loadUnaligned(fromByteOffset: Execution.checkedByteOffset(address), as: UInt64.self))
+        return nil
+    }
+
+    /// `freg = f64.load(ireg + offset)`
+    mutating func memoryLoadFromAccToFAcc(
+        md: Md, ms: Ms, ireg: UInt64, freg: inout Double, loadOperand: Instruction.AccMemoryOffsetOperand
+    ) -> MemoryAccessTrap? {
+        let offset = UInt64(loadOperand.offset)
+        let address = Execution.memoryAddress(offset: offset, index: ireg)
+        if _slowPath(!Execution.isInBounds(address: address, offset: offset, length: 8, ms: ms)) {
+            return .outOfBounds
+        }
+        freg = Double(bitPattern: md.unsafelyUnwrapped.loadUnaligned(fromByteOffset: Execution.checkedByteOffset(address), as: UInt64.self))
+        return nil
+    }
+
+    /// `f64.store(sp[pointer] + offset) = freg`
+    mutating func memoryStoreFromFAcc(
+        sp: Sp, md: Md, ms: Ms, freg: Double, storeOperand: Instruction.AccMemoryPointerOperand
+    ) -> MemoryAccessTrap? {
+        let offset = UInt64(storeOperand.offset)
+        let address = Execution.memoryAddress(offset: offset, index: sp[storeOperand.pointer].asAddressOffset())
+        if _slowPath(!Execution.isInBounds(address: address, offset: offset, length: 8, ms: ms)) {
+            return .outOfBounds
+        }
+        md.unsafelyUnwrapped.advanced(by: Execution.checkedByteOffset(address))
+            .bindMemory(to: UInt64.self, capacity: 1).pointee = freg.bitPattern.littleEndian
+        return nil
+    }
+
     mutating func memorySize(sp: Sp, immediate: Instruction.MemorySizeOperand) {
         let memory = currentInstance(sp: sp).memories[Int(immediate.memoryIndex)]
 
