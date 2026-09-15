@@ -1832,6 +1832,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// the accumulator on untouched once fused with a following write of
         /// the producer's result.
         private var copyAfterAcc: (producer: AccProducer, source: VReg, dest: VReg, end: MetaProgramCounter)?
+        /// The last emitted single copy, for pairing it with the next one.
+        private var lastCopy: (source: VReg, dest: VReg, position: MetaProgramCounter, end: MetaProgramCounter)?
         /// The highest offset any label has been pinned at.
         ///
         /// Rewinding the instruction buffer past a pinned label would silently
@@ -2014,6 +2016,22 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             resetLastEmission()
             lastAccAndSlot = nil
             copyAfterAcc = nil
+            lastCopy = nil
+        }
+
+        /// Records a single copy just emitted at `position`.
+        mutating func recordCopy(source: VReg, dest: VReg, position: MetaProgramCounter) {
+            lastCopy = (source, dest, position, insertingPC)
+        }
+
+        /// The copy right before the insertion point, when a copy reading
+        /// `source` can run together with it: nothing was emitted since, no
+        /// label lands between the two, and it does not write `source`.
+        fileprivate func pairableCopy(reading source: VReg) -> (source: VReg, dest: VReg, position: MetaProgramCounter)? {
+            guard let copy = lastCopy, copy.end.offsetFromHead == insertingPC.offsetFromHead,
+                copy.dest != source, canRewind(to: copy.position)
+            else { return nil }
+            return (copy.source, copy.dest, copy.position)
         }
 
         /// Records that `source` was just copied to `dest` right after
@@ -2427,10 +2445,19 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     @discardableResult
     private mutating func emitCopyStack(from source: VReg, to dest: VReg) -> Bool {
         guard source != dest else { return false }
+        if engineConfiguration.threadingModel == .direct, !module.isDebuggable,
+            let previous = iseqBuilder.pairableCopy(reading: source)
+        {
+            iseqBuilder.rewind(to: previous.position)
+            self.rewindInstructionMapping(to: previous.position)
+            emit(.copyStack2(Instruction.CopyStack2Operand(source0: previous.source, dest0: previous.dest, source1: source, dest1: dest)))
+            return true
+        }
         let producer = iseqBuilder.accProducer
         let oldPC = iseqBuilder.insertingPC
         iseqBuilder.emit(.copyStack(Instruction.CopyStackOperand(source: LVReg(source), dest: LVReg(dest))))
         self.updateInstructionMapping(from: oldPC)
+        iseqBuilder.recordCopy(source: source, dest: dest, position: oldPC)
         if let producer, !producer.keepsSlot, producer.end.offsetFromHead == oldPC.offsetFromHead,
             producer.form.producing(into: .integer) != nil
         {
