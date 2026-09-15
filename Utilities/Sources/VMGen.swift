@@ -183,6 +183,25 @@ enum VMGen {
             if let trap = memoryStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { \(op.castFromValue) }) { %TRAP% }
             """
         }
+        for op in memoryLoadOps {
+            inlineImpls[op.toAccInstruction.name] = """
+            if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) }) { %TRAP% }
+            """
+            inlineImpls[op.fromAccInstruction.name] = """
+            if let trap = memoryLoadFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) }) { %TRAP% }
+            """
+            inlineImpls[op.inAccInstruction.name] = """
+            if let trap = memoryLoadInAcc(md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) }) { %TRAP% }
+            """
+        }
+        for op in memoryStoreOps {
+            inlineImpls[op.fromAccInstruction.name] = """
+            if let trap = memoryStoreFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { \(op.castFromValue) }) { %TRAP% }
+            """
+            inlineImpls[op.addrFromAccInstruction.name] = """
+            if let trap = memoryStoreAddrFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, storeOperand: immediate, castFromValue: { \(op.castFromValue) }) { %TRAP% }
+            """
+        }
 
         for op in memoryAtomicLoadOps {
             inlineImpls[op.atomicInstruction.name] = """
@@ -670,7 +689,7 @@ enum VMGen {
     /// the trap from the dispatcher instead. The handler body itself is written once and
     /// inlined into both.
     static func generateTokenThreadedTrapWrappers(instructions: [Instruction], inlineImpls: [String: String]) -> String {
-        let wrapped = instructions.filter { $0.mayDispatchToTrap }
+        let wrapped = instructions.filter { $0.mayDispatchToTrap && $0.useIreg == .none }
         guard !wrapped.isEmpty else { return "" }
         var output = """
             extension Execution {

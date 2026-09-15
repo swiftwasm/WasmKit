@@ -452,6 +452,30 @@ extension VMGen {
             inst.handlerIdentity = "atomicLoad(\(identitySuffix))"
             return inst
         }
+
+        private func accInstruction(_ suffix: String, _ shape: String, _ layout: ImmediateLayout, _ use: RegisterUse) -> Instruction {
+            var inst = Instruction(
+                name: "\(type)\(op)\(suffix)",
+                documentation: """
+                    `\(shape)`, on a 32-bit memory
+
+                    An accumulator form of `\(type).\(VMGen.snakeCase(pascalCase: op))`.
+                    """,
+                mayThrow: false, useCurrentMemory: .read, immediateLayout: layout)
+            inst.mayDispatchToTrap = true
+            inst.handlerIdentity = "load\(suffix)(\(identitySuffix))"
+            inst.useIreg = use
+            return inst
+        }
+        var toAccInstruction: Instruction {
+            accInstruction("ToAcc", "ireg = load(sp[pointer] + offset)", .accMemoryPointer, .write)
+        }
+        var fromAccInstruction: Instruction {
+            accInstruction("FromAcc", "sp[result] = load(ireg + offset)", .accMemoryResult, .read)
+        }
+        var inAccInstruction: Instruction {
+            accInstruction("InAcc", "ireg = load(ireg + offset)", .accMemoryOffset, .write)
+        }
     }
 
     static let memoryLoadOps: [LoadOpInfo] = [
@@ -499,6 +523,27 @@ extension VMGen {
             inst.handlerIdentity = "atomicStore(\(storeWidth))"
             return inst
         }
+
+        private func accInstruction(_ suffix: String, _ shape: String, _ layout: ImmediateLayout) -> Instruction {
+            var inst = Instruction(
+                name: "\(type)\(op)\(suffix)",
+                documentation: """
+                    `\(shape)`, on a 32-bit memory
+
+                    An accumulator form of `\(type).\(VMGen.snakeCase(pascalCase: op))`.
+                    """,
+                mayThrow: false, useCurrentMemory: .read, immediateLayout: layout)
+            inst.mayDispatchToTrap = true
+            inst.handlerIdentity = "store\(suffix)(\(storeWidth))"
+            inst.useIreg = .read
+            return inst
+        }
+        var fromAccInstruction: Instruction {
+            accInstruction("FromAcc", "store(sp[pointer] + offset) = ireg", .accMemoryPointer)
+        }
+        var addrFromAccInstruction: Instruction {
+            accInstruction("AddrFromAcc", "store(ireg + offset) = sp[value]", .accMemoryValue)
+        }
     }
     static let memoryStoreOps: [StoreOpInfo] = [
         ("i32", 32, "Store", "$0.i32", false),
@@ -516,6 +561,12 @@ extension VMGen {
     static let memoryAtomicStoreOps = memoryStoreOps.filter { !$0.isFloatingPoint }
     static let memoryLoadStoreInsts: [Instruction] = memoryLoadOps.map(\.instruction) + memoryStoreOps.map(\.instruction)
     static let memoryAtomicInsts: [Instruction] = memoryAtomicLoadOps.map(\.atomicInstruction) + memoryAtomicStoreOps.map(\.atomicInstruction)
+    static let memoryAccInsts: [Instruction] =
+        memoryLoadOps.map(\.toAccInstruction)
+        + memoryLoadOps.map(\.fromAccInstruction)
+        + memoryLoadOps.map(\.inAccInstruction)
+        + memoryStoreOps.map(\.fromAccInstruction)
+        + memoryStoreOps.map(\.addrFromAccInstruction)
 
     // MARK: - Atomic RMW Operations
 
@@ -1304,6 +1355,7 @@ extension VMGen {
         instructions += intAccBinOps.map(\.inAcc)
         instructions += brIfAccCmpInsts
         instructions += accMiscInsts
+        instructions += memoryAccInsts
         return instructions
     }
 
