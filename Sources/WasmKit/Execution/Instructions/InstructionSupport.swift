@@ -525,6 +525,38 @@ extension Instruction {
                 target.write("\(reg(op.dest0)) = copy \(reg(op.source0)); \(reg(op.dest1)) = copy \(reg(op.source1))")
             case .selectAcc(let op):
                 target.write("\(reg(op.result)) = select acc, \(reg(op.onTrue)), \(reg(op.onFalse))")
+            case .selectI32Eq(let op):
+                target.write("\(reg(op.result)) = select.i32.eq \(reg(op.lhs)), \(reg(op.rhs)), \(reg(op.onTrue)), \(reg(op.onFalse))")
+            case .selectI32LtS(let op):
+                target.write("\(reg(op.result)) = select.i32.lt_s \(reg(op.lhs)), \(reg(op.rhs)), \(reg(op.onTrue)), \(reg(op.onFalse))")
+            case .selectI32LtU(let op):
+                target.write("\(reg(op.result)) = select.i32.lt_u \(reg(op.lhs)), \(reg(op.rhs)), \(reg(op.onTrue)), \(reg(op.onFalse))")
+            case .selectI32EqImm(let op):
+                target.write("\(reg(op.result)) = select.i32.eq \(reg(op.lhs)), #\(op.imm), \(reg(op.onTrue)), \(reg(op.onFalse))")
+            case .selectI32LtSImm(let op):
+                target.write("\(reg(op.result)) = select.i32.lt_s \(reg(op.lhs)), #\(op.imm), \(reg(op.onTrue)), \(reg(op.onFalse))")
+            case .selectI32LtUImm(let op):
+                target.write("\(reg(op.result)) = select.i32.lt_u \(reg(op.lhs)), #\(op.imm), \(reg(op.onTrue)), \(reg(op.onFalse))")
+            case .selectI32GtSImm(let op):
+                target.write("\(reg(op.result)) = select.i32.gt_s \(reg(op.lhs)), #\(op.imm), \(reg(op.onTrue)), \(reg(op.onFalse))")
+            case .selectI32GtUImm(let op):
+                target.write("\(reg(op.result)) = select.i32.gt_u \(reg(op.lhs)), #\(op.imm), \(reg(op.onTrue)), \(reg(op.onFalse))")
+            case .selectI64Eq(let op):
+                target.write("\(reg(op.result)) = select.i64.eq \(reg(op.lhs)), \(reg(op.rhs)), \(reg(op.onTrue)), \(reg(op.onFalse))")
+            case .selectI64LtS(let op):
+                target.write("\(reg(op.result)) = select.i64.lt_s \(reg(op.lhs)), \(reg(op.rhs)), \(reg(op.onTrue)), \(reg(op.onFalse))")
+            case .selectI64LtU(let op):
+                target.write("\(reg(op.result)) = select.i64.lt_u \(reg(op.lhs)), \(reg(op.rhs)), \(reg(op.onTrue)), \(reg(op.onFalse))")
+            case .selectI64EqImm(let op):
+                target.write("\(reg(op.result)) = select.i64.eq \(reg(op.lhs)), #\(op.imm), \(reg(op.onTrue)), \(reg(op.onFalse))")
+            case .selectI64LtSImm(let op):
+                target.write("\(reg(op.result)) = select.i64.lt_s \(reg(op.lhs)), #\(op.imm), \(reg(op.onTrue)), \(reg(op.onFalse))")
+            case .selectI64LtUImm(let op):
+                target.write("\(reg(op.result)) = select.i64.lt_u \(reg(op.lhs)), #\(op.imm), \(reg(op.onTrue)), \(reg(op.onFalse))")
+            case .selectI64GtSImm(let op):
+                target.write("\(reg(op.result)) = select.i64.gt_s \(reg(op.lhs)), #\(op.imm), \(reg(op.onTrue)), \(reg(op.onFalse))")
+            case .selectI64GtUImm(let op):
+                target.write("\(reg(op.result)) = select.i64.gt_u \(reg(op.lhs)), #\(op.imm), \(reg(op.onTrue)), \(reg(op.onFalse))")
             case .copyStackAccToSlot(let op):
                 target.write("\(reg(op.dest)) = copy \(reg(op.source)); \(reg(op.result)) = acc")
             case .globalGet(let op):
