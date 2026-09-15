@@ -7018,10 +7018,16 @@ nonisolated(unsafe) private let wasmkitExecHandlerTable: UnsafePointer<UInt> = {
 extension Instruction {
     /// The tail-calling execution handler for the instruction.
     var handler: UInt {
+        Instruction.handler(opcodeID: self.opcodeID)
+    }
+
+    /// The tail-calling execution handler for an opcode.
+    @inline(__always)
+    static func handler(opcodeID: OpcodeID) -> UInt {
         #if os(WASI) || $Embedded
         fatalError("Direct threading is not supported on this platform")
         #else
-        return wasmkitExecHandlerTable[Int(self.opcodeID)]
+        return wasmkitExecHandlerTable[Int(opcodeID)]
         #endif
     }
 }

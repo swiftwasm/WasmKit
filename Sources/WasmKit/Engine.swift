@@ -53,7 +53,7 @@ public final class Engine {
         self.configuration = configuration
         self.interceptor = interceptor
         self.funcTypeInterner = Interner()
-        self.crossInstanceReturnSlot = Instruction.returnCrossInstance.headSlot(
+        self.crossInstanceReturnSlot = Instruction.returnCrossInstance(.init()).headSlot(
             threadingModel: configuration.threadingModel
         )
     }

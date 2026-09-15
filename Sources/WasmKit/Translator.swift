@@ -2806,7 +2806,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
         try visitReturnLike()
         let oldPC = iseqBuilder.insertingPC
-        iseqBuilder.emit(._return)
+        iseqBuilder.emit(._return(.init()))
         self.updateInstructionMapping(from: oldPC)
     }
     private mutating func markUnreachable() throws(WasmKitError) {
@@ -2857,7 +2857,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         try iseqBuilder.assertDanglingLabels()
 
         let oldPC = iseqBuilder.insertingPC
-        iseqBuilder.emit(._return)
+        iseqBuilder.emit(._return(.init()))
         self.updateInstructionMapping(from: oldPC)
         let instructions = iseqBuilder.finalize()
         // TODO: Figure out a way to avoid the copy here while keeping the execution performance.
@@ -2935,11 +2935,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     // MARK: - Visitor
 
     mutating func visitUnreachable() throws(WasmKitError) -> Output {
-        emit(.unreachable)
+        emit(.unreachable(.init()))
         try markUnreachable()
     }
     mutating func visitNop() -> Output {
-        emit(.nop)
+        emit(.nop(.init()))
     }
 
     mutating func visitBlock(blockType: WasmParser.BlockType) throws(WasmKitError) -> Output {
@@ -5905,7 +5905,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitAtomicFence() throws(WasmKitError) -> Output {
-        emit(.atomicFence)
+        emit(.atomicFence(.init()))
     }
 }
 
