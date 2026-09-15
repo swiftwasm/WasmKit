@@ -6,7 +6,7 @@
 ///
 /// NOTE: This enum representation is just for modeling purposes. The actual
 /// runtime representation can be different.
-enum Instruction: Equatable {
+enum Instruction {
     /// Copy a register value to another register
     case copyStack(Instruction.CopyStackOperand)
     /// WebAssembly Core Instruction `global.get` for a scalar (64-bit slot) global
@@ -37,9 +37,9 @@ enum Instruction: Equatable {
     /// WebAssembly Core Instruction `return_call_indirect`
     case returnCallIndirect(Instruction.ReturnCallIndirectOperand)
     /// WebAssembly Core Instruction `unreachable`
-    case unreachable
+    case unreachable(NoOperand)
     /// WebAssembly Core Instruction `nop`
-    case nop
+    case nop(NoOperand)
     /// Unconditional pc-relative branch
     case br(Instruction.BrOperand)
     /// Conditional pc-relative branch if the condition is true
@@ -49,12 +49,12 @@ enum Instruction: Equatable {
     /// WebAssembly Core Instruction `br_table`
     case brTable(Instruction.BrTableOperand)
     /// Return from a function
-    case _return
+    case _return(NoOperand)
     /// End the execution of the VM
     /// 
     /// This instruction is used to signal the end of the execution of the VM at
     /// the root frame.
-    case endOfExecution
+    case endOfExecution(NoOperand)
     /// WebAssembly Core Instruction `i32.load`
     case i32Load(Instruction.LoadOperand)
     /// WebAssembly Core Instruction `i64.load`
@@ -426,7 +426,7 @@ enum Instruction: Equatable {
     /// Stop the VM on this instruction as a breakpoint
     /// 
     /// This instruction is used in debugging scenarios.
-    case breakpoint
+    case breakpoint(NoOperand)
     /// WebAssembly Core Instruction `i32.atomic.load`
     case i32AtomicLoad(Instruction.LoadOperand)
     /// WebAssembly Core Instruction `i64.atomic.load`
@@ -560,7 +560,7 @@ enum Instruction: Equatable {
     /// WebAssembly Core Instruction `memory.atomic.notify`
     case memoryAtomicNotify(Instruction.AtomicNotifyOperand)
     /// WebAssembly Core Instruction `atomic.fence`
-    case atomicFence
+    case atomicFence(NoOperand)
     /// WebAssembly Exception Handling `throw`
     case throwTag(Instruction.ThrowTagOperand)
     /// WebAssembly Exception Handling `throw_ref`
@@ -656,11 +656,11 @@ enum Instruction: Equatable {
     /// intra-module return handler contains no call and therefore needs no
     /// stack frame. It receives the *unmodified* `sp`/`pc` of the `_return`
     /// that handed off to it.
-    case returnCrossInstance
+    case returnCrossInstance(NoOperand)
     /// Raise `Trap(.memoryOutOfBounds)`. Dispatched to by the memory handlers; never emitted.
-    case memoryOutOfBoundsTrap
+    case memoryOutOfBoundsTrap(NoOperand)
     /// Raise `Trap(.unalignedAtomic)`. Dispatched to by the atomic handlers; never emitted.
-    case unalignedAtomicTrap
+    case unalignedAtomicTrap(NoOperand)
     /// Conditional pc-relative branch if `a == b` holds for `f32` operands
     /// 
     /// Fused form of a `f32` comparison followed by a conditional
@@ -2376,7 +2376,15 @@ enum Instruction: Equatable {
 extension Instruction {
     // MARK: - Instruction Immediates
 
-    struct CopyStackOperand: Equatable, InstructionImmediate {
+    /// The payload of instructions without an immediate. It is never
+    /// emitted; a payload on every case keeps the enum tag equal to the
+    /// opcode ID, so `opcodeID` needs no table.
+    struct NoOperand {
+        init() {}
+        private var reserved: UInt8 = 0
+    }
+
+    struct CopyStackOperand: InstructionImmediate {
         var source: LVReg
         var dest: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -2395,7 +2403,7 @@ extension Instruction {
         }
     }
 
-    struct GlobalAndVRegOperand: Equatable, InstructionImmediate {
+    struct GlobalAndVRegOperand: InstructionImmediate {
         var reg: LLVReg
         var rawGlobal: UInt64
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -2415,7 +2423,7 @@ extension Instruction {
         }
     }
 
-    struct CallOperand: Equatable, InstructionImmediate {
+    struct CallOperand: InstructionImmediate {
         var rawCallee: UInt64
         var spAddend: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -2429,7 +2437,7 @@ extension Instruction {
         }
     }
 
-    struct CallIndirectOperand: Equatable, InstructionImmediate {
+    struct CallIndirectOperand: InstructionImmediate {
         var tableIndex: UInt32
         var rawType: UInt32
         var index: VReg
@@ -2445,7 +2453,7 @@ extension Instruction {
         }
     }
 
-    struct ResizeFrameHeaderOperand: Equatable, InstructionImmediate {
+    struct ResizeFrameHeaderOperand: InstructionImmediate {
         var delta: VReg
         var sizeToCopy: UInt16
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -2457,7 +2465,7 @@ extension Instruction {
         }
     }
 
-    struct ReturnCallOperand: Equatable, InstructionImmediate {
+    struct ReturnCallOperand: InstructionImmediate {
         var rawCallee: UInt64
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             let (rawCallee) = pc.read((UInt64).self)
@@ -2468,7 +2476,7 @@ extension Instruction {
         }
     }
 
-    struct ReturnCallIndirectOperand: Equatable, InstructionImmediate {
+    struct ReturnCallIndirectOperand: InstructionImmediate {
         var tableIndex: UInt32
         var rawType: UInt32
         var index: VReg
@@ -2483,7 +2491,7 @@ extension Instruction {
         }
     }
 
-    struct BrIfOperand: Equatable, InstructionImmediate {
+    struct BrIfOperand: InstructionImmediate {
         var condition: LVReg
         var offset: Int32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -2495,7 +2503,7 @@ extension Instruction {
         }
     }
 
-    struct BrTableOperand: Equatable, InstructionImmediate {
+    struct BrTableOperand: InstructionImmediate {
         var index: VReg
         var lastIndex: UInt16
         var rawBaseAddress: UInt64
@@ -2510,7 +2518,7 @@ extension Instruction {
         }
     }
 
-    struct LoadOperand: Equatable, InstructionImmediate {
+    struct LoadOperand: InstructionImmediate {
         var offset: UInt64
         var pointer: VReg
         var result: VReg
@@ -2525,7 +2533,7 @@ extension Instruction {
         }
     }
 
-    struct StoreOperand: Equatable, InstructionImmediate {
+    struct StoreOperand: InstructionImmediate {
         var offset: UInt64
         var pointer: VReg
         var value: VReg
@@ -2540,7 +2548,7 @@ extension Instruction {
         }
     }
 
-    struct MemorySizeOperand: Equatable, InstructionImmediate {
+    struct MemorySizeOperand: InstructionImmediate {
         var memoryIndex: UInt32
         var result: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -2559,7 +2567,7 @@ extension Instruction {
         }
     }
 
-    struct MemoryGrowOperand: Equatable, InstructionImmediate {
+    struct MemoryGrowOperand: InstructionImmediate {
         var result: VReg
         var delta: VReg
         var memory: UInt32
@@ -2572,7 +2580,7 @@ extension Instruction {
         }
     }
 
-    struct MemoryInitOperand: Equatable, InstructionImmediate {
+    struct MemoryInitOperand: InstructionImmediate {
         var segmentIndex: UInt32
         var destOffset: VReg
         var sourceOffset: VReg
@@ -2588,7 +2596,7 @@ extension Instruction {
         }
     }
 
-    struct MemoryDataDropOperand: Equatable, InstructionImmediate {
+    struct MemoryDataDropOperand: InstructionImmediate {
         var segmentIndex: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             #if _endian(little)
@@ -2605,7 +2613,7 @@ extension Instruction {
         }
     }
 
-    struct MemoryCopyOperand: Equatable, InstructionImmediate {
+    struct MemoryCopyOperand: InstructionImmediate {
         var destOffset: VReg
         var sourceOffset: VReg
         var size: LVReg
@@ -2618,7 +2626,7 @@ extension Instruction {
         }
     }
 
-    struct MemoryFillOperand: Equatable, InstructionImmediate {
+    struct MemoryFillOperand: InstructionImmediate {
         var destOffset: VReg
         var value: VReg
         var size: LVReg
@@ -2631,7 +2639,7 @@ extension Instruction {
         }
     }
 
-    struct V128ConstOperand: Equatable, InstructionImmediate {
+    struct V128ConstOperand: InstructionImmediate {
         var lo: UInt64
         var hi: UInt64
         var result: VReg
@@ -2656,7 +2664,7 @@ extension Instruction {
         }
     }
 
-    struct I8x16ShuffleOperand: Equatable, InstructionImmediate {
+    struct I8x16ShuffleOperand: InstructionImmediate {
         var lane0: UInt8
         var lane1: UInt8
         var lane2: UInt8
@@ -2715,7 +2723,7 @@ extension Instruction {
         }
     }
 
-    struct SimdOperand: Equatable, InstructionImmediate {
+    struct SimdOperand: InstructionImmediate {
         var opcode: UInt16
         var lane: UInt8
         var reserved: UInt8
@@ -2737,7 +2745,7 @@ extension Instruction {
         }
     }
 
-    struct Const32Operand: Equatable, InstructionImmediate {
+    struct Const32Operand: InstructionImmediate {
         var value: UInt32
         var result: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -2756,7 +2764,7 @@ extension Instruction {
         }
     }
 
-    struct Const64Operand: Equatable, InstructionImmediate {
+    struct Const64Operand: InstructionImmediate {
         var value: UntypedValue
         var result: LLVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -2776,7 +2784,7 @@ extension Instruction {
         }
     }
 
-    struct BinaryOperand: Equatable, InstructionImmediate {
+    struct BinaryOperand: InstructionImmediate {
         var lhs: VReg
         var rhs: VReg
         var result: LVReg
@@ -2797,7 +2805,7 @@ extension Instruction {
         }
     }
 
-    struct UnaryOperand: Equatable, InstructionImmediate {
+    struct UnaryOperand: InstructionImmediate {
         var result: LVReg
         var input: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -2816,7 +2824,7 @@ extension Instruction {
         }
     }
 
-    struct SelectOperand: Equatable, InstructionImmediate {
+    struct SelectOperand: InstructionImmediate {
         var result: VReg
         var condition: VReg
         var onTrue: VReg
@@ -2839,7 +2847,7 @@ extension Instruction {
         }
     }
 
-    struct RefNullOperand: Equatable, InstructionImmediate {
+    struct RefNullOperand: InstructionImmediate {
         var result: VReg
         var rawType: UInt8
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -2858,7 +2866,7 @@ extension Instruction {
         }
     }
 
-    struct RefIsNullOperand: Equatable, InstructionImmediate {
+    struct RefIsNullOperand: InstructionImmediate {
         var value: LVReg
         var result: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -2877,7 +2885,7 @@ extension Instruction {
         }
     }
 
-    struct RefFuncOperand: Equatable, InstructionImmediate {
+    struct RefFuncOperand: InstructionImmediate {
         var index: UInt32
         var result: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -2896,7 +2904,7 @@ extension Instruction {
         }
     }
 
-    struct TableGetOperand: Equatable, InstructionImmediate {
+    struct TableGetOperand: InstructionImmediate {
         var index: VReg
         var result: VReg
         var tableIndex: UInt32
@@ -2909,7 +2917,7 @@ extension Instruction {
         }
     }
 
-    struct TableSetOperand: Equatable, InstructionImmediate {
+    struct TableSetOperand: InstructionImmediate {
         var index: VReg
         var value: VReg
         var tableIndex: UInt32
@@ -2922,7 +2930,7 @@ extension Instruction {
         }
     }
 
-    struct TableSizeOperand: Equatable, InstructionImmediate {
+    struct TableSizeOperand: InstructionImmediate {
         var tableIndex: UInt32
         var result: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -2941,7 +2949,7 @@ extension Instruction {
         }
     }
 
-    struct TableGrowOperand: Equatable, InstructionImmediate {
+    struct TableGrowOperand: InstructionImmediate {
         var tableIndex: UInt32
         var result: VReg
         var delta: VReg
@@ -2957,7 +2965,7 @@ extension Instruction {
         }
     }
 
-    struct TableFillOperand: Equatable, InstructionImmediate {
+    struct TableFillOperand: InstructionImmediate {
         var tableIndex: UInt32
         var destOffset: VReg
         var value: VReg
@@ -2973,7 +2981,7 @@ extension Instruction {
         }
     }
 
-    struct TableCopyOperand: Equatable, InstructionImmediate {
+    struct TableCopyOperand: InstructionImmediate {
         var sourceIndex: UInt32
         var destIndex: UInt32
         var destOffset: VReg
@@ -2990,7 +2998,7 @@ extension Instruction {
         }
     }
 
-    struct TableInitOperand: Equatable, InstructionImmediate {
+    struct TableInitOperand: InstructionImmediate {
         var tableIndex: UInt32
         var segmentIndex: UInt32
         var destOffset: VReg
@@ -3007,7 +3015,7 @@ extension Instruction {
         }
     }
 
-    struct TableElementDropOperand: Equatable, InstructionImmediate {
+    struct TableElementDropOperand: InstructionImmediate {
         var index: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             #if _endian(little)
@@ -3024,7 +3032,7 @@ extension Instruction {
         }
     }
 
-    struct RmwOperand: Equatable, InstructionImmediate {
+    struct RmwOperand: InstructionImmediate {
         var offset: UInt64
         var pointer: VReg
         var value: VReg
@@ -3040,7 +3048,7 @@ extension Instruction {
         }
     }
 
-    struct CmpxchgOperand: Equatable, InstructionImmediate {
+    struct CmpxchgOperand: InstructionImmediate {
         var offset: UInt64
         var pointer: VReg
         var expected: VReg
@@ -3057,7 +3065,7 @@ extension Instruction {
         }
     }
 
-    struct AtomicWaitOperand: Equatable, InstructionImmediate {
+    struct AtomicWaitOperand: InstructionImmediate {
         var offset: UInt64
         var pointer: VReg
         var expected: VReg
@@ -3074,7 +3082,7 @@ extension Instruction {
         }
     }
 
-    struct AtomicNotifyOperand: Equatable, InstructionImmediate {
+    struct AtomicNotifyOperand: InstructionImmediate {
         var offset: UInt64
         var pointer: VReg
         var count: VReg
@@ -3090,7 +3098,7 @@ extension Instruction {
         }
     }
 
-    struct ThrowTagOperand: Equatable, InstructionImmediate {
+    struct ThrowTagOperand: InstructionImmediate {
         var tagIndex: UInt32
         var payloadBase: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -3102,7 +3110,7 @@ extension Instruction {
         }
     }
 
-    struct ThrowRefOperand: Equatable, InstructionImmediate {
+    struct ThrowRefOperand: InstructionImmediate {
         var exnRef: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             let (exnRef, _, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
@@ -3113,7 +3121,7 @@ extension Instruction {
         }
     }
 
-    struct CatchHandlersOperand: Equatable, InstructionImmediate {
+    struct CatchHandlersOperand: InstructionImmediate {
         var rawBaseAddress: UInt64
         var count: UInt16
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -3127,7 +3135,7 @@ extension Instruction {
         }
     }
 
-    struct CatchHandlersEndOperand: Equatable, InstructionImmediate {
+    struct CatchHandlersEndOperand: InstructionImmediate {
         var count: UInt16
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             #if _endian(little)
@@ -3144,7 +3152,7 @@ extension Instruction {
         }
     }
 
-    struct BrIfCmpOperand: Equatable, InstructionImmediate {
+    struct BrIfCmpOperand: InstructionImmediate {
         var lhs: VReg
         var rhs: VReg
         var offset: Int32
@@ -3157,7 +3165,7 @@ extension Instruction {
         }
     }
 
-    struct BinBinOperand: Equatable, InstructionImmediate {
+    struct BinBinOperand: InstructionImmediate {
         var result: VReg
         var x: VReg
         var y: VReg
@@ -3180,7 +3188,7 @@ extension Instruction {
         }
     }
 
-    struct AccBinaryOperand: Equatable, InstructionImmediate {
+    struct AccBinaryOperand: InstructionImmediate {
         var lhs: VReg
         var rhs: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -3199,7 +3207,7 @@ extension Instruction {
         }
     }
 
-    struct AccUnaryOperand: Equatable, InstructionImmediate {
+    struct AccUnaryOperand: InstructionImmediate {
         var operand: VReg
         var result: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -3218,7 +3226,7 @@ extension Instruction {
         }
     }
 
-    struct AccOperand: Equatable, InstructionImmediate {
+    struct AccOperand: InstructionImmediate {
         var operand: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             #if _endian(little)
@@ -3235,7 +3243,7 @@ extension Instruction {
         }
     }
 
-    struct BrIfAccCmpOperand: Equatable, InstructionImmediate {
+    struct BrIfAccCmpOperand: InstructionImmediate {
         var rhs: VReg
         var offset: Int32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -3247,7 +3255,7 @@ extension Instruction {
         }
     }
 
-    struct BrIfAccOperand: Equatable, InstructionImmediate {
+    struct BrIfAccOperand: InstructionImmediate {
         var offset: Int32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             let (offset, _, _, _, _) = pc.read((Int32, UInt8, UInt8, UInt8, UInt8).self)
@@ -3258,7 +3266,7 @@ extension Instruction {
         }
     }
 
-    struct GlobalOperand: Equatable, InstructionImmediate {
+    struct GlobalOperand: InstructionImmediate {
         var rawGlobal: UInt64
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             #if _endian(little)
@@ -3274,7 +3282,7 @@ extension Instruction {
         }
     }
 
-    struct AccMemoryPointerOperand: Equatable, InstructionImmediate {
+    struct AccMemoryPointerOperand: InstructionImmediate {
         var pointer: VReg
         var offset: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -3286,7 +3294,7 @@ extension Instruction {
         }
     }
 
-    struct AccMemoryResultOperand: Equatable, InstructionImmediate {
+    struct AccMemoryResultOperand: InstructionImmediate {
         var result: VReg
         var offset: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -3298,7 +3306,7 @@ extension Instruction {
         }
     }
 
-    struct AccMemoryOffsetOperand: Equatable, InstructionImmediate {
+    struct AccMemoryOffsetOperand: InstructionImmediate {
         var offset: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             let (offset, _, _, _, _) = pc.read((UInt32, UInt8, UInt8, UInt8, UInt8).self)
@@ -3309,7 +3317,7 @@ extension Instruction {
         }
     }
 
-    struct AccMemoryValueOperand: Equatable, InstructionImmediate {
+    struct AccMemoryValueOperand: InstructionImmediate {
         var value: VReg
         var offset: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -3321,7 +3329,7 @@ extension Instruction {
         }
     }
 
-    struct AccBinBinOperand: Equatable, InstructionImmediate {
+    struct AccBinBinOperand: InstructionImmediate {
         var x: VReg
         var y: VReg
         var z: VReg
@@ -3342,7 +3350,7 @@ extension Instruction {
         }
     }
 
-    struct BinaryImmOperand: Equatable, InstructionImmediate {
+    struct BinaryImmOperand: InstructionImmediate {
         var result: VReg
         var lhs: VReg
         var imm: Int32
@@ -3363,7 +3371,7 @@ extension Instruction {
         }
     }
 
-    struct BrIfCmpImmOperand: Equatable, InstructionImmediate {
+    struct BrIfCmpImmOperand: InstructionImmediate {
         var lhs: VReg
         var imm: Int32
         var offset: Int32
@@ -3378,7 +3386,7 @@ extension Instruction {
         }
     }
 
-    struct AccBinaryImmOperand: Equatable, InstructionImmediate {
+    struct AccBinaryImmOperand: InstructionImmediate {
         var lhs: VReg
         var imm: Int32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -3397,7 +3405,7 @@ extension Instruction {
         }
     }
 
-    struct AccMemoryPointerResultOperand: Equatable, InstructionImmediate {
+    struct AccMemoryPointerResultOperand: InstructionImmediate {
         var pointer: VReg
         var result: VReg
         var offset: UInt32
@@ -3410,7 +3418,7 @@ extension Instruction {
         }
     }
 
-    struct CopyStackAccToSlotOperand: Equatable, InstructionImmediate {
+    struct CopyStackAccToSlotOperand: InstructionImmediate {
         var source: VReg
         var dest: VReg
         var result: VReg
@@ -3431,7 +3439,7 @@ extension Instruction {
         }
     }
 
-    struct SelectAccOperand: Equatable, InstructionImmediate {
+    struct SelectAccOperand: InstructionImmediate {
         var result: VReg
         var onTrue: VReg
         var onFalse: VReg
@@ -3452,7 +3460,7 @@ extension Instruction {
         }
     }
 
-    struct CopyStack2Operand: Equatable, InstructionImmediate {
+    struct CopyStack2Operand: InstructionImmediate {
         var source0: VReg
         var dest0: VReg
         var source1: VReg
@@ -3475,7 +3483,7 @@ extension Instruction {
         }
     }
 
-    struct SelectCmpOperand: Equatable, InstructionImmediate {
+    struct SelectCmpOperand: InstructionImmediate {
         var result: VReg
         var lhs: VReg
         var rhs: VReg
@@ -3503,7 +3511,7 @@ extension Instruction {
         }
     }
 
-    struct SelectCmpImmOperand: Equatable, InstructionImmediate {
+    struct SelectCmpImmOperand: InstructionImmediate {
         var result: VReg
         var lhs: VReg
         var imm: Int32
@@ -3531,7 +3539,7 @@ extension Instruction {
         }
     }
 
-    struct LoadWithCopyOperand: Equatable, InstructionImmediate {
+    struct LoadWithCopyOperand: InstructionImmediate {
         var pointer: VReg
         var result: VReg
         var offset: UInt32
@@ -5741,6 +5749,9 @@ extension Instruction {
     /// - Parameter pc: The program counter to read from.
     /// - Returns: The instruction read from the program counter.
     /// - Precondition: The instruction sequence must be compiled with token threading model.
+    ///
+    /// Compiled for size: one arm per opcode, used only for disassembly.
+    @_optimize(size)
     static func load(from pc: inout Pc) -> Instruction {
         let opcode = pc.read(UInt64.self)
         switch opcode {
@@ -5756,14 +5767,14 @@ extension Instruction {
         case 9: return .resizeFrameHeader(Instruction.ResizeFrameHeaderOperand.load(from: &pc))
         case 10: return .returnCall(Instruction.ReturnCallOperand.load(from: &pc))
         case 11: return .returnCallIndirect(Instruction.ReturnCallIndirectOperand.load(from: &pc))
-        case 12: return .unreachable
-        case 13: return .nop
+        case 12: return .unreachable(NoOperand())
+        case 13: return .nop(NoOperand())
         case 14: return .br(Instruction.BrOperand.load(from: &pc))
         case 15: return .brIf(Instruction.BrIfOperand.load(from: &pc))
         case 16: return .brIfNot(Instruction.BrIfOperand.load(from: &pc))
         case 17: return .brTable(Instruction.BrTableOperand.load(from: &pc))
-        case 18: return ._return
-        case 19: return .endOfExecution
+        case 18: return ._return(NoOperand())
+        case 19: return .endOfExecution(NoOperand())
         case 20: return .i32Load(Instruction.LoadOperand.load(from: &pc))
         case 21: return .i64Load(Instruction.LoadOperand.load(from: &pc))
         case 22: return .f32Load(Instruction.LoadOperand.load(from: &pc))
@@ -5948,7 +5959,7 @@ extension Instruction {
         case 201: return .tableElementDrop(Instruction.TableElementDropOperand.load(from: &pc))
         case 202: return .onEnter(Instruction.OnEnterOperand.load(from: &pc))
         case 203: return .onExit(Instruction.OnExitOperand.load(from: &pc))
-        case 204: return .breakpoint
+        case 204: return .breakpoint(NoOperand())
         case 205: return .i32AtomicLoad(Instruction.LoadOperand.load(from: &pc))
         case 206: return .i64AtomicLoad(Instruction.LoadOperand.load(from: &pc))
         case 207: return .i32AtomicLoad8U(Instruction.LoadOperand.load(from: &pc))
@@ -6015,7 +6026,7 @@ extension Instruction {
         case 268: return .memoryAtomicWait32(Instruction.AtomicWaitOperand.load(from: &pc))
         case 269: return .memoryAtomicWait64(Instruction.AtomicWaitOperand.load(from: &pc))
         case 270: return .memoryAtomicNotify(Instruction.AtomicNotifyOperand.load(from: &pc))
-        case 271: return .atomicFence
+        case 271: return .atomicFence(NoOperand())
         case 272: return .throwTag(Instruction.ThrowTagOperand.load(from: &pc))
         case 273: return .throwRef(Instruction.ThrowRefOperand.load(from: &pc))
         case 274: return .catchHandlers(Instruction.CatchHandlersOperand.load(from: &pc))
@@ -6040,9 +6051,9 @@ extension Instruction {
         case 293: return .brIfI64LeU(Instruction.BrIfCmpOperand.load(from: &pc))
         case 294: return .brIfI64GeS(Instruction.BrIfCmpOperand.load(from: &pc))
         case 295: return .brIfI64GeU(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 296: return .returnCrossInstance
-        case 297: return .memoryOutOfBoundsTrap
-        case 298: return .unalignedAtomicTrap
+        case 296: return .returnCrossInstance(NoOperand())
+        case 297: return .memoryOutOfBoundsTrap(NoOperand())
+        case 298: return .unalignedAtomicTrap(NoOperand())
         case 299: return .brIfF32Eq(Instruction.BrIfCmpOperand.load(from: &pc))
         case 300: return .brIfF32Ne(Instruction.BrIfCmpOperand.load(from: &pc))
         case 301: return .brIfF32Lt(Instruction.BrIfCmpOperand.load(from: &pc))
@@ -7493,7 +7504,7 @@ extension Instruction {
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.unreachable
+                let inst = Instruction.unreachable(Instruction.NoOperand())
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
@@ -7513,15 +7524,15 @@ extension Instruction {
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction._return
+                let inst = Instruction._return(Instruction.NoOperand())
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.endOfExecution
+                let inst = Instruction.endOfExecution(Instruction.NoOperand())
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.breakpoint
+                let inst = Instruction.breakpoint(Instruction.NoOperand())
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
@@ -7617,7 +7628,7 @@ extension Instruction {
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.returnCrossInstance
+                let inst = Instruction.returnCrossInstance(Instruction.NoOperand())
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {

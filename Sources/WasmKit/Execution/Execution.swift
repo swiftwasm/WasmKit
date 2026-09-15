@@ -475,7 +475,7 @@ func executeWasm(
         }
 
         try withUnsafeTemporaryAllocation(of: CodeSlot.self, capacity: 2) { rootISeq in
-            rootISeq[0] = Instruction.endOfExecution.headSlot(
+            rootISeq[0] = Instruction.endOfExecution(.init()).headSlot(
                 threadingModel: store.value.engine.configuration.threadingModel
             )
             try stack.execute(

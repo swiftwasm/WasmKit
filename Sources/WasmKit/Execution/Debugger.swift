@@ -127,7 +127,7 @@
                 stackEnd: valueStack.advanced(by: limit)
             )
             self.threadingModel = store.engine.configuration.threadingModel
-            self.endOfExecution = Instruction.endOfExecution.headSlot(threadingModel: threadingModel)
+            self.endOfExecution = Instruction.endOfExecution(.init()).headSlot(threadingModel: threadingModel)
 
             self.headSlotToOpcodeID = Instruction.buildControlHeadSlotMap(
                 threadingModel: self.threadingModel
@@ -201,7 +201,7 @@
             guard self.armedBreakpoints[resolved] == nil else { return }
 
             self.armedBreakpoints[resolved] = (iseq: iseq, originalHeadSlot: iseq.pointee)
-            iseq.pointee = Instruction.breakpoint.headSlot(threadingModel: self.threadingModel)
+            iseq.pointee = Instruction.breakpoint(.init()).headSlot(threadingModel: self.threadingModel)
         }
 
         /// Takes the breakpoint at an already resolved Wasm address out of the bytecode, restoring

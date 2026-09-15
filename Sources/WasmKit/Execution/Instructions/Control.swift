@@ -143,7 +143,8 @@ extension Execution {
         let callee = immediate.callee
         try callee.wasm.ensureCompiled(store: store)
         let replaced = Instruction.internalCall(immediate)
-        headSlotPc.pointee = replaced.headSlot(threadingModel: store.value.engine.configuration.threadingModel)
+        headSlotPc.pointee = replaced.headSlotInline(
+            threadingModel: store.value.engine.configuration.threadingModel)
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)
         return pc.next()
     }
