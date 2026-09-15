@@ -151,6 +151,24 @@ extension Execution {
         return nil
     }
 
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`
+    mutating func memoryLoadToAccAndSlot<T: FixedWidthInteger>(
+        sp: Sp, md: Md, ms: Ms, ireg: inout UInt64, loadOperand: Instruction.AccMemoryPointerResultOperand,
+        loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
+    ) -> MemoryAccessTrap? {
+        let length = UInt64(T.bitWidth) / 8
+        let offset = UInt64(loadOperand.offset)
+        let address = Execution.memoryAddress(offset: offset, index: sp[loadOperand.pointer].asAddressOffset())
+        if _slowPath(!Execution.isInBounds(address: address, offset: offset, length: length, ms: ms)) {
+            return .outOfBounds
+        }
+        let loaded = md.unsafelyUnwrapped.loadUnaligned(fromByteOffset: Execution.checkedByteOffset(address), as: T.self)
+        let value = castToValue(loaded)
+        sp[loadOperand.result] = value
+        ireg = value.storage
+        return nil
+    }
+
     /// `sp[result] = load(ireg + offset)`
     mutating func memoryLoadFromAcc<T: FixedWidthInteger>(
         sp: Sp, md: Md, ms: Ms, ireg: UInt64, loadOperand: Instruction.AccMemoryResultOperand,
