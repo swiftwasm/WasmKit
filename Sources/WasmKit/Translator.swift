@@ -1133,6 +1133,83 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let inAcc: (Instruction.AccOperand) -> Instruction
     }
 
+    /// `sp[result] = ireg = sp[lhs] <op> sp[rhs]`
+    fileprivate static func accAndSlotBinaryInstruction(_ type: ValueType, _ op: BinBinOp) -> ((Instruction.BinaryOperand) -> Instruction)? {
+        switch (type, op) {
+        case (.i32, .add): return Instruction.i32AddToAccAndSlot
+        case (.i32, .sub): return Instruction.i32SubToAccAndSlot
+        case (.i32, .mul): return Instruction.i32MulToAccAndSlot
+        case (.i32, .and): return Instruction.i32AndToAccAndSlot
+        case (.i32, .or): return Instruction.i32OrToAccAndSlot
+        case (.i32, .xor): return Instruction.i32XorToAccAndSlot
+        case (.i32, .shl): return Instruction.i32ShlToAccAndSlot
+        case (.i32, .shrS): return Instruction.i32ShrSToAccAndSlot
+        case (.i32, .shrU): return Instruction.i32ShrUToAccAndSlot
+        case (.i32, .rotl): return Instruction.i32RotlToAccAndSlot
+        case (.i32, .rotr): return Instruction.i32RotrToAccAndSlot
+        case (.i64, .add): return Instruction.i64AddToAccAndSlot
+        case (.i64, .sub): return Instruction.i64SubToAccAndSlot
+        case (.i64, .mul): return Instruction.i64MulToAccAndSlot
+        case (.i64, .and): return Instruction.i64AndToAccAndSlot
+        case (.i64, .or): return Instruction.i64OrToAccAndSlot
+        case (.i64, .xor): return Instruction.i64XorToAccAndSlot
+        case (.i64, .shl): return Instruction.i64ShlToAccAndSlot
+        case (.i64, .shrS): return Instruction.i64ShrSToAccAndSlot
+        case (.i64, .shrU): return Instruction.i64ShrUToAccAndSlot
+        case (.i64, .rotl): return Instruction.i64RotlToAccAndSlot
+        case (.i64, .rotr): return Instruction.i64RotrToAccAndSlot
+        default: return nil
+        }
+    }
+
+    /// `sp[result] = ireg = sp[lhs] <op> imm`
+    fileprivate static func accAndSlotImmInstruction(_ type: ValueType, _ op: BinBinOp) -> ((Instruction.BinaryImmOperand) -> Instruction)? {
+        switch (type, op) {
+        case (.i32, .add): return Instruction.i32AddImmToAccAndSlot
+        case (.i32, .mul): return Instruction.i32MulImmToAccAndSlot
+        case (.i32, .and): return Instruction.i32AndImmToAccAndSlot
+        case (.i32, .or): return Instruction.i32OrImmToAccAndSlot
+        case (.i32, .xor): return Instruction.i32XorImmToAccAndSlot
+        case (.i32, .shl): return Instruction.i32ShlImmToAccAndSlot
+        case (.i32, .shrS): return Instruction.i32ShrSImmToAccAndSlot
+        case (.i32, .shrU): return Instruction.i32ShrUImmToAccAndSlot
+        case (.i32, .rotl): return Instruction.i32RotlImmToAccAndSlot
+        case (.i32, .rotr): return Instruction.i32RotrImmToAccAndSlot
+        case (.i64, .add): return Instruction.i64AddImmToAccAndSlot
+        case (.i64, .mul): return Instruction.i64MulImmToAccAndSlot
+        case (.i64, .and): return Instruction.i64AndImmToAccAndSlot
+        case (.i64, .or): return Instruction.i64OrImmToAccAndSlot
+        case (.i64, .xor): return Instruction.i64XorImmToAccAndSlot
+        case (.i64, .shl): return Instruction.i64ShlImmToAccAndSlot
+        case (.i64, .shrS): return Instruction.i64ShrSImmToAccAndSlot
+        case (.i64, .shrU): return Instruction.i64ShrUImmToAccAndSlot
+        case (.i64, .rotl): return Instruction.i64RotlImmToAccAndSlot
+        case (.i64, .rotr): return Instruction.i64RotrImmToAccAndSlot
+        default: return nil
+        }
+    }
+
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`
+    fileprivate static func accAndSlotLoadInstruction(_ load: WasmParser.Instruction.Load) -> ((Instruction.AccMemoryPointerResultOperand) -> Instruction)? {
+        switch load {
+        case .i32Load: return Instruction.i32LoadToAccAndSlot
+        case .i64Load: return Instruction.i64LoadToAccAndSlot
+        case .f32Load: return Instruction.f32LoadToAccAndSlot
+        case .f64Load: return Instruction.f64LoadToAccAndSlot
+        case .i32Load8S: return Instruction.i32Load8SToAccAndSlot
+        case .i32Load8U: return Instruction.i32Load8UToAccAndSlot
+        case .i32Load16S: return Instruction.i32Load16SToAccAndSlot
+        case .i32Load16U: return Instruction.i32Load16UToAccAndSlot
+        case .i64Load8S: return Instruction.i64Load8SToAccAndSlot
+        case .i64Load8U: return Instruction.i64Load8UToAccAndSlot
+        case .i64Load16S: return Instruction.i64Load16SToAccAndSlot
+        case .i64Load16U: return Instruction.i64Load16UToAccAndSlot
+        case .i64Load32S: return Instruction.i64Load32SToAccAndSlot
+        case .i64Load32U: return Instruction.i64Load32UToAccAndSlot
+        default: return nil
+        }
+    }
+
     fileprivate static func accBinaryForms(_ type: ValueType, _ op: BinBinOp) -> AccBinaryForms? {
         switch (type, op) {
         case (.i32, .add):
@@ -1485,6 +1562,46 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             }
         }
 
+        /// The same operation writing its result to its frame slot and leaving
+        /// it in `ireg` too, or `nil` when it has no such form.
+        var producingIntoAccAndSlot: Instruction? {
+            switch self {
+            case .binary(let type, let op, let lhs, let rhs, let result):
+                return accAndSlotBinaryInstruction(type, op)?(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(result)))
+            case .binaryImm(let type, let op, let lhs, let imm, let result):
+                return accAndSlotImmInstruction(type, op)?(Instruction.BinaryImmOperand(result: result, lhs: lhs, imm: imm))
+            case .load(let load, let pointer, let offset, let result):
+                return accAndSlotLoadInstruction(load)?(Instruction.AccMemoryPointerResultOperand(pointer: pointer, result: result, offset: offset))
+            default:
+                return nil
+            }
+        }
+
+        /// Whether ``producingIntoAccAndSlot`` has a form.
+        var hasAccAndSlotForm: Bool {
+            switch self {
+            case .binary(let type, let op, _, _, _): return (type == .i32 || type == .i64) && op != .div
+            case .binaryImm: return true
+            case .load: return true
+            default: return false
+            }
+        }
+
+        /// The same operation writing `result` instead.
+        func relinked(to result: VReg) -> AccProducerForm {
+            switch self {
+            case .binary(let type, let op, let lhs, let rhs, _): return .binary(type: type, op: op, lhs: lhs, rhs: rhs, result: result)
+            case .binaryImm(let type, let op, let lhs, let imm, _): return .binaryImm(type: type, op: op, lhs: lhs, imm: imm, result: result)
+            case .fromAcc(let type, let op, let operand, _): return .fromAcc(type: type, op: op, operand: operand, result: result)
+            case .fromFloatAcc(let op, let operand, let reversed, _): return .fromFloatAcc(op: op, operand: operand, reversed: reversed, result: result)
+            case .floatBinBin(let op1, let op2, let x, let y, let z, _): return .floatBinBin(op1: op1, op2: op2, x: x, y: y, z: z, result: result)
+            case .sqrt(let operand, _): return .sqrt(operand: operand, result: result)
+            case .globalGet(let type, let global, _): return .globalGet(type: type, global: global, result: result)
+            case .load(let load, let pointer, let offset, _): return .load(load, pointer: pointer, offset: offset, result: result)
+            case .loadFromAcc(let load, let offset, _): return .loadFromAcc(load, offset: offset, result: result)
+            }
+        }
+
         /// The operation writing its result to its frame slot.
         var plain: Instruction {
             switch self {
@@ -1517,6 +1634,16 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let position: MetaProgramCounter
         let end: MetaProgramCounter
         let form: AccProducerForm
+        /// The result is a local that is read again later, so the producer
+        /// keeps writing its slot and also leaves the value in `ireg`.
+        var keepsSlot = false
+
+        /// The form handing the result to the next instruction in `register`,
+        /// or `nil` when there is none.
+        func producing(into register: AccRegister) -> Instruction? {
+            guard keepsSlot else { return form.producing(into: register) }
+            return register == .integer ? form.producingIntoAccAndSlot : nil
+        }
     }
 
     /// A comparison one of whose operands is the result of the instruction
@@ -1534,7 +1661,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// Set when an `eqz` negates the comparison.
         var negated = false
         let producerPosition: MetaProgramCounter
-        let producer: AccProducerForm
+        let producer: AccProducer
 
         var register: AccRegister {
             switch kind {
@@ -1687,7 +1814,20 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         private var unpinnedLabels: Set<LabelRef> = []
         private var instructions: [UInt64] = []
         private var lastEmission: LastEmission?
-        private var lastAcc: AccRecords?
+        /// Kept apart from a presence flag, so that forgetting the records on
+        /// every operand pop is a single store.
+        private var lastAccRecords = AccRecords()
+        private var hasLastAcc = false
+        private var lastAcc: AccRecords? { hasLastAcc ? lastAccRecords : nil }
+        /// The last emission's accumulator producer after its result was
+        /// relinked into a local. Unlike ``lastAcc`` it survives operand pops:
+        /// the slot stays written, so it only has to be the last thing in the
+        /// buffer, which ``accProducer`` checks.
+        private var lastAccAndSlot: AccProducer?
+        /// Off for a debuggable module: a stop between a producer and its
+        /// consumer resumes with a fresh accumulator, and a relinked producer
+        /// reads as a separate guest instruction from the consumer.
+        var tracksAccAndSlot = true
         /// The highest offset any label has been pinned at.
         ///
         /// Rewinding the instruction buffer past a pinned label would silently
@@ -1736,13 +1876,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
         mutating func resetLastEmission() {
             lastEmission = nil
-            lastAcc = nil
+            hasLastAcc = false
         }
 
         /// Records what the instruction just emitted offers to the accumulator
         /// hand-off.
         mutating func recordAcc(_ records: AccRecords) {
-            lastAcc = records
+            lastAccRecords = records
+            hasLastAcc = true
         }
 
         /// Forgets how to relink the last emission's result, but keeps what it
@@ -1791,10 +1932,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// Direct threading only: the token-threaded dispatcher has no
         /// accumulator.
         fileprivate var accProducer: AccProducer? {
-            guard engineConfiguration.threadingModel == .direct,
-                let lastEmission, let acc = lastAcc?.producer
-            else { return nil }
-            return AccProducer(position: lastEmission.position, end: lastEmission.end, form: acc)
+            guard engineConfiguration.threadingModel == .direct else { return nil }
+            if let lastEmission, let acc = lastAcc?.producer {
+                return AccProducer(position: lastEmission.position, end: lastEmission.end, form: acc)
+            }
+            guard let lastAccAndSlot, lastAccAndSlot.end.offsetFromHead == insertingPC.offsetFromHead else { return nil }
+            return lastAccAndSlot
         }
 
         /// Whether `producer` is still the last thing in the buffer.
@@ -1865,6 +2008,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             trace("rewind: \(instructions.count) -> \(position.offsetFromHead)")
             instructions.removeLast(instructions.count - position.offsetFromHead)
             resetLastEmission()
+            lastAccAndSlot = nil
         }
 
         mutating func relinkLastInstructionResult(_ newResult: VReg) -> Bool {
@@ -1873,6 +2017,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             else { return false }
             let newInstruction = resultRelink(newResult)
             assign(at: lastEmission.position.offsetFromHead, newInstruction)
+            if tracksAccAndSlot, let form = lastAcc?.producer, form.hasAccAndSlotForm {
+                lastAccAndSlot = AccProducer(
+                    position: lastEmission.position, end: lastEmission.end, form: form.relinked(to: newResult), keepsSlot: true)
+            }
             resetLastEmission()
             return true
         }
@@ -1913,7 +2061,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 fusable: fusable.map { ($0.condition, $0.result, $0.start ?? position) },
                 binary: binary
             )
-            lastAcc = nil
+            hasLastAcc = false
         }
 
         mutating func putLabel() -> LabelRef {
@@ -2208,6 +2356,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         self.type = type
         self.module = module
         self.iseqBuilder = ISeqBuilder(engineConfiguration: engineConfiguration)
+        self.iseqBuilder.tracksAccAndSlot = !module.isDebuggable
         self.controlStack = ControlStack()
         self.stackLayout = try StackLayout(
             type: type,
@@ -2353,6 +2502,16 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let controlFrame = try controlStack.currentFrame()
         return try self.checkBeforePop(typeHint: typeHint, depth: depth, controlFrame: controlFrame)
     }
+    /// The slot `source` occupies without materializing it: `nil` for a
+    /// constant.
+    private func existingSlot(of source: ValueSource) -> VReg? {
+        switch source {
+        case .vreg(let register): return register
+        case .local(let index): return stackLayout.localReg(index)
+        case .const: return nil
+        }
+    }
+
     private mutating func ensureOnVReg(_ source: ValueSource) -> VReg {
         // TODO: Copy to stack if source is on preg
         // let copyTo = valueStack.stackRegBase + VReg(slotIndex: valueStack.slotHeight)
@@ -3039,7 +3198,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     /// `i32` condition from the accumulator.
     private func accConditionProducer(_ candidate: AccProducer?, condition: VReg) -> AccProducer? {
         guard let candidate, candidate.form.type == .i32, candidate.form.result == condition,
-            candidate.form.producing(into: .integer) != nil, iseqBuilder.canRewind(to: candidate)
+            candidate.producing(into: .integer) != nil, iseqBuilder.canRewind(to: candidate)
         else { return nil }
         return candidate
     }
@@ -3050,7 +3209,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     private mutating func rewindProducerIntoAccumulator(_ producer: AccProducer, _ register: AccRegister = .integer) {
         iseqBuilder.rewind(to: producer.position)
         self.rewindInstructionMapping(to: producer.position)
-        emit(producer.form.producing(into: register)!)
+        emit(producer.producing(into: register)!)
     }
 
     mutating func visitBrIf(relativeDepth: UInt32) throws(WasmKitError) -> Output {
@@ -3854,7 +4013,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let result = valueStack.push(load.type)
         guard let pointer else { return }
         if let accCandidate, accCandidate.form.type == .i32, accCandidate.form.result == pointer,
-            accCandidate.form.producing(into: .integer) != nil, iseqBuilder.canRewind(to: accCandidate)
+            accCandidate.producing(into: .integer) != nil, iseqBuilder.canRewind(to: accCandidate)
         {
             rewindProducerIntoAccumulator(accCandidate)
             emit(
@@ -3892,19 +4051,19 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 // A raw copy through `ireg` serves any producer that has an
                 // integer form, `f64.load` included; `freg` serves float
                 // arithmetic.
-                if accCandidate.form.producing(into: .integer) != nil {
+                if accCandidate.producing(into: .integer) != nil {
                     rewindProducerIntoAccumulator(accCandidate)
                     emit(forms.fromAcc(Instruction.AccMemoryPointerOperand(pointer: pointer, offset: offset)))
                     return
                 }
-                if store == .f64Store, accCandidate.form.producing(into: .float) != nil {
+                if store == .f64Store, accCandidate.producing(into: .float) != nil {
                     rewindProducerIntoAccumulator(accCandidate, .float)
                     emit(.f64StoreFromFAcc(Instruction.AccMemoryPointerOperand(pointer: pointer, offset: offset)))
                     return
                 }
             }
             if accResult == pointer, pointer != value, accCandidate.form.type == .i32,
-                accCandidate.form.producing(into: .integer) != nil
+                accCandidate.producing(into: .integer) != nil
             {
                 rewindProducerIntoAccumulator(accCandidate)
                 emit(forms.addrFromAcc(Instruction.AccMemoryValueOperand(value: value, offset: offset)))
@@ -4439,14 +4598,26 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // The value must be exactly one of the two operands; a commutative
         // operation takes it on either side.
         if let accCandidate, let accForms, accCandidate.form.type == type,
-            accCandidate.form.producing(into: .integer) != nil, iseqBuilder.canRewind(to: accCandidate)
+            accCandidate.producing(into: .integer) != nil, iseqBuilder.canRewind(to: accCandidate)
         {
             let accResult = accCandidate.form.result
+            // Matched against the slot each operand occupies, which is a local's
+            // slot when the producer was relinked into it.
+            let lhsSlot = existingSlot(of: lhsSource)
+            let rhsSlot = existingSlot(of: rhsSource)
             var operandSource: ValueSource?
-            if accResult == lhsProduced, accResult != rhsProduced {
+            if accResult == lhsSlot, accResult != rhsSlot {
                 operandSource = rhsSource
-            } else if accResult == rhsProduced, accResult != lhsProduced, op.isCommutative {
+            } else if accResult == rhsSlot, accResult != lhsSlot, op.isCommutative {
                 operandSource = lhsSource
+            }
+            // A producer that keeps its slot saves only the consumer's load,
+            // which an immediate form also saves without a pool slot.
+            if accCandidate.keepsSlot, let constant = operandSource?.constant,
+                Self.immBinaryForms(type, op == .sub ? .add : op) != nil,
+                Self.immediateEncoding(of: op == .sub ? 0 &- constant : constant, as: type) != nil
+            {
+                operandSource = nil
             }
             if let operandSource {
                 let operand = ensureOnVReg(operandSource)
@@ -4473,7 +4644,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // The same for `f64`, through the float accumulator. A value arriving
         // as the right operand of `sub` or `div` uses a reversed form.
         let floatAccForms = Self.floatAccBinaryForms(type, op)
-        if let accCandidate, let floatAccForms, accCandidate.form.producing(into: .float) != nil,
+        if let accCandidate, let floatAccForms, accCandidate.producing(into: .float) != nil,
             iseqBuilder.canRewind(to: accCandidate)
         {
             let accResult = accCandidate.form.result
@@ -4523,7 +4694,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 binary: BinaryOperation(
                     type: type, op: op, lhs: lhs, rhs: lhs, result: result, rhsConstant: form.constant)
             )
-            iseqBuilder.recordAcc(AccRecords(producer: .binaryImm(type: type, op: form.op, lhs: lhs, imm: imm, result: result)))
+            iseqBuilder.recordAcc(
+                AccRecords(producer: .binaryImm(type: type, op: form.op, lhs: lhs, imm: imm, result: result)))
             return
         }
 
@@ -4597,11 +4769,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let lhsSource = try popOperand(operand)
         let result = valueStack.push(.i32)
         guard let lhsSource, let rhsSource else { return }
-        // Compare against a constant carried in the instruction, unless the
-        // other operand can come from the accumulator.
-        if emitsImmediateOperands, case .compare(let kind, _, _) = makeCondition(.zero, .zero),
-            accCandidate.map({ $0.form.result != lhsSource.stackRegister && $0.form.result != rhsSource.stackRegister }) ?? true
-        {
+        // Compare against a constant carried in the instruction.
+        if emitsImmediateOperands, case .compare(let kind, _, _) = makeCondition(.zero, .zero) {
             var immediate: (kind: FusedCmpKind, lhs: VReg, imm: Int32)?
             if let raw = rhsSource.constant, let imm = Self.immediateEncoding(of: raw, as: operand) {
                 immediate = (kind, ensureOnVReg(lhsSource), imm)
@@ -4640,18 +4809,18 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             switch condition {
             case .compare(let cmp, _, _)
             where accCandidate.form.type == cmp.operandType
-                && accCandidate.form.producing(into: .integer) != nil:
+                && accCandidate.producing(into: .integer) != nil:
                 kind = slot.map { .integer($0.swapped ? cmp.swapped : cmp) }
             case .floatCompare(let cmp, _, _)
             where cmp.operandType == .f64
-                && accCandidate.form.producing(into: .float) != nil:
+                && accCandidate.producing(into: .float) != nil:
                 kind = slot.map { .float($0.swapped ? cmp.swapped : cmp) }
             default:
                 kind = nil
             }
             if let kind, let slot {
                 accCompare = AccCompare(
-                    kind: kind, rhs: slot.rhs, producerPosition: accCandidate.position, producer: accCandidate.form)
+                    kind: kind, rhs: slot.rhs, producerPosition: accCandidate.position, producer: accCandidate)
             }
         }
         emit(

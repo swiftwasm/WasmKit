@@ -2093,6 +2093,190 @@ enum Instruction: Equatable {
     case i64RotlImmToAcc(Instruction.AccBinaryImmOperand)
     /// `ireg = x rotr imm`, on `i64` operands
     case i64RotrImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `result = ireg = x add y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.add`.
+    case i32AddToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x sub y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.sub`.
+    case i32SubToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x mul y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.mul`.
+    case i32MulToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x and y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.and`.
+    case i32AndToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x or y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.or`.
+    case i32OrToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x xor y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.xor`.
+    case i32XorToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x shl y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.shl`.
+    case i32ShlToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x shr_s y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.shr_s`.
+    case i32ShrSToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x shr_u y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.shr_u`.
+    case i32ShrUToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x rotl y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.rotl`.
+    case i32RotlToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x rotr y`, on `i32` operands
+    /// 
+    /// An accumulator form of `i32.rotr`.
+    case i32RotrToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x add y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.add`.
+    case i64AddToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x sub y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.sub`.
+    case i64SubToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x mul y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.mul`.
+    case i64MulToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x and y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.and`.
+    case i64AndToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x or y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.or`.
+    case i64OrToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x xor y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.xor`.
+    case i64XorToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x shl y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.shl`.
+    case i64ShlToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x shr_s y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.shr_s`.
+    case i64ShrSToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x shr_u y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.shr_u`.
+    case i64ShrUToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x rotl y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.rotl`.
+    case i64RotlToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x rotr y`, on `i64` operands
+    /// 
+    /// An accumulator form of `i64.rotr`.
+    case i64RotrToAccAndSlot(Instruction.BinaryOperand)
+    /// `result = ireg = x add imm`, on `i32` operands
+    case i32AddImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x mul imm`, on `i32` operands
+    case i32MulImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x and imm`, on `i32` operands
+    case i32AndImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x or imm`, on `i32` operands
+    case i32OrImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x xor imm`, on `i32` operands
+    case i32XorImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x shl imm`, on `i32` operands
+    case i32ShlImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x shr_s imm`, on `i32` operands
+    case i32ShrSImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x shr_u imm`, on `i32` operands
+    case i32ShrUImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x rotl imm`, on `i32` operands
+    case i32RotlImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x rotr imm`, on `i32` operands
+    case i32RotrImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x add imm`, on `i64` operands
+    case i64AddImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x mul imm`, on `i64` operands
+    case i64MulImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x and imm`, on `i64` operands
+    case i64AndImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x or imm`, on `i64` operands
+    case i64OrImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x xor imm`, on `i64` operands
+    case i64XorImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x shl imm`, on `i64` operands
+    case i64ShlImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x shr_s imm`, on `i64` operands
+    case i64ShrSImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x shr_u imm`, on `i64` operands
+    case i64ShrUImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x rotl imm`, on `i64` operands
+    case i64RotlImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `result = ireg = x rotr imm`, on `i64` operands
+    case i64RotrImmToAccAndSlot(Instruction.BinaryImmOperand)
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load`.
+    case i32LoadToAccAndSlot(Instruction.AccMemoryPointerResultOperand)
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load`.
+    case i64LoadToAccAndSlot(Instruction.AccMemoryPointerResultOperand)
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `f32.load`.
+    case f32LoadToAccAndSlot(Instruction.AccMemoryPointerResultOperand)
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `f64.load`.
+    case f64LoadToAccAndSlot(Instruction.AccMemoryPointerResultOperand)
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load8_s`.
+    case i32Load8SToAccAndSlot(Instruction.AccMemoryPointerResultOperand)
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load8_u`.
+    case i32Load8UToAccAndSlot(Instruction.AccMemoryPointerResultOperand)
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load16_s`.
+    case i32Load16SToAccAndSlot(Instruction.AccMemoryPointerResultOperand)
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i32.load16_u`.
+    case i32Load16UToAccAndSlot(Instruction.AccMemoryPointerResultOperand)
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load8_s`.
+    case i64Load8SToAccAndSlot(Instruction.AccMemoryPointerResultOperand)
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load8_u`.
+    case i64Load8UToAccAndSlot(Instruction.AccMemoryPointerResultOperand)
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load16_s`.
+    case i64Load16SToAccAndSlot(Instruction.AccMemoryPointerResultOperand)
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load16_u`.
+    case i64Load16UToAccAndSlot(Instruction.AccMemoryPointerResultOperand)
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load32_s`.
+    case i64Load32SToAccAndSlot(Instruction.AccMemoryPointerResultOperand)
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// An accumulator form of `i64.load32_u`.
+    case i64Load32UToAccAndSlot(Instruction.AccMemoryPointerResultOperand)
 }
 
 extension Instruction {
@@ -3118,6 +3302,19 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.lhs, $0.imm) as (VReg, Int32), to: CodeSlot.self) }
         }
     }
+
+    struct AccMemoryPointerResultOperand: Equatable, InstructionImmediate {
+        var pointer: VReg
+        var result: VReg
+        var offset: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (pointer, result, offset) = pc.read((VReg, VReg, UInt32).self)
+            return Self(pointer: pointer, result: result, offset: offset)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.pointer, $0.result, $0.offset) as (VReg, VReg, UInt32), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -3752,6 +3949,62 @@ extension Instruction {
         case .i64ShrUImmToAcc(let immediate): return immediate
         case .i64RotlImmToAcc(let immediate): return immediate
         case .i64RotrImmToAcc(let immediate): return immediate
+        case .i32AddToAccAndSlot(let immediate): return immediate
+        case .i32SubToAccAndSlot(let immediate): return immediate
+        case .i32MulToAccAndSlot(let immediate): return immediate
+        case .i32AndToAccAndSlot(let immediate): return immediate
+        case .i32OrToAccAndSlot(let immediate): return immediate
+        case .i32XorToAccAndSlot(let immediate): return immediate
+        case .i32ShlToAccAndSlot(let immediate): return immediate
+        case .i32ShrSToAccAndSlot(let immediate): return immediate
+        case .i32ShrUToAccAndSlot(let immediate): return immediate
+        case .i32RotlToAccAndSlot(let immediate): return immediate
+        case .i32RotrToAccAndSlot(let immediate): return immediate
+        case .i64AddToAccAndSlot(let immediate): return immediate
+        case .i64SubToAccAndSlot(let immediate): return immediate
+        case .i64MulToAccAndSlot(let immediate): return immediate
+        case .i64AndToAccAndSlot(let immediate): return immediate
+        case .i64OrToAccAndSlot(let immediate): return immediate
+        case .i64XorToAccAndSlot(let immediate): return immediate
+        case .i64ShlToAccAndSlot(let immediate): return immediate
+        case .i64ShrSToAccAndSlot(let immediate): return immediate
+        case .i64ShrUToAccAndSlot(let immediate): return immediate
+        case .i64RotlToAccAndSlot(let immediate): return immediate
+        case .i64RotrToAccAndSlot(let immediate): return immediate
+        case .i32AddImmToAccAndSlot(let immediate): return immediate
+        case .i32MulImmToAccAndSlot(let immediate): return immediate
+        case .i32AndImmToAccAndSlot(let immediate): return immediate
+        case .i32OrImmToAccAndSlot(let immediate): return immediate
+        case .i32XorImmToAccAndSlot(let immediate): return immediate
+        case .i32ShlImmToAccAndSlot(let immediate): return immediate
+        case .i32ShrSImmToAccAndSlot(let immediate): return immediate
+        case .i32ShrUImmToAccAndSlot(let immediate): return immediate
+        case .i32RotlImmToAccAndSlot(let immediate): return immediate
+        case .i32RotrImmToAccAndSlot(let immediate): return immediate
+        case .i64AddImmToAccAndSlot(let immediate): return immediate
+        case .i64MulImmToAccAndSlot(let immediate): return immediate
+        case .i64AndImmToAccAndSlot(let immediate): return immediate
+        case .i64OrImmToAccAndSlot(let immediate): return immediate
+        case .i64XorImmToAccAndSlot(let immediate): return immediate
+        case .i64ShlImmToAccAndSlot(let immediate): return immediate
+        case .i64ShrSImmToAccAndSlot(let immediate): return immediate
+        case .i64ShrUImmToAccAndSlot(let immediate): return immediate
+        case .i64RotlImmToAccAndSlot(let immediate): return immediate
+        case .i64RotrImmToAccAndSlot(let immediate): return immediate
+        case .i32LoadToAccAndSlot(let immediate): return immediate
+        case .i64LoadToAccAndSlot(let immediate): return immediate
+        case .f32LoadToAccAndSlot(let immediate): return immediate
+        case .f64LoadToAccAndSlot(let immediate): return immediate
+        case .i32Load8SToAccAndSlot(let immediate): return immediate
+        case .i32Load8UToAccAndSlot(let immediate): return immediate
+        case .i32Load16SToAccAndSlot(let immediate): return immediate
+        case .i32Load16UToAccAndSlot(let immediate): return immediate
+        case .i64Load8SToAccAndSlot(let immediate): return immediate
+        case .i64Load8UToAccAndSlot(let immediate): return immediate
+        case .i64Load16SToAccAndSlot(let immediate): return immediate
+        case .i64Load16UToAccAndSlot(let immediate): return immediate
+        case .i64Load32SToAccAndSlot(let immediate): return immediate
+        case .i64Load32UToAccAndSlot(let immediate): return immediate
         default: return nil
         }
     }
@@ -4390,6 +4643,62 @@ extension Instruction {
         case .i64ShrUImmToAcc(let immediate): immediate.emit(to: emit)
         case .i64RotlImmToAcc(let immediate): immediate.emit(to: emit)
         case .i64RotrImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i32AddToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32SubToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32MulToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32AndToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32OrToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32XorToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32ShlToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32ShrSToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32ShrUToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32RotlToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32RotrToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64AddToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64SubToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64MulToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64AndToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64OrToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64XorToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64ShlToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64ShrSToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64ShrUToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64RotlToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64RotrToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32AddImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32MulImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32AndImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32OrImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32XorImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32ShlImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32ShrSImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32ShrUImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32RotlImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32RotrImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64AddImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64MulImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64AndImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64OrImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64XorImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64ShlImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64ShrSImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64ShrUImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64RotlImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64RotrImmToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32LoadToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64LoadToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .f32LoadToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .f64LoadToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32Load8SToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32Load8UToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32Load16SToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i32Load16UToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64Load8SToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64Load8UToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64Load16SToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64Load16UToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64Load32SToAccAndSlot(let immediate): immediate.emit(to: emit)
+        case .i64Load32UToAccAndSlot(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -5037,7 +5346,63 @@ extension Instruction {
         case .i64ShrSImmToAcc: return 634
         case .i64ShrUImmToAcc: return 635
         case .i64RotlImmToAcc: return 636
-        default: return 637  // .i64RotrImmToAcc
+        case .i64RotrImmToAcc: return 637
+        case .i32AddToAccAndSlot: return 638
+        case .i32SubToAccAndSlot: return 639
+        case .i32MulToAccAndSlot: return 640
+        case .i32AndToAccAndSlot: return 641
+        case .i32OrToAccAndSlot: return 642
+        case .i32XorToAccAndSlot: return 643
+        case .i32ShlToAccAndSlot: return 644
+        case .i32ShrSToAccAndSlot: return 645
+        case .i32ShrUToAccAndSlot: return 646
+        case .i32RotlToAccAndSlot: return 647
+        case .i32RotrToAccAndSlot: return 648
+        case .i64AddToAccAndSlot: return 649
+        case .i64SubToAccAndSlot: return 650
+        case .i64MulToAccAndSlot: return 651
+        case .i64AndToAccAndSlot: return 652
+        case .i64OrToAccAndSlot: return 653
+        case .i64XorToAccAndSlot: return 654
+        case .i64ShlToAccAndSlot: return 655
+        case .i64ShrSToAccAndSlot: return 656
+        case .i64ShrUToAccAndSlot: return 657
+        case .i64RotlToAccAndSlot: return 658
+        case .i64RotrToAccAndSlot: return 659
+        case .i32AddImmToAccAndSlot: return 660
+        case .i32MulImmToAccAndSlot: return 661
+        case .i32AndImmToAccAndSlot: return 662
+        case .i32OrImmToAccAndSlot: return 663
+        case .i32XorImmToAccAndSlot: return 664
+        case .i32ShlImmToAccAndSlot: return 665
+        case .i32ShrSImmToAccAndSlot: return 666
+        case .i32ShrUImmToAccAndSlot: return 667
+        case .i32RotlImmToAccAndSlot: return 668
+        case .i32RotrImmToAccAndSlot: return 669
+        case .i64AddImmToAccAndSlot: return 670
+        case .i64MulImmToAccAndSlot: return 671
+        case .i64AndImmToAccAndSlot: return 672
+        case .i64OrImmToAccAndSlot: return 673
+        case .i64XorImmToAccAndSlot: return 674
+        case .i64ShlImmToAccAndSlot: return 675
+        case .i64ShrSImmToAccAndSlot: return 676
+        case .i64ShrUImmToAccAndSlot: return 677
+        case .i64RotlImmToAccAndSlot: return 678
+        case .i64RotrImmToAccAndSlot: return 679
+        case .i32LoadToAccAndSlot: return 680
+        case .i64LoadToAccAndSlot: return 681
+        case .f32LoadToAccAndSlot: return 682
+        case .f64LoadToAccAndSlot: return 683
+        case .i32Load8SToAccAndSlot: return 684
+        case .i32Load8UToAccAndSlot: return 685
+        case .i32Load16SToAccAndSlot: return 686
+        case .i32Load16UToAccAndSlot: return 687
+        case .i64Load8SToAccAndSlot: return 688
+        case .i64Load8UToAccAndSlot: return 689
+        case .i64Load16SToAccAndSlot: return 690
+        case .i64Load16UToAccAndSlot: return 691
+        case .i64Load32SToAccAndSlot: return 692
+        default: return 693  // .i64Load32UToAccAndSlot
         }
     }
 }
@@ -5687,6 +6052,62 @@ extension Instruction {
         case 635: return .i64ShrUImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
         case 636: return .i64RotlImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
         case 637: return .i64RotrImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 638: return .i32AddToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 639: return .i32SubToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 640: return .i32MulToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 641: return .i32AndToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 642: return .i32OrToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 643: return .i32XorToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 644: return .i32ShlToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 645: return .i32ShrSToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 646: return .i32ShrUToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 647: return .i32RotlToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 648: return .i32RotrToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 649: return .i64AddToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 650: return .i64SubToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 651: return .i64MulToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 652: return .i64AndToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 653: return .i64OrToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 654: return .i64XorToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 655: return .i64ShlToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 656: return .i64ShrSToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 657: return .i64ShrUToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 658: return .i64RotlToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 659: return .i64RotrToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 660: return .i32AddImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 661: return .i32MulImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 662: return .i32AndImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 663: return .i32OrImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 664: return .i32XorImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 665: return .i32ShlImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 666: return .i32ShrSImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 667: return .i32ShrUImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 668: return .i32RotlImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 669: return .i32RotrImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 670: return .i64AddImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 671: return .i64MulImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 672: return .i64AndImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 673: return .i64OrImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 674: return .i64XorImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 675: return .i64ShlImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 676: return .i64ShrSImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 677: return .i64ShrUImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 678: return .i64RotlImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 679: return .i64RotrImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 680: return .i32LoadToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 681: return .i64LoadToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 682: return .f32LoadToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 683: return .f64LoadToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 684: return .i32Load8SToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 685: return .i32Load8UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 686: return .i32Load16SToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 687: return .i32Load16UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 688: return .i64Load8SToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 689: return .i64Load8UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 690: return .i64Load16SToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 691: return .i64Load16UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 692: return .i64Load32SToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 693: return .i64Load32UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -6339,6 +6760,62 @@ extension Instruction {
         case 635: return "i64ShrUImmToAcc"
         case 636: return "i64RotlImmToAcc"
         case 637: return "i64RotrImmToAcc"
+        case 638: return "i32AddToAccAndSlot"
+        case 639: return "i32SubToAccAndSlot"
+        case 640: return "i32MulToAccAndSlot"
+        case 641: return "i32AndToAccAndSlot"
+        case 642: return "i32OrToAccAndSlot"
+        case 643: return "i32XorToAccAndSlot"
+        case 644: return "i32ShlToAccAndSlot"
+        case 645: return "i32ShrSToAccAndSlot"
+        case 646: return "i32ShrUToAccAndSlot"
+        case 647: return "i32RotlToAccAndSlot"
+        case 648: return "i32RotrToAccAndSlot"
+        case 649: return "i64AddToAccAndSlot"
+        case 650: return "i64SubToAccAndSlot"
+        case 651: return "i64MulToAccAndSlot"
+        case 652: return "i64AndToAccAndSlot"
+        case 653: return "i64OrToAccAndSlot"
+        case 654: return "i64XorToAccAndSlot"
+        case 655: return "i64ShlToAccAndSlot"
+        case 656: return "i64ShrSToAccAndSlot"
+        case 657: return "i64ShrUToAccAndSlot"
+        case 658: return "i64RotlToAccAndSlot"
+        case 659: return "i64RotrToAccAndSlot"
+        case 660: return "i32AddImmToAccAndSlot"
+        case 661: return "i32MulImmToAccAndSlot"
+        case 662: return "i32AndImmToAccAndSlot"
+        case 663: return "i32OrImmToAccAndSlot"
+        case 664: return "i32XorImmToAccAndSlot"
+        case 665: return "i32ShlImmToAccAndSlot"
+        case 666: return "i32ShrSImmToAccAndSlot"
+        case 667: return "i32ShrUImmToAccAndSlot"
+        case 668: return "i32RotlImmToAccAndSlot"
+        case 669: return "i32RotrImmToAccAndSlot"
+        case 670: return "i64AddImmToAccAndSlot"
+        case 671: return "i64MulImmToAccAndSlot"
+        case 672: return "i64AndImmToAccAndSlot"
+        case 673: return "i64OrImmToAccAndSlot"
+        case 674: return "i64XorImmToAccAndSlot"
+        case 675: return "i64ShlImmToAccAndSlot"
+        case 676: return "i64ShrSImmToAccAndSlot"
+        case 677: return "i64ShrUImmToAccAndSlot"
+        case 678: return "i64RotlImmToAccAndSlot"
+        case 679: return "i64RotrImmToAccAndSlot"
+        case 680: return "i32LoadToAccAndSlot"
+        case 681: return "i64LoadToAccAndSlot"
+        case 682: return "f32LoadToAccAndSlot"
+        case 683: return "f64LoadToAccAndSlot"
+        case 684: return "i32Load8SToAccAndSlot"
+        case 685: return "i32Load8UToAccAndSlot"
+        case 686: return "i32Load16SToAccAndSlot"
+        case 687: return "i32Load16UToAccAndSlot"
+        case 688: return "i64Load8SToAccAndSlot"
+        case 689: return "i64Load8UToAccAndSlot"
+        case 690: return "i64Load16SToAccAndSlot"
+        case 691: return "i64Load16UToAccAndSlot"
+        case 692: return "i64Load32SToAccAndSlot"
+        case 693: return "i64Load32UToAccAndSlot"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }

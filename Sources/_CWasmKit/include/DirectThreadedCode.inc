@@ -4454,6 +4454,363 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64RotrImmToAcc(Sp sp, Pc pc,
     WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
 }
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32AddToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32AddToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32AddToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32SubToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32SubToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32SubToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32MulToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32MulToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32MulToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32AndToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32AndToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32AndToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32OrToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32OrToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32OrToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32XorToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32XorToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32XorToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32ShlToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32ShlToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32ShlToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32ShrSToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32ShrSToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32ShrSToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32ShrUToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32ShrUToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32ShrUToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32RotlToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32RotlToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32RotlToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32RotrToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32RotrToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32RotrToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64AddToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64AddToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64AddToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64SubToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64SubToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64SubToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64MulToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64MulToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64MulToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64AndToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64AndToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64AndToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64OrToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64OrToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64OrToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64XorToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64XorToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64XorToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64ShlToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64ShlToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64ShlToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64ShrSToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64ShrSToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64ShrSToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64ShrUToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64ShrUToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64ShrUToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64RotlToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64RotlToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64RotlToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64RotrToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64RotrToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64RotrToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32AddImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32AddImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32AddImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32MulImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32MulImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32MulImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32AndImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32AndImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32AndImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32OrImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32OrImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32OrImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32XorImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32XorImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32XorImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32ShlImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32ShlImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32ShlImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32ShrSImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32ShrSImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32ShrSImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32ShrUImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32ShrUImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32ShrUImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32RotlImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32RotlImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32RotlImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32RotrImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32RotrImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32RotrImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64AddImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64AddImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64AddImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64MulImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64MulImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64MulImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64AndImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64AndImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64AndImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64OrImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64OrImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64OrImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64XorImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64XorImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64XorImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64ShlImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64ShlImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64ShlImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64ShrSImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64ShrSImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64ShrSImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64ShrUImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64ShrUImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64ShrUImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64RotlImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64RotlImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64RotlImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64RotrImmToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64RotrImmToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64RotrImmToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32LoadToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32LoadToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32LoadToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64LoadToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64LoadToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64LoadToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32Load8SToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32Load8SToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32Load8SToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32Load8UToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32Load8UToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32Load8UToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32Load16SToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32Load16SToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32Load16SToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32Load16UToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i32Load16UToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i32Load16UToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64Load8SToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64Load8SToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64Load8SToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64Load16SToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64Load16SToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64Load16SToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64Load32SToAccAndSlot(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_i64Load32SToAccAndSlot(Sp *sp, Pc *pc, Md *md, Ms *ms, uint64_t *ireg, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_i64Load32SToAccAndSlot(&sp, &pc, &md, &ms, &ireg, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, ireg, dead_freg, state);
+}
 // Indexed by opcode ID. Opcodes whose handlers are bit-identical (see
 // `Instruction.handlerIdentity` in VMSpec) share a single entry point here,
 // so that dispatch never goes through a compiler-generated merge thunk.
@@ -5096,4 +5453,60 @@ static const uintptr_t wasmkit_tc_exec_handlers[] = {
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64ShrUImmToAcc),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64RotlImmToAcc),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64RotrImmToAcc),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32AddToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32SubToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32MulToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32AndToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32OrToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32XorToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32ShlToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32ShrSToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32ShrUToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32RotlToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32RotrToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64AddToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64SubToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64MulToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64AndToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64OrToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64XorToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64ShlToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64ShrSToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64ShrUToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64RotlToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64RotrToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32AddImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32MulImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32AndImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32OrImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32XorImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32ShlImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32ShrSImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32ShrUImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32RotlImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32RotrImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64AddImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64MulImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64AndImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64OrImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64XorImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64ShlImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64ShrSImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64ShrUImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64RotlImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64RotrImmToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32LoadToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64LoadToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32LoadToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64LoadToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32Load8SToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32Load8UToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32Load16SToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32Load16UToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64Load8SToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32Load8UToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64Load16SToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32Load16UToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i64Load32SToAccAndSlot),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32LoadToAccAndSlot),
 };
