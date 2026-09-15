@@ -1845,6 +1845,254 @@ enum Instruction: Equatable {
     case f64LoadFromAccToFAcc(Instruction.AccMemoryOffsetOperand)
     /// `store(sp[pointer] + offset) = freg`, on a 32-bit memory
     case f64StoreFromFAcc(Instruction.AccMemoryPointerOperand)
+    /// `i32.add` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32AddImm(Instruction.BinaryImmOperand)
+    /// `i32.mul` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32MulImm(Instruction.BinaryImmOperand)
+    /// `i32.and` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32AndImm(Instruction.BinaryImmOperand)
+    /// `i32.or` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32OrImm(Instruction.BinaryImmOperand)
+    /// `i32.xor` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32XorImm(Instruction.BinaryImmOperand)
+    /// `i32.shl` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32ShlImm(Instruction.BinaryImmOperand)
+    /// `i32.shr_s` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32ShrSImm(Instruction.BinaryImmOperand)
+    /// `i32.shr_u` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32ShrUImm(Instruction.BinaryImmOperand)
+    /// `i32.rotl` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32RotlImm(Instruction.BinaryImmOperand)
+    /// `i32.rotr` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32RotrImm(Instruction.BinaryImmOperand)
+    /// `i64.add` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64AddImm(Instruction.BinaryImmOperand)
+    /// `i64.mul` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64MulImm(Instruction.BinaryImmOperand)
+    /// `i64.and` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64AndImm(Instruction.BinaryImmOperand)
+    /// `i64.or` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64OrImm(Instruction.BinaryImmOperand)
+    /// `i64.xor` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64XorImm(Instruction.BinaryImmOperand)
+    /// `i64.shl` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64ShlImm(Instruction.BinaryImmOperand)
+    /// `i64.shr_s` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64ShrSImm(Instruction.BinaryImmOperand)
+    /// `i64.shr_u` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64ShrUImm(Instruction.BinaryImmOperand)
+    /// `i64.rotl` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64RotlImm(Instruction.BinaryImmOperand)
+    /// `i64.rotr` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64RotrImm(Instruction.BinaryImmOperand)
+    /// `i32.eq` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32EqImm(Instruction.BinaryImmOperand)
+    /// `i32.ne` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32NeImm(Instruction.BinaryImmOperand)
+    /// `i32.lt_s` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32LtSImm(Instruction.BinaryImmOperand)
+    /// `i32.lt_u` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32LtUImm(Instruction.BinaryImmOperand)
+    /// `i32.gt_s` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32GtSImm(Instruction.BinaryImmOperand)
+    /// `i32.gt_u` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32GtUImm(Instruction.BinaryImmOperand)
+    /// `i32.le_s` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32LeSImm(Instruction.BinaryImmOperand)
+    /// `i32.le_u` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32LeUImm(Instruction.BinaryImmOperand)
+    /// `i32.ge_s` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32GeSImm(Instruction.BinaryImmOperand)
+    /// `i32.ge_u` with a constant right operand
+    /// 
+    /// The immediate is 32 bits.
+    case i32GeUImm(Instruction.BinaryImmOperand)
+    /// `i64.eq` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64EqImm(Instruction.BinaryImmOperand)
+    /// `i64.ne` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64NeImm(Instruction.BinaryImmOperand)
+    /// `i64.lt_s` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64LtSImm(Instruction.BinaryImmOperand)
+    /// `i64.lt_u` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64LtUImm(Instruction.BinaryImmOperand)
+    /// `i64.gt_s` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64GtSImm(Instruction.BinaryImmOperand)
+    /// `i64.gt_u` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64GtUImm(Instruction.BinaryImmOperand)
+    /// `i64.le_s` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64LeSImm(Instruction.BinaryImmOperand)
+    /// `i64.le_u` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64LeUImm(Instruction.BinaryImmOperand)
+    /// `i64.ge_s` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64GeSImm(Instruction.BinaryImmOperand)
+    /// `i64.ge_u` with a constant right operand
+    /// 
+    /// The immediate is 32 bits, sign-extended to 64 bits.
+    case i64GeUImm(Instruction.BinaryImmOperand)
+    /// Conditional pc-relative branch if `i32.eq` against a constant holds
+    case brIfI32EqImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i32.ne` against a constant holds
+    case brIfI32NeImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i32.lt_s` against a constant holds
+    case brIfI32LtSImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i32.lt_u` against a constant holds
+    case brIfI32LtUImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i32.gt_s` against a constant holds
+    case brIfI32GtSImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i32.gt_u` against a constant holds
+    case brIfI32GtUImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i32.le_s` against a constant holds
+    case brIfI32LeSImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i32.le_u` against a constant holds
+    case brIfI32LeUImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i32.ge_s` against a constant holds
+    case brIfI32GeSImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i32.ge_u` against a constant holds
+    case brIfI32GeUImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i64.eq` against a constant holds
+    case brIfI64EqImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i64.ne` against a constant holds
+    case brIfI64NeImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i64.lt_s` against a constant holds
+    case brIfI64LtSImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i64.lt_u` against a constant holds
+    case brIfI64LtUImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i64.gt_s` against a constant holds
+    case brIfI64GtSImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i64.gt_u` against a constant holds
+    case brIfI64GtUImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i64.le_s` against a constant holds
+    case brIfI64LeSImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i64.le_u` against a constant holds
+    case brIfI64LeUImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i64.ge_s` against a constant holds
+    case brIfI64GeSImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `i64.ge_u` against a constant holds
+    case brIfI64GeUImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `(lhs & imm) != 0` for `i32` operands
+    case brIfI32AndImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `(lhs & imm) == 0` for `i32` operands
+    case brIfNotI32AndImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `(lhs & imm) != 0` for `i64` operands
+    case brIfI64AndImm(Instruction.BrIfCmpImmOperand)
+    /// Conditional pc-relative branch if `(lhs & imm) == 0` for `i64` operands
+    case brIfNotI64AndImm(Instruction.BrIfCmpImmOperand)
+    /// `ireg = x add imm`, on `i32` operands
+    case i32AddImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x mul imm`, on `i32` operands
+    case i32MulImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x and imm`, on `i32` operands
+    case i32AndImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x or imm`, on `i32` operands
+    case i32OrImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x xor imm`, on `i32` operands
+    case i32XorImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x shl imm`, on `i32` operands
+    case i32ShlImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x shr_s imm`, on `i32` operands
+    case i32ShrSImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x shr_u imm`, on `i32` operands
+    case i32ShrUImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x rotl imm`, on `i32` operands
+    case i32RotlImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x rotr imm`, on `i32` operands
+    case i32RotrImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x add imm`, on `i64` operands
+    case i64AddImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x mul imm`, on `i64` operands
+    case i64MulImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x and imm`, on `i64` operands
+    case i64AndImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x or imm`, on `i64` operands
+    case i64OrImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x xor imm`, on `i64` operands
+    case i64XorImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x shl imm`, on `i64` operands
+    case i64ShlImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x shr_s imm`, on `i64` operands
+    case i64ShrSImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x shr_u imm`, on `i64` operands
+    case i64ShrUImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x rotl imm`, on `i64` operands
+    case i64RotlImmToAcc(Instruction.AccBinaryImmOperand)
+    /// `ireg = x rotr imm`, on `i64` operands
+    case i64RotrImmToAcc(Instruction.AccBinaryImmOperand)
 }
 
 extension Instruction {
@@ -2815,6 +3063,61 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.x, $0.y, $0.z, 0, 0) as (VReg, VReg, VReg, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
+
+    struct BinaryImmOperand: Equatable, InstructionImmediate {
+        var result: VReg
+        var lhs: VReg
+        var imm: Int32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let result = VReg(byteOffset: Int16(truncatingIfNeeded: word0))
+                let lhs = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 16))
+                let imm = Int32(truncatingIfNeeded: word0 >> 32)
+                return Self(result: result, lhs: lhs, imm: imm)
+            #else
+                let (result, lhs, imm) = pc.read((VReg, VReg, Int32).self)
+                return Self(result: result, lhs: lhs, imm: imm)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.result, $0.lhs, $0.imm) as (VReg, VReg, Int32), to: CodeSlot.self) }
+        }
+    }
+
+    struct BrIfCmpImmOperand: Equatable, InstructionImmediate {
+        var lhs: VReg
+        var imm: Int32
+        var offset: Int32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (lhs, imm) = pc.read((VReg, Int32).self)
+            let (offset, _, _, _, _) = pc.read((Int32, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(lhs: lhs, imm: imm, offset: offset)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.lhs, $0.imm) as (VReg, Int32), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.offset, 0, 0, 0, 0) as (Int32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct AccBinaryImmOperand: Equatable, InstructionImmediate {
+        var lhs: VReg
+        var imm: Int32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let lhs = VReg(byteOffset: Int16(truncatingIfNeeded: word0))
+                let imm = Int32(truncatingIfNeeded: word0 >> 32)
+                return Self(lhs: lhs, imm: imm)
+            #else
+                let (lhs, imm) = pc.read((VReg, Int32).self)
+                return Self(lhs: lhs, imm: imm)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.lhs, $0.imm) as (VReg, Int32), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -3365,6 +3668,90 @@ extension Instruction {
         case .f64LoadToFAcc(let immediate): return immediate
         case .f64LoadFromAccToFAcc(let immediate): return immediate
         case .f64StoreFromFAcc(let immediate): return immediate
+        case .i32AddImm(let immediate): return immediate
+        case .i32MulImm(let immediate): return immediate
+        case .i32AndImm(let immediate): return immediate
+        case .i32OrImm(let immediate): return immediate
+        case .i32XorImm(let immediate): return immediate
+        case .i32ShlImm(let immediate): return immediate
+        case .i32ShrSImm(let immediate): return immediate
+        case .i32ShrUImm(let immediate): return immediate
+        case .i32RotlImm(let immediate): return immediate
+        case .i32RotrImm(let immediate): return immediate
+        case .i64AddImm(let immediate): return immediate
+        case .i64MulImm(let immediate): return immediate
+        case .i64AndImm(let immediate): return immediate
+        case .i64OrImm(let immediate): return immediate
+        case .i64XorImm(let immediate): return immediate
+        case .i64ShlImm(let immediate): return immediate
+        case .i64ShrSImm(let immediate): return immediate
+        case .i64ShrUImm(let immediate): return immediate
+        case .i64RotlImm(let immediate): return immediate
+        case .i64RotrImm(let immediate): return immediate
+        case .i32EqImm(let immediate): return immediate
+        case .i32NeImm(let immediate): return immediate
+        case .i32LtSImm(let immediate): return immediate
+        case .i32LtUImm(let immediate): return immediate
+        case .i32GtSImm(let immediate): return immediate
+        case .i32GtUImm(let immediate): return immediate
+        case .i32LeSImm(let immediate): return immediate
+        case .i32LeUImm(let immediate): return immediate
+        case .i32GeSImm(let immediate): return immediate
+        case .i32GeUImm(let immediate): return immediate
+        case .i64EqImm(let immediate): return immediate
+        case .i64NeImm(let immediate): return immediate
+        case .i64LtSImm(let immediate): return immediate
+        case .i64LtUImm(let immediate): return immediate
+        case .i64GtSImm(let immediate): return immediate
+        case .i64GtUImm(let immediate): return immediate
+        case .i64LeSImm(let immediate): return immediate
+        case .i64LeUImm(let immediate): return immediate
+        case .i64GeSImm(let immediate): return immediate
+        case .i64GeUImm(let immediate): return immediate
+        case .brIfI32EqImm(let immediate): return immediate
+        case .brIfI32NeImm(let immediate): return immediate
+        case .brIfI32LtSImm(let immediate): return immediate
+        case .brIfI32LtUImm(let immediate): return immediate
+        case .brIfI32GtSImm(let immediate): return immediate
+        case .brIfI32GtUImm(let immediate): return immediate
+        case .brIfI32LeSImm(let immediate): return immediate
+        case .brIfI32LeUImm(let immediate): return immediate
+        case .brIfI32GeSImm(let immediate): return immediate
+        case .brIfI32GeUImm(let immediate): return immediate
+        case .brIfI64EqImm(let immediate): return immediate
+        case .brIfI64NeImm(let immediate): return immediate
+        case .brIfI64LtSImm(let immediate): return immediate
+        case .brIfI64LtUImm(let immediate): return immediate
+        case .brIfI64GtSImm(let immediate): return immediate
+        case .brIfI64GtUImm(let immediate): return immediate
+        case .brIfI64LeSImm(let immediate): return immediate
+        case .brIfI64LeUImm(let immediate): return immediate
+        case .brIfI64GeSImm(let immediate): return immediate
+        case .brIfI64GeUImm(let immediate): return immediate
+        case .brIfI32AndImm(let immediate): return immediate
+        case .brIfNotI32AndImm(let immediate): return immediate
+        case .brIfI64AndImm(let immediate): return immediate
+        case .brIfNotI64AndImm(let immediate): return immediate
+        case .i32AddImmToAcc(let immediate): return immediate
+        case .i32MulImmToAcc(let immediate): return immediate
+        case .i32AndImmToAcc(let immediate): return immediate
+        case .i32OrImmToAcc(let immediate): return immediate
+        case .i32XorImmToAcc(let immediate): return immediate
+        case .i32ShlImmToAcc(let immediate): return immediate
+        case .i32ShrSImmToAcc(let immediate): return immediate
+        case .i32ShrUImmToAcc(let immediate): return immediate
+        case .i32RotlImmToAcc(let immediate): return immediate
+        case .i32RotrImmToAcc(let immediate): return immediate
+        case .i64AddImmToAcc(let immediate): return immediate
+        case .i64MulImmToAcc(let immediate): return immediate
+        case .i64AndImmToAcc(let immediate): return immediate
+        case .i64OrImmToAcc(let immediate): return immediate
+        case .i64XorImmToAcc(let immediate): return immediate
+        case .i64ShlImmToAcc(let immediate): return immediate
+        case .i64ShrSImmToAcc(let immediate): return immediate
+        case .i64ShrUImmToAcc(let immediate): return immediate
+        case .i64RotlImmToAcc(let immediate): return immediate
+        case .i64RotrImmToAcc(let immediate): return immediate
         default: return nil
         }
     }
@@ -3919,6 +4306,90 @@ extension Instruction {
         case .f64LoadToFAcc(let immediate): immediate.emit(to: emit)
         case .f64LoadFromAccToFAcc(let immediate): immediate.emit(to: emit)
         case .f64StoreFromFAcc(let immediate): immediate.emit(to: emit)
+        case .i32AddImm(let immediate): immediate.emit(to: emit)
+        case .i32MulImm(let immediate): immediate.emit(to: emit)
+        case .i32AndImm(let immediate): immediate.emit(to: emit)
+        case .i32OrImm(let immediate): immediate.emit(to: emit)
+        case .i32XorImm(let immediate): immediate.emit(to: emit)
+        case .i32ShlImm(let immediate): immediate.emit(to: emit)
+        case .i32ShrSImm(let immediate): immediate.emit(to: emit)
+        case .i32ShrUImm(let immediate): immediate.emit(to: emit)
+        case .i32RotlImm(let immediate): immediate.emit(to: emit)
+        case .i32RotrImm(let immediate): immediate.emit(to: emit)
+        case .i64AddImm(let immediate): immediate.emit(to: emit)
+        case .i64MulImm(let immediate): immediate.emit(to: emit)
+        case .i64AndImm(let immediate): immediate.emit(to: emit)
+        case .i64OrImm(let immediate): immediate.emit(to: emit)
+        case .i64XorImm(let immediate): immediate.emit(to: emit)
+        case .i64ShlImm(let immediate): immediate.emit(to: emit)
+        case .i64ShrSImm(let immediate): immediate.emit(to: emit)
+        case .i64ShrUImm(let immediate): immediate.emit(to: emit)
+        case .i64RotlImm(let immediate): immediate.emit(to: emit)
+        case .i64RotrImm(let immediate): immediate.emit(to: emit)
+        case .i32EqImm(let immediate): immediate.emit(to: emit)
+        case .i32NeImm(let immediate): immediate.emit(to: emit)
+        case .i32LtSImm(let immediate): immediate.emit(to: emit)
+        case .i32LtUImm(let immediate): immediate.emit(to: emit)
+        case .i32GtSImm(let immediate): immediate.emit(to: emit)
+        case .i32GtUImm(let immediate): immediate.emit(to: emit)
+        case .i32LeSImm(let immediate): immediate.emit(to: emit)
+        case .i32LeUImm(let immediate): immediate.emit(to: emit)
+        case .i32GeSImm(let immediate): immediate.emit(to: emit)
+        case .i32GeUImm(let immediate): immediate.emit(to: emit)
+        case .i64EqImm(let immediate): immediate.emit(to: emit)
+        case .i64NeImm(let immediate): immediate.emit(to: emit)
+        case .i64LtSImm(let immediate): immediate.emit(to: emit)
+        case .i64LtUImm(let immediate): immediate.emit(to: emit)
+        case .i64GtSImm(let immediate): immediate.emit(to: emit)
+        case .i64GtUImm(let immediate): immediate.emit(to: emit)
+        case .i64LeSImm(let immediate): immediate.emit(to: emit)
+        case .i64LeUImm(let immediate): immediate.emit(to: emit)
+        case .i64GeSImm(let immediate): immediate.emit(to: emit)
+        case .i64GeUImm(let immediate): immediate.emit(to: emit)
+        case .brIfI32EqImm(let immediate): immediate.emit(to: emit)
+        case .brIfI32NeImm(let immediate): immediate.emit(to: emit)
+        case .brIfI32LtSImm(let immediate): immediate.emit(to: emit)
+        case .brIfI32LtUImm(let immediate): immediate.emit(to: emit)
+        case .brIfI32GtSImm(let immediate): immediate.emit(to: emit)
+        case .brIfI32GtUImm(let immediate): immediate.emit(to: emit)
+        case .brIfI32LeSImm(let immediate): immediate.emit(to: emit)
+        case .brIfI32LeUImm(let immediate): immediate.emit(to: emit)
+        case .brIfI32GeSImm(let immediate): immediate.emit(to: emit)
+        case .brIfI32GeUImm(let immediate): immediate.emit(to: emit)
+        case .brIfI64EqImm(let immediate): immediate.emit(to: emit)
+        case .brIfI64NeImm(let immediate): immediate.emit(to: emit)
+        case .brIfI64LtSImm(let immediate): immediate.emit(to: emit)
+        case .brIfI64LtUImm(let immediate): immediate.emit(to: emit)
+        case .brIfI64GtSImm(let immediate): immediate.emit(to: emit)
+        case .brIfI64GtUImm(let immediate): immediate.emit(to: emit)
+        case .brIfI64LeSImm(let immediate): immediate.emit(to: emit)
+        case .brIfI64LeUImm(let immediate): immediate.emit(to: emit)
+        case .brIfI64GeSImm(let immediate): immediate.emit(to: emit)
+        case .brIfI64GeUImm(let immediate): immediate.emit(to: emit)
+        case .brIfI32AndImm(let immediate): immediate.emit(to: emit)
+        case .brIfNotI32AndImm(let immediate): immediate.emit(to: emit)
+        case .brIfI64AndImm(let immediate): immediate.emit(to: emit)
+        case .brIfNotI64AndImm(let immediate): immediate.emit(to: emit)
+        case .i32AddImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i32MulImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i32AndImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i32OrImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i32XorImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i32ShlImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i32ShrSImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i32ShrUImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i32RotlImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i32RotrImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i64AddImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i64MulImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i64AndImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i64OrImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i64XorImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i64ShlImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i64ShrSImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i64ShrUImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i64RotlImmToAcc(let immediate): immediate.emit(to: emit)
+        case .i64RotrImmToAcc(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -4483,6 +4954,90 @@ extension Instruction {
         case .f64LoadToFAcc: return 551
         case .f64LoadFromAccToFAcc: return 552
         case .f64StoreFromFAcc: return 553
+        case .i32AddImm: return 554
+        case .i32MulImm: return 555
+        case .i32AndImm: return 556
+        case .i32OrImm: return 557
+        case .i32XorImm: return 558
+        case .i32ShlImm: return 559
+        case .i32ShrSImm: return 560
+        case .i32ShrUImm: return 561
+        case .i32RotlImm: return 562
+        case .i32RotrImm: return 563
+        case .i64AddImm: return 564
+        case .i64MulImm: return 565
+        case .i64AndImm: return 566
+        case .i64OrImm: return 567
+        case .i64XorImm: return 568
+        case .i64ShlImm: return 569
+        case .i64ShrSImm: return 570
+        case .i64ShrUImm: return 571
+        case .i64RotlImm: return 572
+        case .i64RotrImm: return 573
+        case .i32EqImm: return 574
+        case .i32NeImm: return 575
+        case .i32LtSImm: return 576
+        case .i32LtUImm: return 577
+        case .i32GtSImm: return 578
+        case .i32GtUImm: return 579
+        case .i32LeSImm: return 580
+        case .i32LeUImm: return 581
+        case .i32GeSImm: return 582
+        case .i32GeUImm: return 583
+        case .i64EqImm: return 584
+        case .i64NeImm: return 585
+        case .i64LtSImm: return 586
+        case .i64LtUImm: return 587
+        case .i64GtSImm: return 588
+        case .i64GtUImm: return 589
+        case .i64LeSImm: return 590
+        case .i64LeUImm: return 591
+        case .i64GeSImm: return 592
+        case .i64GeUImm: return 593
+        case .brIfI32EqImm: return 594
+        case .brIfI32NeImm: return 595
+        case .brIfI32LtSImm: return 596
+        case .brIfI32LtUImm: return 597
+        case .brIfI32GtSImm: return 598
+        case .brIfI32GtUImm: return 599
+        case .brIfI32LeSImm: return 600
+        case .brIfI32LeUImm: return 601
+        case .brIfI32GeSImm: return 602
+        case .brIfI32GeUImm: return 603
+        case .brIfI64EqImm: return 604
+        case .brIfI64NeImm: return 605
+        case .brIfI64LtSImm: return 606
+        case .brIfI64LtUImm: return 607
+        case .brIfI64GtSImm: return 608
+        case .brIfI64GtUImm: return 609
+        case .brIfI64LeSImm: return 610
+        case .brIfI64LeUImm: return 611
+        case .brIfI64GeSImm: return 612
+        case .brIfI64GeUImm: return 613
+        case .brIfI32AndImm: return 614
+        case .brIfNotI32AndImm: return 615
+        case .brIfI64AndImm: return 616
+        case .brIfNotI64AndImm: return 617
+        case .i32AddImmToAcc: return 618
+        case .i32MulImmToAcc: return 619
+        case .i32AndImmToAcc: return 620
+        case .i32OrImmToAcc: return 621
+        case .i32XorImmToAcc: return 622
+        case .i32ShlImmToAcc: return 623
+        case .i32ShrSImmToAcc: return 624
+        case .i32ShrUImmToAcc: return 625
+        case .i32RotlImmToAcc: return 626
+        case .i32RotrImmToAcc: return 627
+        case .i64AddImmToAcc: return 628
+        case .i64MulImmToAcc: return 629
+        case .i64AndImmToAcc: return 630
+        case .i64OrImmToAcc: return 631
+        case .i64XorImmToAcc: return 632
+        case .i64ShlImmToAcc: return 633
+        case .i64ShrSImmToAcc: return 634
+        case .i64ShrUImmToAcc: return 635
+        case .i64RotlImmToAcc: return 636
+        default: return 637  // .i64RotrImmToAcc
         }
     }
 }
@@ -5048,6 +5603,90 @@ extension Instruction {
         case 551: return .f64LoadToFAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
         case 552: return .f64LoadFromAccToFAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
         case 553: return .f64StoreFromFAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 554: return .i32AddImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 555: return .i32MulImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 556: return .i32AndImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 557: return .i32OrImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 558: return .i32XorImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 559: return .i32ShlImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 560: return .i32ShrSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 561: return .i32ShrUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 562: return .i32RotlImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 563: return .i32RotrImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 564: return .i64AddImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 565: return .i64MulImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 566: return .i64AndImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 567: return .i64OrImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 568: return .i64XorImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 569: return .i64ShlImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 570: return .i64ShrSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 571: return .i64ShrUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 572: return .i64RotlImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 573: return .i64RotrImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 574: return .i32EqImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 575: return .i32NeImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 576: return .i32LtSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 577: return .i32LtUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 578: return .i32GtSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 579: return .i32GtUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 580: return .i32LeSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 581: return .i32LeUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 582: return .i32GeSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 583: return .i32GeUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 584: return .i64EqImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 585: return .i64NeImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 586: return .i64LtSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 587: return .i64LtUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 588: return .i64GtSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 589: return .i64GtUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 590: return .i64LeSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 591: return .i64LeUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 592: return .i64GeSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 593: return .i64GeUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 594: return .brIfI32EqImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 595: return .brIfI32NeImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 596: return .brIfI32LtSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 597: return .brIfI32LtUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 598: return .brIfI32GtSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 599: return .brIfI32GtUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 600: return .brIfI32LeSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 601: return .brIfI32LeUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 602: return .brIfI32GeSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 603: return .brIfI32GeUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 604: return .brIfI64EqImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 605: return .brIfI64NeImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 606: return .brIfI64LtSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 607: return .brIfI64LtUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 608: return .brIfI64GtSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 609: return .brIfI64GtUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 610: return .brIfI64LeSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 611: return .brIfI64LeUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 612: return .brIfI64GeSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 613: return .brIfI64GeUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 614: return .brIfI32AndImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 615: return .brIfNotI32AndImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 616: return .brIfI64AndImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 617: return .brIfNotI64AndImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 618: return .i32AddImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 619: return .i32MulImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 620: return .i32AndImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 621: return .i32OrImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 622: return .i32XorImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 623: return .i32ShlImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 624: return .i32ShrSImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 625: return .i32ShrUImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 626: return .i32RotlImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 627: return .i32RotrImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 628: return .i64AddImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 629: return .i64MulImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 630: return .i64AndImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 631: return .i64OrImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 632: return .i64XorImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 633: return .i64ShlImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 634: return .i64ShrSImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 635: return .i64ShrUImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 636: return .i64RotlImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 637: return .i64RotrImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -5616,6 +6255,90 @@ extension Instruction {
         case 551: return "f64LoadToFAcc"
         case 552: return "f64LoadFromAccToFAcc"
         case 553: return "f64StoreFromFAcc"
+        case 554: return "i32AddImm"
+        case 555: return "i32MulImm"
+        case 556: return "i32AndImm"
+        case 557: return "i32OrImm"
+        case 558: return "i32XorImm"
+        case 559: return "i32ShlImm"
+        case 560: return "i32ShrSImm"
+        case 561: return "i32ShrUImm"
+        case 562: return "i32RotlImm"
+        case 563: return "i32RotrImm"
+        case 564: return "i64AddImm"
+        case 565: return "i64MulImm"
+        case 566: return "i64AndImm"
+        case 567: return "i64OrImm"
+        case 568: return "i64XorImm"
+        case 569: return "i64ShlImm"
+        case 570: return "i64ShrSImm"
+        case 571: return "i64ShrUImm"
+        case 572: return "i64RotlImm"
+        case 573: return "i64RotrImm"
+        case 574: return "i32EqImm"
+        case 575: return "i32NeImm"
+        case 576: return "i32LtSImm"
+        case 577: return "i32LtUImm"
+        case 578: return "i32GtSImm"
+        case 579: return "i32GtUImm"
+        case 580: return "i32LeSImm"
+        case 581: return "i32LeUImm"
+        case 582: return "i32GeSImm"
+        case 583: return "i32GeUImm"
+        case 584: return "i64EqImm"
+        case 585: return "i64NeImm"
+        case 586: return "i64LtSImm"
+        case 587: return "i64LtUImm"
+        case 588: return "i64GtSImm"
+        case 589: return "i64GtUImm"
+        case 590: return "i64LeSImm"
+        case 591: return "i64LeUImm"
+        case 592: return "i64GeSImm"
+        case 593: return "i64GeUImm"
+        case 594: return "brIfI32EqImm"
+        case 595: return "brIfI32NeImm"
+        case 596: return "brIfI32LtSImm"
+        case 597: return "brIfI32LtUImm"
+        case 598: return "brIfI32GtSImm"
+        case 599: return "brIfI32GtUImm"
+        case 600: return "brIfI32LeSImm"
+        case 601: return "brIfI32LeUImm"
+        case 602: return "brIfI32GeSImm"
+        case 603: return "brIfI32GeUImm"
+        case 604: return "brIfI64EqImm"
+        case 605: return "brIfI64NeImm"
+        case 606: return "brIfI64LtSImm"
+        case 607: return "brIfI64LtUImm"
+        case 608: return "brIfI64GtSImm"
+        case 609: return "brIfI64GtUImm"
+        case 610: return "brIfI64LeSImm"
+        case 611: return "brIfI64LeUImm"
+        case 612: return "brIfI64GeSImm"
+        case 613: return "brIfI64GeUImm"
+        case 614: return "brIfI32AndImm"
+        case 615: return "brIfNotI32AndImm"
+        case 616: return "brIfI64AndImm"
+        case 617: return "brIfNotI64AndImm"
+        case 618: return "i32AddImmToAcc"
+        case 619: return "i32MulImmToAcc"
+        case 620: return "i32AndImmToAcc"
+        case 621: return "i32OrImmToAcc"
+        case 622: return "i32XorImmToAcc"
+        case 623: return "i32ShlImmToAcc"
+        case 624: return "i32ShrSImmToAcc"
+        case 625: return "i32ShrUImmToAcc"
+        case 626: return "i32RotlImmToAcc"
+        case 627: return "i32RotrImmToAcc"
+        case 628: return "i64AddImmToAcc"
+        case 629: return "i64MulImmToAcc"
+        case 630: return "i64AndImmToAcc"
+        case 631: return "i64OrImmToAcc"
+        case 632: return "i64XorImmToAcc"
+        case 633: return "i64ShlImmToAcc"
+        case 634: return "i64ShrSImmToAcc"
+        case 635: return "i64ShrUImmToAcc"
+        case 636: return "i64RotlImmToAcc"
+        case 637: return "i64RotrImmToAcc"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
@@ -5716,6 +6439,30 @@ protocol NextInstructionPredictor: ~Copyable {
     mutating func predictNext_brIfNotF64LeAcc(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_brIfNotF64GtAcc(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_brIfNotF64GeAcc(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32EqImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32NeImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32LtSImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32LtUImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32GtSImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32GtUImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32LeSImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32LeUImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32GeSImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32GeUImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64EqImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64NeImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64LtSImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64LtUImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64GtSImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64GtUImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64LeSImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64LeUImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64GeSImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64GeUImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI32AndImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfNotI32AndImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfI64AndImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfNotI64AndImm(operandPc: Pc, sp: Sp) -> [Pc]
 }
 
 extension Instruction {
@@ -5812,6 +6559,30 @@ extension Instruction {
         case 547: return predictor.predictNext_brIfNotF64LeAcc(operandPc: operandPc, sp: sp)
         case 548: return predictor.predictNext_brIfNotF64GtAcc(operandPc: operandPc, sp: sp)
         case 549: return predictor.predictNext_brIfNotF64GeAcc(operandPc: operandPc, sp: sp)
+        case 594: return predictor.predictNext_brIfI32EqImm(operandPc: operandPc, sp: sp)
+        case 595: return predictor.predictNext_brIfI32NeImm(operandPc: operandPc, sp: sp)
+        case 596: return predictor.predictNext_brIfI32LtSImm(operandPc: operandPc, sp: sp)
+        case 597: return predictor.predictNext_brIfI32LtUImm(operandPc: operandPc, sp: sp)
+        case 598: return predictor.predictNext_brIfI32GtSImm(operandPc: operandPc, sp: sp)
+        case 599: return predictor.predictNext_brIfI32GtUImm(operandPc: operandPc, sp: sp)
+        case 600: return predictor.predictNext_brIfI32LeSImm(operandPc: operandPc, sp: sp)
+        case 601: return predictor.predictNext_brIfI32LeUImm(operandPc: operandPc, sp: sp)
+        case 602: return predictor.predictNext_brIfI32GeSImm(operandPc: operandPc, sp: sp)
+        case 603: return predictor.predictNext_brIfI32GeUImm(operandPc: operandPc, sp: sp)
+        case 604: return predictor.predictNext_brIfI64EqImm(operandPc: operandPc, sp: sp)
+        case 605: return predictor.predictNext_brIfI64NeImm(operandPc: operandPc, sp: sp)
+        case 606: return predictor.predictNext_brIfI64LtSImm(operandPc: operandPc, sp: sp)
+        case 607: return predictor.predictNext_brIfI64LtUImm(operandPc: operandPc, sp: sp)
+        case 608: return predictor.predictNext_brIfI64GtSImm(operandPc: operandPc, sp: sp)
+        case 609: return predictor.predictNext_brIfI64GtUImm(operandPc: operandPc, sp: sp)
+        case 610: return predictor.predictNext_brIfI64LeSImm(operandPc: operandPc, sp: sp)
+        case 611: return predictor.predictNext_brIfI64LeUImm(operandPc: operandPc, sp: sp)
+        case 612: return predictor.predictNext_brIfI64GeSImm(operandPc: operandPc, sp: sp)
+        case 613: return predictor.predictNext_brIfI64GeUImm(operandPc: operandPc, sp: sp)
+        case 614: return predictor.predictNext_brIfI32AndImm(operandPc: operandPc, sp: sp)
+        case 615: return predictor.predictNext_brIfNotI32AndImm(operandPc: operandPc, sp: sp)
+        case 616: return predictor.predictNext_brIfI64AndImm(operandPc: operandPc, sp: sp)
+        case 617: return predictor.predictNext_brIfNotI64AndImm(operandPc: operandPc, sp: sp)
         default: return nil
         }
     }
@@ -6166,6 +6937,102 @@ extension Instruction {
             }
             do {
                 let inst = Instruction.brIfNotF64GeAcc(.init(rhs: VReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32EqImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32NeImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32LtSImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32LtUImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32GtSImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32GtUImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32LeSImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32LeUImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32GeSImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32GeUImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64EqImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64NeImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64LtSImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64LtUImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64GtSImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64GtUImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64LeSImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64LeUImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64GeSImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64GeUImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI32AndImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfNotI32AndImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfI64AndImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfNotI64AndImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
         return map

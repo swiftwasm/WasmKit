@@ -829,6 +829,83 @@
         mutating func predictNext_brIfNotAcc(operandPc: Pc, sp: Sp) -> [Pc] {
             predictNext_brIfAcc(operandPc: operandPc, sp: sp)
         }
+        private mutating func predictNext_brIfCmpImm(operandPc: Pc) -> [Pc] {
+            var pc = operandPc
+            let op = Instruction.BrIfCmpImmOperand.load(from: &pc)
+            return [pc, pc.advanced(by: Int(op.offset))]
+        }
+        mutating func predictNext_brIfI32EqImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32NeImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32LtSImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32LtUImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32GtSImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32GtUImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32LeSImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32LeUImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32GeSImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32GeUImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64EqImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64NeImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64LtSImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64LtUImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64GtSImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64GtUImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64LeSImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64LeUImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64GeSImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64GeUImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI32AndImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfNotI32AndImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfI64AndImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
+        mutating func predictNext_brIfNotI64AndImm(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIfCmpImm(operandPc: operandPc)
+        }
         mutating func predictNext_brIfF64EqAcc(operandPc: Pc, sp: Sp) -> [Pc] {
             predictNext_brIfAccCmp(operandPc: operandPc)
         }

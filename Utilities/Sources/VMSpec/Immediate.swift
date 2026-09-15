@@ -275,6 +275,28 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "operand", type: .VReg)
     }
 
+    /// `result = lhs <op> imm`, the right operand being a constant carried in
+    /// the instruction. Two `VReg`s and a 32-bit immediate fill one code slot.
+    static let binaryImm = Self(name: "BinaryImmOperand") {
+        $0.field(name: "result", type: .VReg)
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "imm", type: .Int32)
+    }
+
+    /// `ireg = lhs <op> imm`.
+    static let accBinaryImm = Self(name: "AccBinaryImmOperand") {
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "imm", type: .Int32)
+    }
+
+    /// A fused compare against a constant and branch. The offset does not fit
+    /// next to the 32-bit immediate, so this takes two code slots.
+    static let brIfCmpImmOperand = Self(name: "BrIfCmpImmOperand") {
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "imm", type: .Int32)
+        $0.field(name: "offset", type: .Int32)
+    }
+
     /// `freg = (sp[x] <op1> sp[y]) <op2> sp[z]`.
     static let accBinBin = Self(name: "AccBinBinOperand") {
         $0.field(name: "x", type: .VReg)
