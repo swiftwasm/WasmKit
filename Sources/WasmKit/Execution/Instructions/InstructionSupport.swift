@@ -370,10 +370,24 @@ extension UntypedValue {
 typealias OpcodeID = UInt64
 
 extension Instruction {
+    /// The code slot an emitted instruction starts with: the handler address
+    /// under direct threading, the opcode ID under token threading.
+    ///
+    /// Outlined because the translator emits from many sites and each inlined
+    /// copy would carry the opcode switch.
+    @inline(never)
     func headSlot(threadingModel: EngineConfiguration.ThreadingModel) -> CodeSlot {
+        headSlotInline(threadingModel: threadingModel)
+    }
+
+    /// ``headSlot(threadingModel:)`` for sites where the instruction is a known
+    /// case and the result folds to a constant.
+    @inline(__always)
+    func headSlotInline(threadingModel: EngineConfiguration.ThreadingModel) -> CodeSlot {
+        let opcodeID = self.opcodeID
         switch threadingModel {
         case .direct:
-            return CodeSlot(handler)
+            return CodeSlot(Instruction.handler(opcodeID: opcodeID))
         case .token:
             return opcodeID
         }
@@ -452,11 +466,29 @@ extension Instruction {
             "untyped:\(hex(value.storage))"
         }
 
+        /// Compiled for size: one arm per opcode, used only for disassembly.
+        @_optimize(size)
         mutating func print<Target>(
             instruction: Instruction,
             instructionOffset: Int,
             to target: inout Target
         ) where Target: TextOutputStream {
+            // Local helpers capture only what they need, so rendering a
+            // register does not retain the whole context.
+            let frameHeaderSize = FrameHeaderLayout.size(of: function.type)
+            let shouldColor = self.shouldColor
+            func regCore(_ reg: Int) -> String {
+                let adjusted = frameHeaderSize + reg
+                if shouldColor {
+                    let regColor = adjusted < 15 ? "\u{001B}[3\(adjusted + 1)m" : ""
+                    return "\(regColor)reg:\(reg)\u{001B}[0m"
+                } else {
+                    return "reg:\(reg)"
+                }
+            }
+            @inline(__always) func reg<R: FixedWidthInteger>(_ reg: R) -> String { regCore(Int(reg)) }
+            @inline(__always) func reg<R: ShiftedVReg>(_ x: R) -> String { reg(Int(x.value) / MemoryLayout<StackSlot>.size) }
+
             func binop(_ name: String, _ op: Instruction.BinaryOperand) {
                 target.write("\(reg(op.result)) = \(name) \(reg(op.lhs)), \(reg(op.rhs))")
             }

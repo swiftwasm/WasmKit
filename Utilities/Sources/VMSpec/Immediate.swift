@@ -85,7 +85,7 @@ extension VMGen {
                 "    var \(field.name): \(field.type.name)"
             }.joined(separator: "\n")
             var output = """
-            struct \(name): Equatable, InstructionImmediate {
+            struct \(name): InstructionImmediate {
             \(fieldDeclarations)
 
             """
