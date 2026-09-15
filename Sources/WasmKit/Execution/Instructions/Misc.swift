@@ -32,6 +32,16 @@ extension Execution {
     mutating func copyStack(sp: Sp, immediate: Instruction.CopyStackOperand) {
         sp[immediate.dest] = sp[immediate.source]
     }
+
+    /// Both sources are read before either destination is written, which the
+    /// translator makes equivalent to two copies in order.
+    @inline(__always)
+    mutating func copyStack2(sp: Sp, immediate: Instruction.CopyStack2Operand) {
+        let value0 = sp[immediate.source0]
+        let value1 = sp[immediate.source1]
+        sp[immediate.dest0] = value0
+        sp[immediate.dest1] = value1
+    }
 }
 
 /// > Note:

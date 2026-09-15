@@ -6713,6 +6713,14 @@ extension Execution {
         sp.pointee[immediate.result] = UInt32(truncatingIfNeeded: ireg.pointee) != 0 ? onTrue : onFalse
         return next
     }
+    @_silgen_name("wasmkit_execute_copyStack2") @inline(__always)
+    mutating func execute_copyStack2(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.CopyStack2Operand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        self.copyStack2(sp: sp.pointee, immediate: immediate)
+        return next
+    }
 }
 
 #if !(os(WASI) || $Embedded)
