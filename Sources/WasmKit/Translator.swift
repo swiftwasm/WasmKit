@@ -487,7 +487,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     enum MetaValueOnStack {
         case local(ValueType, LocalIndex)
         case stack(MetaValue)
-        case const(ValueType, Int)
+        /// A constant, which gets a constant-pool slot only when it is read as
+        /// a register operand.
+        case const(ValueType, UntypedValue)
 
         var type: MetaValue {
             switch self {
@@ -500,8 +502,20 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
     enum ValueSource {
         case vreg(VReg)
-        case const(Int, ValueType)
+        case const(UntypedValue, ValueType)
         case local(LocalIndex)
+
+        /// The register when the value is a materialized stack temporary.
+        var stackRegister: VReg? {
+            guard case .vreg(let register) = self else { return nil }
+            return register
+        }
+
+        /// The constant's bits when the value is a constant.
+        var constant: UInt64? {
+            guard case .const(let value, _) = self else { return nil }
+            return value.storage
+        }
     }
 
     struct ValueStack {
@@ -543,9 +557,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             self.slotHeight += type.stackSlotCount
             maxSlotHeight = max(maxSlotHeight, slotHeight)
         }
-        mutating func pushConst(_ index: Int, type: ValueType) {
-            assert(index < stackLayout.constantSlotSize)
-            self.values.append(.const(type, index))
+        mutating func pushConst(_ value: UntypedValue, type: ValueType) {
+            self.values.append(.const(type, value))
             self.startSlotOffsets.append(slotHeight)
             self.slotHeight += type.stackSlotCount
             maxSlotHeight = max(maxSlotHeight, slotHeight)
@@ -572,14 +585,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             return copies
         }
 
-        mutating func preserveConstsOnStack(depth: Int) -> [(source: VReg, to: VReg, type: ValueType)] {
-            var copies: [(source: VReg, to: VReg, type: ValueType)] = []
+        mutating func preserveConstsOnStack(depth: Int) -> [(value: UntypedValue, to: VReg, type: ValueType)] {
+            var copies: [(value: UntypedValue, to: VReg, type: ValueType)] = []
             for offset in 0..<min(depth, self.valueHeight) {
                 let valueIndex = self.values.count - 1 - offset
                 let value = self.values[valueIndex]
-                guard case .const(let type, let index) = value else { continue }
+                guard case .const(let type, let constant) = value else { continue }
                 self.values[valueIndex] = .stack(.some(type))
-                copies.append((stackLayout.constReg(index), self.stackRegBase + VReg(slotIndex: startSlotOffsets[valueIndex]), type))
+                copies.append((constant, self.stackRegBase + VReg(slotIndex: startSlotOffsets[valueIndex]), type))
             }
             return copies
         }
@@ -608,8 +621,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 source = .local(localIndex)
             case .stack:
                 source = .vreg(stackRegBase + VReg(slotIndex: startSlotOffsets[valueIndex]))
-            case .const(let type, let index):
-                source = .const(index, type)
+            case .const(let type, let constant):
+                source = .const(constant, type)
             }
             return source
         }
@@ -629,8 +642,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 source = .local(localIndex)
             case .stack:
                 source = .vreg(stackRegBase + VReg(slotIndex: startSlotOffset))
-            case .const(let type, let index):
-                source = .const(index, type)
+            case .const(let type, let constant):
+                source = .const(constant, type)
             }
             return (value.type, source)
         }
@@ -735,6 +748,58 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 return .i32
             case .i64Eq, .i64Ne, .i64LtS, .i64LtU, .i64GtS, .i64GtU, .i64LeS, .i64LeU, .i64GeS, .i64GeU:
                 return .i64
+            }
+        }
+
+        /// The comparison against a constant.
+        var makeCmpImm: (Instruction.BinaryImmOperand) -> Instruction {
+            switch self {
+            case .i32Eq: return Instruction.i32EqImm
+            case .i32Ne: return Instruction.i32NeImm
+            case .i32LtS: return Instruction.i32LtSImm
+            case .i32LtU: return Instruction.i32LtUImm
+            case .i32GtS: return Instruction.i32GtSImm
+            case .i32GtU: return Instruction.i32GtUImm
+            case .i32LeS: return Instruction.i32LeSImm
+            case .i32LeU: return Instruction.i32LeUImm
+            case .i32GeS: return Instruction.i32GeSImm
+            case .i32GeU: return Instruction.i32GeUImm
+            case .i64Eq: return Instruction.i64EqImm
+            case .i64Ne: return Instruction.i64NeImm
+            case .i64LtS: return Instruction.i64LtSImm
+            case .i64LtU: return Instruction.i64LtUImm
+            case .i64GtS: return Instruction.i64GtSImm
+            case .i64GtU: return Instruction.i64GtUImm
+            case .i64LeS: return Instruction.i64LeSImm
+            case .i64LeU: return Instruction.i64LeUImm
+            case .i64GeS: return Instruction.i64GeSImm
+            case .i64GeU: return Instruction.i64GeUImm
+            }
+        }
+
+        /// The fused comparison against a constant and branch.
+        var makeBrIfImm: (Instruction.BrIfCmpImmOperand) -> Instruction {
+            switch self {
+            case .i32Eq: return Instruction.brIfI32EqImm
+            case .i32Ne: return Instruction.brIfI32NeImm
+            case .i32LtS: return Instruction.brIfI32LtSImm
+            case .i32LtU: return Instruction.brIfI32LtUImm
+            case .i32GtS: return Instruction.brIfI32GtSImm
+            case .i32GtU: return Instruction.brIfI32GtUImm
+            case .i32LeS: return Instruction.brIfI32LeSImm
+            case .i32LeU: return Instruction.brIfI32LeUImm
+            case .i32GeS: return Instruction.brIfI32GeSImm
+            case .i32GeU: return Instruction.brIfI32GeUImm
+            case .i64Eq: return Instruction.brIfI64EqImm
+            case .i64Ne: return Instruction.brIfI64NeImm
+            case .i64LtS: return Instruction.brIfI64LtSImm
+            case .i64LtU: return Instruction.brIfI64LtUImm
+            case .i64GtS: return Instruction.brIfI64GtSImm
+            case .i64GtU: return Instruction.brIfI64GtUImm
+            case .i64LeS: return Instruction.brIfI64LeSImm
+            case .i64LeU: return Instruction.brIfI64LeUImm
+            case .i64GeS: return Instruction.brIfI64GeSImm
+            case .i64GeU: return Instruction.brIfI64GeUImm
             }
         }
 
@@ -902,6 +967,17 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             case .i32: self = .i32
             case .i64: self = .i64
             default: return nil
+            }
+        }
+
+        /// The fused bit test against a constant mask.
+        func makeBrIfImm(polarity: FusedBranchPolarity, lhs: VReg, imm: Int32, offset: Int32) -> Instruction {
+            let operand = Instruction.BrIfCmpImmOperand(lhs: lhs, imm: imm, offset: offset)
+            switch (self, polarity) {
+            case (.i32, .ifTrue): return Instruction.brIfI32AndImm(operand)
+            case (.i32, .ifFalse): return Instruction.brIfNotI32AndImm(operand)
+            case (.i64, .ifTrue): return Instruction.brIfI64AndImm(operand)
+            case (.i64, .ifFalse): return Instruction.brIfNotI64AndImm(operand)
             }
         }
 
@@ -1288,6 +1364,42 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let lhs: VReg
         let rhs: VReg
         let result: VReg
+        /// Set when the right operand is a constant carried in the instruction
+        /// rather than `rhs`. A superinstruction reads it from the constant pool.
+        var rhsConstant: UntypedValue? = nil
+    }
+
+    /// The immediate-operand forms of an integer binary operation.
+    fileprivate struct ImmBinaryForms {
+        let plain: (Instruction.BinaryImmOperand) -> Instruction
+        /// `ireg = lhs <op> imm`
+        let toAcc: (Instruction.AccBinaryImmOperand) -> Instruction
+    }
+
+    fileprivate static func immBinaryForms(_ type: ValueType, _ op: BinBinOp) -> ImmBinaryForms? {
+        switch (type, op) {
+        case (.i32, .add): return ImmBinaryForms(plain: Instruction.i32AddImm, toAcc: Instruction.i32AddImmToAcc)
+        case (.i32, .mul): return ImmBinaryForms(plain: Instruction.i32MulImm, toAcc: Instruction.i32MulImmToAcc)
+        case (.i32, .and): return ImmBinaryForms(plain: Instruction.i32AndImm, toAcc: Instruction.i32AndImmToAcc)
+        case (.i32, .or): return ImmBinaryForms(plain: Instruction.i32OrImm, toAcc: Instruction.i32OrImmToAcc)
+        case (.i32, .xor): return ImmBinaryForms(plain: Instruction.i32XorImm, toAcc: Instruction.i32XorImmToAcc)
+        case (.i32, .shl): return ImmBinaryForms(plain: Instruction.i32ShlImm, toAcc: Instruction.i32ShlImmToAcc)
+        case (.i32, .shrS): return ImmBinaryForms(plain: Instruction.i32ShrSImm, toAcc: Instruction.i32ShrSImmToAcc)
+        case (.i32, .shrU): return ImmBinaryForms(plain: Instruction.i32ShrUImm, toAcc: Instruction.i32ShrUImmToAcc)
+        case (.i32, .rotl): return ImmBinaryForms(plain: Instruction.i32RotlImm, toAcc: Instruction.i32RotlImmToAcc)
+        case (.i32, .rotr): return ImmBinaryForms(plain: Instruction.i32RotrImm, toAcc: Instruction.i32RotrImmToAcc)
+        case (.i64, .add): return ImmBinaryForms(plain: Instruction.i64AddImm, toAcc: Instruction.i64AddImmToAcc)
+        case (.i64, .mul): return ImmBinaryForms(plain: Instruction.i64MulImm, toAcc: Instruction.i64MulImmToAcc)
+        case (.i64, .and): return ImmBinaryForms(plain: Instruction.i64AndImm, toAcc: Instruction.i64AndImmToAcc)
+        case (.i64, .or): return ImmBinaryForms(plain: Instruction.i64OrImm, toAcc: Instruction.i64OrImmToAcc)
+        case (.i64, .xor): return ImmBinaryForms(plain: Instruction.i64XorImm, toAcc: Instruction.i64XorImmToAcc)
+        case (.i64, .shl): return ImmBinaryForms(plain: Instruction.i64ShlImm, toAcc: Instruction.i64ShlImmToAcc)
+        case (.i64, .shrS): return ImmBinaryForms(plain: Instruction.i64ShrSImm, toAcc: Instruction.i64ShrSImmToAcc)
+        case (.i64, .shrU): return ImmBinaryForms(plain: Instruction.i64ShrUImm, toAcc: Instruction.i64ShrUImmToAcc)
+        case (.i64, .rotl): return ImmBinaryForms(plain: Instruction.i64RotlImm, toAcc: Instruction.i64RotlImmToAcc)
+        case (.i64, .rotr): return ImmBinaryForms(plain: Instruction.i64RotrImm, toAcc: Instruction.i64RotrImmToAcc)
+        default: return nil
+        }
     }
 
     /// The two accumulator registers.
@@ -1306,6 +1418,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     fileprivate enum AccProducerForm {
         /// `result = lhs <op> rhs`
         case binary(type: ValueType, op: BinBinOp, lhs: VReg, rhs: VReg, result: VReg)
+        /// `result = lhs <op> imm`
+        case binaryImm(type: ValueType, op: BinBinOp, lhs: VReg, imm: Int32, result: VReg)
         /// `result = ireg <op> operand`
         case fromAcc(type: ValueType, op: BinBinOp, operand: VReg, result: VReg)
         /// `result = freg <op> operand`, or `operand <op> freg` when reversed
@@ -1323,7 +1437,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
         var type: ValueType {
             switch self {
-            case .binary(let type, _, _, _, _), .fromAcc(let type, _, _, _), .globalGet(let type, _, _): return type
+            case .binary(let type, _, _, _, _), .binaryImm(let type, _, _, _, _), .fromAcc(let type, _, _, _), .globalGet(let type, _, _): return type
             case .fromFloatAcc, .floatBinBin, .sqrt: return .f64
             case .load(let load, _, _, _), .loadFromAcc(let load, _, _): return load.type
             }
@@ -1331,7 +1445,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
         var result: VReg {
             switch self {
-            case .binary(_, _, _, _, let result), .fromAcc(_, _, _, let result), .globalGet(_, _, let result): return result
+            case .binary(_, _, _, _, let result), .binaryImm(_, _, _, _, let result), .fromAcc(_, _, _, let result), .globalGet(_, _, let result): return result
             case .fromFloatAcc(_, _, _, let result), .floatBinBin(_, _, _, _, _, let result), .sqrt(_, let result): return result
             case .load(_, _, _, let result), .loadFromAcc(_, _, let result): return result
             }
@@ -1345,6 +1459,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 return accBinaryForms(type, op)?.toAcc(Instruction.AccBinaryOperand(lhs: lhs, rhs: rhs))
             case (.binary(let type, let op, let lhs, let rhs, _), .float):
                 return floatAccBinaryForms(type, op)?.toAcc(Instruction.AccBinaryOperand(lhs: lhs, rhs: rhs))
+            case (.binaryImm(let type, let op, let lhs, let imm, _), .integer):
+                return immBinaryForms(type, op)!.toAcc(Instruction.AccBinaryImmOperand(lhs: lhs, imm: imm))
             case (.fromAcc(let type, let op, let operand, _), .integer):
                 return accBinaryForms(type, op)?.inAcc(Instruction.AccOperand(operand: operand))
             case (.fromFloatAcc(let op, let operand, let reversed, _), .float):
@@ -1374,6 +1490,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             switch self {
             case .binary(let type, let op, let lhs, let rhs, let result):
                 return plainBinaryInstruction(type, op)(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(result)))
+            case .binaryImm(let type, let op, let lhs, let imm, let result):
+                return immBinaryForms(type, op)!.plain(Instruction.BinaryImmOperand(result: result, lhs: lhs, imm: imm))
             case .fromAcc(let type, let op, let operand, let result):
                 return accBinaryForms(type, op)!.fromAcc(Instruction.AccUnaryOperand(operand: operand, result: LVReg(result)))
             case .fromFloatAcc(let op, let operand, let reversed, let result):
@@ -1468,10 +1586,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     fileprivate enum FusableCondition {
         /// `result = lhs <kind> rhs`
         case compare(kind: FusedCmpKind, lhs: VReg, rhs: VReg)
+        /// `result = lhs <kind> imm`
+        case compareImm(kind: FusedCmpKind, lhs: VReg, imm: Int32)
         /// `result = lhs <kind> rhs` for a float comparison
         case floatCompare(kind: FusedFCmpKind, lhs: VReg, rhs: VReg)
         /// `result = lhs & rhs`, tested against zero by the branch that pops it
         case and(width: FusedAndWidth, lhs: VReg, rhs: VReg)
+        /// `result = lhs & imm`, tested against zero
+        case andImm(width: FusedAndWidth, lhs: VReg, imm: Int32)
         /// `result = (input == 0)` for a 32-bit `input`
         case i32Eqz(input: VReg)
         /// `result = (inner == 0)`, i.e. an `i32.eqz` applied to another
@@ -1884,12 +2006,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// branch immediate occupies exactly one code slot.
         mutating func emitBranchWithLabel(
             _ ref: LabelRef,
+            immediateSlots: Int = 1,
             line: UInt = #line,
             make: @escaping InstructionFactoryWithLabel
         ) {
             let insertAt = insertingPC
             emitSlot(0)  // dummy opcode
-            emitSlot(0)  // dummy immediate
+            for _ in 0..<immediateSlots { emitSlot(0) }  // dummy immediate
             emitWithLabel(
                 ref, insertAt: insertAt, line: line,
                 make: { builder, source, target in
@@ -1897,7 +2020,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                     #if DEBUG
                         var slotCount = 0
                         instruction.emitImmediate(to: { _ in slotCount += 1 })
-                        assert(slotCount == 1, "emitBranchWithLabel requires a single-slot immediate")
+                        assert(slotCount == immediateSlots, "emitBranchWithLabel reserved \(immediateSlots) immediate slots but the instruction has \(slotCount)")
                     #endif
                     return instruction
                 })
@@ -1988,17 +2111,27 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             self.stackLayout = stackLayout
         }
 
-        mutating func allocate(_ value: Value) -> Int? {
-            let untyped = UntypedValue(value)
-            if let allocated = indexByValue[untyped] {
-                // NOTE: Share the same const slot for exactly the same bit pattern
-                // values even having different types
-                return allocated
-            }
-            guard values.count < stackLayout.constantSlotSize else { return nil }
+        /// Constants that may still be given a slot. Capped at the pool size, so
+        /// ``allocate(_:)`` cannot run out.
+        private var reserved: Set<UntypedValue> = []
+
+        /// Reserves pool space for `value`; `false` when the pool is full.
+        mutating func reserve(_ value: UntypedValue) -> Bool {
+            // NOTE: Share the same const slot for exactly the same bit pattern
+            // values even having different types
+            if reserved.contains(value) { return true }
+            guard reserved.count < stackLayout.constantSlotSize else { return false }
+            reserved.insert(value)
+            return true
+        }
+
+        /// The slot of a reserved constant, assigned on first use.
+        mutating func allocate(_ value: UntypedValue) -> Int {
+            if let allocated = indexByValue[value] { return allocated }
+            assert(reserved.contains(value), "allocating a constant that was never reserved")
             let constSlotIndex = values.count
-            values.append(untyped)
-            indexByValue[untyped] = constSlotIndex
+            values.append(value)
+            indexByValue[value] = constSlotIndex
             return constSlotIndex
         }
     }
@@ -2179,8 +2312,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     private mutating func preserveOnStack(depth: Int, site: StaticString = #function) {
         assertPreservationStaysInCurrentFrame(depth: depth, caller: site)
         preserveLocalsOnStack(depth: depth)
-        for (source, dest, type) in valueStack.preserveConstsOnStack(depth: depth) {
-            emitCopyValueSlots(type, from: source, to: dest)
+        for (value, dest, type) in valueStack.preserveConstsOnStack(depth: depth) {
+            emitCopyValueSlots(type, from: stackLayout.constReg(constantSlots.allocate(value)), to: dest)
         }
     }
 
@@ -2228,8 +2361,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             return register
         case .local(let index):
             return stackLayout.localReg(index)
-        case .const(let index, _):
-            return stackLayout.constReg(index)
+        case .const(let value, _):
+            return stackLayout.constReg(constantSlots.allocate(value))
         }
     }
     private mutating func ensureOnStack(_ source: ValueSource, type: ValueType) -> VReg {
@@ -2240,8 +2373,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case .local(let localIndex):
             emitCopyValueSlots(type, from: localReg(localIndex), to: copyTo)
             return copyTo
-        case .const(let index, _):
-            emitCopyValueSlots(type, from: stackLayout.constReg(index), to: copyTo)
+        case .const(let value, _):
+            emitCopyValueSlots(type, from: stackLayout.constReg(constantSlots.allocate(value)), to: copyTo)
             return copyTo
         }
     }
@@ -2285,8 +2418,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 _ = try valueStack.pushLocal(localIndex, locals: &locals)
             case .vreg, nil:
                 _ = valueStack.push(type)
-            case .const(let index, let type):
-                valueStack.pushConst(index, type: type)
+            case .const(let value, let type):
+                valueStack.pushConst(value, type: type)
             }
         }
         return stackHeight
@@ -2599,9 +2732,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // `canRewind` refuses and we fall back to the unfused form.
         if let makeFused = fuseCompareIntoBranch(fusable, condition: condition) {
             let oldPC = iseqBuilder.insertingPC
-            iseqBuilder.emitBranchWithLabel(endLabel) { iseqBuilder, selfPC, endPC in
+            iseqBuilder.emitBranchWithLabel(endLabel, immediateSlots: makeFused.immediateSlots) { iseqBuilder, selfPC, endPC in
                 let targetPC = iseqBuilder.resolveLabel(elseLabel) ?? endPC
-                return makeFused(.ifFalse, Int32(targetPC.offsetFromHead - selfPC.offsetFromHead))
+                return makeFused.make(.ifFalse, Int32(targetPC.offsetFromHead - selfPC.offsetFromHead))
             }
             self.updateInstructionMapping(from: oldPC)
             return
@@ -2751,7 +2884,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     /// The polarity is supplied at emission time so that a branch already
     /// emitted as `ifFalse` can be re-emitted as `ifTrue` if the landing pad it
     /// skipped over turns out to be empty (see ``visitBrIf(relativeDepth:)``).
-    private typealias FusedBranchFactory = (_ polarity: FusedBranchPolarity, _ offset: Int32) -> Instruction
+    ///
+    /// The number of immediate slots is fixed before the offset is known, since
+    /// the slots are reserved when the branch is emitted.
+    private struct FusedBranchFactory {
+        var immediateSlots = 1
+        let make: (_ polarity: FusedBranchPolarity, _ offset: Int32) -> Instruction
+    }
 
     /// Folds a just-emitted comparison into the conditional branch about to be
     /// emitted.
@@ -2783,7 +2922,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             iseqBuilder.rewind(to: acc.producerPosition)
             self.rewindInstructionMapping(to: acc.producerPosition)
             emit(producer)
-            return { polarity, offset in acc.makeBranch(polarity: polarity, offset: offset) }
+            return FusedBranchFactory { polarity, offset in acc.makeBranch(polarity: polarity, offset: offset) }
         }
 
         let factory = Self.fusedBranchFactory(for: candidate.condition)
@@ -2800,24 +2939,33 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     private static func fusedBranchFactory(for condition: FusableCondition) -> FusedBranchFactory {
         switch condition {
         case .compare(let kind, let lhs, let rhs):
-            return { polarity, offset in
+            return FusedBranchFactory { polarity, offset in
                 let fused = polarity == .ifTrue ? kind : kind.complement
                 return fused.makeBrIf(Instruction.BrIfCmpOperand(lhs: lhs, rhs: rhs, offset: offset))
             }
+        case .compareImm(let kind, let lhs, let imm):
+            return FusedBranchFactory(immediateSlots: 2) { polarity, offset in
+                let fused = polarity == .ifTrue ? kind : kind.complement
+                return fused.makeBrIfImm(Instruction.BrIfCmpImmOperand(lhs: lhs, imm: imm, offset: offset))
+            }
         case .floatCompare(let kind, let lhs, let rhs):
             // The polarity is part of the opcode here; see `FusedFCmpKind`.
-            return { polarity, offset in
+            return FusedBranchFactory { polarity, offset in
                 kind.makeBrIf(polarity: polarity, lhs: lhs, rhs: rhs, offset: offset)
             }
         case .and(let width, let lhs, let rhs):
             // The polarity is part of the opcode here; see `FusedAndWidth`.
-            return { polarity, offset in
+            return FusedBranchFactory { polarity, offset in
                 width.makeBrIf(polarity: polarity, lhs: lhs, rhs: rhs, offset: offset)
+            }
+        case .andImm(let width, let lhs, let imm):
+            return FusedBranchFactory(immediateSlots: 2) { polarity, offset in
+                width.makeBrIfImm(polarity: polarity, lhs: lhs, imm: imm, offset: offset)
             }
         case .i32Eqz(let input):
             // `eqz(x)` is non-zero exactly when `x` is zero, so the fused form
             // is just the plain branch with the opposite polarity on `x`.
-            return { polarity, offset in
+            return FusedBranchFactory { polarity, offset in
                 let operand = Instruction.BrIfOperand(condition: LVReg(input), offset: offset)
                 switch polarity {
                 case .ifTrue: return Instruction.brIfNot(operand)
@@ -2830,7 +2978,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             // for floats under NaN): the comparison produced 0 or 1, and `eqz`
             // inverts that exactly.
             let innerFactory = fusedBranchFactory(for: inner)
-            return { polarity, offset in innerFactory(polarity.flipped, offset) }
+            return FusedBranchFactory(immediateSlots: innerFactory.immediateSlots) { polarity, offset in
+                innerFactory.make(polarity.flipped, offset)
+            }
         }
     }
 
@@ -2917,8 +3067,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             // and no exception handlers need unwinding.
             if let makeFused = fuseCompareIntoBranch(fusable, condition: condition) {
                 let oldPC = iseqBuilder.insertingPC
-                iseqBuilder.emitBranchWithLabel(frame.continuation) { _, selfPC, continuation in
-                    makeFused(.ifTrue, Int32(continuation.offsetFromHead - selfPC.offsetFromHead))
+                iseqBuilder.emitBranchWithLabel(frame.continuation, immediateSlots: makeFused.immediateSlots) { _, selfPC, continuation in
+                    makeFused.make(.ifTrue, Int32(continuation.offsetFromHead - selfPC.offsetFromHead))
                 }
                 self.updateInstructionMapping(from: oldPC)
                 return
@@ -2976,8 +3126,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             }
             let conditionCheckPC = iseqBuilder.insertingPC
             if let makeFused {
-                iseqBuilder.emitBranchWithLabel(onBranchNotTaken) { _, conditionCheckAt, continuation in
-                    makeFused(.ifFalse, Int32(continuation.offsetFromHead - conditionCheckAt.offsetFromHead))
+                iseqBuilder.emitBranchWithLabel(onBranchNotTaken, immediateSlots: makeFused.immediateSlots) { _, conditionCheckAt, continuation in
+                    makeFused.make(.ifFalse, Int32(continuation.offsetFromHead - conditionCheckAt.offsetFromHead))
                 }
             } else if accProducer != nil {
                 iseqBuilder.emitWithLabel(Instruction.brIfNotAcc, onBranchNotTaken) { _, conditionCheckAt, continuation in
@@ -3042,8 +3192,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 iseqBuilder.rewind(to: conditionCheckPC)
                 self.rewindInstructionMapping(to: conditionCheckPC)
                 if let makeFused {
-                    iseqBuilder.emitBranchWithLabel(frame.continuation) { _, selfPC, continuation in
-                        makeFused(.ifTrue, Int32(continuation.offsetFromHead - selfPC.offsetFromHead))
+                    iseqBuilder.emitBranchWithLabel(frame.continuation, immediateSlots: makeFused.immediateSlots) { _, selfPC, continuation in
+                        makeFused.make(.ifTrue, Int32(continuation.offsetFromHead - selfPC.offsetFromHead))
                     }
                 } else if accProducer != nil {
                     iseqBuilder.emitWithLabel(Instruction.brIfAcc, frame.continuation) { _, selfPC, continuation in
@@ -3506,9 +3656,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         guard try checkBeforePop(typeHint: type) else { return }
         let op = try valueStack.pop(type)
 
-        if case .const(let slotIndex, _) = op {
+        if case .const(let value, _) = op {
             // Optimize (local.set $x (i32.const $c)) to reg:$x = 42 rather than through const slot
-            let value = constantSlots.values[slotIndex]
             let is32Bit = type == .i32 || type == .f32
             if is32Bit {
                 emit(.const32(Instruction.Const32Operand(value: UInt32(value.storage), result: LVReg(result))))
@@ -4141,13 +4290,16 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     private mutating func visitConst(_ type: ValueType, _ value: Value) {
-        // TODO: document this behavior
-        if let constSlotIndex = constantSlots.allocate(value) {
-            valueStack.pushConst(constSlotIndex, type: type)
+        // A constant is pushed without emitting anything. The consumer decides
+        // how it materializes: as an instruction immediate, or, when read as a
+        // register, as a constant-pool slot. When the pool cannot take another
+        // constant, it is written to its stack slot here instead.
+        let value = UntypedValue(value)
+        if constantSlots.reserve(value) {
+            valueStack.pushConst(value, type: type)
             iseqBuilder.dropResultRelink()
             return
         }
-        let value = UntypedValue(value)
         let is32Bit = type == .i32 || type == .f32
         if is32Bit {
             pushEmit(
@@ -4222,35 +4374,47 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         _ type: ValueType,
         _ op: BinBinOp
     ) throws(WasmKitError) {
-        // Captured before `popVRegOperand`, which resets the last emission.
+        // Captured before `popOperand`, which resets the last emission.
         let candidate = iseqBuilder.binaryEmission
         let accCandidate = iseqBuilder.accProducer
-        let rhs = try popVRegOperand(type)
-        let lhs = try popVRegOperand(type)
+        // Popped as sources, so that a constant operand gets a pool slot only
+        // when no immediate form takes it.
+        let rhsSource = try popOperand(type)
+        let lhsSource = try popOperand(type)
         let result = valueStack.push(type)
-        guard let lhs = lhs, let rhs = rhs else { return }
+        guard let lhsSource, let rhsSource else { return }
+        // A fold matches the register a previous instruction wrote, which is
+        // always a stack temporary.
+        let lhsProduced = lhsSource.stackRegister
+        let rhsProduced = rhsSource.stackRegister
 
         if let candidate, candidate.operation.type == type, iseqBuilder.canRewind(to: candidate) {
             let produced = candidate.operation
             // `z` must not be the intermediate itself: its slot is no longer
             // written once the producer is rewound away.
-            var fused: (make: (Instruction.BinBinOperand) -> Instruction, z: VReg)?
-            if produced.result == lhs, produced.result != rhs,
+            var fused: (make: (Instruction.BinBinOperand) -> Instruction, z: ValueSource)?
+            if produced.result == lhsProduced, produced.result != rhsProduced,
                 let make = Self.binBinInstruction(type, produced.op, op, reversed: false)
             {
-                fused = (make, rhs)
-            } else if produced.result == rhs, produced.result != lhs {
+                fused = (make, rhsSource)
+            } else if produced.result == rhsProduced, produced.result != lhsProduced {
                 if op.isCommutative,
                     let make = Self.binBinInstruction(type, produced.op, op, reversed: false)
                 {
-                    fused = (make, lhs)
+                    fused = (make, lhsSource)
                 } else if let make = Self.binBinInstruction(type, produced.op, op, reversed: true) {
-                    fused = (make, lhs)
+                    fused = (make, lhsSource)
                 }
             }
-            if let (make, z) = fused {
+            // A producer that carried its constant in the instruction needs it
+            // in the pool now; no fold when the pool is full.
+            if fused != nil, let constant = produced.rhsConstant, !constantSlots.reserve(constant) {
+                fused = nil
+            }
+            if let (make, zSource) = fused {
+                let z = ensureOnVReg(zSource)
                 let x = produced.lhs
-                let y = produced.rhs
+                let y = produced.rhsConstant.map { stackLayout.constReg(constantSlots.allocate($0)) } ?? produced.rhs
                 iseqBuilder.rewind(to: candidate.position)
                 self.rewindInstructionMapping(to: candidate.position)
                 if let prefix = candidate.prefix {
@@ -4278,13 +4442,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             accCandidate.form.producing(into: .integer) != nil, iseqBuilder.canRewind(to: accCandidate)
         {
             let accResult = accCandidate.form.result
-            var operand: VReg?
-            if accResult == lhs, accResult != rhs {
-                operand = rhs
-            } else if accResult == rhs, accResult != lhs, op.isCommutative {
-                operand = lhs
+            var operandSource: ValueSource?
+            if accResult == lhsProduced, accResult != rhsProduced {
+                operandSource = rhsSource
+            } else if accResult == rhsProduced, accResult != lhsProduced, op.isCommutative {
+                operandSource = lhsSource
             }
-            if let operand {
+            if let operandSource {
+                let operand = ensureOnVReg(operandSource)
                 rewindProducerIntoAccumulator(accCandidate)
                 let fromAcc = accForms.fromAcc(Instruction.AccUnaryOperand(operand: operand, result: LVReg(result)))
                 emit(
@@ -4312,13 +4477,16 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             iseqBuilder.canRewind(to: accCandidate)
         {
             let accResult = accCandidate.form.result
-            var choice: (operand: VReg, reversed: Bool)?
-            if accResult == lhs, accResult != rhs {
-                choice = (rhs, false)
-            } else if accResult == rhs, accResult != lhs {
-                choice = op.isCommutative ? (lhs, false) : (lhs, true)
+            var choice: (operand: ValueSource, reversed: Bool)?
+            if accResult == lhsProduced, accResult != rhsProduced {
+                choice = (rhsSource, false)
+            } else if accResult == rhsProduced, accResult != lhsProduced {
+                choice = op.isCommutative ? (lhsSource, false) : (lhsSource, true)
             }
-            if let (operand, reversed) = choice {
+            if let (operandSource, reversed) = choice {
+                let lhs = ensureOnVReg(lhsSource)
+                let rhs = ensureOnVReg(rhsSource)
+                let operand = ensureOnVReg(operandSource)
                 rewindProducerIntoAccumulator(accCandidate, .float)
                 let make = reversed ? floatAccForms.fromAccRev! : floatAccForms.fromAcc
                 emit(
@@ -4339,6 +4507,28 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             }
         }
 
+        // A constant operand is carried in the instruction when nothing above
+        // folded: a superinstruction removes a dispatch and the accumulator a
+        // frame-slot round trip, which both beat the one load an immediate saves.
+        if emitsImmediateOperands, let form = immediateBinaryForm(type, op, lhs: lhsSource, rhs: rhsSource) {
+            let forms = form.forms
+            let lhs = form.lhs
+            let imm = form.imm
+            emit(
+                forms.plain(Instruction.BinaryImmOperand(result: result, lhs: lhs, imm: imm)),
+                resultRelink: { newResult in
+                    forms.plain(Instruction.BinaryImmOperand(result: newResult, lhs: lhs, imm: imm))
+                },
+                fusable: FusedAndWidth(type: type, op: op).map { (.andImm(width: $0, lhs: lhs, imm: imm), result, nil) },
+                binary: BinaryOperation(
+                    type: type, op: op, lhs: lhs, rhs: lhs, result: result, rhsConstant: form.constant)
+            )
+            iseqBuilder.recordAcc(AccRecords(producer: .binaryImm(type: type, op: form.op, lhs: lhs, imm: imm, result: result)))
+            return
+        }
+
+        let lhs = ensureOnVReg(lhsSource)
+        let rhs = ensureOnVReg(rhsSource)
         let instruction = Self.plainBinaryInstruction(type, op)
         let plain = instruction(Instruction.BinaryOperand(lhs: lhs, rhs: rhs, result: LVReg(result)))
         emit(
@@ -4354,6 +4544,45 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
 
+    /// Immediate-operand forms are emitted under direct threading only; the
+    /// token-threaded dispatcher has no cases for them.
+    private var emitsImmediateOperands: Bool {
+        engineConfiguration.threadingModel == .direct
+    }
+
+    /// The 32-bit immediate encoding `raw` as an operand of `type`: every `i32`
+    /// fits, and an `i64` fits when it survives sign extension.
+    private static func immediateEncoding(of raw: UInt64, as type: ValueType) -> Int32? {
+        let low = Int32(bitPattern: UInt32(truncatingIfNeeded: raw))
+        switch type {
+        case .i32: return low
+        case .i64: return UInt64(bitPattern: Int64(low)) == raw ? low : nil
+        default: return nil
+        }
+    }
+
+    /// The immediate-operand form of `lhs <op> rhs` when one operand is a
+    /// constant that fits. `x - c` is emitted as `x + (-c)`, and a constant on
+    /// the left moves right only when the operation commutes. `constant` is the
+    /// right operand of `op` itself, for a later superinstruction fold.
+    private mutating func immediateBinaryForm(
+        _ type: ValueType, _ op: BinBinOp, lhs lhsSource: ValueSource, rhs rhsSource: ValueSource
+    ) -> (forms: ImmBinaryForms, op: BinBinOp, lhs: VReg, imm: Int32, constant: UntypedValue)? {
+        let immOp: BinBinOp = op == .sub ? .add : op
+        guard let forms = Self.immBinaryForms(type, immOp) else { return nil }
+        if let raw = rhsSource.constant {
+            // Negation wraps, so it is exact for every constant.
+            let value = op == .sub ? 0 &- raw : raw
+            if let imm = Self.immediateEncoding(of: value, as: type) {
+                return (forms, immOp, ensureOnVReg(lhsSource), imm, UntypedValue(storage: raw))
+            }
+        }
+        if op.isCommutative, let raw = lhsSource.constant, let imm = Self.immediateEncoding(of: raw, as: type) {
+            return (forms, immOp, ensureOnVReg(rhsSource), imm, UntypedValue(storage: raw))
+        }
+        return nil
+    }
+
     /// Emits a comparison, recording it as a candidate for compare+branch
     /// fusion. `makeCondition` builds the ``FusableCondition`` from the
     /// comparison's operand registers.
@@ -4362,12 +4591,37 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         _ makeCondition: (_ lhs: VReg, _ rhs: VReg) -> FusableCondition,
         _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction
     ) throws(WasmKitError) {
-        // Captured before `popVRegOperand`, which resets the last emission.
+        // Captured before `popOperand`, which resets the last emission.
         let accCandidate = iseqBuilder.accProducer
-        let rhs = try popVRegOperand(operand)
-        let lhs = try popVRegOperand(operand)
+        let rhsSource = try popOperand(operand)
+        let lhsSource = try popOperand(operand)
         let result = valueStack.push(.i32)
-        guard let lhs = lhs, let rhs = rhs else { return }
+        guard let lhsSource, let rhsSource else { return }
+        // Compare against a constant carried in the instruction, unless the
+        // other operand can come from the accumulator.
+        if emitsImmediateOperands, case .compare(let kind, _, _) = makeCondition(.zero, .zero),
+            accCandidate.map({ $0.form.result != lhsSource.stackRegister && $0.form.result != rhsSource.stackRegister }) ?? true
+        {
+            var immediate: (kind: FusedCmpKind, lhs: VReg, imm: Int32)?
+            if let raw = rhsSource.constant, let imm = Self.immediateEncoding(of: raw, as: operand) {
+                immediate = (kind, ensureOnVReg(lhsSource), imm)
+            } else if let raw = lhsSource.constant, let imm = Self.immediateEncoding(of: raw, as: operand) {
+                immediate = (kind.swapped, ensureOnVReg(rhsSource), imm)
+            }
+            if let immediate {
+                let make = immediate.kind.makeCmpImm
+                emit(
+                    make(Instruction.BinaryImmOperand(result: result, lhs: immediate.lhs, imm: immediate.imm)),
+                    resultRelink: { newResult in
+                        make(Instruction.BinaryImmOperand(result: newResult, lhs: immediate.lhs, imm: immediate.imm))
+                    },
+                    fusable: (.compareImm(kind: immediate.kind, lhs: immediate.lhs, imm: immediate.imm), result, nil)
+                )
+                return
+            }
+        }
+        let lhs = ensureOnVReg(lhsSource)
+        let rhs = ensureOnVReg(rhsSource)
         let condition = makeCondition(lhs, rhs)
         // Record whether a branch fusing this comparison can also take one
         // operand from the accumulator. A right operand swaps the predicate.
