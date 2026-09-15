@@ -521,6 +521,8 @@ extension Instruction {
                 target.write("nop")
             case .copyStack(let op):
                 target.write("\(reg(op.dest)) = copy \(reg(op.source))")
+            case .selectAcc(let op):
+                target.write("\(reg(op.result)) = select acc, \(reg(op.onTrue)), \(reg(op.onFalse))")
             case .copyStackAccToSlot(let op):
                 target.write("\(reg(op.dest)) = copy \(reg(op.source)); \(reg(op.result)) = acc")
             case .globalGet(let op):

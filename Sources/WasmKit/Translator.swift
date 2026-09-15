@@ -3781,6 +3781,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         iseqBuilder.resetLastEmission()
     }
     mutating func visitSelect() throws(WasmKitError) -> Output {
+        // Captured before `popVRegOperand`, which resets the last emission.
+        let accCandidate = iseqBuilder.accProducer
         let condition = try popVRegOperand(.i32)
         let (value1Type, value1) = try popAnyOperand()
         let (value2Type, value2) = try popAnyOperand()
@@ -3798,15 +3800,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         if let condition = condition, let value1 = value1, let value2 = value2 {
             let onTrue = ensureOnVReg(value2)
             let onFalse = ensureOnVReg(value1)
-            if value1Type.concreteType == .v128 {
-                emit(.select(.init(result: result, condition: condition, onTrue: onTrue, onFalse: onFalse)))
-                emit(.select(.init(result: result.nextSlot, condition: condition, onTrue: onTrue.nextSlot, onFalse: onFalse.nextSlot)))
-            } else {
-                emit(.select(.init(result: result, condition: condition, onTrue: onTrue, onFalse: onFalse)))
-            }
+            emitSelect(
+                result: result, condition: condition, onTrue: onTrue, onFalse: onFalse,
+                isV128: value1Type.concreteType == .v128, accCandidate: accCandidate)
         }
     }
     mutating func visitTypedSelect(type: WasmTypes.ValueType) throws(WasmKitError) -> Output {
+        // Captured before `popVRegOperand`, which resets the last emission.
+        let accCandidate = iseqBuilder.accProducer
         let condition = try popVRegOperand(.i32)
         let (value1Type, value1) = try popAnyOperand()
         let (_, value2) = try popAnyOperand()
@@ -3821,13 +3822,38 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         if let condition = condition, let value1 = value1, let value2 = value2 {
             let onTrue = ensureOnVReg(value2)
             let onFalse = ensureOnVReg(value1)
-            if type == .v128 {
-                emit(.select(.init(result: result, condition: condition, onTrue: onTrue, onFalse: onFalse)))
-                emit(.select(.init(result: result.nextSlot, condition: condition, onTrue: onTrue.nextSlot, onFalse: onFalse.nextSlot)))
-            } else {
-                emit(.select(.init(result: result, condition: condition, onTrue: onTrue, onFalse: onFalse)))
-            }
+            emitSelect(
+                result: result, condition: condition, onTrue: onTrue, onFalse: onFalse,
+                isV128: type == .v128, accCandidate: accCandidate)
         }
+    }
+
+    /// Emits `select` so that a following `local.set` can relink its result,
+    /// taking the condition from the accumulator when the instruction right
+    /// before produced it.
+    private mutating func emitSelect(
+        result: VReg, condition: VReg, onTrue: VReg, onFalse: VReg,
+        isV128: Bool, accCandidate: AccProducer?
+    ) {
+        if isV128 {
+            emit(.select(.init(result: result, condition: condition, onTrue: onTrue, onFalse: onFalse)))
+            emit(.select(.init(result: result.nextSlot, condition: condition, onTrue: onTrue.nextSlot, onFalse: onFalse.nextSlot)))
+            return
+        }
+        if let producer = accConditionProducer(accCandidate, condition: condition), onTrue != condition, onFalse != condition {
+            rewindProducerIntoAccumulator(producer)
+            emit(
+                .selectAcc(.init(result: result, onTrue: onTrue, onFalse: onFalse)),
+                resultRelink: { newResult in .selectAcc(.init(result: newResult, onTrue: onTrue, onFalse: onFalse)) }
+            )
+            return
+        }
+        emit(
+            .select(.init(result: result, condition: condition, onTrue: onTrue, onFalse: onFalse)),
+            resultRelink: { newResult in
+                .select(.init(result: newResult, condition: condition, onTrue: onTrue, onFalse: onFalse))
+            }
+        )
     }
     mutating func visitLocalGet(localIndex: UInt32) throws(WasmKitError) -> Output {
         iseqBuilder.dropResultRelink()
