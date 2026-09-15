@@ -121,6 +121,14 @@ extension VMGen {
         /// Whether the handler uses either accumulator.
         var usesAccumulator: Bool { useIreg != .none || useFreg != .none }
 
+        /// Whether the translator emits this instruction only under direct
+        /// threading. The token-threaded dispatcher has no case for it.
+        var isDirectThreadedOnly: Bool {
+            get { usesAccumulator || _isDirectThreadedOnly }
+            set { _isDirectThreadedOnly = newValue }
+        }
+        private var _isDirectThreadedOnly = false
+
         var mayUpdatePc: Bool {
             self.isControl
         }
@@ -1229,6 +1237,89 @@ extension VMGen {
         return [brIfAcc, brIfNotAcc, globalGetToAcc]
     }()
 
+    // MARK: - Immediate-operand integer forms
+
+    /// An integer operation whose right operand can be a constant carried in the
+    /// instruction. `i32` operands use the immediate's bit pattern, `i64`
+    /// operands sign-extend it. There is no `Sub`: the translator emits `x - c`
+    /// as `x + (-c)`.
+    struct IntImmOpInfo {
+        let type: String
+        let op: String
+        /// `i32` for comparisons, `type` otherwise.
+        let resultType: String
+
+        var name: String { "\(type)\(op)Imm" }
+
+        var instruction: Instruction {
+            var inst = Instruction(
+                name: name,
+                documentation: """
+                    `\(type).\(VMGen.snakeCase(pascalCase: op))` with a constant right operand
+
+                    The immediate is 32 bits\(type == "i64" ? ", sign-extended to 64 bits" : "").
+                    """,
+                immediateLayout: .binaryImm
+            )
+            inst.isDirectThreadedOnly = true
+            return inst
+        }
+
+        /// `ireg = x op imm`.
+        var toAcc: Instruction {
+            var inst = Instruction(
+                name: "\(name)ToAcc",
+                documentation: "`ireg = x \(VMGen.snakeCase(pascalCase: op)) imm`, on `\(type)` operands",
+                immediateLayout: .accBinaryImm
+            )
+            inst.useIreg = .write
+            return inst
+        }
+    }
+
+    static let intBinImmInsts: [IntImmOpInfo] = intValueTypes.flatMap { type in
+        ["Add", "Mul", "And", "Or", "Xor", "Shl", "ShrS", "ShrU", "Rotl", "Rotr"].map {
+            IntImmOpInfo(type: type, op: $0, resultType: type)
+        }
+    }
+
+    static let intCmpImmInsts: [IntImmOpInfo] = intValueTypes.flatMap { type in
+        brIfCmpOps.map { IntImmOpInfo(type: type, op: $0, resultType: "i32") }
+    }
+
+    /// Fused compare against a constant and branch. The branch-if-not
+    /// polarity is reached by complementing the comparison.
+    static let brIfCmpImmInsts: [Instruction] = intValueTypes.flatMap { type in
+        brIfCmpOps.map { op in
+            var inst = Instruction(
+                name: "brIf\(type.uppercased())\(op)Imm",
+                documentation: """
+                    Conditional pc-relative branch if `\(type).\(VMGen.snakeCase(pascalCase: op))` against a constant holds
+                    """,
+                isControl: true, mayUpdateFrame: false,
+                immediateLayout: .brIfCmpImmOperand
+            )
+            inst.isDirectThreadedOnly = true
+            return inst
+        }
+    }
+
+    /// Fused bit test against a constant mask and branch, both polarities.
+    static let brIfAndImmInsts: [Instruction] = intValueTypes.flatMap { type in
+        [false, true].map { negated in
+            var inst = Instruction(
+                name: negated ? "brIfNot\(type.uppercased())AndImm" : "brIf\(type.uppercased())AndImm",
+                documentation: """
+                    Conditional pc-relative branch if `(lhs & imm) \(negated ? "==" : "!=") 0` for `\(type)` operands
+                    """,
+                isControl: true, mayUpdateFrame: false,
+                immediateLayout: .brIfCmpImmOperand
+            )
+            inst.isDirectThreadedOnly = true
+            return inst
+        }
+    }
+
     // MARK: - Float accumulator forms
 
     /// The accumulator forms of one `f64` binary operation. `sub` and `div`
@@ -1492,6 +1583,11 @@ extension VMGen {
         instructions += floatBinBinAccInsts
         instructions += brIfFAccCmpInsts
         instructions += floatAccMiscInsts
+        instructions += intBinImmInsts.map(\.instruction)
+        instructions += intCmpImmInsts.map(\.instruction)
+        instructions += brIfCmpImmInsts
+        instructions += brIfAndImmInsts
+        instructions += intBinImmInsts.map(\.toAcc)
         return instructions
     }
 

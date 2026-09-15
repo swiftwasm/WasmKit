@@ -21,6 +21,8 @@ add_wasmkit_library(WasmKit
   Execution/Instructions/ControlAccumulatorFloat.swift
   Execution/Instructions/ControlFusedAnd.swift
   Execution/Instructions/ControlFusedFloat.swift
+  Execution/Instructions/ControlFusedImm.swift
+  Execution/Instructions/IntegerImmediate.swift
   Execution/Instructions/ExceptionHandling.swift
   Execution/Instructions/Instruction.swift
   Execution/Instructions/Table.swift

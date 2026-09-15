@@ -95,7 +95,7 @@ enum VMGen {
                     switch opcode {
             """
 
-        for (opcode, inst) in instructions.enumerated() where !inst.usesAccumulator {
+        for (opcode, inst) in instructions.enumerated() where !inst.isDirectThreadedOnly {
             let owner = owners[inst.name]!
             let tryPrefix = inst.mayThrow || inst.mayDispatchToTrap ? "try " : ""
             let prefix = inst.mayDispatchToTrap ? "executeToken_" : "execute_"
@@ -168,6 +168,17 @@ enum VMGen {
         inlineImpls["globalGetToAcc"] = """
             ireg.pointee = immediate.global.withValue { $0.rawStorage.lo }
             """
+        for op in intBinImmInsts + intCmpImmInsts {
+            inlineImpls[op.instruction.name] = """
+            sp.pointee[\(op.resultType): immediate.result] = sp.pointee[\(op.type): immediate.lhs].\(camelCase(pascalCase: op.op))(immediate.\(op.type))
+            """
+        }
+        for op in intBinImmInsts {
+            let value = "sp.pointee[\(op.type): immediate.lhs].\(camelCase(pascalCase: op.op))(immediate.\(op.type))"
+            inlineImpls[op.toAcc.name] = """
+            ireg.pointee = \(op.type == "i32" ? "UInt64(\(value))" : value)
+            """
+        }
         for op in floatAccBinOps {
             let method = camelCase(pascalCase: op.op)
             inlineImpls["f64\(op.op)ToAcc"] = """
@@ -465,7 +476,13 @@ enum VMGen {
 
         """
         for (i, inst) in instructions.enumerated() {
-            output += "        case .\(inst.name): return \(i)\n"
+            // The last case is spelled `default` because the type checker gives up
+            // proving a switch over this many cases exhaustive.
+            if i == instructions.count - 1 {
+                output += "        default: return \(i)  // .\(inst.name)\n"
+            } else {
+                output += "        case .\(inst.name): return \(i)\n"
+            }
         }
         output += """
                 }
@@ -726,7 +743,7 @@ enum VMGen {
     /// the trap from the dispatcher instead. The handler body itself is written once and
     /// inlined into both.
     static func generateTokenThreadedTrapWrappers(instructions: [Instruction], inlineImpls: [String: String]) -> String {
-        let wrapped = instructions.filter { $0.mayDispatchToTrap && !$0.usesAccumulator }
+        let wrapped = instructions.filter { $0.mayDispatchToTrap && !$0.isDirectThreadedOnly }
         guard !wrapped.isEmpty else { return "" }
         var output = """
             extension Execution {

@@ -5514,6 +5514,654 @@ extension Execution {
         if let trap = memoryStoreFromFAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, freg: freg.pointee, storeOperand: immediate) { return trap.directThreadedHeadSlot }
         return next
     }
+    @_silgen_name("wasmkit_execute_i32AddImm") @inline(__always)
+    mutating func execute_i32AddImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].add(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32MulImm") @inline(__always)
+    mutating func execute_i32MulImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].mul(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32AndImm") @inline(__always)
+    mutating func execute_i32AndImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].and(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32OrImm") @inline(__always)
+    mutating func execute_i32OrImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].or(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32XorImm") @inline(__always)
+    mutating func execute_i32XorImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].xor(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32ShlImm") @inline(__always)
+    mutating func execute_i32ShlImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].shl(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32ShrSImm") @inline(__always)
+    mutating func execute_i32ShrSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].shrS(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32ShrUImm") @inline(__always)
+    mutating func execute_i32ShrUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].shrU(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32RotlImm") @inline(__always)
+    mutating func execute_i32RotlImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].rotl(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32RotrImm") @inline(__always)
+    mutating func execute_i32RotrImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].rotr(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64AddImm") @inline(__always)
+    mutating func execute_i64AddImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i64: immediate.result] = sp.pointee[i64: immediate.lhs].add(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64MulImm") @inline(__always)
+    mutating func execute_i64MulImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i64: immediate.result] = sp.pointee[i64: immediate.lhs].mul(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64AndImm") @inline(__always)
+    mutating func execute_i64AndImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i64: immediate.result] = sp.pointee[i64: immediate.lhs].and(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64OrImm") @inline(__always)
+    mutating func execute_i64OrImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i64: immediate.result] = sp.pointee[i64: immediate.lhs].or(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64XorImm") @inline(__always)
+    mutating func execute_i64XorImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i64: immediate.result] = sp.pointee[i64: immediate.lhs].xor(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64ShlImm") @inline(__always)
+    mutating func execute_i64ShlImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i64: immediate.result] = sp.pointee[i64: immediate.lhs].shl(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64ShrSImm") @inline(__always)
+    mutating func execute_i64ShrSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i64: immediate.result] = sp.pointee[i64: immediate.lhs].shrS(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64ShrUImm") @inline(__always)
+    mutating func execute_i64ShrUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i64: immediate.result] = sp.pointee[i64: immediate.lhs].shrU(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64RotlImm") @inline(__always)
+    mutating func execute_i64RotlImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i64: immediate.result] = sp.pointee[i64: immediate.lhs].rotl(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64RotrImm") @inline(__always)
+    mutating func execute_i64RotrImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i64: immediate.result] = sp.pointee[i64: immediate.lhs].rotr(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32EqImm") @inline(__always)
+    mutating func execute_i32EqImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].eq(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32NeImm") @inline(__always)
+    mutating func execute_i32NeImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].ne(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32LtSImm") @inline(__always)
+    mutating func execute_i32LtSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].ltS(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32LtUImm") @inline(__always)
+    mutating func execute_i32LtUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].ltU(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32GtSImm") @inline(__always)
+    mutating func execute_i32GtSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].gtS(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32GtUImm") @inline(__always)
+    mutating func execute_i32GtUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].gtU(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32LeSImm") @inline(__always)
+    mutating func execute_i32LeSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].leS(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32LeUImm") @inline(__always)
+    mutating func execute_i32LeUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].leU(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32GeSImm") @inline(__always)
+    mutating func execute_i32GeSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].geS(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32GeUImm") @inline(__always)
+    mutating func execute_i32GeUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i32: immediate.lhs].geU(immediate.i32)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64EqImm") @inline(__always)
+    mutating func execute_i64EqImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i64: immediate.lhs].eq(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64NeImm") @inline(__always)
+    mutating func execute_i64NeImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i64: immediate.lhs].ne(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64LtSImm") @inline(__always)
+    mutating func execute_i64LtSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i64: immediate.lhs].ltS(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64LtUImm") @inline(__always)
+    mutating func execute_i64LtUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i64: immediate.lhs].ltU(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64GtSImm") @inline(__always)
+    mutating func execute_i64GtSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i64: immediate.lhs].gtS(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64GtUImm") @inline(__always)
+    mutating func execute_i64GtUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i64: immediate.lhs].gtU(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64LeSImm") @inline(__always)
+    mutating func execute_i64LeSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i64: immediate.lhs].leS(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64LeUImm") @inline(__always)
+    mutating func execute_i64LeUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i64: immediate.lhs].leU(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64GeSImm") @inline(__always)
+    mutating func execute_i64GeSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i64: immediate.lhs].geS(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64GeUImm") @inline(__always)
+    mutating func execute_i64GeUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        sp.pointee[i32: immediate.result] = sp.pointee[i64: immediate.lhs].geU(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32EqImm") @inline(__always)
+    mutating func execute_brIfI32EqImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32EqImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32NeImm") @inline(__always)
+    mutating func execute_brIfI32NeImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32NeImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32LtSImm") @inline(__always)
+    mutating func execute_brIfI32LtSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32LtSImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32LtUImm") @inline(__always)
+    mutating func execute_brIfI32LtUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32LtUImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32GtSImm") @inline(__always)
+    mutating func execute_brIfI32GtSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32GtSImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32GtUImm") @inline(__always)
+    mutating func execute_brIfI32GtUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32GtUImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32LeSImm") @inline(__always)
+    mutating func execute_brIfI32LeSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32LeSImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32LeUImm") @inline(__always)
+    mutating func execute_brIfI32LeUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32LeUImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32GeSImm") @inline(__always)
+    mutating func execute_brIfI32GeSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32GeSImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32GeUImm") @inline(__always)
+    mutating func execute_brIfI32GeUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32GeUImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64EqImm") @inline(__always)
+    mutating func execute_brIfI64EqImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64EqImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64NeImm") @inline(__always)
+    mutating func execute_brIfI64NeImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64NeImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64LtSImm") @inline(__always)
+    mutating func execute_brIfI64LtSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64LtSImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64LtUImm") @inline(__always)
+    mutating func execute_brIfI64LtUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64LtUImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64GtSImm") @inline(__always)
+    mutating func execute_brIfI64GtSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64GtSImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64GtUImm") @inline(__always)
+    mutating func execute_brIfI64GtUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64GtUImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64LeSImm") @inline(__always)
+    mutating func execute_brIfI64LeSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64LeSImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64LeUImm") @inline(__always)
+    mutating func execute_brIfI64LeUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64LeUImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64GeSImm") @inline(__always)
+    mutating func execute_brIfI64GeSImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64GeSImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64GeUImm") @inline(__always)
+    mutating func execute_brIfI64GeUImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64GeUImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI32AndImm") @inline(__always)
+    mutating func execute_brIfI32AndImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI32AndImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfNotI32AndImm") @inline(__always)
+    mutating func execute_brIfNotI32AndImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfNotI32AndImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfI64AndImm") @inline(__always)
+    mutating func execute_brIfI64AndImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfI64AndImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfNotI64AndImm") @inline(__always)
+    mutating func execute_brIfNotI64AndImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfCmpImmOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfNotI64AndImm(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32AddImmToAcc") @inline(__always)
+    mutating func execute_i32AddImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = UInt64(sp.pointee[i32: immediate.lhs].add(immediate.i32))
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32MulImmToAcc") @inline(__always)
+    mutating func execute_i32MulImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = UInt64(sp.pointee[i32: immediate.lhs].mul(immediate.i32))
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32AndImmToAcc") @inline(__always)
+    mutating func execute_i32AndImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = UInt64(sp.pointee[i32: immediate.lhs].and(immediate.i32))
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32OrImmToAcc") @inline(__always)
+    mutating func execute_i32OrImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = UInt64(sp.pointee[i32: immediate.lhs].or(immediate.i32))
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32XorImmToAcc") @inline(__always)
+    mutating func execute_i32XorImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = UInt64(sp.pointee[i32: immediate.lhs].xor(immediate.i32))
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32ShlImmToAcc") @inline(__always)
+    mutating func execute_i32ShlImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = UInt64(sp.pointee[i32: immediate.lhs].shl(immediate.i32))
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32ShrSImmToAcc") @inline(__always)
+    mutating func execute_i32ShrSImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = UInt64(sp.pointee[i32: immediate.lhs].shrS(immediate.i32))
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32ShrUImmToAcc") @inline(__always)
+    mutating func execute_i32ShrUImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = UInt64(sp.pointee[i32: immediate.lhs].shrU(immediate.i32))
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32RotlImmToAcc") @inline(__always)
+    mutating func execute_i32RotlImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = UInt64(sp.pointee[i32: immediate.lhs].rotl(immediate.i32))
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32RotrImmToAcc") @inline(__always)
+    mutating func execute_i32RotrImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = UInt64(sp.pointee[i32: immediate.lhs].rotr(immediate.i32))
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64AddImmToAcc") @inline(__always)
+    mutating func execute_i64AddImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = sp.pointee[i64: immediate.lhs].add(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64MulImmToAcc") @inline(__always)
+    mutating func execute_i64MulImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = sp.pointee[i64: immediate.lhs].mul(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64AndImmToAcc") @inline(__always)
+    mutating func execute_i64AndImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = sp.pointee[i64: immediate.lhs].and(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64OrImmToAcc") @inline(__always)
+    mutating func execute_i64OrImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = sp.pointee[i64: immediate.lhs].or(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64XorImmToAcc") @inline(__always)
+    mutating func execute_i64XorImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = sp.pointee[i64: immediate.lhs].xor(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64ShlImmToAcc") @inline(__always)
+    mutating func execute_i64ShlImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = sp.pointee[i64: immediate.lhs].shl(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64ShrSImmToAcc") @inline(__always)
+    mutating func execute_i64ShrSImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = sp.pointee[i64: immediate.lhs].shrS(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64ShrUImmToAcc") @inline(__always)
+    mutating func execute_i64ShrUImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = sp.pointee[i64: immediate.lhs].shrU(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64RotlImmToAcc") @inline(__always)
+    mutating func execute_i64RotlImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = sp.pointee[i64: immediate.lhs].rotl(immediate.i64)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64RotrImmToAcc") @inline(__always)
+    mutating func execute_i64RotrImmToAcc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.AccBinaryImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        ireg.pointee = sp.pointee[i64: immediate.lhs].rotr(immediate.i64)
+        return next
+    }
 }
 
 #if !(os(WASI) || $Embedded)
