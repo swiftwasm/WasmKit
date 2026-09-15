@@ -267,7 +267,31 @@ extension VMGen {
         let lhsType: String
         let rhsType: String
         let resultType: String
-        var mayThrow: Bool = false
+        let mayThrow: Bool
+        /// The `Sp` accessor the left operand is read through: ``lhsType``,
+        /// unless the operation runs on a whole slot at once.
+        let lhsSlot: String
+        /// The `Sp` accessor the right operand is read through. See ``lhsSlot``.
+        let rhsSlot: String
+        /// The `Sp` accessor the result is written through. See ``lhsSlot``.
+        let resultSlot: String
+
+        /// - Parameter slot: the `Sp` accessor of both operands and the result,
+        ///   when the operation runs on whole slots rather than on the values.
+        init(
+            op: String, name: String, lhsType: String, rhsType: String, resultType: String,
+            mayThrow: Bool = false, slot: String? = nil
+        ) {
+            self.op = op
+            self.name = name
+            self.lhsType = lhsType
+            self.rhsType = rhsType
+            self.resultType = resultType
+            self.mayThrow = mayThrow
+            self.lhsSlot = slot ?? lhsType
+            self.rhsSlot = slot ?? rhsType
+            self.resultSlot = slot ?? resultType
+        }
 
         /// The instruction definition of this binary operation.
         var instruction: Instruction {
@@ -278,13 +302,39 @@ extension VMGen {
 
     /// A unary operation information.
     struct UnOpInfo {
-        var op: String
-        var name: String
-        var inputType: String
-        var resultType: String
-        var mayThrow: Bool = false
+        let op: String
+        let name: String
+        let inputType: String
+        let resultType: String
+        let mayThrow: Bool
         /// See `Instruction.handlerIdentity`.
-        var handlerIdentity: String? = nil
+        let handlerIdentity: String?
+        /// The `Sp` accessor the operand is read through: ``inputType``, unless
+        /// the operation runs on a whole slot at once.
+        let inputSlot: String
+        /// The `Sp` accessor the result is written through: ``resultType``,
+        /// unless the operation writes a whole slot at once.
+        let resultSlot: String
+
+        /// - Parameters:
+        ///   - inputSlot: the `Sp` accessor of the operand, when it is not
+        ///     `inputType`.
+        ///   - resultSlot: the `Sp` accessor of the result, when it is not
+        ///     `resultType`.
+        init(
+            op: String, name: String, inputType: String, resultType: String,
+            mayThrow: Bool = false, handlerIdentity: String? = nil,
+            inputSlot: String? = nil, resultSlot: String? = nil
+        ) {
+            self.op = op
+            self.name = name
+            self.inputType = inputType
+            self.resultType = resultType
+            self.mayThrow = mayThrow
+            self.handlerIdentity = handlerIdentity
+            self.inputSlot = inputSlot ?? inputType
+            self.resultSlot = resultSlot ?? resultType
+        }
 
         /// The instruction definition of this unary operation.
         var instruction: Instruction {
@@ -359,18 +409,23 @@ extension VMGen {
             [
                 UnOpInfo(op: "TruncTo\(result.uppercased())S", name: "\(result)Trunc\(source.uppercased())S", inputType: source, resultType: result, mayThrow: true),
                 UnOpInfo(op: "TruncTo\(result.uppercased())U", name: "\(result)Trunc\(source.uppercased())U", inputType: source, resultType: result, mayThrow: true),
-                UnOpInfo(op: "TruncSatTo\(result.uppercased())S", name: "\(result)TruncSat\(source.uppercased())S", inputType: source, resultType: result, mayThrow: true),
-                UnOpInfo(op: "TruncSatTo\(result.uppercased())U", name: "\(result)TruncSat\(source.uppercased())U", inputType: source, resultType: result, mayThrow: true)
+                UnOpInfo(op: "TruncSatTo\(result.uppercased())S", name: "\(result)TruncSat\(source.uppercased())S", inputType: source, resultType: result),
+                UnOpInfo(op: "TruncSatTo\(result.uppercased())U", name: "\(result)TruncSat\(source.uppercased())U", inputType: source, resultType: result)
             ]
         }
         // Conversion
-        let convInOut: [(source: String, result: String)] = [
-            ("i32", "f32"), ("i64", "f32"), ("i32", "f64"), ("i64", "f64")
+        // An `i32` slot's high half is zero too, so `i32 -> f32` converts both
+        // halves; an `i64` source writes its result with an explicit zero half.
+        let convInOut: [(source: String, result: String, inputSlot: String?, resultSlot: String?)] = [
+            ("i32", "f32", "i32x2", "f32x2"),
+            ("i64", "f32", nil, "f32v"),
+            ("i32", "f64", nil, nil),
+            ("i64", "f64", nil, nil),
         ]
-        results += convInOut.flatMap { source, result in
+        results += convInOut.flatMap { source, result, inputSlot, resultSlot in
             [
-                UnOpInfo(op: "ConvertTo\(result.uppercased())S", name: "\(result)Convert\(source.uppercased())S", inputType: source, resultType: result),
-                UnOpInfo(op: "ConvertTo\(result.uppercased())U", name: "\(result)Convert\(source.uppercased())U", inputType: source, resultType: result),
+                UnOpInfo(op: "ConvertTo\(result.uppercased())S", name: "\(result)Convert\(source.uppercased())S", inputType: source, resultType: result, inputSlot: inputSlot, resultSlot: resultSlot),
+                UnOpInfo(op: "ConvertTo\(result.uppercased())U", name: "\(result)Convert\(source.uppercased())U", inputType: source, resultType: result, inputSlot: inputSlot, resultSlot: resultSlot),
             ]
         }
         // Reinterpret
@@ -394,11 +449,18 @@ extension VMGen {
     static func buildFloatBinOps() -> [BinOpInfo] {
         var results: [BinOpInfo] = []
         // (T, T) -> T for all T in float types
-        results += [
-            "Add", "Sub", "Mul", "Div",
-            "Min", "Max", "CopySign",
-        ].flatMap { op -> [BinOpInfo] in
-            floatValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0) }
+        // `add`, `sub` and `mul` map `+0.0` to `+0.0`, so on `f32` they run on the
+        // whole slot -- the value and its zero high half -- through `f32x2`.
+        // `div` cannot, and writes its result with an explicit zero half through
+        // `f32v`; `min`, `max` and `copysign` stay on the value alone.
+        let sameTypeOps: [(op: String, f32Slot: String?)] = [
+            ("Add", "f32x2"), ("Sub", "f32x2"), ("Mul", "f32x2"), ("Div", "f32v"),
+            ("Min", nil), ("Max", nil), ("CopySign", nil),
+        ]
+        results += sameTypeOps.flatMap { op, f32Slot -> [BinOpInfo] in
+            [("f32", f32Slot), ("f64", nil)].map { type, slot in
+                BinOpInfo(op: op, name: "\(type)\(op)", lhsType: type, rhsType: type, resultType: type, slot: slot)
+            }
         }
         // (T, T) -> i32 for all T in float types
         results += [
@@ -413,8 +475,16 @@ extension VMGen {
     static func buildFloatUnaryOps() -> [UnOpInfo] {
         var results: [UnOpInfo] = []
         // (T) -> T for all T in float types
-        results += ["Abs", "Neg", "Ceil", "Floor", "Trunc", "Nearest", "Sqrt"].flatMap { op -> [UnOpInfo] in
-            floatValueTypes.map { UnOpInfo(op: op, name: "\($0)\(op)", inputType: $0, resultType: $0) }
+        // See `buildFloatBinOps` for the `f32x2` slot; `abs` and `neg` act on the
+        // sign bit of the value alone.
+        let sameTypeOps: [(op: String, f32Slot: String?)] = [
+            ("Abs", nil), ("Neg", nil), ("Ceil", "f32x2"), ("Floor", "f32x2"),
+            ("Trunc", "f32x2"), ("Nearest", "f32x2"), ("Sqrt", "f32x2"),
+        ]
+        results += sameTypeOps.flatMap { op, f32Slot -> [UnOpInfo] in
+            [("f32", f32Slot), ("f64", nil)].map { type, slot in
+                UnOpInfo(op: op, name: "\(type)\(op)", inputType: type, resultType: type, inputSlot: slot, resultSlot: slot)
+            }
         }
         // (f32) -> f64
         results += ["PromoteF32"].map { op -> UnOpInfo in
@@ -422,7 +492,7 @@ extension VMGen {
         }
         // (f64) -> f32
         results += ["DemoteF64"].map { op -> UnOpInfo in
-            UnOpInfo(op: op, name: "f32\(op)", inputType: "f64", resultType: "f32")
+            UnOpInfo(op: op, name: "f32\(op)", inputType: "f64", resultType: "f32", resultSlot: "f32v")
         }
         return results
     }
@@ -1026,6 +1096,19 @@ extension VMGen {
         /// The second operation.
         let op2: String
 
+        /// The `Sp` accessor of both operands and the result: ``type``, unless
+        /// the operations run on a whole slot at once.
+        let slot: String
+
+        /// - Parameter slot: the `Sp` accessor of every slot, when it is not
+        ///   `type`.
+        init(type: String, op1: String, op2: String, slot: String? = nil) {
+            self.type = type
+            self.op1 = op1
+            self.op2 = op2
+            self.slot = slot ?? type
+        }
+
         var name: String { "\(type)\(op1)\(op2)" }
 
         var instruction: Instruction {
@@ -1053,10 +1136,10 @@ extension VMGen {
     /// workloads, and each one added costs two more handlers.
     static let floatBinBinOps: [FloatBinBinOpInfo] = {
         var results: [FloatBinBinOpInfo] = []
-        for type in floatValueTypes {
+        for (type, slot) in [("f32", "f32x2"), ("f64", nil)] as [(String, String?)] {
             for op1 in ["Add", "Sub", "Mul"] {
                 for op2 in ["Add", "Sub", "Mul"] {
-                    results.append(FloatBinBinOpInfo(type: type, op1: op1, op2: op2))
+                    results.append(FloatBinBinOpInfo(type: type, op1: op1, op2: op2, slot: slot))
                 }
             }
         }
