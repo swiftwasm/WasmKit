@@ -947,6 +947,12 @@ public protocol InstructionVisitor: ~Copyable {
 
 extension InstructionVisitor where Self: ~Copyable {
     /// Visits an instruction.
+    ///
+    /// Inlinable so that each concrete visitor gets its own specialized copy:
+    /// the generic one returns the visitor's error type indirectly from every
+    /// case, which allocates and probes a stack slot per case on each call.
+    @inlinable
+    @inline(never)
     public mutating func visit(_ instruction: Instruction) throws(VisitorError) {
         switch instruction {
         case .unreachable: return try visitUnreachable()
