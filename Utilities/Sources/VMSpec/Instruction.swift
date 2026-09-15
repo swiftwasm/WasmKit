@@ -569,6 +569,19 @@ extension VMGen {
         var toAccAndSlotInstruction: Instruction {
             accInstruction("ToAccAndSlot", "sp[result] = ireg = load(sp[pointer] + offset)", .accMemoryPointerResult, .write)
         }
+        var withCopyInstruction: Instruction {
+            var inst = Instruction(
+                name: "\(type)\(op)WithCopy",
+                documentation: """
+                    `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`, on a 32-bit memory
+
+                    `\(type).\(VMGen.snakeCase(pascalCase: op))` with the copy that produced its address.
+                    """,
+                mayThrow: false, useCurrentMemory: .read, immediateLayout: .loadWithCopy)
+            inst.mayDispatchToTrap = true
+            inst.handlerIdentity = "loadWithCopy(\(identitySuffix))"
+            return inst
+        }
     }
 
     static let memoryLoadOps: [LoadOpInfo] = [
@@ -1765,6 +1778,7 @@ extension VMGen {
         copyStack2.isDirectThreadedOnly = true
         instructions += [copyStack2]
         instructions += selectCmpInsts
+        instructions += memoryLoadOps.map(\.withCopyInstruction)
         return instructions
     }
 

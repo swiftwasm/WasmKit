@@ -172,6 +172,25 @@ extension Execution {
         return nil
     }
 
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`.
+    /// The copy runs before the bounds check, as it did when it was its own instruction.
+    mutating func memoryLoadWithCopy<T: FixedWidthInteger>(
+        sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadWithCopyOperand,
+        loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
+    ) -> MemoryAccessTrap? {
+        let length = UInt64(T.bitWidth) / 8
+        let offset = UInt64(loadOperand.offset)
+        let pointer = sp[loadOperand.pointer]
+        sp[loadOperand.copyDest] = pointer
+        let address = Execution.memoryAddress(offset: offset, index: pointer.asAddressOffset())
+        if _slowPath(!Execution.isInBounds(address: address, offset: offset, length: length, ms: ms)) {
+            return .outOfBounds
+        }
+        let loaded = md.unsafelyUnwrapped.loadUnaligned(fromByteOffset: Execution.checkedByteOffset(address), as: T.self)
+        sp[loadOperand.result] = castToValue(loaded)
+        return nil
+    }
+
     /// `sp[result] = load(ireg + offset)`
     mutating func memoryLoadFromAcc<T: FixedWidthInteger>(
         sp: Sp, md: Md, ms: Ms, ireg: UInt64, loadOperand: Instruction.AccMemoryResultOperand,
