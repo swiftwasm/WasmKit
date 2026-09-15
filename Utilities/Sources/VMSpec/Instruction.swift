@@ -1457,6 +1457,20 @@ extension VMGen {
         return [sqrt, loadToFAcc, loadFromAccToFAcc, storeFromFAcc]
     }()
 
+    /// A copy followed by the accumulator's value written to a slot.
+    static let copyStackAccToSlot: Instruction = {
+        var inst = Instruction(
+            name: "copyStackAccToSlot",
+            documentation: "`sp[dest] = sp[source]`, then `sp[result] = ireg`"
+        ) {
+            $0.field(name: "source", type: .VReg)
+            $0.field(name: "dest", type: .VReg)
+            $0.field(name: "result", type: .VReg)
+        }
+        inst.useIreg = .read
+        return inst
+    }()
+
     // MARK: - Instruction generation
 
     static func buildInstructions() -> [Instruction] {
@@ -1608,6 +1622,7 @@ extension VMGen {
         instructions += intAccBinOps.map(\.toAccAndSlot)
         instructions += intBinImmInsts.map(\.toAccAndSlot)
         instructions += memoryLoadOps.map(\.toAccAndSlotInstruction)
+        instructions += [copyStackAccToSlot]
         return instructions
     }
 
