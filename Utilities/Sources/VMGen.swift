@@ -448,7 +448,7 @@ enum VMGen {
         ///
         /// NOTE: This enum representation is just for modeling purposes. The actual
         /// runtime representation can be different.
-        enum Instruction: Equatable {
+        enum Instruction {
 
         """
         for inst in instructions {
@@ -466,6 +466,8 @@ enum VMGen {
                     output += immediate.type
                 }
                 output += ")"
+            } else {
+                output += "(NoOperand)"
             }
             output += "\n"
         }
@@ -538,6 +540,9 @@ enum VMGen {
             /// - Parameter pc: The program counter to read from.
             /// - Returns: The instruction read from the program counter.
             /// - Precondition: The instruction sequence must be compiled with token threading model.
+            ///
+            /// Compiled for size: one arm per opcode, used only for disassembly.
+            @_optimize(size)
             static func load(from pc: inout Pc) -> Instruction {
                 let opcode = pc.read(UInt64.self)
                 switch opcode {
@@ -548,7 +553,7 @@ enum VMGen {
                 let maybeLabel = immediate.name.map { "\($0): " } ?? ""
                 output += "        case \(i): return .\(inst.name)(\(maybeLabel)\(immediate.type).load(from: &pc))\n"
             } else {
-                output += "        case \(i): return .\(inst.name)\n"
+                output += "        case \(i): return .\(inst.name)(NoOperand())\n"
             }
         }
         output += """
@@ -648,7 +653,7 @@ enum VMGen {
                 // Simple immediate type (e.g. BrOperand = Int32)
                 dummyExpr = ".\(inst.name)(\(immediate.type)(0))"
             } else {
-                dummyExpr = ".\(inst.name)"
+                dummyExpr = ".\(inst.name)(Instruction.NoOperand())"
             }
             output += """
                         do {
@@ -676,6 +681,14 @@ enum VMGen {
 
         extension Instruction {
             // MARK: - Instruction Immediates
+
+            /// The payload of instructions without an immediate. It is never
+            /// emitted; a payload on every case keeps the enum tag equal to the
+            /// opcode ID, so `opcodeID` needs no table.
+            struct NoOperand {
+                init() {}
+                private var reserved: UInt8 = 0
+            }
 
         """
 
@@ -1001,10 +1014,16 @@ enum VMGen {
                 extension Instruction {
                     /// The tail-calling execution handler for the instruction.
                     var handler: UInt {
+                        Instruction.handler(opcodeID: self.opcodeID)
+                    }
+
+                    /// The tail-calling execution handler for an opcode.
+                    @inline(__always)
+                    static func handler(opcodeID: OpcodeID) -> UInt {
                         #if os(WASI) || $Embedded
                         fatalError("Direct threading is not supported on this platform")
                         #else
-                        return wasmkitExecHandlerTable[Int(self.opcodeID)]
+                        return wasmkitExecHandlerTable[Int(opcodeID)]
                         #endif
                     }
                 }
