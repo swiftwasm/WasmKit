@@ -752,7 +752,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f32AddAdd(Instruction.FloatBinBinOperand)
+    case f32AddAdd(Instruction.BinBinOperand)
     /// `result = (x add y) sub z`, on `f32` operands
     /// 
     /// Superinstruction fusing `f32.add` with the
@@ -760,7 +760,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f32AddSub(Instruction.FloatBinBinOperand)
+    case f32AddSub(Instruction.BinBinOperand)
     /// `result = (x add y) mul z`, on `f32` operands
     /// 
     /// Superinstruction fusing `f32.add` with the
@@ -768,7 +768,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f32AddMul(Instruction.FloatBinBinOperand)
+    case f32AddMul(Instruction.BinBinOperand)
     /// `result = (x sub y) add z`, on `f32` operands
     /// 
     /// Superinstruction fusing `f32.sub` with the
@@ -776,7 +776,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f32SubAdd(Instruction.FloatBinBinOperand)
+    case f32SubAdd(Instruction.BinBinOperand)
     /// `result = (x sub y) sub z`, on `f32` operands
     /// 
     /// Superinstruction fusing `f32.sub` with the
@@ -784,7 +784,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f32SubSub(Instruction.FloatBinBinOperand)
+    case f32SubSub(Instruction.BinBinOperand)
     /// `result = (x sub y) mul z`, on `f32` operands
     /// 
     /// Superinstruction fusing `f32.sub` with the
@@ -792,7 +792,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f32SubMul(Instruction.FloatBinBinOperand)
+    case f32SubMul(Instruction.BinBinOperand)
     /// `result = (x mul y) add z`, on `f32` operands
     /// 
     /// Superinstruction fusing `f32.mul` with the
@@ -800,7 +800,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f32MulAdd(Instruction.FloatBinBinOperand)
+    case f32MulAdd(Instruction.BinBinOperand)
     /// `result = (x mul y) sub z`, on `f32` operands
     /// 
     /// Superinstruction fusing `f32.mul` with the
@@ -808,7 +808,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f32MulSub(Instruction.FloatBinBinOperand)
+    case f32MulSub(Instruction.BinBinOperand)
     /// `result = (x mul y) mul z`, on `f32` operands
     /// 
     /// Superinstruction fusing `f32.mul` with the
@@ -816,7 +816,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f32MulMul(Instruction.FloatBinBinOperand)
+    case f32MulMul(Instruction.BinBinOperand)
     /// `result = (x add y) add z`, on `f64` operands
     /// 
     /// Superinstruction fusing `f64.add` with the
@@ -824,7 +824,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f64AddAdd(Instruction.FloatBinBinOperand)
+    case f64AddAdd(Instruction.BinBinOperand)
     /// `result = (x add y) sub z`, on `f64` operands
     /// 
     /// Superinstruction fusing `f64.add` with the
@@ -832,7 +832,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f64AddSub(Instruction.FloatBinBinOperand)
+    case f64AddSub(Instruction.BinBinOperand)
     /// `result = (x add y) mul z`, on `f64` operands
     /// 
     /// Superinstruction fusing `f64.add` with the
@@ -840,7 +840,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f64AddMul(Instruction.FloatBinBinOperand)
+    case f64AddMul(Instruction.BinBinOperand)
     /// `result = (x sub y) add z`, on `f64` operands
     /// 
     /// Superinstruction fusing `f64.sub` with the
@@ -848,7 +848,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f64SubAdd(Instruction.FloatBinBinOperand)
+    case f64SubAdd(Instruction.BinBinOperand)
     /// `result = (x sub y) sub z`, on `f64` operands
     /// 
     /// Superinstruction fusing `f64.sub` with the
@@ -856,7 +856,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f64SubSub(Instruction.FloatBinBinOperand)
+    case f64SubSub(Instruction.BinBinOperand)
     /// `result = (x sub y) mul z`, on `f64` operands
     /// 
     /// Superinstruction fusing `f64.sub` with the
@@ -864,7 +864,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f64SubMul(Instruction.FloatBinBinOperand)
+    case f64SubMul(Instruction.BinBinOperand)
     /// `result = (x mul y) add z`, on `f64` operands
     /// 
     /// Superinstruction fusing `f64.mul` with the
@@ -872,7 +872,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f64MulAdd(Instruction.FloatBinBinOperand)
+    case f64MulAdd(Instruction.BinBinOperand)
     /// `result = (x mul y) sub z`, on `f64` operands
     /// 
     /// Superinstruction fusing `f64.mul` with the
@@ -880,7 +880,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f64MulSub(Instruction.FloatBinBinOperand)
+    case f64MulSub(Instruction.BinBinOperand)
     /// `result = (x mul y) mul z`, on `f64` operands
     /// 
     /// Superinstruction fusing `f64.mul` with the
@@ -888,7 +888,7 @@ enum Instruction: Equatable {
     /// the intermediate in a register instead of a frame slot. Each
     /// operation rounds separately -- this is **not** a fused
     /// multiply-add.
-    case f64MulMul(Instruction.FloatBinBinOperand)
+    case f64MulMul(Instruction.BinBinOperand)
     /// Conditional pc-relative branch if `(lhs & rhs) != 0` for `i32` operands
     /// 
     /// Fused form of `i32.and` followed by `br_if`.
@@ -905,6 +905,204 @@ enum Instruction: Equatable {
     /// 
     /// Fused form of `i64.and` followed by `br_if_not`.
     case brIfNotI64And(Instruction.BrIfCmpOperand)
+    /// `result = (x shl y) add z`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.shl` with the
+    /// `i32.add` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32ShlAdd(Instruction.BinBinOperand)
+    /// `result = (x mul y) add z`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.mul` with the
+    /// `i32.add` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32MulAdd(Instruction.BinBinOperand)
+    /// `result = (x add y) add z`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.add` with the
+    /// `i32.add` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32AddAdd(Instruction.BinBinOperand)
+    /// `result = (x and y) add z`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.and` with the
+    /// `i32.add` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32AndAdd(Instruction.BinBinOperand)
+    /// `result = (x shr_u y) and z`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.shr_u` with the
+    /// `i32.and` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32ShrUAnd(Instruction.BinBinOperand)
+    /// `result = (x or y) and z`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.or` with the
+    /// `i32.and` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32OrAnd(Instruction.BinBinOperand)
+    /// `result = (x shr_u y) add z`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.shr_u` with the
+    /// `i32.add` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32ShrUAdd(Instruction.BinBinOperand)
+    /// `result = (x sub y) and z`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.sub` with the
+    /// `i32.and` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32SubAnd(Instruction.BinBinOperand)
+    /// `result = (x shl y) or z`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.shl` with the
+    /// `i32.or` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32ShlOr(Instruction.BinBinOperand)
+    /// `result = (x add y) and z`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.add` with the
+    /// `i32.and` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32AddAnd(Instruction.BinBinOperand)
+    /// `result = (x shr_u y) or z`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.shr_u` with the
+    /// `i32.or` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32ShrUOr(Instruction.BinBinOperand)
+    /// `result = (x xor y) shr_u z`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.xor` with the
+    /// `i32.shr_u` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32XorShrU(Instruction.BinBinOperand)
+    /// `result = (x add y) sub z`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.add` with the
+    /// `i32.sub` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32AddSub(Instruction.BinBinOperand)
+    /// `result = (x xor y) shl z`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.xor` with the
+    /// `i32.shl` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32XorShl(Instruction.BinBinOperand)
+    /// `result = (x sub y) add z`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.sub` with the
+    /// `i32.add` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32SubAdd(Instruction.BinBinOperand)
+    /// `result = (x and y) shl z`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.and` with the
+    /// `i32.shl` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32AndShl(Instruction.BinBinOperand)
+    /// `result = (x xor y) rotl z`, on `i64` operands
+    /// 
+    /// Superinstruction fusing `i64.xor` with the
+    /// `i64.rotl` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i64XorRotl(Instruction.BinBinOperand)
+    /// `result = (x mul y) add z`, on `i64` operands
+    /// 
+    /// Superinstruction fusing `i64.mul` with the
+    /// `i64.add` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i64MulAdd(Instruction.BinBinOperand)
+    /// `result = (x shl y) and z`, on `i64` operands
+    /// 
+    /// Superinstruction fusing `i64.shl` with the
+    /// `i64.and` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i64ShlAnd(Instruction.BinBinOperand)
+    /// `result = (x and y) mul z`, on `i64` operands
+    /// 
+    /// Superinstruction fusing `i64.and` with the
+    /// `i64.mul` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i64AndMul(Instruction.BinBinOperand)
+    /// `result = (x shl y) or z`, on `i64` operands
+    /// 
+    /// Superinstruction fusing `i64.shl` with the
+    /// `i64.or` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i64ShlOr(Instruction.BinBinOperand)
+    /// `result = (x xor y) and z`, on `i64` operands
+    /// 
+    /// Superinstruction fusing `i64.xor` with the
+    /// `i64.and` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i64XorAnd(Instruction.BinBinOperand)
+    /// `result = (x mul y) xor z`, on `i64` operands
+    /// 
+    /// Superinstruction fusing `i64.mul` with the
+    /// `i64.xor` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i64MulXor(Instruction.BinBinOperand)
+    /// `result = (x and y) xor z`, on `i64` operands
+    /// 
+    /// Superinstruction fusing `i64.and` with the
+    /// `i64.xor` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i64AndXor(Instruction.BinBinOperand)
+    /// `result = (x rotl y) xor z`, on `i64` operands
+    /// 
+    /// Superinstruction fusing `i64.rotl` with the
+    /// `i64.xor` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i64RotlXor(Instruction.BinBinOperand)
+    /// `result = (x sub y) and z`, on `i64` operands
+    /// 
+    /// Superinstruction fusing `i64.sub` with the
+    /// `i64.and` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i64SubAnd(Instruction.BinBinOperand)
+    /// `result = (x xor y) xor z`, on `i64` operands
+    /// 
+    /// Superinstruction fusing `i64.xor` with the
+    /// `i64.xor` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i64XorXor(Instruction.BinBinOperand)
+    /// `result = (x or y) or z`, on `i64` operands
+    /// 
+    /// Superinstruction fusing `i64.or` with the
+    /// `i64.or` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i64OrOr(Instruction.BinBinOperand)
+    /// `result = (x shr_u y) and z`, on `i64` operands
+    /// 
+    /// Superinstruction fusing `i64.shr_u` with the
+    /// `i64.and` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i64ShrUAnd(Instruction.BinBinOperand)
+    /// `result = (x and y) and z`, on `i64` operands
+    /// 
+    /// Superinstruction fusing `i64.and` with the
+    /// `i64.and` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i64AndAnd(Instruction.BinBinOperand)
+    /// `result = (x xor y) mul z`, on `i64` operands
+    /// 
+    /// Superinstruction fusing `i64.xor` with the
+    /// `i64.mul` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i64XorMul(Instruction.BinBinOperand)
+    /// `result = (x xor y) shr_u z`, on `i64` operands
+    /// 
+    /// Superinstruction fusing `i64.xor` with the
+    /// `i64.shr_u` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i64XorShrU(Instruction.BinBinOperand)
+    /// `result = z sub (x mul y)`, on `i32` operands
+    /// 
+    /// Superinstruction fusing `i32.mul` with the
+    /// `i32.sub` that immediately consumes its result, keeping
+    /// the intermediate in a register instead of a frame slot.
+    case i32MulSubRev(Instruction.BinBinOperand)
 }
 
 extension Instruction {
@@ -1691,7 +1889,7 @@ extension Instruction {
         }
     }
 
-    struct FloatBinBinOperand: Equatable, InstructionImmediate {
+    struct BinBinOperand: Equatable, InstructionImmediate {
         var result: VReg
         var x: VReg
         var y: VReg
@@ -2042,6 +2240,39 @@ extension Instruction {
         case .brIfNotI32And(let immediate): return immediate
         case .brIfI64And(let immediate): return immediate
         case .brIfNotI64And(let immediate): return immediate
+        case .i32ShlAdd(let immediate): return immediate
+        case .i32MulAdd(let immediate): return immediate
+        case .i32AddAdd(let immediate): return immediate
+        case .i32AndAdd(let immediate): return immediate
+        case .i32ShrUAnd(let immediate): return immediate
+        case .i32OrAnd(let immediate): return immediate
+        case .i32ShrUAdd(let immediate): return immediate
+        case .i32SubAnd(let immediate): return immediate
+        case .i32ShlOr(let immediate): return immediate
+        case .i32AddAnd(let immediate): return immediate
+        case .i32ShrUOr(let immediate): return immediate
+        case .i32XorShrU(let immediate): return immediate
+        case .i32AddSub(let immediate): return immediate
+        case .i32XorShl(let immediate): return immediate
+        case .i32SubAdd(let immediate): return immediate
+        case .i32AndShl(let immediate): return immediate
+        case .i64XorRotl(let immediate): return immediate
+        case .i64MulAdd(let immediate): return immediate
+        case .i64ShlAnd(let immediate): return immediate
+        case .i64AndMul(let immediate): return immediate
+        case .i64ShlOr(let immediate): return immediate
+        case .i64XorAnd(let immediate): return immediate
+        case .i64MulXor(let immediate): return immediate
+        case .i64AndXor(let immediate): return immediate
+        case .i64RotlXor(let immediate): return immediate
+        case .i64SubAnd(let immediate): return immediate
+        case .i64XorXor(let immediate): return immediate
+        case .i64OrOr(let immediate): return immediate
+        case .i64ShrUAnd(let immediate): return immediate
+        case .i64AndAnd(let immediate): return immediate
+        case .i64XorMul(let immediate): return immediate
+        case .i64XorShrU(let immediate): return immediate
+        case .i32MulSubRev(let immediate): return immediate
         default: return nil
         }
     }
@@ -2375,6 +2606,39 @@ extension Instruction {
         case .brIfNotI32And(let immediate): immediate.emit(to: emit)
         case .brIfI64And(let immediate): immediate.emit(to: emit)
         case .brIfNotI64And(let immediate): immediate.emit(to: emit)
+        case .i32ShlAdd(let immediate): immediate.emit(to: emit)
+        case .i32MulAdd(let immediate): immediate.emit(to: emit)
+        case .i32AddAdd(let immediate): immediate.emit(to: emit)
+        case .i32AndAdd(let immediate): immediate.emit(to: emit)
+        case .i32ShrUAnd(let immediate): immediate.emit(to: emit)
+        case .i32OrAnd(let immediate): immediate.emit(to: emit)
+        case .i32ShrUAdd(let immediate): immediate.emit(to: emit)
+        case .i32SubAnd(let immediate): immediate.emit(to: emit)
+        case .i32ShlOr(let immediate): immediate.emit(to: emit)
+        case .i32AddAnd(let immediate): immediate.emit(to: emit)
+        case .i32ShrUOr(let immediate): immediate.emit(to: emit)
+        case .i32XorShrU(let immediate): immediate.emit(to: emit)
+        case .i32AddSub(let immediate): immediate.emit(to: emit)
+        case .i32XorShl(let immediate): immediate.emit(to: emit)
+        case .i32SubAdd(let immediate): immediate.emit(to: emit)
+        case .i32AndShl(let immediate): immediate.emit(to: emit)
+        case .i64XorRotl(let immediate): immediate.emit(to: emit)
+        case .i64MulAdd(let immediate): immediate.emit(to: emit)
+        case .i64ShlAnd(let immediate): immediate.emit(to: emit)
+        case .i64AndMul(let immediate): immediate.emit(to: emit)
+        case .i64ShlOr(let immediate): immediate.emit(to: emit)
+        case .i64XorAnd(let immediate): immediate.emit(to: emit)
+        case .i64MulXor(let immediate): immediate.emit(to: emit)
+        case .i64AndXor(let immediate): immediate.emit(to: emit)
+        case .i64RotlXor(let immediate): immediate.emit(to: emit)
+        case .i64SubAnd(let immediate): immediate.emit(to: emit)
+        case .i64XorXor(let immediate): immediate.emit(to: emit)
+        case .i64OrOr(let immediate): immediate.emit(to: emit)
+        case .i64ShrUAnd(let immediate): immediate.emit(to: emit)
+        case .i64AndAnd(let immediate): immediate.emit(to: emit)
+        case .i64XorMul(let immediate): immediate.emit(to: emit)
+        case .i64XorShrU(let immediate): immediate.emit(to: emit)
+        case .i32MulSubRev(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -2718,6 +2982,39 @@ extension Instruction {
         case .brIfNotI32And: return 330
         case .brIfI64And: return 331
         case .brIfNotI64And: return 332
+        case .i32ShlAdd: return 333
+        case .i32MulAdd: return 334
+        case .i32AddAdd: return 335
+        case .i32AndAdd: return 336
+        case .i32ShrUAnd: return 337
+        case .i32OrAnd: return 338
+        case .i32ShrUAdd: return 339
+        case .i32SubAnd: return 340
+        case .i32ShlOr: return 341
+        case .i32AddAnd: return 342
+        case .i32ShrUOr: return 343
+        case .i32XorShrU: return 344
+        case .i32AddSub: return 345
+        case .i32XorShl: return 346
+        case .i32SubAdd: return 347
+        case .i32AndShl: return 348
+        case .i64XorRotl: return 349
+        case .i64MulAdd: return 350
+        case .i64ShlAnd: return 351
+        case .i64AndMul: return 352
+        case .i64ShlOr: return 353
+        case .i64XorAnd: return 354
+        case .i64MulXor: return 355
+        case .i64AndXor: return 356
+        case .i64RotlXor: return 357
+        case .i64SubAnd: return 358
+        case .i64XorXor: return 359
+        case .i64OrOr: return 360
+        case .i64ShrUAnd: return 361
+        case .i64AndAnd: return 362
+        case .i64XorMul: return 363
+        case .i64XorShrU: return 364
+        case .i32MulSubRev: return 365
         }
     }
 }
@@ -3040,28 +3337,61 @@ extension Instruction {
         case 308: return .brIfF64Le(Instruction.BrIfCmpOperand.load(from: &pc))
         case 309: return .brIfNotF64Lt(Instruction.BrIfCmpOperand.load(from: &pc))
         case 310: return .brIfNotF64Le(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 311: return .f32AddAdd(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 312: return .f32AddSub(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 313: return .f32AddMul(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 314: return .f32SubAdd(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 315: return .f32SubSub(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 316: return .f32SubMul(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 317: return .f32MulAdd(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 318: return .f32MulSub(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 319: return .f32MulMul(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 320: return .f64AddAdd(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 321: return .f64AddSub(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 322: return .f64AddMul(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 323: return .f64SubAdd(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 324: return .f64SubSub(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 325: return .f64SubMul(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 326: return .f64MulAdd(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 327: return .f64MulSub(Instruction.FloatBinBinOperand.load(from: &pc))
-        case 328: return .f64MulMul(Instruction.FloatBinBinOperand.load(from: &pc))
+        case 311: return .f32AddAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 312: return .f32AddSub(Instruction.BinBinOperand.load(from: &pc))
+        case 313: return .f32AddMul(Instruction.BinBinOperand.load(from: &pc))
+        case 314: return .f32SubAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 315: return .f32SubSub(Instruction.BinBinOperand.load(from: &pc))
+        case 316: return .f32SubMul(Instruction.BinBinOperand.load(from: &pc))
+        case 317: return .f32MulAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 318: return .f32MulSub(Instruction.BinBinOperand.load(from: &pc))
+        case 319: return .f32MulMul(Instruction.BinBinOperand.load(from: &pc))
+        case 320: return .f64AddAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 321: return .f64AddSub(Instruction.BinBinOperand.load(from: &pc))
+        case 322: return .f64AddMul(Instruction.BinBinOperand.load(from: &pc))
+        case 323: return .f64SubAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 324: return .f64SubSub(Instruction.BinBinOperand.load(from: &pc))
+        case 325: return .f64SubMul(Instruction.BinBinOperand.load(from: &pc))
+        case 326: return .f64MulAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 327: return .f64MulSub(Instruction.BinBinOperand.load(from: &pc))
+        case 328: return .f64MulMul(Instruction.BinBinOperand.load(from: &pc))
         case 329: return .brIfI32And(Instruction.BrIfCmpOperand.load(from: &pc))
         case 330: return .brIfNotI32And(Instruction.BrIfCmpOperand.load(from: &pc))
         case 331: return .brIfI64And(Instruction.BrIfCmpOperand.load(from: &pc))
         case 332: return .brIfNotI64And(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 333: return .i32ShlAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 334: return .i32MulAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 335: return .i32AddAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 336: return .i32AndAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 337: return .i32ShrUAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 338: return .i32OrAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 339: return .i32ShrUAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 340: return .i32SubAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 341: return .i32ShlOr(Instruction.BinBinOperand.load(from: &pc))
+        case 342: return .i32AddAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 343: return .i32ShrUOr(Instruction.BinBinOperand.load(from: &pc))
+        case 344: return .i32XorShrU(Instruction.BinBinOperand.load(from: &pc))
+        case 345: return .i32AddSub(Instruction.BinBinOperand.load(from: &pc))
+        case 346: return .i32XorShl(Instruction.BinBinOperand.load(from: &pc))
+        case 347: return .i32SubAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 348: return .i32AndShl(Instruction.BinBinOperand.load(from: &pc))
+        case 349: return .i64XorRotl(Instruction.BinBinOperand.load(from: &pc))
+        case 350: return .i64MulAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 351: return .i64ShlAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 352: return .i64AndMul(Instruction.BinBinOperand.load(from: &pc))
+        case 353: return .i64ShlOr(Instruction.BinBinOperand.load(from: &pc))
+        case 354: return .i64XorAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 355: return .i64MulXor(Instruction.BinBinOperand.load(from: &pc))
+        case 356: return .i64AndXor(Instruction.BinBinOperand.load(from: &pc))
+        case 357: return .i64RotlXor(Instruction.BinBinOperand.load(from: &pc))
+        case 358: return .i64SubAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 359: return .i64XorXor(Instruction.BinBinOperand.load(from: &pc))
+        case 360: return .i64OrOr(Instruction.BinBinOperand.load(from: &pc))
+        case 361: return .i64ShrUAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 362: return .i64AndAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 363: return .i64XorMul(Instruction.BinBinOperand.load(from: &pc))
+        case 364: return .i64XorShrU(Instruction.BinBinOperand.load(from: &pc))
+        case 365: return .i32MulSubRev(Instruction.BinBinOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -3409,6 +3739,39 @@ extension Instruction {
         case 330: return "brIfNotI32And"
         case 331: return "brIfI64And"
         case 332: return "brIfNotI64And"
+        case 333: return "i32ShlAdd"
+        case 334: return "i32MulAdd"
+        case 335: return "i32AddAdd"
+        case 336: return "i32AndAdd"
+        case 337: return "i32ShrUAnd"
+        case 338: return "i32OrAnd"
+        case 339: return "i32ShrUAdd"
+        case 340: return "i32SubAnd"
+        case 341: return "i32ShlOr"
+        case 342: return "i32AddAnd"
+        case 343: return "i32ShrUOr"
+        case 344: return "i32XorShrU"
+        case 345: return "i32AddSub"
+        case 346: return "i32XorShl"
+        case 347: return "i32SubAdd"
+        case 348: return "i32AndShl"
+        case 349: return "i64XorRotl"
+        case 350: return "i64MulAdd"
+        case 351: return "i64ShlAnd"
+        case 352: return "i64AndMul"
+        case 353: return "i64ShlOr"
+        case 354: return "i64XorAnd"
+        case 355: return "i64MulXor"
+        case 356: return "i64AndXor"
+        case 357: return "i64RotlXor"
+        case 358: return "i64SubAnd"
+        case 359: return "i64XorXor"
+        case 360: return "i64OrOr"
+        case 361: return "i64ShrUAnd"
+        case 362: return "i64AndAnd"
+        case 363: return "i64XorMul"
+        case 364: return "i64XorShrU"
+        case 365: return "i32MulSubRev"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }

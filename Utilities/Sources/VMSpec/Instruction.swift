@@ -943,7 +943,7 @@ extension VMGen {
                     operation rounds separately -- this is **not** a fused
                     multiply-add.
                     """,
-                immediateLayout: .floatBinBin
+                immediateLayout: .binBin
             )
         }
     }
@@ -963,6 +963,73 @@ extension VMGen {
                 }
             }
         }
+        return results
+    }()
+
+    // MARK: - Two-operation integer superinstructions
+
+    /// `result = (x op1 y) op2 z` on integer operands, or
+    /// `result = z op2 (x op1 y)` when ``reversed`` is set.
+    ///
+    /// Every operation here wraps or is a bit operation, and the generated
+    /// body calls the same helpers as the unfused instructions, so shift
+    /// amounts are masked identically. `div`/`rem` are left out because they
+    /// can trap.
+    struct IntBinBinOpInfo {
+        /// `i32` or `i64`.
+        let type: String
+        /// The producing operation, in `Add`/`ShrU`/... spelling.
+        let op1: String
+        /// The consuming operation.
+        let op2: String
+        /// The intermediate is the right operand of `op2`. Only needed for a
+        /// non-commutative `op2`; a commutative one swaps its operands instead.
+        var reversed: Bool = false
+
+        var name: String { "\(type)\(op1)\(op2)\(reversed ? "Rev" : "")" }
+
+        var instruction: Instruction {
+            let op1Name = VMGen.snakeCase(pascalCase: op1)
+            let op2Name = VMGen.snakeCase(pascalCase: op2)
+            let expression =
+                reversed
+                ? "`result = z \(op2Name) (x \(op1Name) y)`"
+                : "`result = (x \(op1Name) y) \(op2Name) z`"
+            return Instruction(
+                name: name,
+                documentation: """
+                    \(expression), on `\(type)` operands
+
+                    Superinstruction fusing `\(type).\(op1Name)` with the
+                    `\(type).\(op2Name)` that immediately consumes its result, keeping
+                    the intermediate in a register instead of a frame slot.
+                    """,
+                immediateLayout: .binBin
+            )
+        }
+    }
+
+    /// The integer `(op1, op2)` pairs that get a superinstruction: the most
+    /// frequent adjacent producer/consumer pairs in loop bodies of the
+    /// benchmark inputs. The remaining pairs are a long tail.
+    static let intBinBinOps: [IntBinBinOpInfo] = {
+        let i32Pairs = [
+            ("Shl", "Add"), ("Mul", "Add"), ("Add", "Add"), ("And", "Add"),
+            ("ShrU", "And"), ("Or", "And"), ("ShrU", "Add"), ("Sub", "And"),
+            ("Shl", "Or"), ("Add", "And"), ("ShrU", "Or"), ("Xor", "ShrU"),
+            ("Add", "Sub"), ("Xor", "Shl"), ("Sub", "Add"), ("And", "Shl"),
+        ]
+        let i64Pairs = [
+            ("Xor", "Rotl"), ("Mul", "Add"), ("Shl", "And"), ("And", "Mul"),
+            ("Shl", "Or"), ("Xor", "And"), ("Mul", "Xor"), ("And", "Xor"),
+            ("Rotl", "Xor"), ("Sub", "And"), ("Xor", "Xor"), ("Or", "Or"),
+            ("ShrU", "And"), ("And", "And"), ("Xor", "Mul"), ("Xor", "ShrU"),
+        ]
+        var results: [IntBinBinOpInfo] = []
+        results += i32Pairs.map { IntBinBinOpInfo(type: "i32", op1: $0.0, op2: $0.1) }
+        results += i64Pairs.map { IntBinBinOpInfo(type: "i64", op1: $0.0, op2: $0.1) }
+        // `z - x * y` cannot be reached by swapping operands.
+        results.append(IntBinBinOpInfo(type: "i32", op1: "Mul", op2: "Sub", reversed: true))
         return results
     }()
 
@@ -1098,6 +1165,7 @@ extension VMGen {
         instructions += brIfFCmpInsts
         instructions += floatBinBinOps.map(\.instruction)
         instructions += brIfAndInsts
+        instructions += intBinBinOps.map(\.instruction)
         return instructions
     }
 
