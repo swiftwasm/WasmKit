@@ -2404,17 +2404,17 @@ extension Instruction {
     }
 
     struct BrTableOperand: Equatable, InstructionImmediate {
-        var rawBaseAddress: UInt64
-        var count: UInt16
         var index: VReg
+        var lastIndex: UInt16
+        var rawBaseAddress: UInt64
         @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (index, lastIndex, _, _, _, _) = pc.read((VReg, UInt16, UInt8, UInt8, UInt8, UInt8).self)
             let (rawBaseAddress) = pc.read((UInt64).self)
-            let (count, index, _, _, _, _) = pc.read((UInt16, VReg, UInt8, UInt8, UInt8, UInt8).self)
-            return Self(rawBaseAddress: rawBaseAddress, count: count, index: index)
+            return Self(index: index, lastIndex: lastIndex, rawBaseAddress: rawBaseAddress)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.index, $0.lastIndex, 0, 0, 0, 0) as (VReg, UInt16, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
             emitSlot { $0.rawBaseAddress }
-            emitSlot { unsafeBitCast(($0.count, $0.index, 0, 0, 0, 0) as (UInt16, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
@@ -7141,7 +7141,7 @@ extension Instruction {
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.brTable(.init(rawBaseAddress: UInt64(0), count: UInt16(0), index: VReg.zero))
+                let inst = Instruction.brTable(.init(index: VReg.zero, lastIndex: UInt16(0), rawBaseAddress: UInt64(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {

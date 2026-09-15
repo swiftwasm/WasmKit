@@ -37,9 +37,12 @@ extension Execution {
         }
         return pc.advanced(by: Int(immediate.offset)).next()
     }
+    /// Inlined into its handler, which otherwise calls it out of line with a
+    /// stack frame. The clamp is a data select, not a branch to predict.
+    @inline(__always)
     mutating func brTable(sp: Sp, pc: Pc, immediate: Instruction.BrTableOperand) -> (Pc, CodeSlot) {
         let index = sp[i32: immediate.index]
-        let normalizedOffset = min(Int(index), Int(immediate.count - 1))
+        let normalizedOffset = min(Int(index), Int(immediate.lastIndex))
         let entry = immediate.baseAddress[normalizedOffset]
         return pc.advanced(by: Int(entry.offset)).next()
     }
