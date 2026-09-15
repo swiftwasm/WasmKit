@@ -164,6 +164,11 @@ enum VMGen {
             inlineImpls[op.inAccName] = """
                 ireg.pointee = \(store("\(load).\(method)(sp.pointee[\(op.type): immediate.operand])"))
                 """
+            inlineImpls[op.toAccAndSlot.name] = """
+                let value = sp.pointee[\(op.type): immediate.lhs].\(method)(sp.pointee[\(op.type): immediate.rhs])
+                        sp.pointee[\(op.type): immediate.result] = value
+                        ireg.pointee = \(store("value"))
+                """
         }
         inlineImpls["globalGetToAcc"] = """
             ireg.pointee = immediate.global.withValue { $0.rawStorage.lo }
@@ -177,6 +182,11 @@ enum VMGen {
             let value = "sp.pointee[\(op.type): immediate.lhs].\(camelCase(pascalCase: op.op))(immediate.\(op.type))"
             inlineImpls[op.toAcc.name] = """
             ireg.pointee = \(op.type == "i32" ? "UInt64(\(value))" : value)
+            """
+            inlineImpls[op.toAccAndSlot.name] = """
+            let value = \(value)
+                    sp.pointee[\(op.type): immediate.result] = value
+                    ireg.pointee = \(op.type == "i32" ? "UInt64(value)" : "value")
             """
         }
         for op in floatAccBinOps {
@@ -234,6 +244,9 @@ enum VMGen {
         for op in memoryLoadOps {
             inlineImpls[op.toAccInstruction.name] = """
             if let trap = memoryLoadToAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) }) { %TRAP% }
+            """
+            inlineImpls[op.toAccAndSlotInstruction.name] = """
+            if let trap = memoryLoadToAccAndSlot(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: &ireg.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) }) { %TRAP% }
             """
             inlineImpls[op.fromAccInstruction.name] = """
             if let trap = memoryLoadFromAcc(sp: sp.pointee, md: md.pointee, ms: ms.pointee, ireg: ireg.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) }) { %TRAP% }

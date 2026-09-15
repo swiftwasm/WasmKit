@@ -496,6 +496,9 @@ extension VMGen {
         var inAccInstruction: Instruction {
             accInstruction("InAcc", "ireg = load(ireg + offset)", .accMemoryOffset, .write)
         }
+        var toAccAndSlotInstruction: Instruction {
+            accInstruction("ToAccAndSlot", "sp[result] = ireg = load(sp[pointer] + offset)", .accMemoryPointerResult, .write)
+        }
     }
 
     static let memoryLoadOps: [LoadOpInfo] = [
@@ -1172,6 +1175,9 @@ extension VMGen {
         var inAcc: Instruction {
             instruction(inAccName, "ireg = ireg \(VMGen.snakeCase(pascalCase: op)) y", .acc, .write)
         }
+        var toAccAndSlot: Instruction {
+            instruction("\(type)\(op)ToAccAndSlot", "result = ireg = x \(VMGen.snakeCase(pascalCase: op)) y", .binary, .write)
+        }
     }
 
     static let intAccBinOps: [IntAccBinOpInfo] = {
@@ -1262,6 +1268,17 @@ extension VMGen {
                 immediateLayout: .binaryImm
             )
             inst.isDirectThreadedOnly = true
+            return inst
+        }
+
+        /// `result = ireg = x op imm`.
+        var toAccAndSlot: Instruction {
+            var inst = Instruction(
+                name: "\(name)ToAccAndSlot",
+                documentation: "`result = ireg = x \(VMGen.snakeCase(pascalCase: op)) imm`, on `\(type)` operands",
+                immediateLayout: .binaryImm
+            )
+            inst.useIreg = .write
             return inst
         }
 
@@ -1588,6 +1605,9 @@ extension VMGen {
         instructions += brIfCmpImmInsts
         instructions += brIfAndImmInsts
         instructions += intBinImmInsts.map(\.toAcc)
+        instructions += intAccBinOps.map(\.toAccAndSlot)
+        instructions += intBinImmInsts.map(\.toAccAndSlot)
+        instructions += memoryLoadOps.map(\.toAccAndSlotInstruction)
         return instructions
     }
 
