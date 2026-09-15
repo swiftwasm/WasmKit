@@ -1639,6 +1639,17 @@ extension VMGen {
         instructions += intBinImmInsts.map(\.toAccAndSlot)
         instructions += memoryLoadOps.map(\.toAccAndSlotInstruction)
         instructions += [copyStackAccToSlot, selectAcc]
+        var copyStack2 = Instruction(
+            name: "copyStack2",
+            documentation: "Two register copies, `sp[dest0] = sp[source0]` then `sp[dest1] = sp[source1]`, where the second does not read the first's destination"
+        ) {
+            $0.field(name: "source0", type: .VReg)
+            $0.field(name: "dest0", type: .VReg)
+            $0.field(name: "source1", type: .VReg)
+            $0.field(name: "dest1", type: .VReg)
+        }
+        copyStack2.isDirectThreadedOnly = true
+        instructions += [copyStack2]
         return instructions
     }
 
