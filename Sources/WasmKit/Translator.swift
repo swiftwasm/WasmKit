@@ -1246,6 +1246,27 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
 
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`
+    fileprivate static func loadWithCopyInstruction(_ load: WasmParser.Instruction.Load) -> ((Instruction.LoadWithCopyOperand) -> Instruction)? {
+        switch load {
+        case .i32Load: return Instruction.i32LoadWithCopy
+        case .i64Load: return Instruction.i64LoadWithCopy
+        case .f32Load: return Instruction.f32LoadWithCopy
+        case .f64Load: return Instruction.f64LoadWithCopy
+        case .i32Load8S: return Instruction.i32Load8SWithCopy
+        case .i32Load8U: return Instruction.i32Load8UWithCopy
+        case .i32Load16S: return Instruction.i32Load16SWithCopy
+        case .i32Load16U: return Instruction.i32Load16UWithCopy
+        case .i64Load8S: return Instruction.i64Load8SWithCopy
+        case .i64Load8U: return Instruction.i64Load8UWithCopy
+        case .i64Load16S: return Instruction.i64Load16SWithCopy
+        case .i64Load16U: return Instruction.i64Load16UWithCopy
+        case .i64Load32S: return Instruction.i64Load32SWithCopy
+        case .i64Load32U: return Instruction.i64Load32UWithCopy
+        default: return nil
+        }
+    }
+
     fileprivate static func accBinaryForms(_ type: ValueType, _ op: BinBinOp) -> AccBinaryForms? {
         switch (type, op) {
         case (.i32, .add):
@@ -2068,6 +2089,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 copy.dest != source, canRewind(to: copy.position)
             else { return nil }
             return (copy.source, copy.dest, copy.position)
+        }
+
+        /// The copy right before the insertion point when it writes `dest`
+        /// and no label lands after it.
+        fileprivate func copy(into dest: VReg) -> (source: VReg, position: MetaProgramCounter)? {
+            guard let copy = lastCopy, copy.end.offsetFromHead == insertingPC.offsetFromHead,
+                copy.dest == dest, canRewind(to: copy.position)
+            else { return nil }
+            return (copy.source, copy.position)
         }
 
         /// Records that `source` was just copied to `dest` right after
@@ -4188,6 +4218,19 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 }
             )
             iseqBuilder.recordAcc(AccRecords(producer: .loadFromAcc(load, offset: offset, result: result)))
+            return
+        }
+        // The address was just copied: read the copy's source and perform the
+        // copy in the load.
+        if !module.isDebuggable,
+            let copy = iseqBuilder.copy(into: pointer), let withCopy = Self.loadWithCopyInstruction(load)
+        {
+            iseqBuilder.rewind(to: copy.position)
+            self.rewindInstructionMapping(to: copy.position)
+            let make = { (result: VReg) in
+                withCopy(Instruction.LoadWithCopyOperand(pointer: copy.source, result: result, offset: offset, copyDest: pointer))
+            }
+            emit(make(result), resultRelink: { newResult in make(newResult) })
             return
         }
         emit(

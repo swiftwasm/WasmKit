@@ -2315,6 +2315,62 @@ enum Instruction: Equatable {
     case selectI64GtSImm(Instruction.SelectCmpImmOperand)
     /// `select` whose condition is `i64.gt_u` against a constant
     case selectI64GtUImm(Instruction.SelectCmpImmOperand)
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// `i32.load` with the copy that produced its address.
+    case i32LoadWithCopy(Instruction.LoadWithCopyOperand)
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// `i64.load` with the copy that produced its address.
+    case i64LoadWithCopy(Instruction.LoadWithCopyOperand)
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// `f32.load` with the copy that produced its address.
+    case f32LoadWithCopy(Instruction.LoadWithCopyOperand)
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// `f64.load` with the copy that produced its address.
+    case f64LoadWithCopy(Instruction.LoadWithCopyOperand)
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// `i32.load8_s` with the copy that produced its address.
+    case i32Load8SWithCopy(Instruction.LoadWithCopyOperand)
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// `i32.load8_u` with the copy that produced its address.
+    case i32Load8UWithCopy(Instruction.LoadWithCopyOperand)
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// `i32.load16_s` with the copy that produced its address.
+    case i32Load16SWithCopy(Instruction.LoadWithCopyOperand)
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// `i32.load16_u` with the copy that produced its address.
+    case i32Load16UWithCopy(Instruction.LoadWithCopyOperand)
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// `i64.load8_s` with the copy that produced its address.
+    case i64Load8SWithCopy(Instruction.LoadWithCopyOperand)
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// `i64.load8_u` with the copy that produced its address.
+    case i64Load8UWithCopy(Instruction.LoadWithCopyOperand)
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// `i64.load16_s` with the copy that produced its address.
+    case i64Load16SWithCopy(Instruction.LoadWithCopyOperand)
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// `i64.load16_u` with the copy that produced its address.
+    case i64Load16UWithCopy(Instruction.LoadWithCopyOperand)
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// `i64.load32_s` with the copy that produced its address.
+    case i64Load32SWithCopy(Instruction.LoadWithCopyOperand)
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`, on a 32-bit memory
+    /// 
+    /// `i64.load32_u` with the copy that produced its address.
+    case i64Load32UWithCopy(Instruction.LoadWithCopyOperand)
 }
 
 extension Instruction {
@@ -3474,6 +3530,22 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.onTrue, $0.onFalse, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
+
+    struct LoadWithCopyOperand: Equatable, InstructionImmediate {
+        var pointer: VReg
+        var result: VReg
+        var offset: UInt32
+        var copyDest: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (pointer, result, offset) = pc.read((VReg, VReg, UInt32).self)
+            let (copyDest, _, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(pointer: pointer, result: result, offset: offset, copyDest: copyDest)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.pointer, $0.result, $0.offset) as (VReg, VReg, UInt32), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.copyDest, 0, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -4183,6 +4255,20 @@ extension Instruction {
         case .selectI64LtUImm(let immediate): return immediate
         case .selectI64GtSImm(let immediate): return immediate
         case .selectI64GtUImm(let immediate): return immediate
+        case .i32LoadWithCopy(let immediate): return immediate
+        case .i64LoadWithCopy(let immediate): return immediate
+        case .f32LoadWithCopy(let immediate): return immediate
+        case .f64LoadWithCopy(let immediate): return immediate
+        case .i32Load8SWithCopy(let immediate): return immediate
+        case .i32Load8UWithCopy(let immediate): return immediate
+        case .i32Load16SWithCopy(let immediate): return immediate
+        case .i32Load16UWithCopy(let immediate): return immediate
+        case .i64Load8SWithCopy(let immediate): return immediate
+        case .i64Load8UWithCopy(let immediate): return immediate
+        case .i64Load16SWithCopy(let immediate): return immediate
+        case .i64Load16UWithCopy(let immediate): return immediate
+        case .i64Load32SWithCopy(let immediate): return immediate
+        case .i64Load32UWithCopy(let immediate): return immediate
         default: return nil
         }
     }
@@ -4896,6 +4982,20 @@ extension Instruction {
         case .selectI64LtUImm(let immediate): immediate.emit(to: emit)
         case .selectI64GtSImm(let immediate): immediate.emit(to: emit)
         case .selectI64GtUImm(let immediate): immediate.emit(to: emit)
+        case .i32LoadWithCopy(let immediate): immediate.emit(to: emit)
+        case .i64LoadWithCopy(let immediate): immediate.emit(to: emit)
+        case .f32LoadWithCopy(let immediate): immediate.emit(to: emit)
+        case .f64LoadWithCopy(let immediate): immediate.emit(to: emit)
+        case .i32Load8SWithCopy(let immediate): immediate.emit(to: emit)
+        case .i32Load8UWithCopy(let immediate): immediate.emit(to: emit)
+        case .i32Load16SWithCopy(let immediate): immediate.emit(to: emit)
+        case .i32Load16UWithCopy(let immediate): immediate.emit(to: emit)
+        case .i64Load8SWithCopy(let immediate): immediate.emit(to: emit)
+        case .i64Load8UWithCopy(let immediate): immediate.emit(to: emit)
+        case .i64Load16SWithCopy(let immediate): immediate.emit(to: emit)
+        case .i64Load16UWithCopy(let immediate): immediate.emit(to: emit)
+        case .i64Load32SWithCopy(let immediate): immediate.emit(to: emit)
+        case .i64Load32UWithCopy(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -5618,7 +5718,21 @@ extension Instruction {
         case .selectI64LtSImm: return 709
         case .selectI64LtUImm: return 710
         case .selectI64GtSImm: return 711
-        default: return 712  // .selectI64GtUImm
+        case .selectI64GtUImm: return 712
+        case .i32LoadWithCopy: return 713
+        case .i64LoadWithCopy: return 714
+        case .f32LoadWithCopy: return 715
+        case .f64LoadWithCopy: return 716
+        case .i32Load8SWithCopy: return 717
+        case .i32Load8UWithCopy: return 718
+        case .i32Load16SWithCopy: return 719
+        case .i32Load16UWithCopy: return 720
+        case .i64Load8SWithCopy: return 721
+        case .i64Load8UWithCopy: return 722
+        case .i64Load16SWithCopy: return 723
+        case .i64Load16UWithCopy: return 724
+        case .i64Load32SWithCopy: return 725
+        default: return 726  // .i64Load32UWithCopy
         }
     }
 }
@@ -6343,6 +6457,20 @@ extension Instruction {
         case 710: return .selectI64LtUImm(Instruction.SelectCmpImmOperand.load(from: &pc))
         case 711: return .selectI64GtSImm(Instruction.SelectCmpImmOperand.load(from: &pc))
         case 712: return .selectI64GtUImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 713: return .i32LoadWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 714: return .i64LoadWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 715: return .f32LoadWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 716: return .f64LoadWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 717: return .i32Load8SWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 718: return .i32Load8UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 719: return .i32Load16SWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 720: return .i32Load16UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 721: return .i64Load8SWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 722: return .i64Load8UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 723: return .i64Load16SWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 724: return .i64Load16UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 725: return .i64Load32SWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 726: return .i64Load32UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -7070,6 +7198,20 @@ extension Instruction {
         case 710: return "selectI64LtUImm"
         case 711: return "selectI64GtSImm"
         case 712: return "selectI64GtUImm"
+        case 713: return "i32LoadWithCopy"
+        case 714: return "i64LoadWithCopy"
+        case 715: return "f32LoadWithCopy"
+        case 716: return "f64LoadWithCopy"
+        case 717: return "i32Load8SWithCopy"
+        case 718: return "i32Load8UWithCopy"
+        case 719: return "i32Load16SWithCopy"
+        case 720: return "i32Load16UWithCopy"
+        case 721: return "i64Load8SWithCopy"
+        case 722: return "i64Load8UWithCopy"
+        case 723: return "i64Load16SWithCopy"
+        case 724: return "i64Load16UWithCopy"
+        case 725: return "i64Load32SWithCopy"
+        case 726: return "i64Load32UWithCopy"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
