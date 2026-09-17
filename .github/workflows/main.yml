@@ -271,6 +271,11 @@ jobs:
         with:
           android-api-level: 30
           swift-version: "${{ matrix.swift-version }}"
+          # Cold boot instead of loading the quick-boot snapshot kept in the AVD cache. The snapshot is saved on
+          # whichever runner populated the cache, and restoring it on a host with a different CPU vendor kills
+          # system_server, so the action's `adb shell input keyevent 82` fails with "No service published for:
+          # input" or DeadSystemException before any test runs.
+          android-emulator-options: -no-snapshot -no-window -noaudio -no-boot-anim
 
   build-windows:
     runs-on: windows-latest
