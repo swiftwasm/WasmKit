@@ -94,7 +94,27 @@
         }
     }
 
+    /// SwiftPM copies downloaded swift-syntax prebuilts into its shared cache without inter-process locking, so
+    /// concurrent resolutions on a cold cache race and one fails with "... already exists in file system".
+    /// Resolve once up front so the parallel tests only read from the warm cache. A global `let` is initialized
+    /// exactly once, and concurrent readers wait for it.
+    private let sharedCacheWarmUp: Result<Void, TestSupport.Error> = {
+        do {
+            let swift = try hostSwiftExecutable()
+            try TestSupport.withTemporaryDirectory { buildDir in
+                try runSwift(
+                    swift,
+                    ["package", "--package-path", fixtureURL("CrossModulePackage").path, "--scratch-path", buildDir, "resolve"],
+                    buildDir: buildDir)
+            }
+            return .success(())
+        } catch {
+            return .failure(TestSupport.Error(description: "warming up the SwiftPM cache failed: \(error)"))
+        }
+    }()
+
     func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) throws -> ExtractResult {
+        try sharedCacheWarmUp.get()
         let swift = try hostSwiftExecutable()
         return try TestSupport.withTemporaryDirectory { buildDir in
             let outputMappingPath = URL(fileURLWithPath: buildDir).appendingPathComponent("output-mapping.json").path
@@ -118,6 +138,7 @@
     }
 
     func assertSwiftBuilds(fixturePackage: String) throws {
+        try sharedCacheWarmUp.get()
         let swift = try hostSwiftExecutable()
         try TestSupport.withTemporaryDirectory { buildDir in
             try runSwift(
