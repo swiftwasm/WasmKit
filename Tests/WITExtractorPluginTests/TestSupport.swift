@@ -77,17 +77,33 @@
     /// Writes output to a log file: a large build log would fill a pipe and deadlock waitUntilExit.
     private func runSwift(_ swift: URL, _ arguments: [String], buildDir: String) throws {
         let logURL = URL(fileURLWithPath: buildDir).appendingPathComponent("swift.log")
-        _ = FileManager.default.createFile(atPath: logURL.path, contents: nil)
-        let logHandle = try FileHandle(forWritingTo: logURL)
-        defer { try? logHandle.close() }
-        let process = Process()
-        process.executableURL = swift
-        process.arguments = arguments
-        process.standardOutput = logHandle
-        process.standardError = logHandle
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
+        // libdispatch on Linux can use a freed epoll registration after a watched pipe hangs up, which SwiftPM hits
+        // when a plugin or child process exits, and dies with SIGSEGV (swiftlang/swift-corelibs-libdispatch#949).
+        // Rerunning the same idempotent command is the only workaround available here.
+        #if os(Linux)
+            let maxAttempts = 3
+        #else
+            let maxAttempts = 1
+        #endif
+        for attempt in 1...maxAttempts {
+            _ = FileManager.default.createFile(atPath: logURL.path, contents: nil)
+            let logHandle = try FileHandle(forWritingTo: logURL)
+            defer { try? logHandle.close() }
+            let process = Process()
+            process.executableURL = swift
+            process.arguments = arguments
+            process.standardOutput = logHandle
+            process.standardError = logHandle
+            try process.run()
+            process.waitUntilExit()
+            if process.terminationStatus == 0 {
+                return
+            }
+            if process.terminationReason == .uncaughtSignal, process.terminationStatus == SIGSEGV, attempt < maxAttempts {
+                FileHandle.standardError.write(
+                    Data("swift \(arguments.joined(separator: " ")) crashed with SIGSEGV (attempt \(attempt)); retrying\n".utf8))
+                continue
+            }
             let log = (try? String(contentsOf: logURL, encoding: .utf8)) ?? ""
             throw TestSupport.Error(
                 description: "swift \(arguments.joined(separator: " ")) failed (\(process.terminationStatus)):\n\(log)")
