@@ -6,9 +6,15 @@ import class Foundation.ProcessInfo
 
 let DarwinPlatforms: [Platform] = [.macOS, .iOS, .watchOS, .tvOS, .visionOS]
 
-let swiftSettings: [SwiftSetting] = [
-    .treatAllWarnings(as: .error, .when(platforms: DarwinPlatforms + [.linux, .wasi, .android, .openbsd]))
-]
+// Warnings are promoted to errors only when `WASMKIT_WARNINGS_AS_ERRORS` is set, which WasmKit's
+// own CI does. Enabling it unconditionally breaks packages that depend on WasmKit: Xcode and the
+// `swiftbuild` build system compile dependencies with `-suppress-warnings`, and the Swift driver
+// rejects that flag in combination with `-warnings-as-errors`
+// (https://github.com/swiftlang/swift-package-manager/issues/9517).
+let swiftSettings: [SwiftSetting] =
+    Context.environment["WASMKIT_WARNINGS_AS_ERRORS"] != nil
+    ? [.treatAllWarnings(as: .error, .when(platforms: DarwinPlatforms + [.linux, .wasi, .android, .openbsd]))]
+    : []
 
 let cliCommandsTarget = Target.target(
     name: "CLICommands",
