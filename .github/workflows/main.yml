@@ -11,6 +11,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
+  # Package.swift promotes warnings to errors only when this is set, so dependents never inherit it.
+  WASMKIT_WARNINGS_AS_ERRORS: "1"
   # Shared dev snapshot; bump these two to refresh every dev-snapshot download below.
   DEV_SNAPSHOT: swift-DEVELOPMENT-SNAPSHOT-2026-06-12-a
   WASI_SDK_CHECKSUM: "72eeab944b2ac44536aaaea2c5dc75fb30a0aa469f9ce59f831e08d2a8e60c48"
