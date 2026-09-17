@@ -311,9 +311,13 @@
                 case .exited(let status):
                     return Self.exitReply(status: status)
 
-                case .trapped(let trapReason):
-                    result.append(("reason", "trap"))
-                    result.append(("description", trapReason))
+                case .trapped(let trap):
+                    // Report as an exception so the host treats it as a crash rather than a breakpoint.
+                    let pc = UInt64(trap.callStack.first ?? 0) + DebuggerMemoryView.executableCodeOffset
+                    result.append(("thread-pcs", self.hexDump(pc, endianness: .big)))
+                    result.append(("00", self.hexDump(pc, endianness: .little)))
+                    result.append(("reason", "exception"))
+                    result.append(("description", HexEncoding.encode(Array(trap.description.utf8))))
                     return .keyValuePairs(result)
 
                 case .instantiated:

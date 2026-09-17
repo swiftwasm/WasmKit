@@ -14,9 +14,15 @@
         package enum State {
             case instantiated
             case stoppedAtBreakpoint(BreakpointState)
-            case trapped(String)
+            case trapped(TrapState)
             case entrypointReturned([Value])
             case exited(status: UInt32)
+        }
+
+        package struct TrapState {
+            package let description: String
+            /// Wasm addresses of the frames on the call stack, innermost first.
+            package let callStack: [Int]
         }
 
         package enum Error: Swift.Error, @unchecked Sendable {
@@ -313,7 +319,11 @@
                     // The guest is gone, so there is nothing to resume.
                     return
 
-                case .trapped, .entrypointReturned:
+                case .trapped:
+                    // The guest trapped, so there is nothing to resume.
+                    return
+
+                case .entrypointReturned:
                     fatalError("Restarting a Wasm module from the debugger is not implemented yet.")
                 }
             } catch let breakpoint as Execution.Breakpoint {
@@ -341,6 +351,16 @@
                 )
                 // ms may include uncommitted guard pages that fault outside the trap guard.
                 self.linearMemoryByteCount = currentFunction.instance.memories.first?.byteCount ?? 0
+            } catch let trap as Trap {
+                let mapping = self.instance.handle.instructionMapping
+                self.state = .trapped(
+                    .init(
+                        description: "Trap: \(trap.reason)",
+                        callStack: (trap.backtrace?.symbols ?? []).compactMap {
+                            mapping.firstWasm(forIseqAddress: $0.address)
+                        }
+                    )
+                )
             }
         }
 
@@ -504,6 +524,11 @@
         /// Wasm addresses of the frames on the stack, innermost first. Frames with no reverse
         /// mapping are dropped.
         private func callStack(atRunStart: Bool) -> [Int] {
+            // Trap call stacks already use run-start addresses.
+            if case .trapped(let trap) = self.state {
+                return trap.callStack
+            }
+
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 return []
             }
