@@ -273,9 +273,14 @@ public struct Module: Sendable {
                         )
                     )
                 }
+                // A 64-bit offset that does not fit in `Int` cannot address any
+                // table, so report it as out-of-bounds instead of trapping the host.
+                guard let destination = Int(exactly: offset) else {
+                    throw Trap(.tableOutOfBounds(Int(clamping: offset)))
+                }
                 let references = try element.evaluateInits(context: constEvalContext)
                 try table.initialize(
-                    references, from: 0, to: Int(offset), count: references.count
+                    references, from: 0, to: destination, count: references.count
                 )
             }
         }
@@ -303,7 +308,11 @@ public struct Module: Sendable {
                         )
                     )
                 }
-                try memory.write(offset: Int(offset), bytes: data.initializer)
+                // Ditto: an offset beyond `Int.max` is out of bounds for any memory.
+                guard let destination = Int(exactly: offset) else {
+                    throw Trap(.memoryOutOfBounds)
+                }
+                try memory.write(offset: destination, bytes: data.initializer)
             }
         }
     }
