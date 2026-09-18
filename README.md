@@ -28,7 +28,7 @@ To use WasmKit in your package, add it as a [Swift Package Manager](https://www.
 Run the following commands in the same directory as your `Package.swift` manifest to add the dependency:
 
 ```
-swift package add-dependency https://github.com/swiftwasm/WasmKit --up-to-next-minor-from 0.3.1
+swift package add-dependency https://github.com/swiftwasm/WasmKit --up-to-next-minor-from 0.4.0
 swift package add-target-dependency WasmKit <your-package-target-name> --package WasmKit
 ```
 
@@ -37,7 +37,7 @@ You can also add the following snippet manually instead to your `Package.swift` 
 ```swift
 dependencies: [
     // ...other dependencies
-    .package(url: "https://github.com/swiftwasm/WasmKit.git", .upToNextMinor(from: "0.3.1")),
+    .package(url: "https://github.com/swiftwasm/WasmKit.git", .upToNextMinor(from: "0.4.0")),
 ],
 // ...other package configuration
 targets: [
@@ -53,10 +53,11 @@ targets: [
 
 - [Reasonably fast](./Documentation/RegisterMachine.md#performance-evaluation)
 - Minimal dependencies
-    - The core runtime engine depends only on [swift-system](https://github.com/apple/swift-system).
+    - The core runtime engine has no external package dependencies.
     - No Foundation dependency
 - Compact and embeddable
     - Debug build complete in 5 seconds[^1]
+    - Builds with Embedded Swift, down to bare-metal targets
 - Batteries included
     - WASI support, WAT (WebAssembly text format) parser/assembler, etc.
 
@@ -66,10 +67,11 @@ targets: [
 WasmKit engine works on all major platforms supported by Swift. It is continuously tested on macOS, Ubuntu, Amazon Linux 2023, Android, and Windows,
 and should work on the following platforms:
 
-- macOS 10.13+, iOS 12.0+, tvOS 12.0+, watchOS 6.0+
+- macOS 15+, iOS 18+, tvOS 18+, watchOS 11+, visionOS 2+
 - Amazon Linux 2, Debian 12, Ubuntu 22.04+, Fedora 39+
 - Android [API Level 30](https://developer.android.com/tools/releases/platforms)
 - Windows 10+
+- Bare-metal targets with Embedded Swift (see the [ESP32 example](./Examples/embedded-esp32))
 
 ## Implementation Status
 
@@ -103,15 +105,16 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | [Typed Function References](https://github.com/WebAssembly/function-references) | 🚧 Parser implemented | [0.2.0] |
 | [Branch Hinting](https://github.com/WebAssembly/branch-hinting) | ❌ Not implemented | |
 | [Custom Annotation Syntax in the Text Format](https://github.com/WebAssembly/annotations) | ❌ Not implemented | |
-| [Extended Constant Expressions](https://github.com/WebAssembly/extended-const) | ✅ Implemented | `main` branch |
+| [Extended Constant Expressions](https://github.com/WebAssembly/extended-const) | ✅ Implemented | [0.4.0] |
 | [Garbage Collection](https://github.com/WebAssembly/gc) | ❌ Not implemented | |
 | [Multiple Memories](https://github.com/WebAssembly/multi-memory) | ❌ Not implemented | |
-| [Relaxed SIMD](https://github.com/WebAssembly/relaxed-simd) | ✅ Implemented | `main` branch |
+| [Relaxed SIMD](https://github.com/WebAssembly/relaxed-simd) | ✅ Implemented | [0.4.0] |
 
 [0.0.2]: https://github.com/swiftwasm/WasmKit/releases/tag/0.0.2
 [0.1.4]: https://github.com/swiftwasm/WasmKit/releases/tag/0.1.4
 [0.2.0]: https://github.com/swiftwasm/WasmKit/releases/tag/0.2.0
 [0.3.0]: https://github.com/swiftwasm/WasmKit/releases/tag/0.3.0
+[0.4.0]: https://github.com/swiftwasm/WasmKit/releases/tag/0.4.0
 
 #### Phase 4 - Standardize the Feature (WG)
 
@@ -130,7 +133,7 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | Feature | Status | WasmKit version |
 |---------|--------|-----------------|
 | [WASI 0.1](https://github.com/WebAssembly/WASI/tree/wasi-0.1) | 🚧 [Majority of syscalls implemented](https://github.com/swiftwasm/WasmKit/blob/d9b56a7b3f979a72682c0d37f6cc71b3493dae65/Tests/WASITests/IntegrationTests.swift#L31) | [0.0.2] |
-| [WASI Threads](https://github.com/WebAssembly/wasi-threads) | ✅ Implemented | `wasmkit-cli run --wasi-threads` |
+| [WASI Threads](https://github.com/WebAssembly/wasi-threads) | ✅ [Implemented](./Documentation/WASIThreads.md) | [0.4.0] |
 
 
 ## Minimum Supported Swift Version (MSSV)
