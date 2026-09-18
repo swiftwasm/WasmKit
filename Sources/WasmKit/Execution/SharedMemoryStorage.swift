@@ -1,6 +1,6 @@
 // Shared memory relies on the mprotect guard-page reservation for OOB detection, so it is
 // only built where that is available (see `SharedMemoryStorage.isSupported`).
-#if os(macOS) || os(Linux)
+#if (os(macOS) || os(Linux)) && !$Embedded
 
     import Synchronization
     import WasmParser

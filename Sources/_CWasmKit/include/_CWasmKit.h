@@ -1,9 +1,12 @@
 #ifndef WASMKIT__CWASMKIT_H
 #define WASMKIT__CWASMKIT_H
 
-#include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
+// <stdint.h> must precede <stdatomic.h>: some bare-metal C libraries (newlib)
+// declare the atomic typedefs in terms of int_least8_t and friends without
+// including <stdint.h> themselves.
+#include <stdatomic.h>
 
 #include "Platform.h"
 
