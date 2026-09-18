@@ -3059,7 +3059,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
     mutating func visitElse() throws(WasmKitError) -> Output {
         var frame = try controlStack.currentFrame()
-        guard case .if(let elseLabel, let endLabel, _) = frame.kind else {
+        // `isElse: true` means this `if` already has an `else`, so a second one
+        // would pin `elseLabel` twice.
+        guard case .if(let elseLabel, let endLabel, isElse: false) = frame.kind else {
             throw WasmKitError(message: .expectedIfControlFrame)
         }
         preserveOnStack(depth: valueStack.valueHeight - frame.valueStackHeight)
