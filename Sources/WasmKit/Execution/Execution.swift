@@ -21,6 +21,7 @@ struct Execution: ~Copyable {
     /// Storage for caught exceptions that may be referenced via `exnref`.
     var storedExceptions: [WasmKitException] = []
 
+
     /// An active exception handler entry registered by a `try_table` block.
     struct ExceptionHandler {
         /// The tag to match, `nil` for `catch_all`/`catch_all_ref`.
@@ -829,14 +830,30 @@ extension Execution {
     /// Note that this function does not modify neither the positions of the
     /// stack pointer nor the program counter.
     @inline(never)
-    private func invokeHostFunction(function: EntityHandle<HostFunctionEntity>, sp: Sp, spAddend: VReg) throws {
+    private func invokeHostFunction(
+        function: EntityHandle<HostFunctionEntity>, sp: Sp, spAddend: VReg
+    ) throws {
         let resolvedType = store.value.engine.resolveType(function.type)
         let layout = FrameHeaderLayout(type: resolvedType)
         // A Wasm function's frame header is checked when the function is
         // translated; a host function is never translated, so check it here.
         try FrameHeaderLayout.checkFitsVRegRange(layout.size)
-        let parameters = resolvedType.parameters.enumerated().map { (i, type) in
-            sp.loadValue(at: spAddend + layout.paramReg(i), type: type)
+        // Built at exact capacity rather than through `enumerated().map`.
+        // That map has no count to reserve from -- `EnumeratedSequence` is a
+        // Sequence, not a Collection -- so it grew the array by appending and
+        // reallocated as it went, on every call a guest made into the host.
+        // For a drawing-heavy cart that is thousands of calls a frame, and the
+        // reallocation was most of what they cost.
+        let parameterTypes = resolvedType.parameters
+        let parameters = [Value](unsafeUninitializedCapacity: parameterTypes.count) {
+            buffer, initializedCount in
+            for index in 0..<parameterTypes.count {
+                buffer.initializeElement(
+                    at: index,
+                    to: sp.loadValue(
+                        at: spAddend + layout.paramReg(index), type: parameterTypes[index]))
+            }
+            initializedCount = parameterTypes.count
         }
         let instance = self.currentInstance(sp: sp)
         let caller = Caller(
@@ -844,7 +861,7 @@ extension Execution {
             store: store.value,
             sp: sp
         )
-        let results = try function.implementation(caller, Array(parameters))
+        let results = try function.implementation(caller, parameters)
         guard resolvedType.results.count == results.count else {
             throw Trap(.resultTypesMismatch(expected: resolvedType.results, got: results))
         }
