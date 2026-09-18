@@ -9,6 +9,10 @@ This subdirectory contains some [libFuzzer](https://www.llvm.org/docs/LibFuzzer.
 
 - [Open Source Swift Toolchain](https://swift.org/install) - Xcode toolchain does not contain fuzzing support, so you need to install the open source toolchain.
 - [wasm-tools](https://github.com/bytecodealliance/wasm-tools) - Required to generate random seed corpora
+- The `wasm-c-api` vendored dependency - `FuzzDifferential` links against it, so check it out first:
+    ```sh
+    ../Vendor/checkout-dependency wasm-c-api
+    ```
 
 ## libFuzzer-based Fuzzing Targets
 
@@ -44,6 +48,8 @@ Generate a Wasm module with termination ensured by `wasm-tools smith` and check 
 
 1. Build the differential testing tool:
     ```sh
+    # Check out the `wasm.h` header that the `WasmCAPI` target wraps
+    ../Vendor/checkout-dependency wasm-c-api
     # Download and extract the Wasmtime C API library
     mkdir -p .build/libwasmtime && \
       curl -L https://github.com/bytecodealliance/wasmtime/releases/download/v23.0.2/wasmtime-v23.0.2-x86_64-linux-c-api.tar.xz -o - | \
