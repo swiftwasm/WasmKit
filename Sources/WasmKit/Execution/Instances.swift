@@ -797,8 +797,8 @@ struct MemoryEntity: ~Copyable {
     }
 
     mutating func write(offset: Int, bytes: ArraySlice<UInt8>) throws {
-        let endOffset = offset + bytes.count
-        guard endOffset <= byteCount else {
+        let (endOffset, overflow) = offset.addingReportingOverflow(bytes.count)
+        guard !overflow, endOffset <= byteCount else {
             throw Trap(.memoryOutOfBounds)
         }
         guard bytes.count > 0 else { return }
@@ -808,8 +808,8 @@ struct MemoryEntity: ~Copyable {
     }
 
     mutating func fill(offset: Int, value: UInt8, count: Int) throws {
-        let endOffset = offset + count
-        guard endOffset <= byteCount else {
+        let (endOffset, overflow) = offset.addingReportingOverflow(count)
+        guard !overflow, endOffset <= byteCount else {
             throw Trap(.memoryOutOfBounds)
         }
         guard count > 0 else { return }
