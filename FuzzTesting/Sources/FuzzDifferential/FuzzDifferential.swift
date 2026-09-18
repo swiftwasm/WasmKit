@@ -1,7 +1,6 @@
 import WasmCAPI
 import WasmKit
 import WAT
-import SystemPackage
 import Foundation
 
 protocol Engine {
@@ -139,11 +138,17 @@ struct WasmKitEngine: Engine {
         }
         let type = fn.type
         let arguments = type.parameters.map { $0.defaultValue }
+        func snapshot(_ memory: Memory?) -> [UInt8]? {
+            guard let memory else { return nil }
+            return memory.withUnsafeBufferPointer(offset: 0, count: memory.byteCount) {
+                Array($0)
+            }
+        }
         do {
             let results = try fn(arguments)
-            return ExecResult(values: results, trap: nil, memory: memory?.data)
+            return ExecResult(values: results, trap: nil, memory: snapshot(memory))
         } catch {
-            return ExecResult(values: nil, trap: String(describing: error), memory: memory?.data)
+            return ExecResult(values: nil, trap: String(describing: error), memory: snapshot(memory))
         }
     }
 }
