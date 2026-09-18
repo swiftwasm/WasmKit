@@ -36,6 +36,20 @@ struct SpectestTests {
     }
 
     #if !os(Android)
+        /// Exercises every specification case through a live grouped-dispatch store.
+        ///
+        /// - Parameter test: A specification fixture with its own store and controller lifetime.
+        /// - Throws: Fixture construction or specification conformance failures.
+        @Test(arguments: try SpectestDiscovery(path: SpectestTests.testPaths).discover())
+        func runWithExecutionControl(test: TestCase) throws {
+            let configuration = EngineConfiguration(threadingModel: .token)
+            let runner = try SpectestRunner(configuration: configuration)
+            try runner.run(
+                test: test, reporter: NullSpectestProgressReporter(),
+                executionControl: ExecutionControl()
+            )
+        }
+
         @Test(
             .disabled("unable to run spectest on Android due to missing files on emulator", platforms: [.android]),
             arguments: try SpectestDiscovery(path: SpectestTests.testPaths).discover()

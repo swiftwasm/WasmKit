@@ -272,15 +272,20 @@
             self.armedBreakpoints.removeAll()
         }
 
-        /// Resumes the module instantiated by the debugger stopped at a breakpoint. The lowest-level
-        /// resume: the breakpoint at the current program counter is taken out of the bytecode so that
-        /// execution can make progress, and it is not put back. Execution continues until the next
-        /// breakpoint is triggered or all remaining instructions are executed. If the module is not
-        /// stopped at a breakpoint, this function returns immediately.
+        /// Starts the entrypoint or resumes a breakpoint until execution stops or returns.
+        ///
+        /// Resuming removes the current breakpoint from the bytecode without restoring it.
+        /// Call only while instantiated or stopped at a breakpoint. An exited debugger returns
+        /// immediately. A controlled store checks its signal before starting or resuming.
+        /// Execution termination permanently prevents further guest execution on that store.
+        ///
+        /// - Throws: Requested execution termination, a guest or native failure, or invalid
+        ///   breakpoint mapping information.
         package mutating func run() throws {
             do {
                 switch self.state {
                 case .stoppedAtBreakpoint(let breakpoint):
+                    try self.store.executionControl?.check()
                     self.disarm(resolved: breakpoint.wasmPc)
                     self.execution.resetError()
 
@@ -305,6 +310,7 @@
                         )
                     }
                 case .instantiated:
+                    try self.store.executionControl?.check()
                     let result = try self.execution.executeWasm(
                         threadingModel: self.threadingModel,
                         function: self.entrypointFunction.handle,
