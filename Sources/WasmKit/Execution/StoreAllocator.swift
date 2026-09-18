@@ -575,7 +575,7 @@ extension StoreAllocator {
         return InternalMemory(unsafe: pointer)
     }
 
-    #if os(macOS) || os(Linux)
+    #if (os(macOS) || os(Linux)) && !$Embedded
         /// Allocate a memory entity wrapping an existing shared memory storage.
         ///
         /// Used by `wasi_thread_spawn` to provide the same shared memory as an

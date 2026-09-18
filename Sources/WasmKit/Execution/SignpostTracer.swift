@@ -1,4 +1,4 @@
-#if canImport(os.signpost)
+#if canImport(os.signpost) && !$Embedded
     import os.signpost
 
     /// A `RuntimeInterceptor` that emits signposts for each function call

@@ -1,4 +1,4 @@
-#if os(macOS) || os(Linux)
+#if (os(macOS) || os(Linux)) && !$Embedded
 
     #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
         import Darwin

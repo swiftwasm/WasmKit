@@ -87,7 +87,7 @@ public struct EngineConfiguration: Sendable {
         }
 
         static var defaultForCurrentPlatform: ThreadingModel {
-            #if os(WASI)
+            #if os(WASI) || $Embedded
                 return .token
             #else
                 return useDirectThreadedCode ? .direct : .token

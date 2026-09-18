@@ -10,7 +10,7 @@ public final class SharedMemory: @unchecked Sendable {
     public let type: MemoryType
     private let resourceLimiter: any ResourceLimiter
 
-    #if os(macOS) || os(Linux)
+    #if (os(macOS) || os(Linux)) && !$Embedded
         let storage: SharedMemoryStorage
 
         /// Creates a shared wasm32 memory backing.
