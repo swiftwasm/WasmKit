@@ -2414,6 +2414,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     /// callee's frame header) and a `return_call`'s frame-header resize.
     var maxFrameSlotIndex: Int = 0
 
+    /// Whether the `end` that closes the function body has been visited.
+    ///
+    /// The root control frame stays on the control stack after that `end`, so a
+    /// trailing instruction would be translated against a frame that is already
+    /// finished. ``translate(code:)`` rejects anything that follows instead.
+    var reachedFunctionEnd: Bool = false
+
     let validator: InstructionValidator
 
     // Wasm debugging support.
@@ -2919,6 +2926,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
         var parser = ExpressionParser(code: code)
         while let visit = try WasmKitError.wrap({ () throws(WasmParserError) in try parser.parse() }) {
+            guard !reachedFunctionEnd else {
+                // The expression parser only stops at an `end` that exhausts the
+                // code entry, so a body with trailing operators keeps decoding.
+                var error = WasmKitError(message: .controlStackEmpty)
+                error.location = parser.offset
+                throw error
+            }
             do throws(WasmKitError) {
                 try visit(visitor: &self)
             } catch {
@@ -3092,6 +3106,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 throw WasmKitError(message: .valuesRemainingAtEndOfBlock)
             }
             try iseqBuilder.pinLabelHere(toBePopped.continuation)
+            reachedFunctionEnd = true
             return
         }
 
