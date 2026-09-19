@@ -44,18 +44,14 @@ struct Execution: ~Copyable {
     #endif
 
     /// Executes the given closure with a new execution state associated with
-    /// the given ``Store`` instance.
+    /// the given ``Store`` instance, running on the given stack.
     static func with<T>(
         store: StoreRef,
+        stack: inout ExecutionStack,
         body: (inout Execution, Sp) throws -> T
     ) rethrows -> T {
-        let limit = store.value.engine.configuration.stackSize / MemoryLayout<StackSlot>.stride
-        let valueStack = UnsafeMutablePointer<StackSlot>.allocate(capacity: limit)
-        defer {
-            valueStack.deallocate()
-        }
-        var context = Execution(store: store, stackEnd: valueStack.advanced(by: limit))
-        return try body(&context, valueStack)
+        var context = Execution(store: store, stackEnd: stack.slots.advanced(by: stack.count))
+        return try body(&context, stack.slots)
     }
 
     /// Gets the current instance from the stack pointer.
@@ -453,43 +449,68 @@ extension Pc {
 ///   - callerInstance: The instance that called the function.
 /// - Returns: The result values of the function.
 @inline(never)
+/// Lays out the root frame, runs the guest and reads its results back.
+private func runRoot(
+    _ stack: inout Execution,
+    sp: Sp,
+    store: StoreRef,
+    handle: InternalFunction,
+    type: FunctionType,
+    arguments: [Value]
+) throws -> [Value] {
+    // Advance the stack pointer to be able to reference negative indices
+    // for saving slots.
+    let sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
+    // Mark root stack pointer and current function as nil.
+    sp.previousSP = nil
+    sp.currentFunction = nil
+    let layout = FrameHeaderLayout(type: type)
+    try FrameHeaderLayout.checkFitsVRegRange(layout.size)
+    for (index, argument) in arguments.enumerated() {
+        let reg = VReg(slotIndex: layout.size) + layout.paramReg(index)
+        sp.storeValue(argument, at: reg, type: type.parameters[index])
+    }
+
+    try withUnsafeTemporaryAllocation(of: CodeSlot.self, capacity: 2) { rootISeq in
+        rootISeq[0] = Instruction.endOfExecution(.init()).headSlot(
+            threadingModel: store.value.engine.configuration.threadingModel
+        )
+        try stack.execute(
+            sp: sp,
+            pc: rootISeq.baseAddress!,
+            handle: handle,
+            type: type
+        )
+    }
+    return type.results.enumerated().map { (i, resultType) in
+        let reg = VReg(slotIndex: layout.size) + layout.returnReg(i)
+        return sp.loadValue(at: reg, type: resultType)
+    }
+}
+
 func executeWasm(
     store: Store,
     function handle: InternalFunction,
     type: FunctionType,
     arguments: [Value]
 ) throws -> [Value] {
+    var stack = ExecutionStack(engine: store.engine)
+    return try executeWasm(
+        store: store, function: handle, type: type, arguments: arguments, stack: &stack)
+}
+
+/// As above, on a stack the caller owns and can use again.
+func executeWasm(
+    store: Store,
+    function handle: InternalFunction,
+    type: FunctionType,
+    arguments: [Value],
+    stack executionStack: inout ExecutionStack
+) throws -> [Value] {
     // NOTE: `store` variable must not outlive this function
     let store = StoreRef(store)
-    return try Execution.with(store: store) { (stack, sp) in
-        // Advance the stack pointer to be able to reference negative indices
-        // for saving slots.
-        let sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
-        // Mark root stack pointer and current function as nil.
-        sp.previousSP = nil
-        sp.currentFunction = nil
-        let layout = FrameHeaderLayout(type: type)
-        try FrameHeaderLayout.checkFitsVRegRange(layout.size)
-        for (index, argument) in arguments.enumerated() {
-            let reg = VReg(slotIndex: layout.size) + layout.paramReg(index)
-            sp.storeValue(argument, at: reg, type: type.parameters[index])
-        }
-
-        try withUnsafeTemporaryAllocation(of: CodeSlot.self, capacity: 2) { rootISeq in
-            rootISeq[0] = Instruction.endOfExecution(.init()).headSlot(
-                threadingModel: store.value.engine.configuration.threadingModel
-            )
-            try stack.execute(
-                sp: sp,
-                pc: rootISeq.baseAddress!,
-                handle: handle,
-                type: type
-            )
-        }
-        return type.results.enumerated().map { (i, resultType) in
-            let reg = VReg(slotIndex: layout.size) + layout.returnReg(i)
-            return sp.loadValue(at: reg, type: resultType)
-        }
+    return try Execution.with(store: store, stack: &executionStack) { (stack, sp) in
+        try runRoot(&stack, sp: sp, store: store, handle: handle, type: type, arguments: arguments)
     }
 }
 
