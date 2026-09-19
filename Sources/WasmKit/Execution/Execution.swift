@@ -842,8 +842,9 @@ extension Execution {
     private func invokeHostFunction(
         function: EntityHandle<HostFunctionEntity>, sp: Sp, spAddend: VReg
     ) throws {
-        let resolvedType = store.value.engine.resolveType(function.type)
-        let layout = FrameHeaderLayout(type: resolvedType)
+        let parameterTypes = function.parameterTypes
+        let resultTypes = function.resultTypes
+        let layout = function.layout
         // A Wasm function's frame header is checked when the function is
         // translated; a host function is never translated, so check it here.
         try FrameHeaderLayout.checkFitsVRegRange(layout.size)
@@ -853,36 +854,47 @@ extension Execution {
         // reallocated as it went, on every call a guest made into the host.
         // For a drawing-heavy cart that is thousands of calls a frame, and the
         // reallocation was most of what they cost.
-        let parameterTypes = resolvedType.parameters
-        let parameters = [Value](unsafeUninitializedCapacity: parameterTypes.count) {
-            buffer, initializedCount in
-            for index in 0..<parameterTypes.count {
-                buffer.initializeElement(
-                    at: index,
-                    to: sp.loadValue(
-                        at: spAddend + layout.paramReg(index), type: parameterTypes[index]))
-            }
-            initializedCount = parameterTypes.count
-        }
         let instance = self.currentInstance(sp: sp)
         let caller = Caller(
             instanceHandle: instance,
             store: store.value,
             sp: sp
         )
-        let results = try function.implementation(caller, parameters)
-        guard resolvedType.results.count == results.count else {
-            throw Trap(.resultTypesMismatch(expected: resolvedType.results, got: results))
-        }
-        for (expected, value) in zip(resolvedType.results, results) {
-            do {
-                try value.checkType(expected)
-            } catch {
-                throw Trap(.resultTypesMismatch(expected: resolvedType.results, got: results))
+
+        // Both buffers are on the stack, so a call into the host allocates
+        // nothing. A host function written against the array-based API is
+        // wrapped when it is created, so there is only this one shape here.
+        let implementation = function.implementation
+        try withUnsafeTemporaryAllocation(of: Value.self, capacity: parameterTypes.count) {
+            parameters throws -> Void in
+            for index in 0..<parameterTypes.count {
+                parameters.initializeElement(
+                    at: index,
+                    to: sp.loadValue(
+                        at: spAddend + layout.paramReg(index), type: parameterTypes[index]))
             }
-        }
-        for (index, result) in results.enumerated() {
-            sp.storeValue(result, at: spAddend + layout.returnReg(index), type: resolvedType.results[index])
+            defer { parameters.deinitialize() }
+
+            // Most host functions return nothing -- every drawing call a
+            // fantasy console offers, for one -- so the result buffer and the
+            // store-back loop are skipped rather than run empty.
+            if resultTypes.isEmpty {
+                return try implementation(
+                    caller, UnsafeBufferPointer(parameters), .init(start: nil, count: 0))
+            }
+            return try withUnsafeTemporaryAllocation(of: Value.self, capacity: resultTypes.count) {
+                results throws -> Void in
+                for index in 0..<resultTypes.count {
+                    results.initializeElement(at: index, to: .i32(0))
+                }
+                defer { results.deinitialize() }
+                try implementation(caller, UnsafeBufferPointer(parameters), results)
+                for index in 0..<resultTypes.count {
+                    sp.storeValue(
+                        results[index], at: spAddend + layout.returnReg(index),
+                        type: resultTypes[index])
+                }
+            }
         }
     }
 }

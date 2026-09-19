@@ -82,7 +82,7 @@ public final class Runtime {
         for (functionName, function) in hostModule.functions {
             moduleExports[functionName] = .function(
                 Function(
-                    handle: store.allocator.allocate(type: function.type, implementation: function.implementation, engine: engine),
+                    handle: store.allocator.allocate(type: function.type, implementation: Function.adapting(function.implementation, results: function.type.results), engine: engine),
                     store: store
                 )
             )

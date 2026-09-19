@@ -1227,7 +1227,10 @@ extension EntityHandle<TagEntity> {
 
 extension EntityHandle<HostFunctionEntity> {
     var type: InternedFuncType { withValue { $0.type } }
-    var implementation: Function.Implementation { withValue { $0.implementation } }
+    var parameterTypes: [ValueType] { withValue { $0.parameterTypes } }
+    var resultTypes: [ValueType] { withValue { $0.resultTypes } }
+    var layout: FrameHeaderLayout { withValue { $0.layout } }
+    var implementation: Function.RawImplementation { withValue { $0.implementation } }
 }
 
 extension InternalUncompiledCode {
