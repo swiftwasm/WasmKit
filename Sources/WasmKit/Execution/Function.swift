@@ -144,6 +144,19 @@ public struct Function: Equatable {
     ///   - arguments: The arguments to pass to the function.
     /// - Throws: A trap if the function invocation fails.
     /// - Returns: The results of the function invocation.
+    /// Invokes the function on a stack the caller owns.
+    ///
+    /// ``invoke(_:)`` allocates a stack for the call and frees it again, which
+    /// is the right default but is worth avoiding when calling in repeatedly
+    /// and allocation is expensive. The stack is taken `inout` so that a host
+    /// function called from here cannot run a second guest on the same one.
+    @discardableResult
+    public func invoke(
+        _ arguments: [Value] = [], on stack: inout ExecutionStack
+    ) throws -> [Value] {
+        return try handle.invoke(arguments, store: store, stack: &stack)
+    }
+
     @discardableResult
     public func callAsFunction(_ arguments: [Value] = []) throws -> [Value] {
         return try invoke(arguments)
@@ -226,20 +239,44 @@ extension InternalFunction {
                 arguments: arguments
             )
         } else {
-            let entity = host
+            return try invokeHost(arguments, store: store)
+        }
+    }
+
+    func invoke(
+        _ arguments: [Value], store: Store, stack: inout ExecutionStack
+    ) throws -> [Value] {
+        if isWasm {
+            let entity = wasm
             let resolvedType = store.engine.resolveType(entity.type)
             try check(functionType: resolvedType, parameters: arguments)
-            let caller = Caller(instanceHandle: nil, store: store)
-            var results = [Value](repeating: .i32(0), count: resolvedType.results.count)
-            let implementation = entity.implementation
-            try arguments.withUnsafeBufferPointer { parameters in
-                try results.withUnsafeMutableBufferPointer { out in
-                    try implementation(caller, parameters, out)
-                }
-            }
-            try check(functionType: resolvedType, results: results)
-            return results
+            return try executeWasm(
+                store: store,
+                function: self,
+                type: resolvedType,
+                arguments: arguments,
+                stack: &stack
+            )
+        } else {
+            // A host function does not run on the guest stack at all.
+            return try invokeHost(arguments, store: store)
         }
+    }
+
+    private func invokeHost(_ arguments: [Value], store: Store) throws -> [Value] {
+        let entity = host
+        let resolvedType = store.engine.resolveType(entity.type)
+        try check(functionType: resolvedType, parameters: arguments)
+        let caller = Caller(instanceHandle: nil, store: store)
+        var results = [Value](repeating: .i32(0), count: resolvedType.results.count)
+        let implementation = entity.implementation
+        try arguments.withUnsafeBufferPointer { parameters in
+            try results.withUnsafeMutableBufferPointer { out in
+                try implementation(caller, parameters, out)
+            }
+        }
+        try check(functionType: resolvedType, results: results)
+        return results
     }
 
     private func check(expectedTypes: [ValueType], values: [Value]) -> Bool {
