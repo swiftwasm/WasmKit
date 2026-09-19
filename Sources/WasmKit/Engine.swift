@@ -88,6 +88,11 @@ public struct EngineConfiguration: Sendable {
 
         static var defaultForCurrentPlatform: ThreadingModel {
             #if os(WASI) || $Embedded
+                // Direct threading is available on an embedded target but not
+                // chosen for it: whether the convention it is built with really
+                // tail calls is a property of the target, and a wrong guess
+                // there exhausts the stack rather than running slowly. An
+                // embedded host asks for `.direct` deliberately.
                 return .token
             #else
                 return useDirectThreadedCode ? .direct : .token
