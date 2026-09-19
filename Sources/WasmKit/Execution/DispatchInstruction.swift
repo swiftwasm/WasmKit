@@ -7126,7 +7126,7 @@ extension Execution {
     }
 }
 
-#if !(os(WASI) || $Embedded)
+#if !(os(WASI))
 /// A copy of the direct-threading handler table, made once per process.
 ///
 /// Swift imports the C array as a tuple value, so taking its address
@@ -7155,7 +7155,7 @@ extension Instruction {
     /// The tail-calling execution handler for an opcode.
     @inline(__always)
     static func handler(opcodeID: OpcodeID) -> UInt {
-        #if os(WASI) || $Embedded
+        #if os(WASI)
         fatalError("Direct threading is not supported on this platform")
         #else
         return wasmkitExecHandlerTable[Int(opcodeID)]
@@ -7171,7 +7171,7 @@ extension Instruction {
         /// leave the reading handler with a stack-protector prologue.
         @inline(__always)
         static var memoryOutOfBoundsTrapHeadSlot: CodeSlot {
-            #if os(WASI) || $Embedded
+            #if os(WASI)
             fatalError("Direct threading is not supported on this platform")
             #else
             return CodeSlot(wasmkit_tc_exec_handlers.297)
@@ -7184,7 +7184,7 @@ extension Instruction {
         /// leave the reading handler with a stack-protector prologue.
         @inline(__always)
         static var unalignedAtomicTrapHeadSlot: CodeSlot {
-            #if os(WASI) || $Embedded
+            #if os(WASI)
             fatalError("Direct threading is not supported on this platform")
             #else
             return CodeSlot(wasmkit_tc_exec_handlers.298)

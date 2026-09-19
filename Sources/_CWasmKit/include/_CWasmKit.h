@@ -83,9 +83,9 @@ typedef uintptr_t Ms;
 /// `ireg` and `freg` are the integer and float accumulators. Each is live only
 /// between the handler that produces a value into it and the handler right
 /// after it.
-typedef SWIFT_CC(swiftasync) void (* WASMKIT_NONNULL wasmkit_tc_exec)(
+typedef WASMKIT_TC_CC void (* WASMKIT_NONNULL wasmkit_tc_exec)(
     uint64_t *WASMKIT_NONNULL sp, Pc, Md, Ms, uint64_t ireg, double freg,
-    SWIFT_CONTEXT void *WASMKIT_NULLABLE state);
+    WASMKIT_TC_CONTEXT void *WASMKIT_NULLABLE state);
 
 /// Declares an accumulator value that the next handler never reads, for a
 /// handler that does not use the accumulator. Leaving it indeterminate lets a

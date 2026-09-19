@@ -895,7 +895,7 @@ enum VMGen {
             let params = ExecutionParameter.allCases
             let bodyParams = wrapperParameters(of: inst)
             output += """
-            SWIFT_CC(swiftasync) static inline void \(handlerName(inst))(\(params.map { "\($0.cType) \($0.label)" }.joined(separator: ", ")), SWIFT_CONTEXT void *state) {
+            WASMKIT_TC_CC static inline void \(handlerName(inst))(\(params.map { "\($0.cType) \($0.label)" }.joined(separator: ", ")), WASMKIT_TC_CONTEXT void *state) {
                 SWIFT_CC(swift) uint64_t wasmkit_execute_\(inst.name)(\(bodyParams.map { "\($0.cType) *\($0.label)" }.joined(separator: ", ")), SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
                 void * _Nullable error = NULL; uint64_t next;
                 INLINE_CALL next = wasmkit_execute_\(inst.name)(\(bodyParams.map { "&\($0.label)" }.joined(separator: ", ")), state, &error);\n
@@ -916,7 +916,7 @@ enum VMGen {
                 }
             }
             output += """
-                return ((wasmkit_tc_exec)next)(sp, pc, md, ms, \(accArgs.joined(separator: ", ")), state);
+                WASMKIT_TC_MUSTTAIL return ((wasmkit_tc_exec)next)(sp, pc, md, ms, \(accArgs.joined(separator: ", ")), state);
             }
 
             """

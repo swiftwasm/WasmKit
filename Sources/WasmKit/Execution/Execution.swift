@@ -630,37 +630,46 @@ extension Execution {
     mutating func runDirectThreaded(
         sp: Sp, pc: Pc, md: Md, ms: Ms
     ) throws {
-        #if os(WASI) || $Embedded
+        #if os(WASI)
             fatalError("Direct threading is not supported on this platform")
         #else
             var sp = sp
             var pc = pc
             var md = md
             var ms = ms
-            let shouldUseMprotectTrapGuards = store.value.engine.configuration.memoryBoundsChecking == .mprotect
-            let storeValue = store.value
+            #if !$Embedded
+                let shouldUseMprotectTrapGuards = store.value.engine.configuration.memoryBoundsChecking == .mprotect
+                let storeValue = store.value
+            #endif
             while true {
                 let handler = pc.read(wasmkit_tc_exec.self)
                 try withUnsafeMutablePointer(to: &self) { execution in
-                    if shouldUseMprotectTrapGuards {
-                        let trapped: Bool = {
-                            let statePtr = UnsafeMutableRawPointer(execution)
-                            var context = WasmKitDirectThreadedTrapGuardContext(
-                                exec: handler,
-                                sp: sp,
-                                pc: pc,
-                                md: md,
-                                ms: ms,
-                                state: statePtr
-                            )
-                            return wasmkit_trap_guard_run(wasmkit_direct_threaded_trap_guard_entry, &context)
-                        }()
-                        if trapped {
-                            throw Trap(.memoryOutOfBounds).withBacktrace(Self.captureBacktrace(sp: sp, store: storeValue))
+                    // The mprotect guards are unavailable where there is no
+                    // operating system to take the signal, and bounds checking
+                    // there is always the software kind, so this arm is dead.
+                    #if !$Embedded
+                        if shouldUseMprotectTrapGuards {
+                            let trapped: Bool = {
+                                let statePtr = UnsafeMutableRawPointer(execution)
+                                var context = WasmKitDirectThreadedTrapGuardContext(
+                                    exec: handler,
+                                    sp: sp,
+                                    pc: pc,
+                                    md: md,
+                                    ms: ms,
+                                    state: statePtr
+                                )
+                                return wasmkit_trap_guard_run(wasmkit_direct_threaded_trap_guard_entry, &context)
+                            }()
+                            if trapped {
+                                throw Trap(.memoryOutOfBounds).withBacktrace(Self.captureBacktrace(sp: sp, store: storeValue))
+                            }
+                        } else {
+                            wasmkit_tc_start(handler, sp, pc, md, ms, execution)
                         }
-                    } else {
+                    #else
                         wasmkit_tc_start(handler, sp, pc, md, ms, execution)
-                    }
+                    #endif
                 }
                 guard let (rawError, trappingSp) = self.trap else { return }
                 let error = unsafeBitCast(rawError, to: Error.self)
