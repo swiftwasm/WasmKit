@@ -651,7 +651,12 @@ extension Execution {
     mutating func runDirectThreaded(
         sp: Sp, pc: Pc, md: Md, ms: Ms
     ) throws {
-        #if os(WASI)
+        // The handlers are reached through one of Swift's calling conventions,
+        // which Clang offers for these architectures only. This list is the
+        // Swift-side spelling of WASMKIT_USE_DIRECT_THREADED_CODE in Platform.h,
+        // which decides whether the C names used below exist at all; a target
+        // missing from the C side but present here fails to compile.
+        #if !(arch(i386) || arch(x86_64) || arch(arm) || arch(arm64) || arch(arm64_32))
             fatalError("Direct threading is not supported on this platform")
         #else
             var sp = sp
