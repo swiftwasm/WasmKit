@@ -21,7 +21,6 @@ struct Execution: ~Copyable {
     /// Storage for caught exceptions that may be referenced via `exnref`.
     var storedExceptions: [WasmKitException] = []
 
-
     /// An active exception handler entry registered by a `try_table` block.
     struct ExceptionHandler {
         /// The tag to match, `nil` for `catch_all`/`catch_all_ref`.
