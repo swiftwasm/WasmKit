@@ -550,12 +550,16 @@ extension StoreAllocator {
 
     internal func allocate(
         type: FunctionType,
-        implementation: @escaping Function.Implementation,
+        implementation: @escaping Function.RawImplementation,
         engine: Engine
     ) -> InternalFunction {
         let pointer = hostFunctions.allocate(
             initializing: HostFunctionEntity(
-                type: engine.internType(type), implementation: implementation
+                type: engine.internType(type),
+                parameterTypes: type.parameters,
+                resultTypes: type.results,
+                layout: FrameHeaderLayout(type: type),
+                implementation: implementation
             )
         )
         return InternalFunction.host(EntityHandle(unsafe: pointer))

@@ -73,7 +73,18 @@ public struct Caller: ~Copyable {
 
 struct HostFunctionEntity {
     let type: InternedFuncType
-    let implementation: Function.Implementation
+    /// The signature, resolved once here rather than looked up through the
+    /// engine's interner on every call. On a small device the lookup and the
+    /// retain traffic on the type's arrays cost more than the call they
+    /// preface.
+    let parameterTypes: [ValueType]
+    let resultTypes: [ValueType]
+    let layout: FrameHeaderLayout
+    /// Always the buffer-based form. A host function written against the
+    /// array-based API is wrapped in one of these when it is created, so the
+    /// engine has a single shape to call and only the functions that want
+    /// arrays pay for them.
+    let implementation: Function.RawImplementation
 }
 
 extension Store {

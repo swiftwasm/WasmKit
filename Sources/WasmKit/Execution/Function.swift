@@ -37,6 +37,16 @@ public struct Function: Equatable {
     /// The type of a host function implementation closure.
     public typealias Implementation = (borrowing Caller, [Value]) throws -> [Value]
 
+    /// A host function that reads its parameters from, and writes its results
+    /// into, buffers the engine supplies.
+    ///
+    /// The array-based form has to allocate for every call, and on a small
+    /// device an allocation costs far more than the work most host functions
+    /// do. The buffers are valid only for the duration of the call.
+    public typealias RawImplementation = (
+        borrowing Caller, UnsafeBufferPointer<Value>, UnsafeMutableBufferPointer<Value>
+    ) throws -> Void
+
     internal let handle: InternalFunction
     let store: Store
 
@@ -71,7 +81,45 @@ public struct Function: Equatable {
         type: FunctionType,
         body: @escaping Implementation
     ) {
-        self.init(handle: store.allocator.allocate(type: type, implementation: body, engine: store.engine), store: store)
+        self.init(
+            handle: store.allocator.allocate(
+                type: type, implementation: Function.adapting(body, results: type.results),
+                engine: store.engine),
+            store: store)
+    }
+
+    /// Wraps an array-based host function in the buffer-based form the engine
+    /// calls, materialising the arrays and checking the results it returns.
+    static func adapting(
+        _ body: @escaping Implementation, results: [ValueType]
+    ) -> RawImplementation {
+        { caller, parameters, out in
+            let produced = try body(caller, Array(parameters))
+            guard produced.count == results.count else {
+                throw Trap(.resultTypesMismatch(expected: results, got: produced))
+            }
+            for index in 0..<produced.count {
+                do {
+                    try produced[index].checkType(results[index])
+                } catch {
+                    throw Trap(.resultTypesMismatch(expected: results, got: produced))
+                }
+                out[index] = produced[index]
+            }
+        }
+    }
+
+    /// Creates a function backed by a host implementation that does not
+    /// allocate to receive its parameters.
+    public init(
+        store: Store,
+        parameters: [ValueType], results: [ValueType] = [],
+        raw body: @escaping RawImplementation
+    ) {
+        let type = FunctionType(parameters: parameters, results: results)
+        self.init(
+            handle: store.allocator.allocate(type: type, implementation: body, engine: store.engine),
+            store: store)
     }
 
     /// The signature type of the function.
@@ -182,7 +230,13 @@ extension InternalFunction {
             let resolvedType = store.engine.resolveType(entity.type)
             try check(functionType: resolvedType, parameters: arguments)
             let caller = Caller(instanceHandle: nil, store: store)
-            let results = try entity.implementation(caller, arguments)
+            var results = [Value](repeating: .i32(0), count: resolvedType.results.count)
+            let implementation = entity.implementation
+            try arguments.withUnsafeBufferPointer { parameters in
+                try results.withUnsafeMutableBufferPointer { out in
+                    try implementation(caller, parameters, out)
+                }
+            }
             try check(functionType: resolvedType, results: results)
             return results
         }
