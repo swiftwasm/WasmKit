@@ -38,6 +38,7 @@ add_wasmkit_library(WasmKit
   Execution/EngineInterceptor.swift
   Execution/Errors.swift
   Execution/Execution.swift
+  Execution/ExecutionStack.swift
   Execution/Function.swift
   Execution/Instances.swift
   Execution/MprotectLinearMemory.swift

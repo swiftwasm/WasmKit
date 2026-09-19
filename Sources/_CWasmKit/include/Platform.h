@@ -65,6 +65,15 @@
 #  define WASMKIT_TC_CHOICE 0
 #endif
 
+// Both conventions exist only where Clang supports Swift's calling conventions
+// at all, which is x86, x86-64, ARM and AArch64 -- the handler bodies are Swift
+// functions declared `SWIFT_CC(swift)`, so a target without that support has no
+// direct threading whichever option it picks.
+//
+// The Swift side cannot read this macro from `#if`, so it repeats that
+// architecture list instead; see `runDirectThreaded` in Execution.swift. Keep
+// the two in step, and never let the Swift list be the more permissive one: it
+// decides whether the names below are referenced at all.
 #if WASMKIT_TC_CHOICE
 #  define WASMKIT_USE_DIRECT_THREADED_CODE 1
 #else
