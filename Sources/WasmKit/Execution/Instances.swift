@@ -696,7 +696,12 @@ struct MemoryEntity: ~Copyable {
     }
 
     init(_ memoryType: MemoryType, engineConfiguration: EngineConfiguration, resourceLimiter: any ResourceLimiter) throws {
-        let initialBytes = Int(memoryType.min) * Self.pageSize
+        // A memory64 minimum can name more pages than `Int` can hold bytes for, so
+        // the byte count has to be computed before it can be range-checked.
+        let (initialBytes, initialOverflow) = Int(clamping: memoryType.min).multipliedReportingOverflow(by: Self.pageSize)
+        guard !initialOverflow else {
+            throw Trap(.initialMemorySizeExceedsLimit(byteSize: Int.max))
+        }
         guard try resourceLimiter.limitMemoryGrowth(to: initialBytes) else {
             throw Trap(.initialMemorySizeExceedsLimit(byteSize: initialBytes))
         }
