@@ -20,6 +20,8 @@ mkdir -p "$BUILD"
 common=(
     -target "$TARGET"
     -enable-experimental-feature Embedded
+    # `Cell` (Sources/WasmKit/Platform/Cell.swift) stores a value inline.
+    -enable-experimental-feature RawLayout
     -wmo -parse-as-library -Osize
     -Xfrontend -function-sections
     # Build the debugging-enabled configuration: it is a strict superset, and

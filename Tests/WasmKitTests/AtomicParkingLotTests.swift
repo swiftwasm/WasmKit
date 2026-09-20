@@ -92,7 +92,7 @@
 
             /// Contention breadth: across a run using only `unpark`, the sum of `unpark`
             /// return values must equal the number of `parkConditionally` calls returning
-            /// `.woken` (exact post-fix; see the plan's Correctness argument). Waiters use a
+            /// `.woken` (exact post-fix). Waiters use a
             /// short positive timeout so they block in `pthread_cond_timedwait`, the
             /// production `memory.atomic.wait` path.
             @Test func notifyCountMatchesObservedWakeupsUnderContention() {

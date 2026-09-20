@@ -16,6 +16,10 @@ let swiftSettings: [SwiftSetting] =
     ? [.treatAllWarnings(as: .error, .when(platforms: DarwinPlatforms + [.linux, .wasi, .android, .openbsd]))]
     : []
 
+/// Settings for the engine itself, which stores a few values inline with `Cell` (see
+/// `Sources/WasmKit/Platform/Cell.swift`).
+let engineSwiftSettings: [SwiftSetting] = swiftSettings + [.enableExperimentalFeature("RawLayout")]
+
 let cliCommandsTarget = Target.target(
     name: "CLICommands",
     dependencies: [
@@ -100,7 +104,7 @@ let package = Package(
                 ),
             ],
             exclude: ["CMakeLists.txt"],
-            swiftSettings: swiftSettings
+            swiftSettings: engineSwiftSettings
         ),
         .target(name: "_CWasmKit"),
         .target(

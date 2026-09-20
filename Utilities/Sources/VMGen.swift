@@ -170,6 +170,9 @@ enum VMGen {
                         ireg.pointee = \(store("value"))
                 """
         }
+        inlineImpls["consumeFuel"] = """
+            if let trap = consumeFuel(immediate: immediate) { %TRAP% }
+            """
         inlineImpls["selectAcc"] = """
             let onTrue = sp.pointee[immediate.onTrue]
                     let onFalse = sp.pointee[immediate.onFalse]
@@ -437,7 +440,17 @@ enum VMGen {
         }
     }
     static func replaceMethodSignature(instructions: [Instruction], sourceRoot: URL) throws {
+        let inlineImpls = generateBasicInstImplementations()
         for inst in instructions {
+            // An instruction whose body is generated inline has no wrapper handler for this pass
+            // to fix up: what it has is an ordinary function that the generated body calls, whose
+            // signature is chosen by that call site rather than by `instMethodDecl`. Rewriting it
+            // to the wrapper shape breaks it, so leave these alone. The cost is that such a
+            // function's signature is maintained by hand; a spec change that outgrows it shows up
+            // as a build error rather than an automatic rewrite.
+            if inlineImpls[inst.name] != nil {
+                continue
+            }
             try replaceInstMethodSignature(inst, sourceRoot: sourceRoot)
         }
     }

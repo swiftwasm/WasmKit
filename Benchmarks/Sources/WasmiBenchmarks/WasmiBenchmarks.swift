@@ -34,6 +34,9 @@ struct Options {
     var compilationMode: EngineConfiguration.CompilationMode?
     var threadingModel: EngineConfiguration.ThreadingModel?
     var memoryBoundsChecking: EngineConfiguration.MemoryBoundsChecking?
+    /// Run with fuel metering enabled and an effectively unlimited budget, to measure what
+    /// metering costs rather than to bound anything.
+    var fuelMetering: Bool = false
 
     /// `<repo>/Vendor/wasmi-benchmarks`, derived from this source file's location
     /// (`<repo>/Benchmarks/Sources/WasmiBenchmarks/`).
@@ -56,6 +59,7 @@ struct Options {
           --eager              Compile eagerly instead of lazily.
           --token              Use token-threaded dispatch instead of direct threading.
           --software-bounds    Use software memory bounds checking.
+          --fuel               Enable fuel metering with an unlimited budget.
         """
 
     static func parse(_ arguments: [String]) throws -> Options {
@@ -71,6 +75,7 @@ struct Options {
             case "--eager": options.compilationMode = .eager
             case "--token": options.threadingModel = .token
             case "--software-bounds": options.memoryBoundsChecking = .software
+            case "--fuel": options.fuelMetering = true
             case "-h", "--help":
                 print(usage)
                 exit(EXIT_SUCCESS)
@@ -228,9 +233,15 @@ final class Runner {
                 compilationMode: options.compilationMode,
                 // The deeply recursive cases (fibonacci-rec) need more than the default.
                 stackSize: 8 << 20,
-                memoryBoundsChecking: options.memoryBoundsChecking
+                memoryBoundsChecking: options.memoryBoundsChecking,
+                fuelMetering: options.fuelMetering
             ))
-        return Store(engine: engine)
+        let store = Store(engine: engine)
+        if options.fuelMetering {
+            // Unlimited in practice: the point is to pay for the checkpoints, not to run out.
+            store.fuel = Fuel(remaining: .max)
+        }
+        return store
     }
 
     private func url(_ relativePath: String) -> URL {

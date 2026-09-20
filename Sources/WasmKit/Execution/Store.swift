@@ -1,5 +1,19 @@
 import WasmParser
 
+/// A budget for WebAssembly execution, measured in fuel.
+///
+/// One unit of fuel is roughly one executed WebAssembly operator; bulk memory and table
+/// operations additionally cost one unit per 64 bytes they move.
+public struct Fuel: Sendable {
+    /// The fuel remaining in this budget.
+    public var remaining: UInt64
+
+    /// Creates a budget with the given amount of fuel remaining.
+    public init(remaining: UInt64) {
+        self.remaining = remaining
+    }
+}
+
 /// A container to manage WebAssembly object space.
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#store>
@@ -7,6 +21,58 @@ public final class Store {
     var nameRegistry = NameRegistry()
     @_spi(Fuzzing)  // Consider making this public
     public var resourceLimiter: ResourceLimiter = DefaultResourceLimiter()
+
+    /// The remaining fuel. `UInt64.max` means "unlimited".
+    ///
+    /// In a ``Cell`` so that the interpreter can charge it through its address. Unsynchronized: a
+    /// `Store` is thread-confined, and each wasi thread gets its own.
+    let remainingFuel = Cell<UInt64>(.max)
+    /// Whether this store's engine meters fuel.
+    ///
+    /// Bulk memory and table handlers exist whether or not fuel is metered, so they have to ask.
+    /// Resolved once here rather than per operation, because reaching the engine's configuration
+    /// from a handler is a chain of loads that a copy-heavy guest pays for on every copy, metered
+    /// or not.
+    let isFuelMetered: Bool
+    /// Whether a budget was ever set. Distinguishes "unlimited" from a budget that happens to
+    /// hold `UInt64.max`.
+    private var hasFuel: Bool = false
+    /// The program counter of the fuel charge that exhausted the budget.
+    ///
+    /// Written on the out-of-fuel path and not read yet: resuming a suspended execution needs the
+    /// program counter of the charge in order to retry it, and recording it keeps that change
+    /// additive. It lives here rather than in `Execution` because adding a stored property there
+    /// grows the call and throw handlers noticeably, even though they never read it.
+    var fuelTrapPC: UnsafeRawPointer? = nil
+
+    /// The remaining execution budget of this store, or `nil` when execution is unlimited.
+    /// (Default: `nil`)
+    ///
+    /// Execution traps with an out-of-fuel trap once the budget is exhausted. The remaining fuel
+    /// is left untouched by the failed charge, and the store stays usable: assign a new budget and
+    /// call again.
+    ///
+    /// - Note: This has no effect unless the store's engine was configured with
+    ///   ``EngineConfiguration/fuelMetering``. Setting a budget on an engine without fuel metering
+    ///   is accepted, but nothing consumes it, so the value never decreases.
+    public var fuel: Fuel? {
+        get {
+            hasFuel ? Fuel(remaining: remainingFuel.value) : nil
+        }
+        set {
+            assign(fuel: newValue)
+        }
+        _modify {
+            var value = hasFuel ? Fuel(remaining: remainingFuel.value) : nil
+            defer { assign(fuel: value) }
+            yield &value
+        }
+    }
+
+    private func assign(fuel newValue: Fuel?) {
+        hasFuel = newValue != nil
+        remainingFuel.value = newValue?.remaining ?? .max
+    }
 
     @available(*, unavailable)
     public var namedModuleInstances: [String: Any] {
@@ -22,6 +88,7 @@ public final class Store {
     public init(engine: Engine) {
         self.engine = engine
         self.allocator = StoreAllocator(funcTypeInterner: engine.funcTypeInterner)
+        self.isFuelMetered = engine.configuration.fuelMetering
     }
 }
 

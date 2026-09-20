@@ -28,6 +28,7 @@ struct SpectestTests {
             Self.testsuite.appendingPathComponent("proposals/relaxed-simd").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/memory64").path,
+            Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/fuel").path,
         ]
         if sharedMemorySupported {
             paths.append(Self.testsuite.appendingPathComponent("proposals/threads").path)

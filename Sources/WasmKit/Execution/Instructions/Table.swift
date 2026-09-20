@@ -35,6 +35,7 @@ extension Execution {
             sp[immediate.result] = UntypedValue(.i32(Int32(-1).unsigned))
             return
         }
+        try chargeElementsCopied(growthSize)
         sp[immediate.result] = UntypedValue(table.limits.isMemory64 ? .i64(UInt64(oldSize)) : .i32(UInt32(oldSize)))
     }
     mutating func tableFill(sp: Sp, immediate: Instruction.TableFillOperand) throws {
@@ -48,6 +49,7 @@ extension Execution {
             throw Trap(.tableOutOfBounds(Int(clamping: startIndex)))
         }
         try table.withValue { try $0.fill(repeating: fillValue, from: start, count: count) }
+        try chargeElementsCopied(fillCounter)
     }
     mutating func tableCopy(sp: Sp, immediate: Instruction.TableCopyOperand) throws {
         let sourceTableIndex = immediate.sourceIndex
@@ -68,6 +70,7 @@ extension Execution {
             throw Trap(.tableOutOfBounds(Int(clamping: destinationIndex)))
         }
         try destinationTable.copy(sourceTable, from: source, to: destination, count: count)
+        try chargeElementsCopied(size)
     }
     mutating func tableInit(sp: Sp, immediate: Instruction.TableInitOperand) throws {
         let tableIndex = immediate.tableIndex
@@ -89,6 +92,7 @@ extension Execution {
                 count: Int(copyCounter)
             )
         }
+        try chargeElementsCopied(copyCounter)
     }
     mutating func tableElementDrop(sp: Sp, immediate: Instruction.TableElementDropOperand) {
         let segment = currentInstance(sp: sp).elementSegments[Int(immediate.index)]

@@ -389,6 +389,20 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     typealias LabelRef = Int
     typealias ValueType = WasmTypes.ValueType
 
+    /// The fuel meter of a region being translated, when the engine meters fuel.
+    ///
+    /// A "region" is a stretch of code that always runs from its head: a function body, a loop
+    /// body, or one arm of an `if`. Each one is charged once, up front, by a `consumeFuel`
+    /// instruction at its head whose immediate is the summed cost of the operators inside it.
+    /// The cost is only known once the region has been translated, so the instruction is emitted
+    /// with a zero immediate and patched at `meter` when the region closes.
+    fileprivate struct FuelRegion {
+        /// Position of the region's `consumeFuel` instruction.
+        let meter: MetaProgramCounter
+        /// Summed cost of the operators translated into this region so far.
+        var cost: UInt64
+    }
+
     struct ControlStack {
         typealias BlockType = FunctionType
 
@@ -410,6 +424,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             let continuation: LabelRef
             var kind: Kind
             var reachable: Bool = true
+            /// Set when this frame opened a fuel region: the state to restore when it closes.
+            ///
+            /// `nil` for frames that share their parent's meter (`block`, `try_table`) and for
+            /// every frame when the engine does not meter fuel.
+            fileprivate var fuelRegion: FuelRegion? = nil
+            /// The enclosing region, saved while this frame's region is the current one.
+            fileprivate var enclosingFuelRegion: FuelRegion? = nil
 
             var copyTypes: [ValueType] {
                 switch self.kind {
@@ -448,6 +469,21 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 throw WasmKitError(message: .controlStackEmpty)
             }
             self.frames[self.frames.count - 1].reachable = value
+        }
+
+        /// Whether the operators being translated right now will ever run.
+        ///
+        /// Reads the flag in place rather than copying the frame, because fuel metering consults
+        /// it once per operator.
+        var isCurrentFrameReachable: Bool {
+            self.frames.last?.reachable ?? false
+        }
+
+        /// Records the fuel region opened by the frame on top of the stack.
+        fileprivate mutating func setCurrentFuelRegion(_ region: FuelRegion, enclosing: FuelRegion?) {
+            guard !self.frames.isEmpty else { return }
+            self.frames[self.frames.count - 1].fuelRegion = region
+            self.frames[self.frames.count - 1].enclosingFuelRegion = enclosing
         }
 
         func currentFrame() throws(WasmKitError) -> ControlFrame {
@@ -1939,6 +1975,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             }
         }
 
+        /// Overwrites the instruction previously emitted at `position`.
+        ///
+        /// The replacement must occupy the same number of code slots as the instruction it
+        /// replaces, which holds for a fuel meter: it is always a `consumeFuel` with a
+        /// fixed-width immediate, emitted with a zero cost and patched with the real one.
+        mutating func patch(at position: MetaProgramCounter, _ instruction: Instruction) {
+            assign(at: position.offsetFromHead, instruction)
+        }
+
         mutating func resetLastEmission() {
             lastEmission = nil
             hasLastAcc = false
@@ -2397,6 +2442,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     let funcTypeInterner: Interner<FunctionType>
     let engineConfiguration: EngineConfiguration
     var module: InternalInstance
+    /// The fuel region being translated, when the engine meters fuel; `nil` otherwise.
+    private var fuelRegion: FuelRegion?
     private var iseqBuilder: ISeqBuilder
     var controlStack: ControlStack
     var valueStack: ValueStack
@@ -2516,6 +2563,61 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let oldPC = iseqBuilder.insertingPC
         iseqBuilder.emit(instruction, resultRelink: resultRelink, fusable: fusable, binary: binary)
         self.updateInstructionMapping(from: oldPC)
+    }
+
+    // MARK: - Fuel metering
+
+    /// Emits the meter for a region starting here and makes it the region being charged.
+    ///
+    /// Does nothing when the engine does not meter fuel. The meter is attached to the control
+    /// frame on top of the stack, which must be the frame that owns the region, so that
+    /// ``closeFuelRegion(of:)`` can give it its final cost when that frame ends.
+    private mutating func openFuelRegion() {
+        guard engineConfiguration.fuelMetering else { return }
+        let meter = iseqBuilder.insertingPC
+        emit(.consumeFuel(Instruction.ConsumeFuelOperand(raw: 0)))
+        // A peephole fusion that rewound past the meter would drop the charge and leave the
+        // patch position pointing at unrelated code, so put it out of the rewinder's reach.
+        iseqBuilder.resetLastEmission()
+        let enclosing = fuelRegion
+        let region = FuelRegion(meter: meter, cost: 0)
+        fuelRegion = region
+        controlStack.setCurrentFuelRegion(region, enclosing: enclosing)
+    }
+
+    /// Writes the accumulated cost into the meter `frame` opened, and makes the enclosing region
+    /// current again. Does nothing for a frame that shares its parent's meter.
+    private mutating func closeFuelRegion(of frame: ControlStack.ControlFrame) {
+        guard frame.fuelRegion != nil, let region = fuelRegion else { return }
+        iseqBuilder.patch(at: region.meter, .consumeFuel(Instruction.ConsumeFuelOperand(raw: region.cost)))
+        fuelRegion = frame.enclosingFuelRegion
+    }
+
+    /// Prices the operator about to be translated at one unit, in the region being translated.
+    ///
+    /// Charged before the operator is visited, so that it lands in the region that is current at
+    /// that moment rather than in one the operator itself opens: an `if` belongs to the region
+    /// that evaluates its condition, not to the arm it guards.
+    ///
+    /// The operators that generate no code give the unit back in ``refundFuelForFreeOperator()``.
+    /// Pricing this way, rather than by asking what the operator is, keeps the translator from
+    /// switching over every operator kind on a path the visitor is already dispatching on.
+    ///
+    /// Operators in unreachable code are not charged: the translator emits nothing for them, so
+    /// charging would bill a guest for work it cannot do.
+    private mutating func chargeFuelForOperator() {
+        guard fuelRegion != nil, controlStack.isCurrentFrameReachable else { return }
+        fuelRegion?.cost += 1
+    }
+
+    /// Gives back the unit charged by ``chargeFuelForOperator()`` for an operator that generates
+    /// no code: `nop`, `drop`, `block`, `loop`, `unreachable`, `return`, `else` and `end`.
+    ///
+    /// Call it as the first act of the visit method, before anything that opens or closes a region
+    /// or changes reachability, so that the refund lands where the charge did.
+    private mutating func refundFuelForFreeOperator() {
+        guard fuelRegion != nil, controlStack.isCurrentFrameReachable else { return }
+        fuelRegion?.cost -= 1
     }
 
     @discardableResult
@@ -2869,6 +2971,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let oldPC = iseqBuilder.insertingPC
         iseqBuilder.emit(._return(.init()))
         self.updateInstructionMapping(from: oldPC)
+        // The function body's region closes here rather than in `visitEnd`, which returns for the
+        // root frame without popping it.
+        if let region = fuelRegion {
+            iseqBuilder.patch(at: region.meter, .consumeFuel(Instruction.ConsumeFuelOperand(raw: region.cost)))
+            fuelRegion = nil
+        }
         let instructions = iseqBuilder.finalize()
         // TODO: Figure out a way to avoid the copy here while keeping the execution performance.
         let buffer = allocator.allocateInstructions(capacity: instructions.count)
@@ -2927,8 +3035,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             // Emit `onEnter` instruction at the beginning of the function
             emit(.onEnter(functionIndex))
         }
+        // The function body is a region: everything reachable without taking a back-edge or
+        // entering an `if` arm is charged once, here, before any of it runs.
+        openFuelRegion()
         var parser = ExpressionParser(code: code)
         while let visit = try WasmKitError.wrap({ () throws(WasmParserError) in try parser.parse() }) {
+            chargeFuelForOperator()
             guard !reachedFunctionEnd else {
                 // The expression parser only stops at an `end` that exhausts the
                 // code entry, so a body with trailing operators keeps decoding.
@@ -2952,14 +3064,17 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     // MARK: - Visitor
 
     mutating func visitUnreachable() throws(WasmKitError) -> Output {
+        refundFuelForFreeOperator()
         emit(.unreachable(.init()))
         try markUnreachable()
     }
     mutating func visitNop() -> Output {
+        refundFuelForFreeOperator()
         emit(.nop(.init()))
     }
 
     mutating func visitBlock(blockType: WasmParser.BlockType) throws(WasmKitError) -> Output {
+        refundFuelForFreeOperator()
         let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
         self.preserveOnStack(depth: self.valueStack.valueHeight)
@@ -2976,6 +3091,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitLoop(blockType: WasmParser.BlockType) throws(WasmKitError) -> Output {
+        refundFuelForFreeOperator()
         let blockType = try module.resolveBlockType(blockType)
         preserveOnStack(depth: self.valueStack.valueHeight)
         iseqBuilder.resetLastEmission()
@@ -2996,6 +3112,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 kind: .loop
             )
         )
+        // After the label, so that the back-edge lands on the meter and every iteration is
+        // charged. This is what bounds a guest that loops without ever calling out.
+        openFuelRegion()
     }
 
     mutating func visitIf(blockType: WasmParser.BlockType) throws(WasmKitError) -> Output {
@@ -3024,6 +3143,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 kind: .if(elseLabel: elseLabel, endLabel: endLabel, isElse: false)
             )
         )
+        // The `then` arm is its own region, and it must be metered after the conditional branch
+        // that guards it, whichever of the branch forms below gets emitted.
+        defer { openFuelRegion() }
         guard let condition = condition else { return }
         // NOTE: `preserveOnStack` above may have emitted copies; when it did,
         // `canRewind` refuses and we fall back to the unfused form.
@@ -3061,6 +3183,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitElse() throws(WasmKitError) -> Output {
+        refundFuelForFreeOperator()
         var frame = try controlStack.currentFrame()
         // `isElse: true` means this `if` already has an `else`, so a second one
         // would pin `elseLabel` twice.
@@ -3088,8 +3211,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             throw WasmKitError(message: .valuesRemainingAtEndOfBlock)
         }
         _ = controlStack.popFrame()
+        // The `then` arm ends here, so its meter can be given its final cost.
+        closeFuelRegion(of: frame)
         frame.kind = .if(elseLabel: elseLabel, endLabel: endLabel, isElse: true)
         frame.reachable = true
+        frame.fuelRegion = nil
+        frame.enclosingFuelRegion = nil
         controlStack.pushFrame(frame)
 
         // Re-push parameters
@@ -3097,9 +3224,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             _ = valueStack.push(parameter)
         }
         try iseqBuilder.pinLabelHere(elseLabel)
+        // The `else` arm is a region of its own, entered only when the condition was false.
+        openFuelRegion()
     }
 
     mutating func visitEnd() throws(WasmKitError) -> Output {
+        refundFuelForFreeOperator()
         let toBePopped = try controlStack.currentFrame()
         iseqBuilder.resetLastEmission()
         if case .block(root: true) = toBePopped.kind {
@@ -3147,6 +3277,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             _ = valueStack.push(result)
         }
         _ = controlStack.popFrame()
+        // A loop body, a `then` without an `else`, or an `else`: whichever region this frame
+        // opened is complete, so its meter gets the cost accumulated for it.
+        closeFuelRegion(of: toBePopped)
     }
 
     private static func computePopCount(
@@ -3659,6 +3792,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitReturn() throws(WasmKitError) -> Output {
+        refundFuelForFreeOperator()
         try translateReturn()
         try markUnreachable()
     }
@@ -3928,6 +4062,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitDrop() throws(WasmKitError) -> Output {
+        refundFuelForFreeOperator()
         _ = try popAnyOperand()
         iseqBuilder.resetLastEmission()
     }

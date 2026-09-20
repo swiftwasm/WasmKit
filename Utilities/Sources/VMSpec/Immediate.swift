@@ -375,6 +375,10 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "rawGlobal", type: .UInt64)
     }
 
+    static let consumeFuel = Self(name: "ConsumeFuelOperand") {
+        $0.field(name: "raw", type: .UInt64)
+    }
+
     static let call = Self(name: "CallOperand") {
         $0.field(name: "rawCallee", type: .UInt64)
         $0.field(name: "spAddend", type: .VReg)
