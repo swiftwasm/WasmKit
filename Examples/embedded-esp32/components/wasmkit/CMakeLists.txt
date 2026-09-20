@@ -25,6 +25,7 @@ set_target_properties(${COMPONENT_LIB} PROPERTIES
 # `-Xfrontend -function-sections -DWasmDebuggingSupport` puts each function in its own section so
 # ESP-IDF's `--gc-sections` can drop what the firmware never calls. Without it
 # swiftc emits one `.text` per module and none of it can be stripped.
+# `RawLayout` is for `Cell` (Sources/WasmKit/Platform/Cell.swift), which stores a value inline.
 target_compile_options(${COMPONENT_LIB} PRIVATE
-    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-I ${CMAKE_BINARY_DIR}/swift-modules -Xcc -I${WASMKIT_ROOT}/Sources/_CWasmKit/include -Xfrontend -function-sections -DWasmDebuggingSupport -package-name wasmkit>")
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-I ${CMAKE_BINARY_DIR}/swift-modules -Xcc -I${WASMKIT_ROOT}/Sources/_CWasmKit/include -Xfrontend -function-sections -enable-experimental-feature RawLayout -DWasmDebuggingSupport -package-name wasmkit>")
 add_dependencies(${COMPONENT_LIB} __idf_wasmtypes __idf_wasmparser)

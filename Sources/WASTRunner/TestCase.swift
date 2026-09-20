@@ -128,6 +128,7 @@ extension TestCase {
         let rootPath = URL(fileURLWithPath: path).deletingLastPathComponent().path
         let features = WASTRunContext.deriveFeatureSet(rootPath: rootPath)
         configuration.features = features
+        configuration.fuelMetering = WASTRunContext.deriveFuelMetering(rootPath: rootPath)
 
         let engine = Engine(configuration: configuration)
         let store = Store(engine: engine)
@@ -274,6 +275,43 @@ extension WASTRunContext {
             }
             return .passed
 
+        case .assertFuel(let execute, let expected):
+            guard engine.configuration.fuelMetering else {
+                return .failed("assert_fuel needs an engine with fuel metering enabled")
+            }
+            // A charge that cannot be paid leaves the budget untouched, so an unpayable budget
+            // would measure nothing; start from the largest one and subtract.
+            store.fuel = Fuel(remaining: .max)
+            do {
+                _ = try wastExecute(execute: execute)
+            } catch is Trap {
+                // A run that traps still consumed what it consumed, and pinning that number is
+                // the point of cases like a guest that traps part-way through a region.
+            }
+            guard let remaining = store.fuel?.remaining else {
+                return .failed("fuel metering reported no budget after the run")
+            }
+            let consumed = UInt64.max - remaining
+            guard consumed == expected else {
+                return .failed("fuel mismatch: expected \(expected), consumed \(consumed)")
+            }
+            return .passed
+        case .assertOutOfFuel(let execute, let budget):
+            guard engine.configuration.fuelMetering else {
+                return .failed("assert_out_of_fuel needs an engine with fuel metering enabled")
+            }
+            store.fuel = Fuel(remaining: budget)
+            do {
+                _ = try wastExecute(execute: execute)
+                return .failed("expected the run to exhaust its budget of \(budget)")
+            } catch let trap as Trap {
+                guard trap.reason.description.contains("out of fuel") else {
+                    return .failed("expected to run out of fuel, but trapped with: \(trap.reason.description)")
+                }
+                return .passed
+            } catch {
+                return .failed("\(error)")
+            }
         case .assertReturn(let execute, let expected):
             let actual = try wastExecute(execute: execute)
             guard actual.isTestEquivalent(to: expected) else {
@@ -382,6 +420,15 @@ extension WASTRunContext {
         return try function.invoke(args)
     }
 
+    /// Whether scripts under `rootPath` run on an engine that meters fuel.
+    ///
+    /// Metering is instrumented at translation time, so `assert_fuel` needs it on before the
+    /// module is translated. Derived from the directory for the same reason the feature set below
+    /// is: it keeps the decision in one place and out of the scripts themselves.
+    static func deriveFuelMetering(rootPath: String) -> Bool {
+        rootPath.hasSuffix("fuel")
+    }
+
     static func deriveFeatureSet(rootPath: String) -> WasmFeatureSet {
         var features = WasmFeatureSet.default
         if rootPath.hasSuffix("memory64") {
@@ -396,6 +443,10 @@ extension WASTRunContext {
         }
         if rootPath.hasSuffix("proposals/exception-handling") {
             features.insert(.exceptionHandling)
+        }
+        if rootPath.hasSuffix("fuel") {
+            // A tail call is one of the ways a guest can run forever, so the fuel suite needs it.
+            features.insert(.tailCall)
         }
         return features
     }

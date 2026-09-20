@@ -1056,6 +1056,8 @@
         // Terminal instructions — no successor exists
         mutating func predictNext_unreachable(operandPc: Pc, sp: Sp) -> [Pc] { [] }
         mutating func predictNext_endOfExecution(operandPc: Pc, sp: Sp) -> [Pc] { [] }
+        // Raises the out-of-fuel trap, so nothing follows it.
+        mutating func predictNext_outOfFuelTrap(operandPc: Pc, sp: Sp) -> [Pc] { [] }
         mutating func predictNext_breakpoint(operandPc: Pc, sp: Sp) -> [Pc] { [] }
 
         // Exception-handling instructions — destination depends on which handler

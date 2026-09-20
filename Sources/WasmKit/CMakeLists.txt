@@ -24,6 +24,7 @@ add_wasmkit_library(WasmKit
   Execution/Instructions/ControlFusedImm.swift
   Execution/Instructions/IntegerImmediate.swift
   Execution/Instructions/ExceptionHandling.swift
+  Execution/Instructions/Fuel.swift
   Execution/Instructions/Instruction.swift
   Execution/Instructions/Table.swift
   Execution/Instructions/Memory.swift
@@ -56,6 +57,7 @@ add_wasmkit_library(WasmKit
   Execution/Value.swift
   Execution/V128Storage.swift
   Platform/AtomicParkingLot.swift
+  Platform/Cell.swift
   Platform/PlatformMutex.swift
   Platform/SystemVirtualMemory.swift
 )
@@ -66,6 +68,11 @@ if(WASMKIT_ENABLE_FILESYSTEM)
   target_compile_options(WasmKit PRIVATE
     $<$<COMPILE_LANGUAGE:Swift>:-DFileSystem>)
 endif()
+
+# `Cell` (Platform/Cell.swift) stores a value inline with `@_rawLayout`. SHELL: keeps the flag and
+# its value together; as separate options CMake's de-duplication can split them.
+target_compile_options(WasmKit PRIVATE
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature RawLayout>")
 
 target_compile_options(WasmKit PRIVATE
   $<$<COMPILE_LANGUAGE:Swift>:-DMultiThread>)

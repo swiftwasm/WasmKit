@@ -322,6 +322,13 @@ extension Execution {
                 return
             }
             let oldPageCount = try memory.grow(by: delta, resourceLimiter: store.value.resourceLimiter)
+            // Charge only for a growth that happened: a refused one did no work. `grow` reports
+            // refusal as -1 rather than throwing, hence the check against the old page count.
+            let grew = memory.limit.isMemory64 ? oldPageCount.i64 != (-1 as Int64).unsigned : oldPageCount.i32 != (-1 as Int32).unsigned
+            if grew {
+                let (bytes, overflow) = pageCount.multipliedReportingOverflow(by: UInt64(MemoryEntity.pageSize))
+                try chargeBytesCopied(overflow ? .max : bytes)
+            }
             CurrentMemory.assign(md: &md, ms: &ms, memory: &memory)
             sp[immediate.result] = UntypedValue(oldPageCount)
         }
@@ -339,6 +346,7 @@ extension Execution {
             let source = sp[immediate.sourceOffset].i32
             let destination = sp[immediate.destOffset].asAddressOffset(memory.limit.isMemory64)
             try memory.initialize(segmentBytes, from: source, to: destination, count: size)
+            try chargeBytesCopied(UInt64(size))
         }
     }
     mutating func memoryDataDrop(sp: Sp, immediate: Instruction.MemoryDataDropOperand) {
@@ -353,6 +361,7 @@ extension Execution {
             let source = sp[immediate.sourceOffset].asAddressOffset(isMemory64)
             let destination = sp[immediate.destOffset].asAddressOffset(isMemory64)
             try memory.copy(from: source, to: destination, count: size)
+            try chargeBytesCopied(size)
         }
     }
     mutating func memoryFill(sp: Sp, immediate: Instruction.MemoryFillOperand) throws {
@@ -370,6 +379,7 @@ extension Execution {
                 throw Trap(.memoryOutOfBounds)
             }
             try memoryInstance.fill(offset: destinationIndex, value: UInt8(truncatingIfNeeded: value), count: copyCounter)
+            try chargeBytesCopied(UInt64(copyCounter))
         }
     }
 

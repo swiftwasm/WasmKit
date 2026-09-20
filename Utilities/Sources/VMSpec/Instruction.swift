@@ -1779,6 +1779,32 @@ extension VMGen {
         instructions += [copyStack2]
         instructions += selectCmpInsts
         instructions += memoryLoadOps.map(\.withCopyInstruction)
+        var consumeFuel = Instruction(
+            name: "consumeFuel",
+            documentation: """
+                Charge the fuel cost of the region that begins here
+
+                Emitted at function entry, at loop headers and at the arms of an `if`, and only
+                when the engine is configured with fuel metering. The immediate is the summed
+                cost of the Wasm operators in the region, so a region is charged once, before it
+                runs. Exhaustion dispatches to `outOfFuelTrap` rather than throwing, so that a
+                loop's per-iteration charge stays a straight-line handler.
+                """,
+            immediateLayout: .consumeFuel
+        )
+        consumeFuel.mayDispatchToTrap = true
+        var outOfFuelTrap = Instruction(
+            name: "outOfFuelTrap",
+            documentation: """
+                Raise `Trap(.outOfFuel)`. Dispatched to by `consumeFuel`; never emitted.
+
+                Control-shaped so that it receives the program counter, which it records for a
+                future resumable-call API before throwing.
+                """,
+            isControl: true, mayThrow: true
+        )
+        outOfFuelTrap.isTrapPseudoInstruction = true
+        instructions += [consumeFuel, outOfFuelTrap]
         return instructions
     }
 

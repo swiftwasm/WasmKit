@@ -194,6 +194,15 @@ package struct Run: AsyncParsableCommand {
     )
     var stackSize: Int?
 
+    @Option(
+        help: ArgumentHelp(
+            "Limit the execution to N units of fuel, roughly one per WebAssembly operator. "
+                + "The execution traps once the budget is exhausted.",
+            valueName: "N"
+        )
+    )
+    var fuel: UInt64?
+
     #if WasmDebuggingSupport
 
         @Option(
@@ -289,8 +298,9 @@ package struct Run: AsyncParsableCommand {
         defer { finalize() }
 
         let invoke: () throws -> Void
+        let store: Store
         if module.exports.contains(where: { $0.name == "_start" }) {
-            invoke = try instantiateWASI(module: module, interceptor: interceptor)
+            (store, invoke) = try instantiateWASI(module: module, interceptor: interceptor)
         } else {
             if wasiThreads {
                 throw ValidationError("--wasi-threads requires a WASI command module exporting _start.")
@@ -298,8 +308,11 @@ package struct Run: AsyncParsableCommand {
             guard let entry = try instantiateNonWASI(module: module, interceptor: interceptor) else {
                 return
             }
-            invoke = entry
+            (store, invoke) = entry
         }
+        // Reported even when the guest traps or exits: knowing what a run consumed before it
+        // stopped is the point of asking for a budget in the first place.
+        defer { reportFuelConsumption(of: store) }
 
         if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
             let (_, invokeTime) = try measure(execution: invoke)
@@ -393,7 +406,8 @@ package struct Run: AsyncParsableCommand {
             threadingModel: self.threadingModel?.resolve(),
             compilationMode: self.compilationMode?.resolve(),
             stackSize: self.stackSize,
-            features: enabledFeatures
+            features: enabledFeatures,
+            fuelMetering: self.fuel != nil
         )
     }
 
@@ -451,7 +465,7 @@ package struct Run: AsyncParsableCommand {
         )
     }
 
-    func instantiateWASI(module: Module, interceptor: EngineInterceptor?) throws -> () throws -> Void {
+    func instantiateWASI(module: Module, interceptor: EngineInterceptor?) throws -> (Store, () throws -> Void) {
         let wasi = try WASIBridgeToHost(configuration: deriveWASIConfiguration())
         let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
         if wasiThreads {
@@ -479,28 +493,36 @@ package struct Run: AsyncParsableCommand {
                 }
             )
             let store = Store(engine: engine)
-            return {
-                try wasi.runAndClose { wasi in
-                    let imports = try threads.makeImports(store: store)
-                    let moduleInstance = try module.instantiate(store: store, imports: imports)
-                    let exitCode = try wasi.start(moduleInstance)
-                    threads.mainThreadDidExit(code: exitCode)
+            applyFuelBudget(to: store)
+            return (
+                store,
+                {
+                    try wasi.runAndClose { wasi in
+                        let imports = try threads.makeImports(store: store)
+                        let moduleInstance = try module.instantiate(store: store, imports: imports)
+                        let exitCode = try wasi.start(moduleInstance)
+                        threads.mainThreadDidExit(code: exitCode)
+                    }
                 }
-            }
+            )
         }
         let store = Store(engine: engine)
-        return {
-            try wasi.runAndClose { wasi in
-                var imports = Imports()
-                wasi.link(to: &imports, store: store)
-                let moduleInstance = try module.instantiate(store: store, imports: imports)
-                let exitCode = try wasi.start(moduleInstance)
-                throw ExitCode(Int32(exitCode))
+        applyFuelBudget(to: store)
+        return (
+            store,
+            {
+                try wasi.runAndClose { wasi in
+                    var imports = Imports()
+                    wasi.link(to: &imports, store: store)
+                    let moduleInstance = try module.instantiate(store: store, imports: imports)
+                    let exitCode = try wasi.start(moduleInstance)
+                    throw ExitCode(Int32(exitCode))
+                }
             }
-        }
+        )
     }
 
-    func instantiateNonWASI(module: Module, interceptor: EngineInterceptor?) throws -> (() throws -> Void)? {
+    func instantiateNonWASI(module: Module, interceptor: EngineInterceptor?) throws -> (Store, () throws -> Void)? {
         let (functionName, parameters) = Run.parseInvocation(arguments: self.arguments)
         guard let functionName else {
             log("Error: No function specified to run in a given module.")
@@ -509,16 +531,32 @@ package struct Run: AsyncParsableCommand {
 
         let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
         let store = Store(engine: engine)
+        applyFuelBudget(to: store)
         let instance = try module.instantiate(store: store)
-        return {
-            log("Started invoking function \"\(functionName)\" with parameters: \(parameters)", verbose: true)
-            guard let toInvoke = instance.exports[function: functionName] else {
-                log("Error: Function \"\(functionName)\" not found in the module.")
-                return
+        return (
+            store,
+            {
+                log("Started invoking function \"\(functionName)\" with parameters: \(parameters)", verbose: true)
+                guard let toInvoke = instance.exports[function: functionName] else {
+                    log("Error: Function \"\(functionName)\" not found in the module.")
+                    return
+                }
+                let results = try toInvoke.invoke(parameters)
+                print(results.description)
             }
-            let results = try toInvoke.invoke(parameters)
-            print(results.description)
-        }
+        )
+    }
+
+    /// Gives the store the budget requested with `--fuel`, if any.
+    func applyFuelBudget(to store: Store) {
+        guard let fuel else { return }
+        store.fuel = Fuel(remaining: fuel)
+    }
+
+    /// Reports what the run consumed, so that `--fuel` also answers "how much would it need?".
+    func reportFuelConsumption(of store: Store) {
+        guard let budget = fuel, let remaining = store.fuel?.remaining else { return }
+        print("fuel consumed: \(budget - remaining), fuel remaining: \(remaining)")
     }
 
     @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)

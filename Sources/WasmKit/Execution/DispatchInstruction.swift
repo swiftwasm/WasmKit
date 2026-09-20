@@ -438,6 +438,8 @@ extension Execution {
         case 725: return try self.executeToken_i64Load32SWithCopy(sp: &sp, pc: &pc, md: &md, ms: &ms)
         // i64Load32UWithCopy shares i32LoadWithCopy's handler body; see Instruction.handlerIdentity
         case 726: return try self.executeToken_i32LoadWithCopy(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 727: return try self.executeToken_consumeFuel(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 728: return try self.execute_outOfFuelTrap(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -1240,6 +1242,14 @@ extension Execution {
     mutating func executeToken_i64Load32UWithCopy(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.LoadWithCopyOperand.load(from: &pc.pointee)
         if let trap = memoryLoadWithCopy(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) }) { try trap.raise() }
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        return next
+    }
+    @inline(__always)
+    mutating func executeToken_consumeFuel(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
+        let immediate = Instruction.ConsumeFuelOperand.load(from: &pc.pointee)
+        if let trap = consumeFuel(immediate: immediate) { try trap.raise() }
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -7124,6 +7134,20 @@ extension Execution {
         if let trap = memoryLoadWithCopy(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) }) { return trap.directThreadedHeadSlot }
         return next
     }
+    @_silgen_name("wasmkit_execute_consumeFuel") @inline(__always)
+    mutating func execute_consumeFuel(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.ConsumeFuelOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = consumeFuel(immediate: immediate) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_outOfFuelTrap") @inline(__always)
+    mutating func execute_outOfFuelTrap(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
+        let next: CodeSlot
+        (pc.pointee, next) = try self.outOfFuelTrap(sp: sp.pointee, pc: pc.pointee)
+        return next
+    }
 }
 
 // The handler table exists only where Clang offers one of Swift's
@@ -7191,6 +7215,19 @@ extension Instruction {
             fatalError("Direct threading is not supported on this platform")
             #else
             return CodeSlot(wasmkit_tc_exec_handlers.298)
+            #endif
+        }
+        /// The direct-threaded head slot of the `outOfFuelTrap` pseudo-instruction.
+        ///
+        /// Reads one element of the handler table directly: going through
+        /// `handler` would copy the whole table into a stack temporary and
+        /// leave the reading handler with a stack-protector prologue.
+        @inline(__always)
+        static var outOfFuelTrapHeadSlot: CodeSlot {
+            #if !(arch(i386) || arch(x86_64) || arch(arm) || arch(arm64) || arch(arm64_32))
+            fatalError("Direct threading is not supported on this platform")
+            #else
+            return CodeSlot(wasmkit_tc_exec_handlers.728)
             #endif
         }
 }

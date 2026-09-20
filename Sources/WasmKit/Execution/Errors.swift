@@ -112,6 +112,8 @@ package enum TrapReason: Error, CustomStringConvertible, Sendable {
     case integerOverflow
     /// Invalid conversion to integer
     case invalidConversionToInteger
+    /// Execution consumed all of the fuel budgeted by ``Store/fuel``
+    case outOfFuel
 
     /// The description of the trap reason.
     package var description: String {
@@ -132,6 +134,8 @@ package enum TrapReason: Error, CustomStringConvertible, Sendable {
             return "integer overflow"
         case .invalidConversionToInteger:
             return "invalid conversion to integer"
+        case .outOfFuel:
+            return "out of fuel"
         case .indirectCallToNull(let elementIndex):
             return "indirect call to null element (uninitialized element \(elementIndex))"
         case .typeMismatchCall(let actual, let expected):

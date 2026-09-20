@@ -2371,6 +2371,19 @@ enum Instruction {
     /// 
     /// `i64.load32_u` with the copy that produced its address.
     case i64Load32UWithCopy(Instruction.LoadWithCopyOperand)
+    /// Charge the fuel cost of the region that begins here
+    /// 
+    /// Emitted at function entry, at loop headers and at the arms of an `if`, and only
+    /// when the engine is configured with fuel metering. The immediate is the summed
+    /// cost of the Wasm operators in the region, so a region is charged once, before it
+    /// runs. Exhaustion dispatches to `outOfFuelTrap` rather than throwing, so that a
+    /// loop's per-iteration charge stays a straight-line handler.
+    case consumeFuel(Instruction.ConsumeFuelOperand)
+    /// Raise `Trap(.outOfFuel)`. Dispatched to by `consumeFuel`; never emitted.
+    /// 
+    /// Control-shaped so that it receives the program counter, which it records for a
+    /// future resumable-call API before throwing.
+    case outOfFuelTrap(NoOperand)
 }
 
 extension Instruction {
@@ -3554,6 +3567,17 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.copyDest, 0, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
+
+    struct ConsumeFuelOperand: InstructionImmediate {
+        var raw: UInt64
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (raw) = pc.read((UInt64).self)
+            return Self(raw: raw)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.raw }
+        }
+    }
 }
 
 extension Instruction {
@@ -4277,6 +4301,7 @@ extension Instruction {
         case .i64Load16UWithCopy(let immediate): return immediate
         case .i64Load32SWithCopy(let immediate): return immediate
         case .i64Load32UWithCopy(let immediate): return immediate
+        case .consumeFuel(let immediate): return immediate
         default: return nil
         }
     }
@@ -5004,6 +5029,7 @@ extension Instruction {
         case .i64Load16UWithCopy(let immediate): immediate.emit(to: emit)
         case .i64Load32SWithCopy(let immediate): immediate.emit(to: emit)
         case .i64Load32UWithCopy(let immediate): immediate.emit(to: emit)
+        case .consumeFuel(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -5740,7 +5766,9 @@ extension Instruction {
         case .i64Load16SWithCopy: return 723
         case .i64Load16UWithCopy: return 724
         case .i64Load32SWithCopy: return 725
-        default: return 726  // .i64Load32UWithCopy
+        case .i64Load32UWithCopy: return 726
+        case .consumeFuel: return 727
+        default: return 728  // .outOfFuelTrap
         }
     }
 }
@@ -6482,6 +6510,8 @@ extension Instruction {
         case 724: return .i64Load16UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
         case 725: return .i64Load32SWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
         case 726: return .i64Load32UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 727: return .consumeFuel(Instruction.ConsumeFuelOperand.load(from: &pc))
+        case 728: return .outOfFuelTrap(NoOperand())
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -7223,6 +7253,8 @@ extension Instruction {
         case 724: return "i64Load16UWithCopy"
         case 725: return "i64Load32SWithCopy"
         case 726: return "i64Load32UWithCopy"
+        case 727: return "consumeFuel"
+        case 728: return "outOfFuelTrap"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
@@ -7347,6 +7379,7 @@ protocol NextInstructionPredictor: ~Copyable {
     mutating func predictNext_brIfNotI32AndImm(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_brIfI64AndImm(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_brIfNotI64AndImm(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_outOfFuelTrap(operandPc: Pc, sp: Sp) -> [Pc]
 }
 
 extension Instruction {
@@ -7467,6 +7500,7 @@ extension Instruction {
         case 615: return predictor.predictNext_brIfNotI32AndImm(operandPc: operandPc, sp: sp)
         case 616: return predictor.predictNext_brIfI64AndImm(operandPc: operandPc, sp: sp)
         case 617: return predictor.predictNext_brIfNotI64AndImm(operandPc: operandPc, sp: sp)
+        case 728: return predictor.predictNext_outOfFuelTrap(operandPc: operandPc, sp: sp)
         default: return nil
         }
     }
@@ -7917,6 +7951,10 @@ extension Instruction {
             }
             do {
                 let inst = Instruction.brIfNotI64AndImm(.init(lhs: VReg.zero, imm: Int32(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.outOfFuelTrap(Instruction.NoOperand())
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
         return map

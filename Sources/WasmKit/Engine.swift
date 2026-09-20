@@ -167,6 +167,15 @@ public struct EngineConfiguration: Sendable {
     /// example threading model), or otherwise not applicable.
     public var memoryBoundsChecking: MemoryBoundsChecking
 
+    /// Whether the engine instruments translated code to consume fuel as it runs. (Default: `false`)
+    ///
+    /// When enabled, give a store a budget with ``Store/fuel``. Execution traps once the budget
+    /// is exhausted, and the store stays usable: set a new budget and call again.
+    ///
+    /// This is a translation-time property. Code translated by an engine without fuel metering is
+    /// never metered, which is why this lives on the engine rather than on the store.
+    public var fuelMetering: Bool
+
     /// FIXME: Make it public once we add mprotect-based bounds checking with JIT.
     /// Extra reserved bytes after the 4 GiB wasm32 address space for future
     /// unchecked constant-offset accesses in JIT code.
@@ -183,18 +192,22 @@ public struct EngineConfiguration: Sendable {
     /// interpreter. If `nil`, the default stack size (512KB) will be used.
     /// - Parameter features: The WebAssembly features that can be used by Wasm
     /// modules running on this engine.
+    /// - Parameter fuelMetering: Whether translated code consumes fuel as it
+    /// runs, so that execution can be bounded with ``Store/fuel``.
     public init(
         threadingModel: ThreadingModel? = nil,
         compilationMode: CompilationMode? = nil,
         stackSize: Int? = nil,
         features: WasmFeatureSet = .default,
         memoryBoundsChecking: MemoryBoundsChecking? = nil,
+        fuelMetering: Bool = false,
     ) {
         self.threadingModel = threadingModel ?? .defaultForCurrentPlatform
         self.compilationMode = compilationMode ?? .lazy
         self.stackSize = stackSize ?? (1 << 19)
         self.features = features
         self.memoryBoundsChecking = memoryBoundsChecking ?? .defaultForCurrentPlatform
+        self.fuelMetering = fuelMetering
     }
 }
 

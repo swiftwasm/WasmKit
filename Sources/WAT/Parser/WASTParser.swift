@@ -236,6 +236,17 @@ public enum WASTDirective {
     case assertTrap(execute: WASTExecute, message: String)
     case assertExhaustion(call: WASTInvoke, message: String)
     case assertException(execute: WASTExecute)
+    /// Assert that running `execute` consumes exactly `fuel` units of fuel.
+    ///
+    /// Example: `(assert_fuel 3 (invoke "f"))`, or `(assert_fuel 5 (module (func $f) (start $f)))`
+    /// to measure instantiation. Only meaningful on an engine configured for fuel metering; the
+    /// runner turns metering on for a script that uses this directive.
+    case assertFuel(execute: WASTExecute, fuel: UInt64)
+    /// Assert that running `execute` with a budget of `fuel` units exhausts it.
+    ///
+    /// Example: `(assert_out_of_fuel 1000 (invoke "spin"))`. The budget is named by the directive
+    /// because a run that is supposed to never finish needs a finite one to stop against.
+    case assertOutOfFuel(execute: WASTExecute, fuel: UInt64)
     case assertUnlinkable(module: Wat, message: String)
     case register(name: String, moduleId: String?)
     case invoke(WASTInvoke)
@@ -282,6 +293,18 @@ public enum WASTDirective {
             let message = try wastParser.parser.expectString()
             try wastParser.parser.expect(.rightParen)
             return .assertExhaustion(call: call, message: message)
+        case "assert_fuel":
+            try wastParser.parser.consume()
+            let fuel = try wastParser.parser.expectUnsignedInt(UInt64.self)
+            let execute = try wastParser.parens { wastParser throws(WatParserError) in try WASTExecute.parse(wastParser: &wastParser) }
+            try wastParser.parser.expect(.rightParen)
+            return .assertFuel(execute: execute, fuel: fuel)
+        case "assert_out_of_fuel":
+            try wastParser.parser.consume()
+            let fuel = try wastParser.parser.expectUnsignedInt(UInt64.self)
+            let execute = try wastParser.parens { wastParser throws(WatParserError) in try WASTExecute.parse(wastParser: &wastParser) }
+            try wastParser.parser.expect(.rightParen)
+            return .assertOutOfFuel(execute: execute, fuel: fuel)
         case "assert_exception":
             try wastParser.parser.consume()
             let execute = try wastParser.parens { wastParser throws(WatParserError) in try WASTExecute.parse(wastParser: &wastParser) }

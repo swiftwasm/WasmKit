@@ -186,8 +186,12 @@ public final class WASIThreads: @unchecked Sendable {
             )
             imports.define(
                 module: "wasi", name: "thread-spawn",
-                Function(store: store, parameters: [.i32], results: [.i32]) { [self] _, arguments in
-                    [.i32(UInt32(bitPattern: spawn(Int32(bitPattern: arguments[0].i32))))]
+                Function(store: store, parameters: [.i32], results: [.i32]) { [self] caller, arguments in
+                    // Each worker gets its own `Store`, and therefore its own budget. Copying the
+                    // spawning store's budget bounds every thread instead of leaving spawned ones
+                    // unmetered; it does not bound their total, which would need a shared counter.
+                    let fuel = caller.store.fuel
+                    return [.i32(UInt32(bitPattern: spawn(Int32(bitPattern: arguments[0].i32), fuel: fuel)))]
                 }
             )
             return imports
@@ -201,14 +205,14 @@ public final class WASIThreads: @unchecked Sendable {
         processControl.terminateAfterMainReturn(code)
     }
 
-    private func spawn(_ argument: Int32) -> Int32 {
+    private func spawn(_ argument: Int32, fuel: Fuel?) -> Int32 {
         guard module.exportedFunctionType(named: "wasi_thread_start") == FunctionType(parameters: [.i32, .i32], results: []) else {
             return -1
         }
         guard let tid = reserveThread() else { return -1 }
         guard let startup = Startup() else { return -1 }
         let result = PlatformThread.start(stackSize: configuration.nativeStackSize) { [self] in
-            runWorker(tid: tid, argument: argument, startup: startup)
+            runWorker(tid: tid, argument: argument, startup: startup, fuel: fuel)
         }
         guard result == 0 else {
             releaseThread()
@@ -234,9 +238,10 @@ public final class WASIThreads: @unchecked Sendable {
         state.withLock { $0.liveThreads -= 1 }
     }
 
-    private func runWorker(tid: Int32, argument: Int32, startup: Startup) {
+    private func runWorker(tid: Int32, argument: Int32, startup: Startup, fuel: Fuel?) {
         do {
             let store = Store(engine: engine)
+            store.fuel = fuel
             let imports = try makeImports(store: store)
             let instance = try module.instantiate(store: store, imports: imports)
             guard let entry = instance.exports[function: "wasi_thread_start"],
