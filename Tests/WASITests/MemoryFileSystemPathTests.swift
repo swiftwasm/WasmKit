@@ -35,7 +35,7 @@ import WasmTypes
             _ = try self.open(wasi, "inside.txt")
             _ = try self.open(wasi, "./inside.txt")
             // `..` is fine as long as it only unwinds what the path descended.
-            try _ = wasi.path_create_directory(dirFd: 3, path: "sub")
+            try wasi.path_create_directory(dirFd: 3, path: "sub")
             _ = try self.open(wasi, "sub/../inside.txt")
         }
     }

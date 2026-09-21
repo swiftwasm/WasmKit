@@ -14,6 +14,23 @@ import Foundation
 #endif
 
 enum TestSupport {
+    /// Opening a host directory as a preopen returns `EACCES` on Windows, so
+    /// tests that need one run against the in-memory filesystem only there.
+    static var hostPreopensUnavailable: Bool {
+        #if os(Windows)
+            return true
+        #else
+            return false
+        #endif
+    }
+
+    /// `poll_oneoff` is `ENOTSUP` on Windows.
+    static var pollUnavailable: Bool { hostPreopensUnavailable }
+
+    /// `true` selects a host-backed filesystem, `false` the in-memory one.
+    static var fileSystemBackings: [Bool] {
+        hostPreopensUnavailable ? [false] : [true, false]
+    }
 
     #if os(macOS) || os(Linux)
         /// Comparing paths rather than descriptor counts keeps assertions immune to whatever tests
