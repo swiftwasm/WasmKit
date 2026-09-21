@@ -291,8 +291,19 @@ struct TableEntity /* : ~Copyable */ {
             throw Trap(.unimplemented(feature: "heap type other than `func`, `extern`, and `exn`"))
         }
 
-        let numberOfElements = Int(tableType.limits.min)
+        // The validator caps a declared table size at `UInt32.max`, which still
+        // exceeds `Int` on a 32-bit host, so the conversion has to be checked.
+        guard let numberOfElements = Int(exactly: tableType.limits.min) else {
+            throw Trap(.initialTableSizeExceedsLimit(numberOfElements: Int.max))
+        }
         guard try resourceLimiter.limitTableGrowth(to: numberOfElements) else {
+            throw Trap(.initialTableSizeExceedsLimit(numberOfElements: numberOfElements))
+        }
+        // `Array(repeating:count:)` aborts when the host cannot satisfy the
+        // allocation, and the guest picks this count.
+        guard FailableAllocation.canAllocate(
+            byteCount: numberOfElements.multipliedReportingOverflow(by: MemoryLayout<Reference>.stride).partialValue
+        ), !numberOfElements.multipliedReportingOverflow(by: MemoryLayout<Reference>.stride).overflow else {
             throw Trap(.initialTableSizeExceedsLimit(numberOfElements: numberOfElements))
         }
         elements = Array(repeating: emptyElement, count: numberOfElements)
@@ -313,10 +324,19 @@ struct TableEntity /* : ~Copyable */ {
         if newSize > maxLimit {
             return false
         }
-        guard try resourceLimiter.limitTableGrowth(to: Int(newSize)) else {
+        // A table64 can name more elements than the host can index. `growthSize`
+        // is bounded by `newSize`, so one check covers both conversions.
+        guard let newElementCount = Int(exactly: newSize), let growth = Int(exactly: growthSize) else {
             return false
         }
-        elements.append(contentsOf: Array(repeating: value, count: Int(growthSize)))
+        guard try resourceLimiter.limitTableGrowth(to: newElementCount) else {
+            return false
+        }
+        let (byteCount, byteOverflow) = newElementCount.multipliedReportingOverflow(by: MemoryLayout<Reference>.stride)
+        guard !byteOverflow, FailableAllocation.canAllocate(byteCount: byteCount) else {
+            return false
+        }
+        elements.append(contentsOf: Array(repeating: value, count: growth))
         return true
     }
 
@@ -477,9 +497,15 @@ struct MemoryEntity: ~Copyable {
     private struct MallocStorage {
         var buffer: UnsafeMutableBufferPointer<UInt8>
 
-        init(byteSize: Int, isMemory64: Bool, engineConfiguration: EngineConfiguration) {
-            buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteSize)
-            if byteSize > 0 { buffer.initialize(repeating: 0) }
+        init(byteSize: Int, isMemory64: Bool, engineConfiguration: EngineConfiguration) throws(Trap) {
+            // The guest picks this size, so an allocation the host cannot satisfy
+            // has to be an error rather than an abort.
+            guard let storage = FailableAllocation.allocateZeroed(byteCount: byteSize) else {
+                throw Trap(.initialMemorySizeExceedsLimit(byteSize: byteSize))
+            }
+            buffer = UnsafeMutableBufferPointer<UInt8>(
+                start: storage.assumingMemoryBound(to: UInt8.self), count: byteSize
+            )
         }
 
         var data: UnsafeBufferPointer<UInt8> {
@@ -496,18 +522,22 @@ struct MemoryEntity: ~Copyable {
         var trapGuardReservationSize: Int { 0 }
 
         mutating func grow(to newByteCount: Int) throws {
-            let storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: newByteCount)
+            guard let raw = FailableAllocation.allocateZeroed(byteCount: newByteCount) else {
+                throw Trap(.initialMemorySizeExceedsLimit(byteSize: newByteCount))
+            }
+            let storage = UnsafeMutableBufferPointer<UInt8>(
+                start: raw.assumingMemoryBound(to: UInt8.self), count: newByteCount
+            )
             let oldStorage = self.buffer
-            if newByteCount > 0 { storage.initialize(repeating: 0) }
             if oldStorage.count > 0 {
                 storage.baseAddress!.update(from: oldStorage.baseAddress!, count: oldStorage.count)
             }
-            oldStorage.deallocate()
+            FailableAllocation.deallocate(oldStorage.baseAddress)
             self.buffer = storage
         }
 
         func deallocate() {
-            buffer.deallocate()
+            FailableAllocation.deallocate(buffer.baseAddress)
         }
     }
 
@@ -546,7 +576,7 @@ struct MemoryEntity: ~Copyable {
                     }
                 }
             #endif
-            self = .malloc(MallocStorage(byteSize: initialBytes, isMemory64: isMemory64, engineConfiguration: engineConfiguration))
+            self = .malloc(try MallocStorage(byteSize: initialBytes, isMemory64: isMemory64, engineConfiguration: engineConfiguration))
         }
 
         var data: UnsafeBufferPointer<UInt8> {
@@ -660,9 +690,12 @@ struct MemoryEntity: ~Copyable {
             currentBytes: Int, by pageCount: Int, maxPageCount: UInt64, resourceLimiter: any ResourceLimiter
         ) throws -> (oldPages: Int, newByteCount: Int)? {
             let oldPages = currentBytes / MemoryEntity.pageSize
-            let newPageCount = oldPages + pageCount
-            guard newPageCount <= maxPageCount else { return nil }
-            let newByteCount = newPageCount * MemoryEntity.pageSize
+            // `maxPageCount` is `UInt64.max` for a memory64, so neither the page
+            // total nor its byte count is bounded by the check below on its own.
+            let (newPageCount, pageOverflow) = oldPages.addingReportingOverflow(pageCount)
+            guard !pageOverflow, newPageCount <= maxPageCount else { return nil }
+            let (newByteCount, byteOverflow) = newPageCount.multipliedReportingOverflow(by: MemoryEntity.pageSize)
+            guard !byteOverflow else { return nil }
             guard try resourceLimiter.limitMemoryGrowth(to: newByteCount) else { return nil }
             return (oldPages, newByteCount)
         }

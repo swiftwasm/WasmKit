@@ -62,7 +62,9 @@ extension InternalInstance {
         return self.types[Int(index)]
     }
     func resolveBlockType(_ blockType: BlockType) throws(WasmKitError) -> FunctionType {
-        try FunctionType(blockType: blockType, typeSection: self.types)
+        let type = try FunctionType(blockType: blockType, typeSection: self.types)
+        try checkBlockTypeFitsInterpreter(type)
+        return type
     }
     func functionType(_ index: FunctionIndex, interner: Interner<FunctionType>) throws(WasmKitError) -> FunctionType {
         return try interner.resolve(self.functions[validating: Int(index)].type)
@@ -3565,9 +3567,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         )
         let allLabelIndices = targets.labelIndices + [targets.defaultIndex]
         let tableBuffer = allocator.allocateBrTable(capacity: allLabelIndices.count)
+        guard let targetCount = UInt16(exactly: tableBuffer.count) else {
+            throw WasmKitError(message: .vectorTooLargeForInterpreter("this `br_table`", count: tableBuffer.count))
+        }
         let operand = Instruction.BrTableOperand(
             baseAddress: tableBuffer.baseAddress!,
-            count: UInt16(tableBuffer.count), index: index
+            count: targetCount, index: index
         )
         let oldPC = iseqBuilder.insertingPC
         iseqBuilder.emit(.brTable(operand))
@@ -3821,7 +3826,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         self.preserveOnStack(depth: self.valueStack.valueHeight)
         let stackHeight = try popPushValues(blockType.parameters)
 
-        let catchCount = UInt16(tryCatch.catches.count)
+        guard let catchCount = UInt16(exactly: tryCatch.catches.count) else {
+            throw WasmKitError(message: .vectorTooLargeForInterpreter("this `try_table`", count: tryCatch.catches.count))
+        }
 
         // Allocate the catch table
         let catchTable = allocator.allocateCatchTable(capacity: tryCatch.catches.count)
@@ -3955,15 +3962,24 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let accCandidate = iseqBuilder.accProducer
         let condition = try popVRegOperand(.i32)
         let (value1Type, value1) = try popAnyOperand()
-        let (_, value2) = try popAnyOperand()
-        // TODO: Perform actual validation
-        // guard value1 == ValueType(type) else {
-        //     throw WasmKitError("Type mismatch on `select`. Expected \(value1) and \(type) to be same")
-        // }
-        // guard value2 == ValueType(type) else {
-        //     throw WasmKitError("Type mismatch on `select`. Expected \(value2) and \(type) to be same")
-        // }
-        let result = valueStack.push(value1Type)
+        let (value2Type, value2) = try popAnyOperand()
+        // Both operands must have the annotated type. Without this check the
+        // result was pushed with the *operand's* type while the copy width came
+        // from the *annotation*, so a `(select (result i64))` over two `v128`
+        // operands copied only 8 of the 16 bytes and left the rest of the
+        // result slot holding whatever the stack happened to contain.
+        for operandType in [value1Type, value2Type] {
+            switch operandType {
+            case .unknown:
+                // Polymorphic stack after `unreachable`; nothing to check.
+                break
+            case .some(let operandType):
+                guard operandType == type else {
+                    throw WasmKitError(message: .typeMismatchOnSelect(expected: type, actual: operandType))
+                }
+            }
+        }
+        let result = valueStack.push(type)
         if let condition = condition, let value1 = value1, let value2 = value2 {
             let onTrue = ensureOnVReg(value2)
             let onFalse = ensureOnVReg(value1)
@@ -5932,6 +5948,20 @@ extension InstructionTranslator.MetaValue {
         case .some(let type): return type
         case .unknown: return nil
         }
+    }
+}
+
+/// A branch out of a block copies the block's values, and ``ControlFrame/copySlotCount``
+/// counts those slots in a `UInt16`. Reject a block type that would overflow that count
+/// up front, so the conversion stays total.
+func checkBlockTypeFitsInterpreter(_ type: FunctionType) throws(WasmKitError) {
+    let parameterSlots = type.parameters.reduce(into: 0) { $0 += $1.stackSlotCount }
+    guard parameterSlots <= Int(UInt16.max) else {
+        throw WasmKitError(message: .blockTypeTooLargeForInterpreter("parameters", slots: parameterSlots))
+    }
+    let resultSlots = type.results.reduce(into: 0) { $0 += $1.stackSlotCount }
+    guard resultSlots <= Int(UInt16.max) else {
+        throw WasmKitError(message: .blockTypeTooLargeForInterpreter("results", slots: resultSlots))
     }
 }
 

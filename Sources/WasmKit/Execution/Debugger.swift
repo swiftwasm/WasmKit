@@ -1018,8 +1018,8 @@
             let callerInstance = self.instance.handle
             let table = callerInstance.tables[Int(tableIndex)]
             let value = sp[index].asAddressOffset(table.limits.isMemory64)
-            let elementIndex = Int(value)
-            guard elementIndex < table.elements.count,
+            guard let elementIndex = Int(exactly: value),
+                elementIndex < table.elements.count,
                 case .function(let rawBitPattern?) = table.elements[elementIndex]
             else { return nil }
             let function = InternalFunction(bitPattern: rawBitPattern)

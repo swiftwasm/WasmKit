@@ -43,7 +43,11 @@ extension Execution {
         let fillValue = sp.getReference(immediate.value, type: table.tableType)
         let startIndex = sp[immediate.destOffset].asAddressOffset(table.limits.isMemory64)
 
-        try table.withValue { try $0.fill(repeating: fillValue, from: Int(startIndex), count: Int(fillCounter)) }
+        // A table64 index or count beyond `Int` cannot be in bounds for any table.
+        guard let start = Int(exactly: startIndex), let count = Int(exactly: fillCounter) else {
+            throw Trap(.tableOutOfBounds(Int(clamping: startIndex)))
+        }
+        try table.withValue { try $0.fill(repeating: fillValue, from: start, count: count) }
     }
     mutating func tableCopy(sp: Sp, immediate: Instruction.TableCopyOperand) throws {
         let sourceTableIndex = immediate.sourceIndex
@@ -58,7 +62,12 @@ extension Execution {
         let sourceIndex = sp[immediate.sourceOffset].asAddressOffset(sourceTable.limits.isMemory64)
         let destinationIndex = sp[immediate.destOffset].asAddressOffset(destinationTable.limits.isMemory64)
 
-        try destinationTable.copy(sourceTable, from: Int(sourceIndex), to: Int(destinationIndex), count: Int(size))
+        guard let source = Int(exactly: sourceIndex), let destination = Int(exactly: destinationIndex),
+            let count = Int(exactly: size)
+        else {
+            throw Trap(.tableOutOfBounds(Int(clamping: destinationIndex)))
+        }
+        try destinationTable.copy(sourceTable, from: source, to: destination, count: count)
     }
     mutating func tableInit(sp: Sp, immediate: Instruction.TableInitOperand) throws {
         let tableIndex = immediate.tableIndex
@@ -70,10 +79,13 @@ extension Execution {
         let sourceIndex = UInt64(sp[immediate.sourceOffset].i32)
         let destinationIndex = sp[immediate.destOffset].asAddressOffset(destinationTable.limits.isMemory64)
 
+        guard let destination = Int(exactly: destinationIndex) else {
+            throw Trap(.tableOutOfBounds(Int(clamping: destinationIndex)))
+        }
         try destinationTable.withValue {
             try $0.initialize(
                 sourceElement,
-                from: Int(sourceIndex), to: Int(destinationIndex),
+                from: Int(sourceIndex), to: destination,
                 count: Int(copyCounter)
             )
         }
@@ -106,7 +118,7 @@ extension Execution {
         let elementIndex = sp[register].asAddressOffset(table.limits.isMemory64)
 
         guard elementIndex < table.elements.count else {
-            throw Trap(.tableOutOfBounds(Int(elementIndex)))
+            throw Trap(.tableOutOfBounds(Int(clamping: elementIndex)))
         }
 
         return ElementIndex(elementIndex)
