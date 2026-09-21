@@ -10,7 +10,10 @@ public func FuzzCheck(_ start: UnsafePointer<UInt8>, _ count: Int) -> CInt {
         let store = WasmKit.Store(engine: engine)
         store.resourceLimiter = FuzzerResourceLimiter()
         let instance = try module.instantiate(store: store)
-        for export in instance.exports.values {
+        // `exports` is a Dictionary and Swift seeds its hasher per process, so
+        // iterating it directly calls the exports in a different order on every
+        // run -- an artifact would not replay the sequence that produced it.
+        for (_, export) in instance.exports.sorted(by: { $0.name < $1.name }) {
             guard case let .function(fn) = export else {
                 continue
             }
