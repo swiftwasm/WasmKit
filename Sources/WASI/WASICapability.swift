@@ -234,9 +234,7 @@ extension WASIImplementation {
         preview1["fd_fdstat_set_flags"] = wasiFunction(
             type: .init(parameters: [.i32, .i32], results: [.i32])
         ) { caller, arguments in
-            guard let rawFdFlags = UInt16(exactly: arguments[1].i32) else {
-                throw WASIAbi.Errno.EINVAL
-            }
+            let rawFdFlags = try WASIAbi.flagsField(arguments[1])
             try self.fd_fdstat_set_flags(
                 fd: arguments[0].i32, flags: WASIAbi.Fdflags(rawValue: rawFdFlags)
             )
@@ -345,9 +343,7 @@ extension WASIImplementation {
         preview1["fd_filestat_set_times"] = wasiFunction(
             type: .init(parameters: [.i32, .i64, .i64, .i32], results: [.i32])
         ) { caller, arguments in
-            guard let rawFstFlags = UInt16(exactly: arguments[3].i32) else {
-                throw WASIAbi.Errno.EINVAL
-            }
+            let rawFstFlags = try WASIAbi.flagsField(arguments[3])
             try self.fd_filestat_set_times(
                 fd: arguments[0].i32,
                 atim: arguments[1].i64, mtim: arguments[2].i64,
@@ -468,9 +464,7 @@ extension WASIImplementation {
         preview1["path_filestat_set_times"] = wasiFunction(
             type: .init(parameters: [.i32, .i32, .i32, .i32, .i64, .i64, .i32], results: [.i32])
         ) { caller, arguments in
-            guard let rawFstFlags = UInt16(exactly: arguments[6].i32) else {
-                throw WASIAbi.Errno.EINVAL
-            }
+            let rawFstFlags = try WASIAbi.flagsField(arguments[6])
             try withMemoryBuffer(caller: caller) { buffer in
                 try self.path_filestat_set_times(
                     dirFd: arguments[0].i32, flags: .init(rawValue: arguments[1].i32),
@@ -499,9 +493,7 @@ extension WASIImplementation {
         preview1["path_open"] = wasiFunction(
             type: .init(parameters: [.i32, .i32, .i32, .i32, .i32, .i64, .i64, .i32, .i32], results: [.i32])
         ) { caller, arguments in
-            guard let rawFdFlags = UInt16(exactly: arguments[7].i32) else {
-                throw WASIAbi.Errno.EINVAL
-            }
+            let rawFdFlags = try WASIAbi.flagsField(arguments[7])
             return try withMemoryBuffer(caller: caller) { buffer in
                 let newFd = try self.path_open(
                     dirFd: arguments[0].i32,

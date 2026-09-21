@@ -55,10 +55,7 @@ extension FdWASIFile {
     @inlinable
     func pwrite(vectored buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size {
         // TODO: Use `pwritev`
-        // The offset is a `u64` the guest chooses, but a file offset is signed.
-        guard var currentOffset = Int64(exactly: offset) else {
-            throw WASIAbi.Errno.EINVAL
-        }
+        var currentOffset = try WASIAbi.hostOffset(offset)
         for index in 0..<buffers.count {
             currentOffset += Int64(
                 try buffers.withHostBuffer(at: index) {
@@ -92,9 +89,7 @@ extension FdWASIFile {
         guard accessMode.contains(.read) else {
             throw WASIAbi.Errno.EBADF
         }
-        guard var currentOffset = Int64(exactly: offset) else {
-            throw WASIAbi.Errno.EINVAL
-        }
+        var currentOffset = try WASIAbi.hostOffset(offset)
         var nread: UInt32 = 0
         for index in 0..<buffers.count {
             let count = try buffers.withHostBuffer(at: index) {
