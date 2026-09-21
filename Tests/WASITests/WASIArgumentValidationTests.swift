@@ -136,6 +136,22 @@ import WasmTypes
         }
     }
 
+    /// A write lands at the descriptor's position, which the guest can put
+    /// anywhere a position is expressible.
+    @Test func aWriteThatWouldRunOffTheEndOfThePositionRangeIsRejected() throws {
+        try withMemoryBackedWASI { wasi, memory in
+            let fd = try self.openFile(wasi)
+            let vectors = memory.writeIOVecs([Array("x".utf8)])
+            _ = try wasi.fd_seek(fd: fd, offset: .max, whence: .SET)
+            #expect(throws: WASIAbi.Errno.EFBIG) {
+                _ = try wasi.fd_write(fileDescriptor: fd, ioVectors: vectors, memory: memory)
+            }
+            #expect(throws: WASIAbi.Errno.EFBIG) {
+                _ = try wasi.fd_pwrite(fd: fd, iovs: vectors, offset: WASIAbi.FileSize(Int64.max), memory: memory)
+            }
+        }
+    }
+
     /// A readdir cookie is a `u64` the guest chooses.
     @Test(arguments: [true, false])
     func aDirectoryCookieBeyondTheEntryCountYieldsNothing(hostBacked: Bool) throws {

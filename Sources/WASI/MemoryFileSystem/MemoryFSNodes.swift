@@ -340,7 +340,12 @@ final class MemoryFileNode: MemFSNode {
                 for index in 0..<buffers.count {
                     try buffers.withHostBuffer(at: index) { bufferPtr in
                         let bytesToWrite = bufferPtr.count
-                        let requiredSize = cur + bytesToWrite
+                        // The position comes from a guest-chosen seek or pwrite
+                        // offset, so it can sit at the end of the range.
+                        let (requiredSize, overflow) = cur.addingReportingOverflow(bytesToWrite)
+                        guard !overflow else {
+                            throw WASIAbi.Errno.EFBIG
+                        }
                         if requiredSize > bytes.count {
                             bytes.append(contentsOf: Array(repeating: 0, count: requiredSize - bytes.count))
                         }
@@ -383,7 +388,12 @@ final class MemoryFileNode: MemFSNode {
                 for index in 0..<buffers.count {
                     try buffers.withHostBuffer(at: index) { bufferPtr in
                         let bytesToWrite = bufferPtr.count
-                        let requiredSize = cur + bytesToWrite
+                        // The position comes from a guest-chosen seek or pwrite
+                        // offset, so it can sit at the end of the range.
+                        let (requiredSize, overflow) = cur.addingReportingOverflow(bytesToWrite)
+                        guard !overflow else {
+                            throw WASIAbi.Errno.EFBIG
+                        }
                         if requiredSize > bytes.count {
                             bytes.append(contentsOf: Array(repeating: 0, count: requiredSize - bytes.count))
                         }
