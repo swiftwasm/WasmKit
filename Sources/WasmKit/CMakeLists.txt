@@ -40,6 +40,7 @@ add_wasmkit_library(WasmKit
   Execution/Execution.swift
   Execution/ExecutionStack.swift
   Execution/Function.swift
+  Execution/FailableAllocation.swift
   Execution/Instances.swift
   Execution/MprotectLinearMemory.swift
   Execution/MprotectTrapGuard.swift

@@ -75,10 +75,18 @@
             #else
                 #if os(Linux)
                     let mapAnon = MAP_ANONYMOUS
+                    let mapNoReserve = MAP_NORESERVE
                 #else
                     let mapAnon = MAP_ANON
+                    // Darwin and the BSDs have no `MAP_NORESERVE`; they do not
+                    // charge commit for untouched anonymous pages either.
+                    let mapNoReserve: Int32 = 0
                 #endif
-                let base = mmap(nil, reservationBytes, PROT_NONE, MAP_PRIVATE | mapAnon, -1, 0)
+                // `MAP_NORESERVE` so a large reservation is not charged against
+                // commit/swap up front; pages are backed on first access. Without
+                // it a big reservation is refused outright under strict overcommit
+                // (`vm.overcommit_memory=2`).
+                let base = mmap(nil, reservationBytes, PROT_NONE, MAP_PRIVATE | mapAnon | mapNoReserve, -1, 0)
                 // `MAP_FAILED` is `(void *)-1`; compare that sentinel directly rather than the
                 // macro, which Bionic defines as a C++ `reinterpret_cast` Swift cannot import.
                 guard base != UnsafeMutableRawPointer(bitPattern: -1) else { return nil }

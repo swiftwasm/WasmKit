@@ -49,10 +49,31 @@ struct GuestControlledSizeTests {
 
     /// `(module (table 0xffffffff funcref))` is 41 bytes, valid under plain MVP,
     /// and used to abort with `failed to allocate 68719476752 bytes`.
-    @Test func aTableTooLargeToAllocateIsRejected() throws {
-        #expect(throws: (any Error).self) {
-            _ = try Self.instantiate(#"(module (table 0xffffffff funcref))"#)
+    ///
+    /// Whether a table that large can be reserved depends on the host's memory
+    /// and its overcommit policy, so both outcomes are correct here. What must
+    /// not happen is an abort: the allocation has to report failure so an
+    /// embedder can catch it.
+    @Test func aTableTooLargeToCommitDoesNotAbort() throws {
+        let wat = #"(module (table (export "t") 0xffffffff funcref) (func (export "f") (result funcref) (table.get 0 (i32.const 0xfffffffe))))"#
+        do {
+            let (instance, _) = try Self.instantiate(wat)
+            // Reserved. The storage is zero-filled, so an untouched slot is null.
+            let f = try #require(instance.exports[function: "f"])
+            #expect(try f() == [.ref(.function(nil))])
+        } catch {
+            // Refused rather than aborted, which is the other correct outcome.
         }
+    }
+
+    /// A table large enough to have been a problem, but small enough that any
+    /// host can reserve it, so the zero-filled-and-untouched behaviour is
+    /// actually asserted rather than skipped.
+    @Test func aLargeTableReadsBackAsNull() throws {
+        let wat = #"(module (table (export "t") 0x1000000 funcref) (func (export "f") (result funcref) (table.get 0 (i32.const 0xffffff))))"#
+        let (instance, _) = try Self.instantiate(wat)
+        let f = try #require(instance.exports[function: "f"])
+        #expect(try f() == [.ref(.function(nil))])
     }
 
     /// Interpreter encoding limits that a plain MVP module can exceed.
