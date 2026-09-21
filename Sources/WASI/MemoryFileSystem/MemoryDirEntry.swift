@@ -103,7 +103,8 @@ struct MemoryDirEntry: WASIDir {
     }
 
     func createDirectory(atPath path: String) throws {
-        try fileSystem.ensureDirectory(at: MemoryFileSystem.joinGuestPath(self.path, path))
+        let (parent, name) = try MemoryFileSystem.resolveParent(from: dirNode, path: path)
+        _ = try parent.getOrCreateChildDirectory(name: name)
     }
 
     func removeDirectory(atPath path: String) throws {
@@ -141,7 +142,7 @@ struct MemoryDirEntry: WASIDir {
     }
 
     func attributes(path: String, symlinkFollow: Bool) throws -> WASIAbi.Filestat {
-        guard let node = fileSystem.lookup(at: MemoryFileSystem.joinGuestPath(self.path, path)) else {
+        guard let node = try MemoryFileSystem.resolve(from: dirNode, path: path) else {
             throw WASIAbi.Errno.ENOENT
         }
 
@@ -185,7 +186,7 @@ struct MemoryDirEntry: WASIDir {
         atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags, symlinkFollow: Bool
     ) throws {
-        guard let node = fileSystem.lookup(at: MemoryFileSystem.joinGuestPath(self.path, path)) else {
+        guard let node = try MemoryFileSystem.resolve(from: dirNode, path: path) else {
             throw WASIAbi.Errno.ENOENT
         }
 
@@ -217,30 +218,9 @@ struct MemoryDirEntry: WASIDir {
             return
         }
 
-        // nil means the times were applied in memory; a non-nil handle is a host
-        // fd whose times we set below.
-        guard let handle = fileNode.setTimesInMemory(atim: newAtim, mtim: newMtim) else {
-            return
-        }
-
-        let accessTime: FileTime
-        if fstFlags.contains(.ATIM) {
-            accessTime = FileTime(seconds: Int(atim / 1_000_000_000), nanoseconds: Int(atim % 1_000_000_000))
-        } else if fstFlags.contains(.ATIM_NOW) {
-            accessTime = .now
-        } else {
-            accessTime = .omit
-        }
-
-        let modTime: FileTime
-        if fstFlags.contains(.MTIM) {
-            modTime = FileTime(seconds: Int(mtim / 1_000_000_000), nanoseconds: Int(mtim % 1_000_000_000))
-        } else if fstFlags.contains(.MTIM_NOW) {
-            modTime = .now
-        } else {
-            modTime = .omit
-        }
-
-        try handle.setTimes(access: accessTime, modification: modTime)
+        // Record the times on the node. A `.handle`-backed file is a host
+        // descriptor the embedder supplied; the guest must not be able to change
+        // the host file's timestamps through it.
+        _ = fileNode.setTimesInMemory(atim: newAtim, mtim: newMtim)
     }
 }

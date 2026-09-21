@@ -56,34 +56,69 @@ public final class MemoryFileSystem: Sendable {
         return current
     }
 
-    private static func resolveNode(root: MemoryDirectoryNode, from directory: MemoryDirectoryNode, at directoryPath: String, path relativePath: String) -> MemFSNode? {
+    /// Resolves a guest-supplied path against the directory a descriptor refers
+    /// to, without leaving that directory.
+    ///
+    /// The guest chooses the path, and the directory it holds a descriptor for
+    /// is the boundary it is allowed to work within. So the walk starts at that
+    /// directory rather than at the filesystem root, an absolute path is
+    /// refused, and `..` pops the directories this walk has itself descended
+    /// through -- never above the one it started from.
+    static func resolve(
+        from directory: MemoryDirectoryNode, path relativePath: String
+    ) throws -> MemFSNode? {
         if relativePath.isEmpty {
             return directory
         }
-
-        if relativePath.hasPrefix("/") {
-            return lookupNode(from: root, at: relativePath)
+        guard !relativePath.hasPrefix("/") else {
+            throw WASIAbi.Errno.EPERM
         }
 
-        let fullPath = joinGuestPath(directoryPath, relativePath)
+        var current: MemFSNode = directory
+        // The directories descended through since `directory`, so `..` can only
+        // unwind what this walk did.
+        var descended: [MemoryDirectoryNode] = []
 
-        let components = fullPath.split(separator: "/").map(String.init)
-        var stack: [String] = []
-
-        for component in components {
-            if component == "." {
+        for component in relativePath.split(separator: "/").map(String.init) {
+            switch component {
+            case "", ".":
                 continue
-            } else if component == ".." {
-                if !stack.isEmpty {
-                    stack.removeLast()
+            case "..":
+                guard let parent = descended.popLast() else {
+                    // Would leave the directory the descriptor refers to.
+                    throw WASIAbi.Errno.EPERM
                 }
-            } else {
-                stack.append(component)
+                current = parent
+            default:
+                guard let dir = current as? MemoryDirectoryNode else {
+                    throw WASIAbi.Errno.ENOTDIR
+                }
+                guard let next = dir.getChild(name: component) else {
+                    return nil
+                }
+                descended.append(dir)
+                current = next
             }
         }
 
-        let resolvedPath = stack.isEmpty ? Self.rootPath : Self.rootPath + stack.joined(separator: "/")
-        return lookupNode(from: root, at: resolvedPath)
+        return current
+    }
+
+    /// Resolves the parent directory and final component of a guest path, under
+    /// the same confinement as ``resolve(from:path:)``.
+    static func resolveParent(
+        from directory: MemoryDirectoryNode, path relativePath: String
+    ) throws -> (parent: MemoryDirectoryNode, name: String) {
+        try validateRelativePath(relativePath)
+        var components = relativePath.split(separator: "/").map(String.init).filter { $0 != "." && !$0.isEmpty }
+        guard let name = components.popLast(), name != ".." else {
+            throw WASIAbi.Errno.EINVAL
+        }
+        guard let parent = try resolve(from: directory, path: components.joined(separator: "/")) as? MemoryDirectoryNode
+        else {
+            throw WASIAbi.Errno.ENOENT
+        }
+        return (parent, name)
     }
 
     @discardableResult
@@ -96,6 +131,12 @@ public final class MemoryFileSystem: Sendable {
         let components = normalized.split(separator: "/").map(String.init)
         var current = root
         for component in components {
+            if component == "." { continue }
+            // A literal ".." entry would be unreachable by resolution and would
+            // give a traversal something to walk onto.
+            guard component != ".." else {
+                throw WASIAbi.Errno.EINVAL
+            }
             current = try current.getOrCreateChildDirectory(name: component)
         }
         return current
@@ -193,7 +234,23 @@ public final class MemoryFileSystem: Sendable {
         guard let directory = Self.lookupNode(from: root, at: directoryPath) as? MemoryDirectoryNode else {
             return nil
         }
-        return Self.resolveNode(root: root, from: directory, at: directoryPath, path: relativePath)?.type
+        // Note: this resolves across the whole filesystem by design. It is an
+        // embedder-side helper -- no guest entry point reaches it, and those go
+        // through `resolve(from:path:)`, which stays inside the directory.
+        if relativePath.hasPrefix("/") {
+            return Self.lookupNode(from: root, at: relativePath)?.type
+        }
+        let components = Self.joinGuestPath(directoryPath, relativePath).split(separator: "/").map(String.init)
+        var stack: [String] = []
+        for component in components {
+            switch component {
+            case ".": continue
+            case "..": if !stack.isEmpty { stack.removeLast() }
+            default: stack.append(component)
+            }
+        }
+        let resolvedPath = stack.isEmpty ? Self.rootPath : Self.rootPath + stack.joined(separator: "/")
+        return Self.lookupNode(from: root, at: resolvedPath)?.type
     }
 
     /// The type of the node at `path`, or nil if nothing is there.
@@ -257,7 +314,7 @@ public final class MemoryFileSystem: Sendable {
             throw WASIAbi.Errno.ENOENT
         }
 
-        guard let sourceNode = Self.resolveNode(root: root, from: sourceDir, at: sourceDirectoryPath, path: sourcePath) else {
+        guard let sourceNode = try Self.resolve(from: sourceDir, path: sourcePath) else {
             throw WASIAbi.Errno.ENOENT
         }
 
@@ -374,7 +431,7 @@ public final class MemoryFileSystem: Sendable {
             throw WASIAbi.Errno.EBADF
         }
 
-        var node = Self.resolveNode(root: root, from: dirNode, at: dirPath, path: path)
+        var node = try Self.resolve(from: dirNode, path: path)
 
         if node != nil {
             if oflags.contains(.EXCL) && oflags.contains(.CREAT) {
