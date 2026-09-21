@@ -474,7 +474,8 @@ extension WatParser.DataSegmentDecl {
             }
             try offset.encode(to: &encoder, wat: &wat, isMemory64: isMemory64(memoryIndex: memoryIndex))
         case (_?, nil):
-            fatalError("memory with memory index but no offset")
+            // `WatParser` rejects this shape, so it cannot be reached from text.
+            throw WatParserError("data segment with a memory index requires an offset", location: nil)
         }
         encoder.encodeByteVector(data)
     }

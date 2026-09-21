@@ -220,6 +220,11 @@ internal struct Parser {
             return 1 &<< UInt(F.exponentBitCount) - 1
         }
 
+        /// The widest NaN payload the format can hold.
+        var significandMask: BitPattern {
+            (1 &<< BitPattern(F.significandBitCount)) - 1
+        }
+
         let makeError = { [lexer] in
             WatParserError("invalid float literal \(token.text(from: lexer))", location: token.location(in: lexer))
         }
@@ -244,6 +249,10 @@ internal struct Parser {
                 float = .nan
             case .nan(let hexPattern?):
                 guard let significandBitPattern = BitPattern(hexPattern, radix: 16) else { throw makeError() }
+                // The payload has to fit the significand before it is assembled;
+                // `buildBitPattern` shifts and adds in a fixed-width integer and
+                // would trap on a wider one.
+                guard significandBitPattern <= significandMask else { throw makeError() }
                 let bitPattern = buildBitPattern(sign ?? .plus, infinityExponent, UInt(significandBitPattern))
                 // Ensure that the given bit pattern is a NaN.
                 guard isNaN(bitPattern) else { throw makeError() }
