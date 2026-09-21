@@ -969,7 +969,12 @@ final class WASIImplementation: Sendable {
             table[fd] = nil
             return entry
         }
-        try entry.asEntry().close()
+        // A borrowed entry (e.g. process stdio) wraps a resource the embedder
+        // owns and outlives the guest: the descriptor leaves the guest's table,
+        // but the resource behind it stays open.
+        let closingEntry = entry.asEntry()
+        guard !closingEntry.isBorrowed else { return }
+        try closingEntry.close()
     }
 
     /// Synchronize the data of a file to disk.
@@ -1202,18 +1207,24 @@ final class WASIImplementation: Sendable {
 
     /// Atomically replace a file descriptor by renumbering another file descriptor.
     func fd_renumber(fd: WASIAbi.Fd, to toFd: WASIAbi.Fd) throws {
-        let toClose = try fdTable.withLock { table -> FdEntry in
+        let toClose = try fdTable.withLock { table -> FdEntry? in
             guard let entry = table[fd] else {
                 throw WASIAbi.Errno.EBADF
             }
             guard let toEntry = table[toFd] else {
                 throw WASIAbi.Errno.EBADF
             }
+            // Renumbering a descriptor onto itself leaves it in place; clearing
+            // the source would otherwise destroy the entry it just installed.
+            guard fd != toFd else { return nil }
             table[toFd] = entry
             table[fd] = nil
             return toEntry
         }
-        try toClose.asEntry().close()
+        // The displaced entry may be borrowed, in which case it is dropped from
+        // the table but its resource is left open, as in `fd_close`.
+        guard let closingEntry = toClose?.asEntry(), !closingEntry.isBorrowed else { return }
+        try closingEntry.close()
     }
 
     /// Move the offset of a file descriptor.
