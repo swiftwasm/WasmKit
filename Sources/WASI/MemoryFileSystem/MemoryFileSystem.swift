@@ -56,14 +56,10 @@ public final class MemoryFileSystem: Sendable {
         return current
     }
 
-    /// Resolves a guest-supplied path against the directory a descriptor refers
-    /// to, without leaving that directory.
+    /// Resolves a guest-supplied path within `directory`, which bounds it.
     ///
-    /// The guest chooses the path, and the directory it holds a descriptor for
-    /// is the boundary it is allowed to work within. So the walk starts at that
-    /// directory rather than at the filesystem root, an absolute path is
-    /// refused, and `..` pops the directories this walk has itself descended
-    /// through -- never above the one it started from.
+    /// The walk starts at `directory` rather than at the root, an absolute path
+    /// is refused, and `..` only unwinds directories this walk descended.
     static func resolve(
         from directory: MemoryDirectoryNode, path relativePath: String
     ) throws -> MemFSNode? {
@@ -145,10 +141,8 @@ public final class MemoryFileSystem: Sendable {
         return current
     }
 
-    /// Creates the file `relativePath` names within `directory`. The parent
-    /// directories on the way there must already exist: creating them would
-    /// both deviate from `openat` and put entries in the tree that the guest
-    /// path never named.
+    /// Creates the file `relativePath` names within `directory`. Its parent
+    /// directories must already exist, as they must for `openat`.
     @discardableResult
     private static func createFileNode(in directory: MemoryDirectoryNode, at relativePath: String, oflags: WASIAbi.Oflags) throws -> MemoryFileNode {
         let (parentDir, fileName) = try resolveParent(from: directory, path: relativePath)
@@ -226,9 +220,8 @@ public final class MemoryFileSystem: Sendable {
         guard Self.lookupNode(from: root, at: directoryPath) is MemoryDirectoryNode else {
             return nil
         }
-        // Note: this resolves across the whole filesystem by design. It is an
-        // embedder-side helper -- no guest entry point reaches it, and those go
-        // through `resolve(from:path:)`, which stays inside the directory.
+        // Resolves across the whole filesystem by design: this is an
+        // embedder-side helper, and no guest entry point reaches it.
         if relativePath.hasPrefix("/") {
             return Self.lookupNode(from: root, at: relativePath)?.type
         }

@@ -179,11 +179,8 @@ final class MemoryFileNode: MemFSNode {
         }
     }
 
-    /// The node's own timestamps.
-    ///
-    /// A `.handle` file is backed by a host descriptor, but that descriptor's
-    /// timestamps are the host file's, which is not something this file system
-    /// reports to a guest or lets it change.
+    /// The node's own timestamps. A `.handle` file does not report the host
+    /// file's, nor let a guest change them.
     var timestamps: (atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp, ctim: WASIAbi.Timestamp) {
         state.withLock { ($0.atim, $0.mtim, $0.ctim) }
     }

@@ -163,6 +163,23 @@ import WasmTypes
     /// Non-negative file size or length of a region within a file.
     public typealias FileSize = UInt64
 
+    /// A 16-bit ABI flag field, or `EINVAL` if the guest sent a wider value.
+    static func flagsField(_ value: Value) throws -> UInt16 {
+        guard let field = UInt16(exactly: value.i32) else {
+            throw Errno.EINVAL
+        }
+        return field
+    }
+
+    /// A host file offset or size, or `EINVAL` if the guest's value does not fit
+    /// one. Sizes and offsets cross the ABI unsigned and are signed on the host.
+    static func hostOffset(_ value: FileSize) throws -> Int64 {
+        guard let offset = Int64(exactly: value) else {
+            throw Errno.EINVAL
+        }
+        return offset
+    }
+
     typealias Fd = UInt32
 
     public struct IOVec: GuestPointee {
