@@ -90,6 +90,10 @@ enum TestSupport {
             data.replaceSubrange(Int(offset)..<Int(offset) + bytes.count, with: bytes)
         }
 
+        func read(count: Int, at offset: UInt = 0) -> [UInt8] {
+            Array(data[Int(offset)..<Int(offset) + count])
+        }
+
         func writeIOVecs(_ buffers: [[UInt8]]) -> UnsafeGuestBufferPointer<WASIAbi.IOVec> {
             var currentDataOffset: UInt32 = 0
             let iovecOffset: UInt32 = 32768

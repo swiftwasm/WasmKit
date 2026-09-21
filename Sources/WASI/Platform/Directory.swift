@@ -170,7 +170,9 @@ extension DirEntry: WASIDir, FdWASIEntry {
             self.entryIndex = 0
             self.stream = stream
 
-            let skippedCount = Int(cookie)
+            // The cookie is a `u64` the guest chooses; one past the last entry
+            // simply skips everything.
+            let skippedCount = Int(clamping: cookie)
             while entryIndex < skippedCount {
                 guard let entry = next() else { break }
                 _ = try entry.get()

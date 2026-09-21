@@ -246,7 +246,9 @@ extension WASIImplementation {
         preview1["fd_seek"] = wasiFunction(
             type: .init(parameters: [.i32, .i64, .i32, .i32], results: [.i32])
         ) { caller, arguments in
-            guard let whence = WASIAbi.Whence(rawValue: UInt8(arguments[2].i32)) else {
+            guard let rawWhence = UInt8(exactly: arguments[2].i32),
+                let whence = WASIAbi.Whence(rawValue: rawWhence)
+            else {
                 return [.i32(.init(WASIAbi.Errno.EINVAL.rawValue))]
             }
             let ret = try self.fd_seek(
@@ -497,7 +499,10 @@ extension WASIImplementation {
         preview1["path_open"] = wasiFunction(
             type: .init(parameters: [.i32, .i32, .i32, .i32, .i32, .i64, .i64, .i32, .i32], results: [.i32])
         ) { caller, arguments in
-            try withMemoryBuffer(caller: caller) { buffer in
+            guard let rawFdFlags = UInt16(exactly: arguments[7].i32) else {
+                throw WASIAbi.Errno.EINVAL
+            }
+            return try withMemoryBuffer(caller: caller) { buffer in
                 let newFd = try self.path_open(
                     dirFd: arguments[0].i32,
                     dirFlags: .init(rawValue: arguments[1].i32),
@@ -505,7 +510,7 @@ extension WASIImplementation {
                     oflags: .init(rawValue: arguments[4].i32),
                     fsRightsBase: .init(rawValue: arguments[5].i64),
                     fsRightsInheriting: .init(rawValue: arguments[6].i64),
-                    fdflags: .init(rawValue: UInt16(arguments[7].i32))
+                    fdflags: .init(rawValue: rawFdFlags)
                 )
                 let newFdPointer = UnsafeGuestPointer<WASIAbi.Fd>(offset: arguments[8].i32)
                 newFdPointer.write(newFd, to: buffer)
