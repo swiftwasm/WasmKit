@@ -48,6 +48,11 @@ def main():
         'target_name', type=str, help='Name of the target', choices=available_targets)
     build_parser.add_argument(
         '--sanitizer', type=str, default='address')
+    build_parser.add_argument(
+        '--release', action='store_true',
+        help='Build optimized. The interpreter is written for the optimizer, '
+             'so a bug that only exists in an optimized build is invisible to '
+             'a debug-only campaign.')
     build_parser.set_defaults(func=build)
 
     run_parser = subparsers.add_parser('run', help='Run the fuzzer')
@@ -56,6 +61,9 @@ def main():
     run_parser.add_argument(
         '--skip-build', action='store_true',
         help='Skip building the fuzzer')
+    run_parser.add_argument(
+        '--release', action='store_true',
+        help='Build and run the optimized fuzzer')
     run_parser.add_argument(
         'args', nargs=argparse.REMAINDER,
         help='Arguments to pass to the fuzzer')
@@ -91,8 +99,12 @@ def seed(args, runner):
         print(f"Generated seed corpus: {output}")
 
 
-def executable_path(target_name: str) -> str:
-    return f'./.build/debug/{target_name}'
+def build_configuration(args) -> str:
+    return 'release' if getattr(args, 'release', False) else 'debug'
+
+
+def executable_path(target_name: str, configuration: str = 'debug') -> str:
+    return f'./.build/{configuration}/{target_name}'
 
 
 def build(args, runner: CommandRunner):
@@ -107,9 +119,13 @@ def build(args, runner: CommandRunner):
     else:
         driver_flags += [f'-sanitize=fuzzer,{args.sanitizer}']
 
+    configuration = build_configuration(args)
     build_args = [
-        'swift', 'build', '--product', args.target_name,
+        'swift', 'build', '-c', configuration, '--product', args.target_name,
     ]
+    if configuration == 'release':
+        # Keep symbols so an artifact can be symbolicated.
+        build_args += ['-Xswiftc', '-g']
     for driver_flag in driver_flags:
         build_args += ['-Xswiftc', driver_flag]
 
@@ -118,9 +134,9 @@ def build(args, runner: CommandRunner):
     print('Building fuzzer executable')
     # See "Discussion" in Package.swift for why we need to manually link
     # the library product.
-    output = executable_path(args.target_name)
+    output = executable_path(args.target_name, configuration)
     link_args = [
-        'swiftc', f'./.build/debug/lib{args.target_name}.a', '-g',
+        'swiftc', f'./.build/{configuration}/lib{args.target_name}.a', '-g',
         # Link Swift runtime statically to allow copying fuzzers to other
         # machines (oss-fuzz does this)
         '-static-stdlib', '-o', output
@@ -141,15 +157,22 @@ def run(args, runner: CommandRunner):
     artifact_dir = f'./FailCases/{args.target_name}/'
     os.makedirs(artifact_dir, exist_ok=True)
     fuzzer_args = [
-        executable_path(args.target_name), './.build/fuzz-corpus',
+        executable_path(args.target_name, build_configuration(args)),
+        './.build/fuzz-corpus',
         '-fork=2',
         '-timeout=5', '-ignore_timeouts=1',
-        # Relax the RSS limit to 5GB (default is 4GB) to allow
+        # Relax the RSS limit to 5GB (default is 2GB) to allow
         # allocating maximum memory for 32-bit space.
-        '-rss_limit_mb=5368709120',
+        # NOTE: -rss_limit_mb is in MEGABYTES.
+        '-rss_limit_mb=5120',
         f'-artifact_prefix={artifact_dir}'
     ] + args.args
-    runner.run(fuzzer_args, env={'SWIFT_BACKTRACE': 'enable=off'})
+    runner.run(fuzzer_args, env={
+        'SWIFT_BACKTRACE': 'enable=off',
+        # Swift seeds its hasher per process, so a target that walks a
+        # Dictionary replays in a different order than it crashed in.
+        'SWIFT_DETERMINISTIC_HASHING': '1',
+    })
 
 
 if __name__ == '__main__':
