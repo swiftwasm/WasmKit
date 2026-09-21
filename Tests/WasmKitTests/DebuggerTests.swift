@@ -139,6 +139,21 @@
         )
         """
 
+    /// A load whose result reaches the add that consumes it without going through a frame slot,
+    /// followed by a store of the sum, so that a stop in the middle of the computation is
+    /// observable in linear memory.
+    private let registerHandoffWAT = """
+        (module
+          (memory 1)
+          (func $addTo (param $a i32) (param $b i32)
+            (i32.store offset=4 (local.get $b)
+              (i32.add (i32.load offset=0 (local.get $b)) (local.get $a))))
+          (func (export "_start") (result i32)
+            (i32.store offset=0 (i32.const 16) (i32.const 3))
+            (call $addTo (i32.const 2) (i32.const 16))
+            (i32.load offset=4 (i32.const 16))))
+        """
+
     /// Module with indirect call through a table.
     private let callIndirectWAT = """
         (module
@@ -414,6 +429,22 @@
             try debugger.run()
             let values = try requireReturned(debugger)
             #expect(values == [.i32(42)])
+        }
+
+        /// A step must leave the guest with the state it would have had running uninterrupted, so
+        /// a value in flight between two instructions has to survive the stop between them.
+        @Test
+        func steppingPreservesAValueHeldInARegister() throws {
+            let store = Store(engine: Engine())
+            let module = try parseWasm(bytes: try wat2wasm(registerHandoffWAT))
+            var debugger = try Debugger(module: module, store: store, imports: [:])
+
+            _ = try debugger.enableBreakpoint(module: module, function: 0)
+            try debugger.run()
+            try debugger.step()
+            try debugger.run()
+
+            #expect(try requireReturned(debugger) == [.i32(5)])
         }
 
         /// Ensures that breakpoints and call stacks work across multiple function calls.

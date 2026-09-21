@@ -1881,10 +1881,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// the slot stays written, so it only has to be the last thing in the
         /// buffer, which ``accProducer`` checks.
         private var lastAccAndSlot: AccProducer?
-        /// Off for a debuggable module: a stop between a producer and its
-        /// consumer resumes with a fresh accumulator, and a relinked producer
-        /// reads as a separate guest instruction from the consumer.
-        var tracksAccAndSlot = true
+        /// Off for a debuggable module: an accumulator is live only between one
+        /// instruction and the next, and a resume re-enters the dispatch loop
+        /// with a fresh one, so a stop anywhere in a hand-off loses the value.
+        /// A relinked producer also reads as a separate guest instruction from
+        /// the consumer.
+        var tracksAcc = true
         /// A copy emitted right after an accumulator producer, which hands
         /// the accumulator on untouched once fused with a following write of
         /// the producer's result.
@@ -1945,6 +1947,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// Records what the instruction just emitted offers to the accumulator
         /// hand-off.
         mutating func recordAcc(_ records: AccRecords) {
+            guard tracksAcc else { return }
             lastAccRecords = records
             hasLastAcc = true
         }
@@ -2103,7 +2106,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// Records that `source` was just copied to `dest` right after
         /// `producer`.
         mutating func recordCopy(after producer: AccProducer, source: VReg, dest: VReg) {
-            guard tracksAccAndSlot else { return }
+            guard tracksAcc else { return }
             copyAfterAcc = (producer, source, dest, insertingPC)
         }
 
@@ -2123,7 +2126,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             else { return false }
             let newInstruction = resultRelink(newResult)
             assign(at: lastEmission.position.offsetFromHead, newInstruction)
-            if tracksAccAndSlot, let form = lastAcc?.producer, form.hasAccAndSlotForm {
+            if tracksAcc, let form = lastAcc?.producer, form.hasAccAndSlotForm {
                 lastAccAndSlot = AccProducer(
                     position: lastEmission.position, end: lastEmission.end, form: form.relinked(to: newResult), keepsSlot: true)
             }
@@ -2469,7 +2472,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         self.type = type
         self.module = module
         self.iseqBuilder = ISeqBuilder(engineConfiguration: engineConfiguration)
-        self.iseqBuilder.tracksAccAndSlot = !module.isDebuggable
+        self.iseqBuilder.tracksAcc = !module.isDebuggable
         self.controlStack = ControlStack()
         self.stackLayout = try StackLayout(
             type: type,
