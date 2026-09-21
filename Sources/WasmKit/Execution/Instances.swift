@@ -813,17 +813,20 @@ struct MemoryEntity: ~Copyable {
         )
     }
 
-    mutating func initialize(_ segment: InternalDataSegment, from source: UInt32, to destination: UInt64, count: UInt32) throws {
+    /// Takes the segment's bytes rather than its handle: reading one entity
+    /// handle from inside another's `withValue` is what made this crash in a
+    /// release build. See ``Execution/memoryInit(sp:immediate:)``.
+    mutating func initialize(_ segmentBytes: ArraySlice<UInt8>, from source: UInt32, to destination: UInt64, count: UInt32) throws {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(UInt64(count))
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
         let byteCount = byteCount
         guard !destinationOverflow, destinationEnd <= byteCount,
-            !sourceOverflow, sourceEnd <= segment.data.count
+            !sourceOverflow, sourceEnd <= segmentBytes.count
         else {
             throw Trap(.memoryOutOfBounds)
         }
-        segment.data.withUnsafeBufferPointer { segment in
+        segmentBytes.withUnsafeBufferPointer { segment in
             guard
                 let memory = baseAddress,
                 let segment = UnsafeRawPointer(segment.baseAddress)
