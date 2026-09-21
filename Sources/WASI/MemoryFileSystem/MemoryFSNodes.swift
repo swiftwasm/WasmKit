@@ -220,10 +220,13 @@ final class MemoryFileNode: MemFSNode {
     /// Truncates or extends a `.bytes` file; calls `truncate` on the host descriptor
     /// for a `.handle` file outside the lock.
     func setFilestatSize(_ size: WASIAbi.FileSize) throws {
+        // The size is a `u64` the guest chooses, but a file size is signed.
+        guard let newSize = Int(exactly: size) else {
+            throw WASIAbi.Errno.EINVAL
+        }
         let handle: FileDescriptor? = state.withLock { s in
             switch s.content {
             case .bytes(var bytes):
-                let newSize = Int(size)
                 if newSize < bytes.count {
                     bytes = Array(bytes.prefix(newSize))
                 } else if newSize > bytes.count {
@@ -238,7 +241,7 @@ final class MemoryFileNode: MemFSNode {
                 return FileDescriptor(rawValue: fd)
             }
         }
-        if let handle { try handle.truncate(size: Int64(size)) }
+        if let handle { try handle.truncate(size: Int64(newSize)) }
     }
 
     /// The byte count of a `.bytes` file, or the host descriptor for a `.handle` file

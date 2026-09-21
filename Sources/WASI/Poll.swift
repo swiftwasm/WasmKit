@@ -18,14 +18,16 @@ func poll<M: GuestMemory>(
 ) throws -> WASIAbi.Size {
     var pollSubscriptions = [PlatformPoll.Subscription]()
     var fdUserData = [WASIAbi.UserData]()
-    var timeoutMilliseconds = UInt.max
+    // nil means no clock subscription, i.e. wait until a descriptor is ready.
+    var timeoutMilliseconds: UInt?
     var clockUserData: WASIAbi.UserData?
 
     for subscription in subscriptions {
         let union = subscription.union
         switch union {
         case .clock(let clock):
-            timeoutMilliseconds = min(timeoutMilliseconds, .init(clock.timeout / 1_000_000))
+            let timeout = UInt(clamping: clock.timeout / 1_000_000)
+            timeoutMilliseconds = min(timeoutMilliseconds ?? .max, timeout)
             clockUserData = subscription.userData
         case .fdRead(let fd):
             pollSubscriptions.append(.init(fd: try fdTable.hostFileDescriptor(fd: fd), waitWrite: false))
@@ -33,6 +35,8 @@ func poll<M: GuestMemory>(
         case .fdWrite(let fd):
             pollSubscriptions.append(.init(fd: try fdTable.hostFileDescriptor(fd: fd), waitWrite: true))
             fdUserData.append(subscription.userData)
+        case .unknown:
+            throw WASIAbi.Errno.EINVAL
         }
     }
 

@@ -19,7 +19,11 @@ extension FdWASIEntry {
 
     /// Truncates or extends the file
     func setFilestatSize(_ size: WASIAbi.FileSize) throws {
-        try fd.truncate(size: Int64(size))
+        // The size is a `u64` the guest chooses, but a file size is signed.
+        guard let size = Int64(exactly: size) else {
+            throw WASIAbi.Errno.EINVAL
+        }
+        try fd.truncate(size: size)
     }
 
     /// Seek to the offset

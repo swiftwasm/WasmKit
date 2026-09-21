@@ -159,13 +159,19 @@ final class MemoryFileEntry: WASIFile {
                 return WASIAbi.FileSize(result)
             }
 
-            let newPosition: Int
+            let base: Int
             switch whence {
-            case .SET: newPosition = Int(offset)
-            case .CUR: newPosition = pos + Int(offset)
-            case .END: newPosition = prep.byteCount + Int(offset)
+            case .SET: base = 0
+            case .CUR: base = pos
+            case .END: base = prep.byteCount
             }
-            guard newPosition >= 0 else {
+            // The delta is signed and guest-chosen, so the sum can run off
+            // either end of the range a position is expressed in.
+            guard let delta = Int(exactly: offset) else {
+                throw WASIAbi.Errno.EINVAL
+            }
+            let (newPosition, overflow) = base.addingReportingOverflow(delta)
+            guard !overflow, newPosition >= 0 else {
                 throw WASIAbi.Errno.EINVAL
             }
             pos = newPosition
@@ -188,7 +194,10 @@ final class MemoryFileEntry: WASIFile {
         guard accessMode.contains(.write) else {
             throw WASIAbi.Errno.EBADF
         }
-        return try fileNode.pwrite(vectored: buffers, offset: Int(offset))
+        guard let offset = Int(exactly: offset) else {
+            throw WASIAbi.Errno.EINVAL
+        }
+        return try fileNode.pwrite(vectored: buffers, offset: offset)
     }
 
     func read(into buffers: GuestBuffers) throws -> WASIAbi.Size {
@@ -206,6 +215,9 @@ final class MemoryFileEntry: WASIFile {
         guard accessMode.contains(.read) else {
             throw WASIAbi.Errno.EBADF
         }
-        return try fileNode.pread(into: buffers, offset: Int(offset))
+        guard let offset = Int(exactly: offset) else {
+            throw WASIAbi.Errno.EINVAL
+        }
+        return try fileNode.pread(into: buffers, offset: offset)
     }
 }

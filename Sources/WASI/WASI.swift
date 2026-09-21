@@ -258,6 +258,9 @@ import WasmTypes
             case clock(Clock)
             case fdRead(Fd)
             case fdWrite(Fd)
+            /// A tag the guest chose that names no `eventtype`. Reading cannot
+            /// fail, so the tag is carried through and rejected by the caller.
+            case unknown(UInt8)
 
             public static let sizeInGuest: UInt32 = 40
             public static let alignInGuest: UInt32 = max(Clock.alignInGuest, Fd.alignInGuest)
@@ -279,8 +282,7 @@ import WasmTypes
                     return .fdWrite(.readFromGuest(&pointer, in: memory))
 
                 default:
-                    // FIXME: should this throw?
-                    fatalError()
+                    return .unknown(tag)
                 }
             }
 
@@ -299,6 +301,8 @@ import WasmTypes
                     UInt8.writeToGuest(at: &pointer, in: memory, value: 2)
                     pointer = pointer.alignedUp(toMultipleOf: Clock.alignInGuest)
                     Fd.writeToGuest(at: &pointer, in: memory, value: fd)
+                case .unknown(let tag):
+                    UInt8.writeToGuest(at: &pointer, in: memory, value: tag)
                 }
             }
         }
@@ -1106,7 +1110,9 @@ final class WASIImplementation: Sendable {
             guard bytes.count <= maxPathLength else {
                 throw WASIAbi.Errno.ENAMETOOLONG
             }
-            path.withHostPointer(in: memory, count: Int(maxPathLength)) { buffer in
+            // Map what is written, not `maxPathLength`: that is the capacity
+            // the guest declares, which it need not have actually reserved.
+            path.withHostPointer(in: memory, count: bytes.count) { buffer in
                 UnsafeMutableRawBufferPointer(buffer).copyBytes(from: bytes)
             }
         }
@@ -1359,7 +1365,9 @@ final class WASIImplementation: Sendable {
         let linkBytes = try dirEntry.readlink(atPath: path)
         let bytesWritten = min(Int(buffer.count), linkBytes.count)
         if bytesWritten > 0 {
-            buffer.withHostPointer(in: memory) { hostBuffer in
+            // Map the prefix the link fills, not the whole buffer the guest
+            // declared: the rest of it need not be addressable.
+            buffer.baseAddress.withHostPointer(in: memory, count: bytesWritten) { hostBuffer in
                 linkBytes.withUnsafeBytes { linkBytes in
                     guard let source = linkBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
                     hostBuffer.baseAddress?.update(from: source, count: bytesWritten)

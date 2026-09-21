@@ -30,17 +30,22 @@ enum PlatformPoll {
     }
 
     /// Waits for readiness of the given descriptors, or for the timeout.
+    /// A nil timeout waits until a descriptor is ready.
     /// Returns one `ReadyState` per subscription (empty when not ready), or
     /// nil when the call timed out with no ready descriptor.
     static func poll(
-        subscriptions: [Subscription], timeoutMilliseconds: UInt
+        subscriptions: [Subscription], timeoutMilliseconds: UInt?
     ) throws -> [ReadyState]? {
         #if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             var pollfds = subscriptions.map {
                 pollfd(fd: $0.fd, events: Int16($0.waitWrite ? POLLOUT : POLLIN), revents: 0)
             }
+            // `poll` takes the timeout in a CInt, where a negative value waits
+            // indefinitely. A guest picks the timeout, so clamp rather than
+            // narrow: a wait longer than CInt can express is one it can wait out.
+            let timeout: CInt = timeoutMilliseconds.map { CInt(clamping: $0) } ?? -1
             let result = pollfds.withUnsafeMutableBufferPointer { buffer in
-                poll_syscall(buffer.baseAddress, .init(buffer.count), .init(timeoutMilliseconds))
+                poll_syscall(buffer.baseAddress, .init(buffer.count), timeout)
             }
             let err = _palErrno  // Preserve `errno` immediately after `poll`
             if result == 0 {
