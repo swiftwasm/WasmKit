@@ -48,8 +48,8 @@ async def run_single(lane, i, program):
         # Pin every proposal rather than inheriting wasm-tools' defaults, which
         # move over time: with a recent wasm-tools most generated modules used
         # GC types and were rejected by both engines, so the comparison ran on
-        # almost nothing. SIMD and reference types stay off because Wasmtime's
-        # C API cannot build a `wasm_val_t` for `v128` or `externref`.
+        # almost nothing. SIMD and reference types stay off because the Wasm C
+        # API cannot build a `wasm_val_t` for `v128` or `externref`.
         "--gc-enabled=false",
         "--custom-descriptors-enabled=false",
         "--reference-types-enabled=false",
