@@ -163,7 +163,7 @@ struct MemoryDirEntry: WASIDir {
             fileType = .REGULAR_FILE
             if let fileNode = node as? MemoryFileNode {
                 size = WASIAbi.FileSize(try fileNode.size)
-                let timestamps = try fileNode.timestamps
+                let timestamps = fileNode.timestamps
                 atim = timestamps.atim
                 mtim = timestamps.mtim
                 ctim = timestamps.ctim
@@ -216,9 +216,6 @@ struct MemoryDirEntry: WASIDir {
             return
         }
 
-        // Record the times on the node. A `.handle`-backed file is a host
-        // descriptor the embedder supplied; the guest must not be able to change
-        // the host file's timestamps through it.
-        _ = fileNode.setTimesInMemory(atim: newAtim, mtim: newMtim)
+        fileNode.setTimes(atim: newAtim, mtim: newMtim)
     }
 }

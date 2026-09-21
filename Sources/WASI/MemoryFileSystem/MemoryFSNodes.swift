@@ -179,19 +179,13 @@ final class MemoryFileNode: MemFSNode {
         }
     }
 
+    /// The node's own timestamps.
+    ///
+    /// A `.handle` file is backed by a host descriptor, but that descriptor's
+    /// timestamps are the host file's, which is not something this file system
+    /// reports to a guest or lets it change.
     var timestamps: (atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp, ctim: WASIAbi.Timestamp) {
-        get throws {
-            let snapshot = state.withLock { (content: $0.content, atim: $0.atim, mtim: $0.mtim, ctim: $0.ctim) }
-            switch snapshot.content {
-            case .bytes:
-                return (snapshot.atim, snapshot.mtim, snapshot.ctim)
-            case .handle:
-                // A `.handle` file is backed by a host descriptor, but its
-                // timestamps are the host file's, which is not something this
-                // filesystem should report to a guest. Use the node's own.
-                return (snapshot.atim, snapshot.mtim, snapshot.ctim)
-            }
-        }
+        state.withLock { ($0.atim, $0.mtim, $0.ctim) }
     }
 
     /// Resets a `.bytes` file to empty content (used for `O_TRUNC`). No-op for `.handle`.
@@ -205,15 +199,13 @@ final class MemoryFileNode: MemFSNode {
         }
     }
 
-    /// Sets in-memory times on a `.bytes` file; returns the host descriptor for a
-    /// `.handle` file so the caller applies the change with a syscall outside the lock.
-    func setTimesInMemory(atim: WASIAbi.Timestamp?, mtim: WASIAbi.Timestamp?) -> FileDescriptor? {
+    /// Records access and modification times on the node, as
+    /// ``MemoryDirectoryNode/setTimes(atim:mtim:)`` does for a directory.
+    func setTimes(atim: WASIAbi.Timestamp?, mtim: WASIAbi.Timestamp?) {
         state.withLock { s in
-            if case .handle(let fd) = s.content { return FileDescriptor(rawValue: fd) }
             if let atim { s.atim = atim }
             if let mtim { s.mtim = mtim }
             s.ctim = WASIAbi.Timestamp.currentWallClock()
-            return nil
         }
     }
 
