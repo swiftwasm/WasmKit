@@ -22,7 +22,7 @@ final class MemoryFileEntry: WASIFile {
     // MARK: - WASIEntry
 
     func attributes() throws -> WASIAbi.Filestat {
-        let timestamps = try fileNode.timestamps
+        let timestamps = fileNode.timestamps
         return WASIAbi.Filestat(
             dev: 0, ino: 0, filetype: .REGULAR_FILE,
             nlink: 1, size: WASIAbi.FileSize(try fileNode.size),
@@ -61,31 +61,7 @@ final class MemoryFileEntry: WASIFile {
             newMtim = nil
         }
 
-        // nil means the times were applied in memory; a non-nil handle is a host
-        // fd whose times we set below.
-        guard let handle = fileNode.setTimesInMemory(atim: newAtim, mtim: newMtim) else {
-            return
-        }
-
-        let accessTime: FileTime
-        if fstFlags.contains(.ATIM) {
-            accessTime = FileTime(seconds: Int(atim / 1_000_000_000), nanoseconds: Int(atim % 1_000_000_000))
-        } else if fstFlags.contains(.ATIM_NOW) {
-            accessTime = .now
-        } else {
-            accessTime = .omit
-        }
-
-        let modTime: FileTime
-        if fstFlags.contains(.MTIM) {
-            modTime = FileTime(seconds: Int(mtim / 1_000_000_000), nanoseconds: Int(mtim % 1_000_000_000))
-        } else if fstFlags.contains(.MTIM_NOW) {
-            modTime = .now
-        } else {
-            modTime = .omit
-        }
-
-        try handle.setTimes(access: accessTime, modification: modTime)
+        fileNode.setTimes(atim: newAtim, mtim: newMtim)
     }
 
     func advise(

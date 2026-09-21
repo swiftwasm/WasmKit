@@ -71,6 +71,11 @@ extension FdWASIFile {
 
     @inlinable
     func read(into buffers: GuestBuffers) throws -> WASIAbi.Size {
+        // `path_open` may omit FD_READ, but `openat` needs an access mode, so
+        // the host descriptor underneath is readable even then.
+        guard accessMode.contains(.read) else {
+            throw WASIAbi.Errno.EBADF
+        }
         var nread: UInt32 = 0
         for index in 0..<buffers.count {
             nread += UInt32(
@@ -84,6 +89,9 @@ extension FdWASIFile {
     @inlinable
     func pread(into buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size {
         // TODO: Use `preadv`
+        guard accessMode.contains(.read) else {
+            throw WASIAbi.Errno.EBADF
+        }
         guard var currentOffset = Int64(exactly: offset) else {
             throw WASIAbi.Errno.EINVAL
         }
