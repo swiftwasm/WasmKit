@@ -2,8 +2,7 @@
 struct MemoryDirEntry: WASIDir {
     struct MemoryDirectoryIterator: WASIReaddirIterator {
         let children: [String]
-        let fileSystem: MemoryFileSystem
-        let basePath: String
+        let dirNode: MemoryDirectoryNode
         var nextIndex: Int
 
         mutating func next() -> Result<ReaddirElement, any Error>? {
@@ -12,8 +11,9 @@ struct MemoryDirEntry: WASIDir {
             let name = children[index]
             nextIndex += 1
             return Result(catching: {
-                let childPath = MemoryFileSystem.joinGuestPath(basePath, name)
-                guard let childNode = fileSystem.lookup(at: childPath) else {
+                // Ask the directory this descriptor refers to for the child,
+                // rather than looking the name up by path from the root.
+                guard let childNode = dirNode.getChild(name: name) else {
                     throw WASIAbi.Errno.ENOENT
                 }
 
@@ -41,7 +41,6 @@ struct MemoryDirEntry: WASIDir {
 
     let preopenPath: String?
     let dirNode: MemoryDirectoryNode
-    let path: String
     let fileSystem: MemoryFileSystem
 
     func readlink(atPath path: String) throws -> [UInt8] {
@@ -108,11 +107,11 @@ struct MemoryDirEntry: WASIDir {
     }
 
     func removeDirectory(atPath path: String) throws {
-        try fileSystem.removeNode(at: self.path, relativePath: path, mustBeDirectory: true)
+        try fileSystem.removeNode(in: dirNode, relativePath: path, mustBeDirectory: true)
     }
 
     func removeFile(atPath path: String) throws {
-        try fileSystem.removeNode(at: self.path, relativePath: path, mustBeDirectory: false)
+        try fileSystem.removeNode(in: dirNode, relativePath: path, mustBeDirectory: false)
     }
 
     func symlink(from sourcePath: String, to destPath: String) throws {
@@ -126,8 +125,8 @@ struct MemoryDirEntry: WASIDir {
         }
 
         try fileSystem.rename(
-            from: sourcePath, at: self.path,
-            to: destPath, at: newMemoryDir.path
+            from: sourcePath, in: dirNode,
+            to: destPath, in: newMemoryDir.dirNode
         )
     }
 
@@ -135,9 +134,8 @@ struct MemoryDirEntry: WASIDir {
         WASIReaddirEntries(
             MemoryDirectoryIterator(
                 children: dirNode.listChildren(),
-                fileSystem: fileSystem,
-                basePath: path,
-                nextIndex: Int(cookie)
+                dirNode: dirNode,
+                nextIndex: Int(clamping: cookie)
             ))
     }
 

@@ -84,6 +84,9 @@ public final class MemoryFileSystem: Sendable {
             case "", ".":
                 continue
             case "..":
+                guard current is MemoryDirectoryNode else {
+                    throw WASIAbi.Errno.ENOTDIR
+                }
                 guard let parent = descended.popLast() else {
                     // Would leave the directory the descriptor refers to.
                     throw WASIAbi.Errno.EPERM
@@ -142,16 +145,13 @@ public final class MemoryFileSystem: Sendable {
         return current
     }
 
+    /// Creates the file `relativePath` names within `directory`. The parent
+    /// directories on the way there must already exist: creating them would
+    /// both deviate from `openat` and put entries in the tree that the guest
+    /// path never named.
     @discardableResult
     private static func createFileNode(in directory: MemoryDirectoryNode, at relativePath: String, oflags: WASIAbi.Oflags) throws -> MemoryFileNode {
-        try validateRelativePath(relativePath)
-
-        let components = relativePath.split(separator: "/").map(String.init)
-        guard let fileName = components.last else {
-            throw WASIAbi.Errno.EINVAL
-        }
-
-        let parentDir = try traverseToParent(from: directory, components: Array(components.dropLast()))
+        let (parentDir, fileName) = try resolveParent(from: directory, path: relativePath)
         let fileNode = try parentDir.getOrCreateChildFile(name: fileName)
         if oflags.contains(.TRUNC) {
             fileNode.truncateToEmpty()
@@ -163,14 +163,6 @@ public final class MemoryFileSystem: Sendable {
         guard !path.isEmpty && !path.hasPrefix("/") else {
             throw WASIAbi.Errno.EINVAL
         }
-    }
-
-    private static func traverseToParent(from directory: MemoryDirectoryNode, components: [String]) throws -> MemoryDirectoryNode {
-        var current = directory
-        for component in components {
-            current = try current.getOrCreateChildDirectory(name: component)
-        }
-        return current
     }
 
     // MARK: - Public API
@@ -231,7 +223,7 @@ public final class MemoryFileSystem: Sendable {
 
     /// The type of the node reached by resolving `relativePath` from `directoryPath`.
     func resolveType(at directoryPath: String, path relativePath: String) -> MemFSNodeType? {
-        guard let directory = Self.lookupNode(from: root, at: directoryPath) as? MemoryDirectoryNode else {
+        guard Self.lookupNode(from: root, at: directoryPath) is MemoryDirectoryNode else {
             return nil
         }
         // Note: this resolves across the whole filesystem by design. It is an
@@ -263,26 +255,9 @@ public final class MemoryFileSystem: Sendable {
         try Self.ensureDirectoryNode(from: root, at: path)
     }
 
-    /// Remove a node relative to the directory at `directoryPath`.
-    func removeNode(at directoryPath: String, relativePath: String, mustBeDirectory: Bool) throws {
-        guard let directory = Self.lookupNode(from: root, at: directoryPath) as? MemoryDirectoryNode else {
-            throw WASIAbi.Errno.ENOENT
-        }
-
-        try Self.validateRelativePath(relativePath)
-
-        let components = relativePath.split(separator: "/").map(String.init)
-        guard let fileName = components.last else {
-            throw WASIAbi.Errno.EINVAL
-        }
-
-        var current = directory
-        for component in components.dropLast() {
-            guard let next = current.getChild(name: component) as? MemoryDirectoryNode else {
-                throw WASIAbi.Errno.ENOENT
-            }
-            current = next
-        }
+    /// Remove a node named by a guest path relative to `directory`.
+    func removeNode(in directory: MemoryDirectoryNode, relativePath: String, mustBeDirectory: Bool) throws {
+        let (current, fileName) = try Self.resolveParent(from: directory, path: relativePath)
 
         guard let node = current.getChild(name: fileName) else {
             throw WASIAbi.Errno.ENOENT
@@ -304,38 +279,14 @@ public final class MemoryFileSystem: Sendable {
         current.removeChild(name: fileName)
     }
 
-    /// Rename a node from `sourcePath` (relative to `sourceDirectoryPath`) to
-    /// `destPath` (relative to `destDirectoryPath`).
-    func rename(from sourcePath: String, at sourceDirectoryPath: String, to destPath: String, at destDirectoryPath: String) throws {
-        guard let sourceDir = Self.lookupNode(from: root, at: sourceDirectoryPath) as? MemoryDirectoryNode else {
+    /// Rename a node from `sourcePath` (relative to `sourceDirectory`) to
+    /// `destPath` (relative to `destDirectory`).
+    func rename(from sourcePath: String, in sourceDirectory: MemoryDirectoryNode, to destPath: String, in destDirectory: MemoryDirectoryNode) throws {
+        let (sourceParentDir, sourceFileName) = try Self.resolveParent(from: sourceDirectory, path: sourcePath)
+        let (destParentDir, destFileName) = try Self.resolveParent(from: destDirectory, path: destPath)
+
+        guard let sourceNode = sourceParentDir.getChild(name: sourceFileName) else {
             throw WASIAbi.Errno.ENOENT
-        }
-        guard let destDir = Self.lookupNode(from: root, at: destDirectoryPath) as? MemoryDirectoryNode else {
-            throw WASIAbi.Errno.ENOENT
-        }
-
-        guard let sourceNode = try Self.resolve(from: sourceDir, path: sourcePath) else {
-            throw WASIAbi.Errno.ENOENT
-        }
-
-        let destComponents = destPath.split(separator: "/").map(String.init)
-        guard let destFileName = destComponents.last else {
-            throw WASIAbi.Errno.EINVAL
-        }
-
-        let destParentDir = try Self.traverseToParent(from: destDir, components: Array(destComponents.dropLast()))
-
-        let sourceComponents = sourcePath.split(separator: "/").map(String.init)
-        guard let sourceFileName = sourceComponents.last else {
-            throw WASIAbi.Errno.EINVAL
-        }
-
-        var sourceParentDir = sourceDir
-        for component in sourceComponents.dropLast() {
-            guard let next = sourceParentDir.getChild(name: component) as? MemoryDirectoryNode else {
-                throw WASIAbi.Errno.ENOENT
-            }
-            sourceParentDir = next
         }
 
         sourceParentDir.removeChild(name: sourceFileName)
@@ -408,7 +359,7 @@ public final class MemoryFileSystem: Sendable {
 
     public func preopenDirectory(guestPath: String, hostPath: String) throws -> any WASIDir {
         let node = try ensureDirectory(at: guestPath)
-        return MemoryDirEntry(preopenPath: guestPath, dirNode: node, path: guestPath, fileSystem: self)
+        return MemoryDirEntry(preopenPath: guestPath, dirNode: node, fileSystem: self)
     }
 
     public func openAt(
@@ -424,12 +375,10 @@ public final class MemoryFileSystem: Sendable {
             throw WASIAbi.Errno.EBADF
         }
 
-        let dirPath = memoryDir.path
-        let fullPath = Self.joinGuestPath(dirPath, path)
-
-        guard let dirNode = Self.lookupNode(from: root, at: dirPath) as? MemoryDirectoryNode else {
-            throw WASIAbi.Errno.EBADF
-        }
+        // The descriptor's own directory node, not a fresh lookup by its path:
+        // the path is a name the tree may no longer agree with, while the node
+        // is what the descriptor refers to.
+        let dirNode = memoryDir.dirNode
 
         var node = try Self.resolve(from: dirNode, path: path)
 
@@ -460,7 +409,7 @@ public final class MemoryFileSystem: Sendable {
                 throw WASIAbi.Errno.ENOTDIR
             }
             return .directory(
-                MemoryDirEntry(preopenPath: nil, dirNode: dirNode, path: fullPath, fileSystem: self))
+                MemoryDirEntry(preopenPath: nil, dirNode: dirNode, fileSystem: self))
         }
 
         if resolvedNode.type == .file {
