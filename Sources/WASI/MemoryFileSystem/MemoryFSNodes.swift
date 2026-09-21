@@ -185,13 +185,11 @@ final class MemoryFileNode: MemFSNode {
             switch snapshot.content {
             case .bytes:
                 return (snapshot.atim, snapshot.mtim, snapshot.ctim)
-            case .handle(let fd):
-                let attrs = try FileDescriptor(rawValue: fd).attributes()
-                return (
-                    WASIAbi.Timestamp(platformTimeSpec: attrs.accessTime),
-                    WASIAbi.Timestamp(platformTimeSpec: attrs.modificationTime),
-                    WASIAbi.Timestamp(platformTimeSpec: attrs.creationTime)
-                )
+            case .handle:
+                // A `.handle` file is backed by a host descriptor, but its
+                // timestamps are the host file's, which is not something this
+                // filesystem should report to a guest. Use the node's own.
+                return (snapshot.atim, snapshot.mtim, snapshot.ctim)
             }
         }
     }
