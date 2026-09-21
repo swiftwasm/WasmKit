@@ -315,7 +315,13 @@ extension Execution {
 
             let value = sp[immediate.delta]
             let pageCount: UInt64 = isMemory64 ? value.i64 : UInt64(value.i32)
-            let oldPageCount = try memory.grow(by: Int(pageCount), resourceLimiter: store.value.resourceLimiter)
+            // `memory.grow` reports failure as -1 rather than trapping, so a delta
+            // the host cannot represent is just a failed grow.
+            guard let delta = Int(exactly: pageCount) else {
+                sp[immediate.result] = UntypedValue(isMemory64 ? .i64(UInt64(bitPattern: -1)) : .i32(UInt32(bitPattern: -1)))
+                return
+            }
+            let oldPageCount = try memory.grow(by: delta, resourceLimiter: store.value.resourceLimiter)
             CurrentMemory.assign(md: &md, ms: &ms, memory: &memory)
             sp[immediate.result] = UntypedValue(oldPageCount)
         }
@@ -350,11 +356,14 @@ extension Execution {
         let memory = currentInstance(sp: sp).memories[0]
         try memory.withValue { memoryInstance in
             let isMemory64 = memoryInstance.limit.isMemory64
-            let copyCounter = Int(sp[immediate.size].asAddressOffset(isMemory64))
+            let rawCount = sp[immediate.size].asAddressOffset(isMemory64)
             let value = sp[immediate.value].i32
-            let destinationIndex = Int(sp[immediate.destOffset].asAddressOffset(isMemory64))
+            let rawDestination = sp[immediate.destOffset].asAddressOffset(isMemory64)
 
-            guard !destinationIndex.addingReportingOverflow(copyCounter).overflow else {
+            // A memory64 offset or count beyond `Int` cannot be in bounds.
+            guard let copyCounter = Int(exactly: rawCount), let destinationIndex = Int(exactly: rawDestination),
+                !destinationIndex.addingReportingOverflow(copyCounter).overflow
+            else {
                 throw Trap(.memoryOutOfBounds)
             }
             try memoryInstance.fill(offset: destinationIndex, value: UInt8(truncatingIfNeeded: value), count: copyCounter)

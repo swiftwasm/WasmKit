@@ -157,9 +157,10 @@ extension Execution {
         let callerInstance = currentInstance(sp: sp)
         let table = callerInstance.tables[Int(tableIndex)]
         let value = sp[address].asAddressOffset(table.limits.isMemory64)
-        let elementIndex = Int(value)
-        guard elementIndex < table.elements.count else {
-            throw Trap(.tableOutOfBounds(elementIndex))
+        // A table64 index beyond `Int` is out of bounds for any table; converting
+        // it before the check below would trap the host instead.
+        guard let elementIndex = Int(exactly: value), elementIndex < table.elements.count else {
+            throw Trap(.tableOutOfBounds(Int(clamping: value)))
         }
         guard case .function(let rawBitPattern?) = table.elements[elementIndex]
         else {

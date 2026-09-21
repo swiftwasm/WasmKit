@@ -366,6 +366,10 @@ struct WasmFunctionEntity {
         let store = store.value
         let engine = store.engine
         let type = self.type
+        // The interpreter counts a branch's copied slots in a `UInt16`; reject a
+        // function type that overflows it before translating anything. The
+        // translator is noncopyable, so this cannot be a throw inside its `init`.
+        try checkBlockTypeFitsInterpreter(engine.resolveType(type))
         let iseq = try code.withValue { code in
             try InstructionTranslator(
                 allocator: store.allocator.iseqAllocator,

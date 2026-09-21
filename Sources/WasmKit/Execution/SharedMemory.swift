@@ -24,7 +24,10 @@ public final class SharedMemory: @unchecked Sendable {
             try ModuleValidator.checkMemoryType(type, features: engine.configuration.features)
 
             let maxPages = type.max ?? MemoryEntity.maxPageCount(isMemory64: false)
-            let initialBytes = Int(type.min) * MemoryEntity.pageSize
+            let (initialBytes, initialOverflow) = Int(clamping: type.min).multipliedReportingOverflow(by: MemoryEntity.pageSize)
+            guard !initialOverflow else {
+                throw Trap(.initialMemorySizeExceedsLimit(byteSize: Int.max))
+            }
             guard try resourceLimiter.limitMemoryGrowth(to: initialBytes) else {
                 throw Trap(.initialMemorySizeExceedsLimit(byteSize: initialBytes))
             }

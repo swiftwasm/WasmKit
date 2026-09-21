@@ -196,6 +196,18 @@ extension WasmKitError.Message {
         Self("control stack is empty. Instruction cannot be appeared after \"end\" of function")
     }
 
+    /// The interpreter addresses a `br_table` target vector and a `try_table`
+    /// catch vector with a 16-bit count, so a larger vector cannot be encoded.
+    static func vectorTooLargeForInterpreter(_ what: String, count: Int) -> Self {
+        Self("\(what) has \(count) entries, but the interpreter addresses at most \(UInt16.max)")
+    }
+
+    /// A branch copies its block's values, and the interpreter counts those
+    /// slots with a 16-bit field.
+    static func blockTypeTooLargeForInterpreter(_ role: String, slots: Int) -> Self {
+        Self("this block type's \(role) occupy \(slots) stack slots, but the interpreter addresses at most \(UInt16.max)")
+    }
+
     static func relativeDepthOutOfRange(relativeDepth: UInt32) -> Self {
         Self("relative depth \(relativeDepth) is out of range")
     }
