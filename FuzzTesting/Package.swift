@@ -23,6 +23,8 @@ let package = Package(
         // fuzzing target functions and manually link them with fuzzing runtime libraries.
         .library(name: "FuzzTranslator", type: .static, targets: ["FuzzTranslator"]),
         .library(name: "FuzzExecute", type: .static, targets: ["FuzzExecute"]),
+        .library(name: "FuzzWAT", type: .static, targets: ["FuzzWAT"]),
+        .library(name: "FuzzWAST", type: .static, targets: ["FuzzWAST"]),
         // FuzzDifferential is not a libFuzzer-based target, so we build it as an executable.
         .executable(name: "FuzzDifferential", targets: ["FuzzDifferential"]),
     ],
@@ -37,6 +39,12 @@ let package = Package(
         .target(name: "FuzzExecute", dependencies: [
             "WasmKitFuzzing",
             .product(name: "WasmKit", package: "WasmKit"),
+        ]),
+        .target(name: "FuzzWAT", dependencies: [
+            .product(name: "WAT", package: "WasmKit"),
+        ]),
+        .target(name: "FuzzWAST", dependencies: [
+            .product(name: "WAT", package: "WasmKit"),
         ]),
         .executableTarget(name: "FuzzDifferential", dependencies: [
             .product(name: "WasmKit", package: "WasmKit"),
