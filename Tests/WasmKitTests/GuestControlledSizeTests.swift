@@ -86,4 +86,49 @@ struct GuestControlledSizeTests {
             _ = try Self.instantiate(wat)
         }
     }
+
+    /// A host function may re-enter the guest and grow the caller's memory. A
+    /// malloc-backed memory is reallocated by `grow`, so the interpreter's
+    /// cached base/bound has to be refreshed when the host call returns --
+    /// otherwise the next load or store goes through a freed pointer.
+    @Test func aHostCallThatGrowsMemoryDoesNotLeaveTheCachedMemoryStale() throws {
+        let wat = """
+            (module
+              (import "env" "cb" (func $cb))
+              (memory (export "mem") 1 100)
+              (func (export "growit") (result i32) (memory.grow (i32.const 8)))
+              (func (export "start") (result i32)
+                (call $cb)
+                ;; Only in bounds once the callback has grown the memory, so a
+                ;; stale cached bound rejects it and a stale cached base writes
+                ;; through freed storage.
+                (i32.store (i32.const 100000) (i32.const 0x5A5A5A5A))
+                (i32.load (i32.const 100000))))
+            """
+        let module = try parseWasm(bytes: try wat2wasm(wat, features: .all), features: .all)
+        // Software bounds checking uses the malloc backing, where growing moves
+        // the buffer. Under mprotect the base is stable and the bug only shows
+        // up as a spurious trap.
+        let engine = Engine(
+            configuration: EngineConfiguration(compilationMode: .eager, memoryBoundsChecking: .software)
+        )
+        let store = Store(engine: engine)
+
+        // The callback re-enters the guest, which is what moves the memory.
+        final class Box: @unchecked Sendable { var instance: Instance? }
+        let box = Box()
+        var imports = Imports()
+        imports.define(
+            module: "env", name: "cb",
+            Function(store: store, type: FunctionType(parameters: [], results: [])) { _, _ in
+                _ = try box.instance?.exports[function: "growit"]?()
+                return []
+            }
+        )
+        let instance = try module.instantiate(store: store, imports: imports)
+        box.instance = instance
+
+        let start = try #require(instance.exports[function: "start"])
+        #expect(try start() == [.i32(0x5A5A_5A5A)])
+    }
 }
