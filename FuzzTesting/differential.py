@@ -45,6 +45,25 @@ async def run_single(lane, i, program):
         "--canonicalize-nans=true",
         "--saturating-float-to-int-enabled=true",
         "--sign-extension-ops-enabled=true",
+        # Pin every proposal rather than inheriting wasm-tools' defaults, which
+        # move over time: with a recent wasm-tools most generated modules used
+        # GC types and were rejected by both engines, so the comparison ran on
+        # almost nothing. SIMD and reference types stay off because Wasmtime's
+        # C API cannot build a `wasm_val_t` for `v128` or `externref`.
+        "--gc-enabled=false",
+        "--custom-descriptors-enabled=false",
+        "--reference-types-enabled=false",
+        "--simd-enabled=false",
+        "--relaxed-simd-enabled=false",
+        "--exceptions-enabled=false",
+        "--memory64-enabled=false",
+        "--threads-enabled=false",
+        "--shared-everything-threads-enabled=false",
+        "--custom-page-sizes-enabled=false",
+        "--wide-arithmetic-enabled=false",
+        "--extended-const-enabled=false",
+        "--tail-call-enabled=false",
+        "--multi-value-enabled=true",
         "--min-funcs=1",
         "--min-memories=1",
         "--max-imports=0",
@@ -53,7 +72,10 @@ async def run_single(lane, i, program):
         "--max-memory32-bytes=65536",
         "--memory-max-size-required=true"
     ]
-    random_seed = os.urandom(100)
+    # wasm-smith consumes its input as a choice stream, so a short seed runs out
+    # early and the module degenerates. 100 bytes yielded roughly 20 distinct
+    # opcodes across a batch; 8 KiB yields several hundred.
+    random_seed = os.urandom(8192)
 
     proc = await asyncio.create_subprocess_exec(
         *cmd, stdin=asyncio.subprocess.PIPE)
@@ -77,6 +99,14 @@ async def run_single(lane, i, program):
             except subprocess.CalledProcessError:
                 # If shrinking fails, just dump the original testcase
                 crash_file = dump_crash_wasm(wasm_file, "diff")
+    # `TimeoutError` is a subclass of `OSError`, so it has to be handled first;
+    # otherwise the `OSError` arm below catches it, finds no `errno`, and
+    # re-raises -- which ended the whole run on the first timeout.
+    except TimeoutError:
+        timeout_file = os.path.join(fail_dir, f"timeout-{i}.wasm")
+        shutil.copy(wasm_file, timeout_file)
+        print(f"Timeout in iteration {i};"
+              f" reproduce with {program} {timeout_file})")
     except OSError as e:
         import errno
         if e.errno == errno.ETXTBSY:
@@ -85,12 +115,6 @@ async def run_single(lane, i, program):
             pass
         else:
             raise e
-
-    except TimeoutError:
-        timeout_file = os.path.join(fail_dir, f"timeout-{i}.wasm")
-        shutil.copy(wasm_file, timeout_file)
-        print(f"Timeout in iteration {i};"
-              f" reproduce with {program} {timeout_file})")
     except KeyboardInterrupt:
         print("Interrupted by user")
         exit(0)
