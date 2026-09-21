@@ -329,13 +329,16 @@ extension Execution {
     mutating func memoryInit(sp: Sp, immediate: Instruction.MemoryInitOperand) throws {
         let instance = currentInstance(sp: sp)
         let memory = instance.memories[0]
+        // Read the segment's bytes before opening the memory's access. Reaching
+        // through a second entity handle from inside `memory.withValue` -- both
+        // of which hand out `inout` access to a raw pointee -- miscompiles in a
+        // release build, where the retain of the returned slice faults.
+        let segmentBytes = instance.dataSegments[Int(immediate.segmentIndex)].data
         try memory.withValue { memory in
-            let segment = instance.dataSegments[Int(immediate.segmentIndex)]
-
             let size = sp[immediate.size].i32
             let source = sp[immediate.sourceOffset].i32
             let destination = sp[immediate.destOffset].asAddressOffset(memory.limit.isMemory64)
-            try memory.initialize(segment, from: source, to: destination, count: size)
+            try memory.initialize(segmentBytes, from: source, to: destination, count: size)
         }
     }
     mutating func memoryDataDrop(sp: Sp, immediate: Instruction.MemoryDataDropOperand) {
