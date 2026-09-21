@@ -514,6 +514,12 @@ struct WatParser {
                 try parser.consume()  // consume (
                 try parser.skipParenBlock()  // skip offset expr
             }
+            // `(data (memory 0) "x")` names a memory but gives no offset. The
+            // encoder cannot represent that, so reject it here rather than
+            // aborting later.
+            if memory != nil, offset == nil {
+                throw WatParserError("data segment with a memory index requires an offset", location: location)
+            }
             let data = try dataString()
             kind = .data(DataSegmentDecl(id: id, memory: memory, offset: offset, data: data))
             try parser.expect(.rightParen)

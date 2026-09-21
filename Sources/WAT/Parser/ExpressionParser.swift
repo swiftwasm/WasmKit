@@ -26,8 +26,12 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
             stack.append(name?.value)
         }
 
-        mutating func pop() {
+        /// Returns false when there is no label to pop, i.e. the source has more
+        /// `end` keywords than blocks.
+        mutating func pop() -> Bool {
+            guard !stack.isEmpty else { return false }
             stack.removeLast()
+            return true
         }
 
         mutating func peek() -> String?? {
@@ -338,7 +342,11 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
                     try parser.expect(.rightParen)
                 }
                 suspense = Suspense(visit: { visitor, this throws(WatParserError) in
-                    this.labelStack.pop()
+                    // An unfolded `end` inside the folded block already popped this
+                    // label, which means the source has a surplus `end`.
+                    guard this.labelStack.pop() else {
+                        throw WatParserError("unexpected `end`: no block is open here", location: nil)
+                    }
                     return try visitor.visitEnd()
                 })
             case "block", "loop", "try_table":
@@ -348,7 +356,11 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
                 // allows unfolded child instructions unlike others.
                 try parse(visitor: &visitor, wat: &wat)
                 suspense = Suspense(visit: { visitor, this throws(WatParserError) in
-                    this.labelStack.pop()
+                    // An unfolded `end` inside the folded block already popped this
+                    // label, which means the source has a surplus `end`.
+                    guard this.labelStack.pop() else {
+                        throw WatParserError("unexpected `end`: no block is open here", location: nil)
+                    }
                     return try visitor.visitEnd()
                 })
             default:
@@ -387,7 +399,9 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
         case "end":
             // This path should not be reached when parsing folded block instructions.
             try checkRepeatedLabelConsistency()
-            labelStack.pop()
+            guard labelStack.pop() else {
+                throw WatParserError("unexpected `end`: no block is open here", location: nil)
+            }
             return { visitor in
                 return try visitor.visitEnd()
             }
