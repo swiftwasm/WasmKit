@@ -62,9 +62,7 @@ extension InternalInstance {
         return self.types[Int(index)]
     }
     func resolveBlockType(_ blockType: BlockType) throws(WasmKitError) -> FunctionType {
-        let type = try FunctionType(blockType: blockType, typeSection: self.types)
-        try checkBlockTypeFitsInterpreter(type)
-        return type
+        try FunctionType(blockType: blockType, typeSection: self.types)
     }
     func functionType(_ index: FunctionIndex, interner: Interner<FunctionType>) throws(WasmKitError) -> FunctionType {
         return try interner.resolve(self.functions[validating: Int(index)].type)
@@ -5951,21 +5949,20 @@ extension InstructionTranslator.MetaValue {
     }
 }
 
-/// A branch out of a block copies the block's values, and ``ControlFrame/copySlotCount``
-/// counts those slots in a `UInt16`. Reject a block type that would overflow that count
-/// up front, so the conversion stays total.
-func checkBlockTypeFitsInterpreter(_ type: FunctionType) throws(WasmKitError) {
-    let parameterSlots = type.parameters.reduce(into: 0) { $0 += $1.stackSlotCount }
-    guard parameterSlots <= Int(UInt16.max) else {
-        throw WasmKitError(message: .blockTypeTooLargeForInterpreter("parameters", slots: parameterSlots))
-    }
-    let resultSlots = type.results.reduce(into: 0) { $0 += $1.stackSlotCount }
-    guard resultSlots <= Int(UInt16.max) else {
-        throw WasmKitError(message: .blockTypeTooLargeForInterpreter("results", slots: resultSlots))
-    }
-}
-
 extension FunctionType {
+    /// A branch out of a block copies the block's values, and
+    /// ``ControlFrame/copySlotCount`` counts those slots in a `UInt16`.
+    func checkFitsInterpreter() throws(WasmKitError) {
+        let parameterSlots = parameters.reduce(into: 0) { $0 += $1.stackSlotCount }
+        guard parameterSlots <= Int(UInt16.max) else {
+            throw WasmKitError(message: .blockTypeTooLargeForInterpreter("parameters", slots: parameterSlots))
+        }
+        let resultSlots = results.reduce(into: 0) { $0 += $1.stackSlotCount }
+        guard resultSlots <= Int(UInt16.max) else {
+            throw WasmKitError(message: .blockTypeTooLargeForInterpreter("results", slots: resultSlots))
+        }
+    }
+
     fileprivate init(blockType: WasmParser.BlockType, typeSection: [FunctionType]) throws(WasmKitError) {
         switch blockType {
         case .type(let valueType):
@@ -5983,6 +5980,7 @@ extension FunctionType {
                 results: funcType.results
             )
         }
+        try checkFitsInterpreter()
     }
 }
 

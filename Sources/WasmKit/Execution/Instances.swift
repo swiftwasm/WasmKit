@@ -269,8 +269,65 @@ public typealias ModuleInstance = Instance
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#table-instances>
-struct TableEntity /* : ~Copyable */ {
-    var elements: [Reference]
+/// Storage for a table's elements: one raw address per element, where `0` is the
+/// null reference of the table's element type.
+///
+/// A table is homogeneous, so the element type belongs to the table rather than
+/// to every slot. Keeping only the address means the storage is correct when
+/// zero-filled, so it never has to be written on creation.
+struct TableElements: ~Copyable {
+    private var base: UnsafeMutablePointer<Int>?
+    private(set) var count: Int
+
+    init(count: Int) throws(Trap) {
+        let (byteCount, overflow) = count.multipliedReportingOverflow(by: MemoryLayout<Int>.stride)
+        guard !overflow else {
+            throw Trap(.initialTableSizeExceedsLimit(numberOfElements: count))
+        }
+        guard count > 0 else {
+            self.base = nil
+            self.count = 0
+            return
+        }
+        guard let raw = FailableAllocation.allocateZeroed(byteCount: byteCount) else {
+            throw Trap(.initialTableSizeExceedsLimit(numberOfElements: count))
+        }
+        self.base = raw.bindMemory(to: Int.self, capacity: count)
+        self.count = count
+    }
+
+    deinit {
+        FailableAllocation.deallocate(base)
+    }
+
+    subscript(index: Int) -> Int {
+        get { base.unsafelyUnwrapped.advanced(by: index).pointee }
+        set { base.unsafelyUnwrapped.advanced(by: index).pointee = newValue }
+    }
+
+    /// Returns false when the allocator cannot satisfy the larger table.
+    mutating func grow(to newCount: Int) -> Bool {
+        guard var grown = try? TableElements(count: newCount) else { return false }
+        if let base, count > 0 {
+            grown.base.unsafelyUnwrapped.update(from: base, count: count)
+        }
+        swap(&self, &grown)
+        return true
+    }
+
+    func withUnsafeBufferPointer<R>(_ body: (UnsafeBufferPointer<Int>) throws -> R) rethrows -> R {
+        try body(UnsafeBufferPointer(start: base, count: count))
+    }
+
+    mutating func withUnsafeMutableBufferPointer<R>(_ body: (UnsafeMutableBufferPointer<Int>) throws -> R) rethrows -> R {
+        try body(UnsafeMutableBufferPointer(start: base, count: count))
+    }
+}
+
+/// > Note:
+/// <https://webassembly.github.io/spec/core/exec/runtime.html#table-instances>
+struct TableEntity: ~Copyable {
+    var elements: TableElements
     let tableType: TableType
     var limits: Limits { tableType.limits }
 
@@ -278,15 +335,43 @@ struct TableEntity /* : ~Copyable */ {
         return UInt64(UInt32.max)
     }
 
-    init(_ tableType: TableType, resourceLimiter: any ResourceLimiter) throws {
-        let emptyElement: Reference
-        switch tableType.elementType.heapType {
-        case .abstract(.funcRef):
-            emptyElement = .function(nil)
+    /// The raw slot value for a reference, where `0` is always null.
+    ///
+    /// A function address is a live `EntityHandle` pointer and so is never `0`,
+    /// which leaves `0` free to mean null without any encoding. An extern or
+    /// exception address is an embedder-chosen integer and `0` is a valid one --
+    /// the spec suite stores `(ref.extern 0)` -- so those are biased by one.
+    /// ``UntypedValue`` already reserves the top bit for null, so a valid
+    /// address is below `1 << 63` and the bias cannot wrap onto `0`.
+    static func rawValue(_ reference: Reference) -> Int {
+        switch reference {
+        case .function(let address):
+            return address ?? 0
+        case .extern(let address), .exception(let address):
+            return address.map { $0 &+ 1 } ?? 0
+        }
+    }
+
+    /// Rebuilds a typed reference from a raw slot, using the table's element type.
+    static func reference(_ raw: Int, type: ReferenceType) -> Reference {
+        switch type.heapType {
         case .abstract(.externRef):
-            emptyElement = .extern(nil)
+            return .extern(raw == 0 ? nil : raw &- 1)
         case .abstract(.exnRef):
-            emptyElement = .exception(nil)
+            return .exception(raw == 0 ? nil : raw &- 1)
+        case .abstract(.funcRef), .concrete:
+            return .function(raw == 0 ? nil : raw)
+        }
+    }
+
+    func reference(at index: Int) -> Reference {
+        Self.reference(elements[index], type: tableType.elementType)
+    }
+
+    init(_ tableType: TableType, resourceLimiter: any ResourceLimiter) throws {
+        switch tableType.elementType.heapType {
+        case .abstract(.funcRef), .abstract(.externRef), .abstract(.exnRef):
+            break
         case .concrete:
             throw Trap(.unimplemented(feature: "heap type other than `func`, `extern`, and `exn`"))
         }
@@ -299,14 +384,7 @@ struct TableEntity /* : ~Copyable */ {
         guard try resourceLimiter.limitTableGrowth(to: numberOfElements) else {
             throw Trap(.initialTableSizeExceedsLimit(numberOfElements: numberOfElements))
         }
-        // `Array(repeating:count:)` aborts when the host cannot satisfy the
-        // allocation, and the guest picks this count.
-        guard FailableAllocation.canAllocate(
-            byteCount: numberOfElements.multipliedReportingOverflow(by: MemoryLayout<Reference>.stride).partialValue
-        ), !numberOfElements.multipliedReportingOverflow(by: MemoryLayout<Reference>.stride).overflow else {
-            throw Trap(.initialTableSizeExceedsLimit(numberOfElements: numberOfElements))
-        }
-        elements = Array(repeating: emptyElement, count: numberOfElements)
+        elements = try TableElements(count: numberOfElements)
         self.tableType = tableType
     }
 
@@ -324,19 +402,24 @@ struct TableEntity /* : ~Copyable */ {
         if newSize > maxLimit {
             return false
         }
-        // A table64 can name more elements than the host can index. `growthSize`
-        // is bounded by `newSize`, so one check covers both conversions.
-        guard let newElementCount = Int(exactly: newSize), let growth = Int(exactly: growthSize) else {
+        // A table64 can name more elements than the host can index.
+        guard let newElementCount = Int(exactly: newSize) else {
             return false
         }
         guard try resourceLimiter.limitTableGrowth(to: newElementCount) else {
             return false
         }
-        let (byteCount, byteOverflow) = newElementCount.multipliedReportingOverflow(by: MemoryLayout<Reference>.stride)
-        guard !byteOverflow, FailableAllocation.canAllocate(byteCount: byteCount) else {
-            return false
+        let oldCount = elements.count
+        // Reports failure rather than aborting when the host cannot satisfy it.
+        guard elements.grow(to: newElementCount) else { return false }
+        let raw = Self.rawValue(value)
+        if raw != 0 {
+            // The new slots are already zero, i.e. null; only a non-null fill
+            // has to touch them.
+            elements.withUnsafeMutableBufferPointer {
+                $0[oldCount..<newElementCount].initialize(repeating: raw)
+            }
         }
-        elements.append(contentsOf: Array(repeating: value, count: growth))
         return true
     }
 
@@ -356,8 +439,8 @@ struct TableEntity /* : ~Copyable */ {
         }
 
         elements.withUnsafeMutableBufferPointer { table in
-            references.withUnsafeBufferPointer { segment in
-                _ = table[destination..<destination + count].initialize(from: segment[source..<source + count])
+            for offset in 0..<count {
+                table[destination + offset] = TableEntity.rawValue(references[source + offset])
             }
         }
     }
@@ -365,15 +448,17 @@ struct TableEntity /* : ~Copyable */ {
     mutating func fill(repeating value: Reference, from index: Int, count: Int) throws {
         let (end, overflow) = index.addingReportingOverflow(count)
         guard !overflow, end <= elements.count else { throw Trap(.tableOutOfBounds(end)) }
+        guard count > 0 else { return }
 
+        let raw = Self.rawValue(value)
         elements.withUnsafeMutableBufferPointer {
-            $0[index..<index + count].initialize(repeating: value)
+            $0[index..<index + count].initialize(repeating: raw)
         }
     }
 
     static func copy(
-        _ sourceTable: UnsafeBufferPointer<Reference>,
-        _ destinationTable: UnsafeMutableBufferPointer<Reference>,
+        _ sourceTable: UnsafeBufferPointer<Int>,
+        _ destinationTable: UnsafeMutableBufferPointer<Int>,
         from source: Int, to destination: Int, count: Int
     ) throws {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
@@ -391,13 +476,13 @@ struct TableEntity /* : ~Copyable */ {
             let destinationBase = destinationTable.baseAddress
         else { return }
 
-        // `Reference` is a trivial (bitwise-copyable) type, so the elements can be
-        // moved with a single `memmove`, which is also overlap-safe as required when
-        // the source and destination tables are the same.
+        // A slot is a bare address, so the elements can be moved with a single
+        // `memmove`, which is also overlap-safe as required when the source and
+        // destination tables are the same.
         let destination = UnsafeMutableRawPointer(destinationBase.advanced(by: destination))
         destination.copyMemory(
             from: sourceBase.advanced(by: source),
-            byteCount: count * MemoryLayout<Reference>.stride
+            byteCount: count * MemoryLayout<Int>.stride
         )
     }
 }
@@ -479,8 +564,10 @@ public struct Table: Equatable {
 
     /// Accesses the element at the given index.
     public subscript(index: Int) -> Reference {
-        get { handle.elements[index] }
-        nonmutating set { handle.withValue { $0.elements[index] = newValue } }
+        get { handle.withValue { $0.reference(at: index) } }
+        nonmutating set {
+            handle.withValue { $0.elements[index] = TableEntity.rawValue(newValue) }
+        }
     }
 }
 
@@ -1234,7 +1321,10 @@ extension InternalInstance {
 }
 
 extension InternalTable {
-    var elements: [Reference] { withValue { $0.elements } }
+    var elementCount: Int { withValue { $0.elements.count } }
+    /// The raw slot at `index`; `0` is the null reference.
+    func rawElement(at index: Int) -> Int { withValue { $0.elements[index] } }
+    func reference(at index: Int) -> Reference { withValue { $0.reference(at: index) } }
     var tableType: TableType { withValue { $0.tableType } }
     var limits: Limits { withValue { $0.limits } }
 }

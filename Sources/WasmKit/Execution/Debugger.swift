@@ -1019,9 +1019,10 @@
             let table = callerInstance.tables[Int(tableIndex)]
             let value = sp[index].asAddressOffset(table.limits.isMemory64)
             guard let elementIndex = Int(exactly: value),
-                elementIndex < table.elements.count,
-                case .function(let rawBitPattern?) = table.elements[elementIndex]
+                elementIndex < table.elementCount
             else { return nil }
+            let rawBitPattern = table.rawElement(at: elementIndex)
+            guard rawBitPattern != 0 else { return nil }
             let function = InternalFunction(bitPattern: rawBitPattern)
             return calleeEntryPc(function)
         }

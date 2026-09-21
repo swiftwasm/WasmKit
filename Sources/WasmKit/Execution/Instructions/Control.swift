@@ -159,11 +159,12 @@ extension Execution {
         let value = sp[address].asAddressOffset(table.limits.isMemory64)
         // A table64 index beyond `Int` is out of bounds for any table; converting
         // it before the check below would trap the host instead.
-        guard let elementIndex = Int(exactly: value), elementIndex < table.elements.count else {
+        guard let elementIndex = Int(exactly: value), elementIndex < table.elementCount else {
             throw Trap(.tableOutOfBounds(Int(clamping: value)))
         }
-        guard case .function(let rawBitPattern?) = table.elements[elementIndex]
-        else {
+        // A slot holds the bare address; `0` is the null reference.
+        let rawBitPattern = table.rawElement(at: elementIndex)
+        guard rawBitPattern != 0 else {
             throw Trap(.indirectCallToNull(elementIndex))
         }
         let function = InternalFunction(bitPattern: rawBitPattern)
