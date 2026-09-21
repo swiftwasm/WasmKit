@@ -85,7 +85,7 @@ import WasmTypes
 
     // MARK: - Offsets, sizes and cookies
 
-    @Test(arguments: [true, false])
+    @Test(arguments: TestSupport.fileSystemBackings)
     func anOffsetBeyondTheAddressableRangeIsRejected(hostBacked: Bool) throws {
         func check(_ wasi: WASIImplementation, _ memory: TestSupport.TestGuestMemory) throws {
             let fd = try self.openFile(wasi)
@@ -106,7 +106,7 @@ import WasmTypes
         }
     }
 
-    @Test(arguments: [true, false])
+    @Test(arguments: TestSupport.fileSystemBackings)
     func aFileSizeBeyondTheAddressableRangeIsRejected(hostBacked: Bool) throws {
         func check(_ wasi: WASIImplementation) throws {
             let fd = try self.openFile(wasi)
@@ -153,7 +153,7 @@ import WasmTypes
     }
 
     /// A readdir cookie is a `u64` the guest chooses.
-    @Test(arguments: [true, false])
+    @Test(arguments: TestSupport.fileSystemBackings)
     func aDirectoryCookieBeyondTheEntryCountYieldsNothing(hostBacked: Bool) throws {
         func check(_ wasi: WASIImplementation, _ memory: TestSupport.TestGuestMemory) throws {
             let buffer = UnsafeGuestBufferPointer<UInt8>(baseAddress: .init(offset: 0), count: 4096)
@@ -171,7 +171,8 @@ import WasmTypes
 
     /// Only the bytes actually produced are written back, so the size the guest
     /// declares for the destination does not have to be addressable.
-    @Test func prestatDirNameWritesOnlyThePathItReturns() throws {
+    @Test(.disabled(if: TestSupport.hostPreopensUnavailable, "host preopens are not available on this platform"))
+    func prestatDirNameWritesOnlyThePathItReturns() throws {
         try withMemoryBackedWASI { wasi, memory in
             try wasi.fd_prestat_dir_name(
                 fd: 3, path: .init(offset: 0), maxPathLength: .max, memory: memory)
@@ -179,7 +180,8 @@ import WasmTypes
         }
     }
 
-    @Test func readlinkWritesOnlyTheLinkItReturns() throws {
+    @Test(.disabled(if: TestSupport.hostPreopensUnavailable, "host preopens are not available on this platform"))
+    func readlinkWritesOnlyTheLinkItReturns() throws {
         try withHostBackedWASI { wasi, memory, directory in
             try directory.createSymlink(at: "link", to: "a.txt")
             let buffer = UnsafeGuestBufferPointer<UInt8>(baseAddress: .init(offset: 0), count: .max)
@@ -193,7 +195,8 @@ import WasmTypes
 
     /// A subscription set with no clock in it waits indefinitely rather than
     /// carrying a timeout that does not fit the platform call.
-    @Test func pollingOnADescriptorWithoutAClockSubscriptionWorks() throws {
+    @Test(.disabled(if: TestSupport.pollUnavailable, "poll is not available on this platform"))
+    func pollingOnADescriptorWithoutAClockSubscriptionWorks() throws {
         let directory = try TestSupport.TemporaryDirectory()
         try directory.createFile(at: "in.txt", contents: "hello")
         let opened = try directory.openFile(at: "in.txt", .readOnly)
