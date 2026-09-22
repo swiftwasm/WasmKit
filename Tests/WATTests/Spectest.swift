@@ -25,6 +25,7 @@ enum Spectest {
                 testsuitePath.appendingPathComponent("proposals/memory64"),
                 testsuitePath.appendingPathComponent("proposals/tail-call"),
                 testsuitePath.appendingPathComponent("proposals/threads"),
+                testsuitePath.appendingPathComponent("proposals/function-references"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/function-references"),
             ].flatMap {
@@ -69,6 +70,7 @@ enum Spectest {
             case assertTrap = "assert_trap"
             case assertMalformed = "assert_malformed"
             case assertExhaustion = "assert_exhaustion"
+            case assertException = "assert_exception"
             case assertUnlinkable = "assert_unlinkable"
             case assertUninstantiable = "assert_uninstantiable"
             case assertReturnCanonicalNan = "assert_return_canonical_nan"

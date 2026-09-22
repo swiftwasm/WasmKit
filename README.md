@@ -102,7 +102,7 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | [Reference Types](https://github.com/WebAssembly/reference-types) | ✅ Implemented | [0.0.2] |
 | [Sign-extension Operators](https://github.com/WebAssembly/sign-extension-ops) | ✅ Implemented | [0.0.2] |
 | [Tail Call](https://github.com/WebAssembly/tail-call) | ✅ Implemented | [0.1.4] |
-| [Typed Function References](https://github.com/WebAssembly/function-references) | 🚧 Parser implemented | [0.2.0] |
+| [Typed Function References](https://github.com/WebAssembly/function-references) | ✅ Implemented | `main` branch |
 | [Branch Hinting](https://github.com/WebAssembly/branch-hinting) | ❌ Not implemented | |
 | [Custom Annotation Syntax in the Text Format](https://github.com/WebAssembly/annotations) | ❌ Not implemented | |
 | [Extended Constant Expressions](https://github.com/WebAssembly/extended-const) | ✅ Implemented | [0.4.0] |
@@ -112,7 +112,6 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 
 [0.0.2]: https://github.com/swiftwasm/WasmKit/releases/tag/0.0.2
 [0.1.4]: https://github.com/swiftwasm/WasmKit/releases/tag/0.1.4
-[0.2.0]: https://github.com/swiftwasm/WasmKit/releases/tag/0.2.0
 [0.3.0]: https://github.com/swiftwasm/WasmKit/releases/tag/0.3.0
 [0.4.0]: https://github.com/swiftwasm/WasmKit/releases/tag/0.4.0
 
