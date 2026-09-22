@@ -446,6 +446,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             let continuation: LabelRef
             var kind: Kind
             var reachable: Bool = true
+            /// How many locals had been initialized (see
+            /// `InstructionTranslator.initializedLocals`) when the frame was entered.
+            /// Initialization inside the frame does not outlive it.
+            var initializedLocalsHeight: Int = 0
             /// Set when this frame opened a fuel region: the state to restore when it closes.
             ///
             /// `nil` for frames that share their parent's meter (`block`, `try_table`) and for
@@ -540,6 +544,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     enum MetaValue: Equatable {
         case some(ValueType)
         case unknown
+        /// A non-null reference of unknown heap type, `(ref bot)`: what a
+        /// reference operand taken from an unreachable, polymorphic stack becomes.
+        /// It matches any reference type but no numeric or vector type.
+        case bottomRef
     }
 
     enum MetaValueOnStack {
@@ -609,7 +617,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             return stackRegBase + VReg(slotIndex: usedSlotOffset)
         }
         mutating func pushLocal(_ localIndex: LocalIndex, locals: inout Locals) throws(WasmKitError) {
-            let type = try locals.type(of: localIndex)
+            pushLocal(localIndex, type: try locals.type(of: localIndex))
+        }
+        /// Pushes a reference to a local, typed `type`: the local's own type or a
+        /// supertype of it.
+        mutating func pushLocal(_ localIndex: LocalIndex, type: ValueType) {
             self.values.append(.local(type, localIndex))
             self.startSlotOffsets.append(slotHeight)
             self.slotHeight += type.stackSlotCount
@@ -707,25 +719,36 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
         mutating func pop(_ expected: ValueType) throws(WasmKitError) -> ValueSource {
             let (value, register) = try pop()
-            switch value {
+            try Self.check(value, matches: expected)
+            return register
+        }
+        /// Checks that a value of type `actual` can be used where `expected` is.
+        static func check(_ actual: MetaValue, matches expected: ValueType) throws(WasmKitError) {
+            switch actual {
             case .some(let actual):
-                guard actual == expected else {
+                guard actual == expected || actual.isSubtype(of: expected) else {
                     throw WasmKitError("Expected \(expected) on the stack top but got \(actual)")
                 }
             case .unknown: break  // OK
+            case .bottomRef:
+                guard case .ref = expected else {
+                    throw WasmKitError("Expected \(expected) on the stack top but got a reference")
+                }
             }
-            return register
         }
-        mutating func popRef() throws(WasmKitError) -> ValueSource {
+        /// Pops a reference and returns its type, or `nil` for a reference of
+        /// unknown heap type (on an unreachable, polymorphic stack).
+        mutating func popRef() throws(WasmKitError) -> (ReferenceType?, ValueSource) {
             let (value, register) = try pop()
             switch value {
             case .some(let actual):
-                guard case .ref = actual else {
+                guard case .ref(let referenceType) = actual else {
                     throw WasmKitError("Expected reference value on the stack top but got \(actual)")
                 }
-            case .unknown: break  // OK
+                return (referenceType, register)
+            case .unknown, .bottomRef:
+                return (nil, register)
             }
-            return register
         }
         mutating func truncate(height: Int) throws(WasmKitError) {
             guard height <= self.valueHeight else {
@@ -2416,6 +2439,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
         var count: Int { types.count }
 
+        /// Whether any local lacks a default value (a non-nullable reference), and
+        /// so must be written before it is read.
+        var hasNonDefaultable: Bool {
+            types.contains { !$0.isDefaultable }
+        }
+
         func type(of localIndex: UInt32) throws(WasmKitError) -> ValueType {
             guard Int(localIndex) < types.count else {
                 throw WasmKitError("Local index \(localIndex) is out of range")
@@ -2470,6 +2499,16 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     var controlStack: ControlStack
     var valueStack: ValueStack
     var locals: Locals
+    /// Whether each local may be read. Parameters and defaultable locals always
+    /// may; a non-defaultable local (a non-nullable reference) only once it has
+    /// been written in an enclosing block.
+    private var isLocalInitialized: [Bool]
+    /// The non-defaultable locals initialized so far, in order, so that the
+    /// initialization done inside a block can be undone when it ends.
+    private var initializedLocals: [LocalIndex] = []
+    /// Skips initialization tracking for the usual function without any
+    /// non-defaultable local.
+    private let tracksLocalInitialization: Bool
     let type: FunctionType
     let stackLayout: StackLayout
     /// The index of the function in the module
@@ -2551,6 +2590,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         )
         self.valueStack = ValueStack(stackLayout: stackLayout)
         self.locals = Locals(types: type.parameters + locals)
+        self.tracksLocalInitialization = self.locals.hasNonDefaultable
+        self.isLocalInitialized = self.locals.types.enumerated().map { index, localType in
+            index < type.parameters.count || localType.isDefaultable
+        }
         self.functionIndex = functionIndex
         self.isIntercepting = isIntercepting
         self.constantSlots = ConstSlots(stackLayout: stackLayout)
@@ -2811,14 +2854,16 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         return ensureOnVReg(op)
     }
 
-    /// Pops an operand of any reference type, or returns nil for a missing
-    /// operand of an unreachable, polymorphic stack.
-    private mutating func popRefOperand() throws(WasmKitError) -> ValueSource? {
+    /// Pops an operand of any reference type. Returns its type, `nil` for a
+    /// reference of unknown heap type, and no source for a missing operand of an
+    /// unreachable, polymorphic stack.
+    private mutating func popRefOperand() throws(WasmKitError) -> (type: ReferenceType?, source: ValueSource?) {
         guard try checkBeforePop(typeHint: nil) else {
-            return nil
+            return (nil, nil)
         }
         iseqBuilder.resetLastEmission()
-        return try valueStack.popRef()
+        let (type, source) = try valueStack.popRef()
+        return (type, source)
     }
 
     private mutating func popAnyOperand() throws(WasmKitError) -> (MetaValue, ValueSource?) {
@@ -2837,13 +2882,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
         let stackHeight = (valueHeight: self.valueStack.valueHeight, slotHeight: self.valueStack.slotHeight)
         for (type, value) in zip(valueTypes, values.reversed()) {
+            // Re-push with the expected type, which may be a supertype of the
+            // value's own.
             switch value {
             case .local(let localIndex):
-                // Re-push local variables to the stack
-                _ = try valueStack.pushLocal(localIndex, locals: &locals)
+                valueStack.pushLocal(localIndex, type: type)
             case .vreg, nil:
                 _ = valueStack.push(type)
-            case .const(let value, let type):
+            case .const(let value, _):
                 valueStack.pushConst(value, type: type)
             }
         }
@@ -2853,14 +2899,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     private func checkStackTop(_ valueTypes: [ValueType]) throws(WasmKitError) {
         for (stackDepth, type) in valueTypes.reversed().enumerated() {
             guard try checkBeforePop(typeHint: type, depth: stackDepth) else { return }
-            let actual = valueStack.peekType(depth: stackDepth)
-            switch actual {
-            case .some(let actualType):
-                guard actualType == type else {
-                    throw WasmKitError(message: .expectedTypeOnStack(expected: type, actual: actualType))
-                }
-            case .unknown: break
-            }
+            try ValueStack.check(valueStack.peekType(depth: stackDepth), matches: type)
         }
     }
 
@@ -3119,7 +3158,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 valueStackHeight: stackHeight.valueHeight,
                 slotStackHeight: stackHeight.slotHeight,
                 continuation: endLabel,
-                kind: .block
+                kind: .block,
+                initializedLocalsHeight: initializedLocals.count
             )
         )
     }
@@ -3143,7 +3183,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 valueStackHeight: stackHeight.valueHeight,
                 slotStackHeight: stackHeight.slotHeight,
                 continuation: headLabel,
-                kind: .loop
+                kind: .loop,
+                initializedLocalsHeight: initializedLocals.count
             )
         )
         // After the label, so that the back-edge lands on the meter and every iteration is
@@ -3174,7 +3215,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 valueStackHeight: stackHeight.valueHeight,
                 slotStackHeight: stackHeight.slotHeight,
                 continuation: endLabel,
-                kind: .if(elseLabel: elseLabel, endLabel: endLabel, isElse: false)
+                kind: .if(elseLabel: elseLabel, endLabel: endLabel, isElse: false),
+                initializedLocalsHeight: initializedLocals.count
             )
         )
         // The `then` arm is its own region, and it must be metered after the conditional branch
@@ -3245,6 +3287,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             throw WasmKitError(message: .valuesRemainingAtEndOfBlock)
         }
         _ = controlStack.popFrame()
+        // Locals initialized in the `then` arm are not initialized in the `else` arm.
+        resetInitializedLocals(to: frame.initializedLocalsHeight)
         // The `then` arm ends here, so its meter can be given its final cost.
         closeFuelRegion(of: frame)
         frame.kind = .if(elseLabel: elseLabel, endLabel: endLabel, isElse: true)
@@ -3281,7 +3325,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
         if case .if(_, _, isElse: false) = toBePopped.kind {
             let blockType = toBePopped.blockType
-            guard blockType.parameters == blockType.results else {
+            guard blockType.parameters.isSubtype(of: blockType.results) else {
                 throw WasmKitError(message: .parameterResultTypeMismatch(blockType: blockType))
             }
         }
@@ -3311,6 +3355,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             _ = valueStack.push(result)
         }
         _ = controlStack.popFrame()
+        resetInitializedLocals(to: toBePopped.initializedLocalsHeight)
         // A loop body, a `then` without an `else`, or an `else`: whichever region this frame
         // opened is complete, so its meter gets the cost accumulated for it.
         closeFuelRegion(of: toBePopped)
@@ -3874,6 +3919,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(WasmKitError) -> Output {
+        try validator.validateCallIndirectTable(tableIndex)
         let addressType = try module.addressType(tableIndex: tableIndex)
         let address = try popVRegOperand(addressType)  // function address
         let calleeType = try self.module.resolveType(typeIndex)
@@ -3943,13 +3989,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(WasmKitError) {
+        try validator.validateCallIndirectTable(tableIndex)
+        let calleeType = try self.module.resolveType(typeIndex)
+        try validator.validateReturnCallLike(calleeType: calleeType, callerType: type)
         let stackTopHeightToCopy = valueStack.slotHeight
         let addressType = try module.addressType(tableIndex: tableIndex)
         // Preserve function index slot on stack
         let address = try popOnStackOperand(addressType)  // function address
         guard let address = address else { return }
 
-        let calleeType = try self.module.resolveType(typeIndex)
         let internType = funcTypeInterner.intern(calleeType)
 
         // Clean up all exception handlers before the tail call
@@ -4065,11 +4113,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 catchTypes = []
             }
             if isRef {
-                catchTypes.append(.ref(.init(isNullable: true, heapType: .abstract(.exnRef))))
+                // A caught exception is never null.
+                catchTypes.append(.ref(.init(isNullable: false, heapType: .abstract(.exnRef))))
             }
 
             // Validate that the caught value types match the target label's copy types
-            guard catchTypes == targetFrame.copyTypes else {
+            guard catchTypes.isSubtype(of: targetFrame.copyTypes) else {
                 throw WasmKitError(message: .catchTypeMismatch)
             }
 
@@ -4101,7 +4150,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 valueStackHeight: stackHeight.valueHeight,
                 slotStackHeight: stackHeight.slotHeight,
                 continuation: endLabel,
-                kind: .tryTable(catchCount: catchCount)
+                kind: .tryTable(catchCount: catchCount),
+                initializedLocalsHeight: initializedLocals.count
             )
         )
     }
@@ -4119,7 +4169,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let (value1Type, value1) = try popAnyOperand()
         let (value2Type, value2) = try popAnyOperand()
         switch (value1Type, value2Type) {
-        case (.some(.ref(_)), _), (_, .some(.ref(_))):
+        case (.some(.ref(_)), _), (_, .some(.ref(_))), (.bottomRef, _), (_, .bottomRef):
             throw WasmKitError(message: .cannotSelectOnReferenceTypes)
         case (.some(let type1), .some(let type2)):
             guard type1 == type2 else {
@@ -4128,7 +4178,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case (.unknown, _), (_, .unknown):
             break
         }
-        let result = valueStack.push(value1Type)
+        // With one operand from the polymorphic stack, the other gives the type.
+        let result = valueStack.push(value1Type == .unknown ? value2Type : value1Type)
         if let condition = condition, let value1 = value1, let value2 = value2 {
             let onTrue = ensureOnVReg(value2)
             let onFalse = ensureOnVReg(value1)
@@ -4155,8 +4206,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             case .unknown:
                 // Polymorphic stack after `unreachable`; nothing to check.
                 break
+            case .bottomRef:
+                guard case .ref = type else {
+                    throw WasmKitError(message: .cannotSelectOnReferenceTypes)
+                }
             case .some(let operandType):
-                guard operandType == type else {
+                guard operandType.isSubtype(of: type) else {
                     throw WasmKitError(message: .typeMismatchOnSelect(expected: type, actual: operandType))
                 }
             }
@@ -4204,13 +4259,35 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
     mutating func visitLocalGet(localIndex: UInt32) throws(WasmKitError) -> Output {
         iseqBuilder.dropResultRelink()
+        if tracksLocalInitialization {
+            _ = try locals.type(of: localIndex)
+            guard isLocalInitialized[Int(localIndex)] else {
+                throw WasmKitError(message: .uninitializedLocal(localIndex))
+            }
+        }
         try valueStack.pushLocal(localIndex, locals: &locals)
+    }
+
+    /// Records that a local has been written, for the locals that must be
+    /// written before they are read.
+    private mutating func markLocalInitialized(_ localIndex: LocalIndex) {
+        guard tracksLocalInitialization, !isLocalInitialized[Int(localIndex)] else { return }
+        isLocalInitialized[Int(localIndex)] = true
+        initializedLocals.append(localIndex)
+    }
+
+    /// Forgets the locals initialized since a frame was entered.
+    private mutating func resetInitializedLocals(to height: Int) {
+        while initializedLocals.count > height {
+            isLocalInitialized[Int(initializedLocals.removeLast())] = false
+        }
     }
     /// Shared lowering of `local.set` and `local.tee`. `local.tee` differs
     /// only in that its caller re-pushes the local afterwards.
     mutating func visitLocalSetOrTee(localIndex: UInt32) throws(WasmKitError) {
         preserveLocalsOnStack(localIndex)
         let type = try locals.type(of: localIndex)
+        markLocalInitialized(localIndex)
         let result = localReg(localIndex)
 
         guard try checkBeforePop(typeHint: type) else { return }
@@ -4898,21 +4975,28 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     mutating func visitF32Const(value: IEEE754.Float32) -> Output { visitConst(.f32, .f32(value.bitPattern)) }
     mutating func visitF64Const(value: IEEE754.Float64) -> Output { visitConst(.f64, .f64(value.bitPattern)) }
     mutating func visitRefNull(type: HeapType) throws(WasmKitError) {
-        guard case .abstract(let abstractType) = type else {
-            throw WasmKitError("concrete heap type is not implemented yet")
+        let type = try module.typeCanonicalizer.canonicalize(type)
+        // At run time, the null of a concrete (function) type is a null function reference.
+        let abstractType: AbstractHeapType
+        switch type {
+        case .abstract(let abstract): abstractType = abstract
+        case .concrete: abstractType = .funcRef
         }
         let typeToPush = ReferenceType(isNullable: true, heapType: type)
         pushEmit(.ref(typeToPush), { .refNull(Instruction.RefNullOperand(result: $0, type: abstractType)) })
     }
     mutating func visitRefIsNull() throws(WasmKitError) -> Output {
-        let value = try popRefOperand()
+        let value = try popRefOperand().source
         let result = valueStack.push(.i32)
         guard let value else { return }
         emit(.refIsNull(Instruction.RefIsNullOperand(value: LVReg(ensureOnVReg(value)), result: LVReg(result))))
     }
     mutating func visitRefFunc(functionIndex: UInt32) throws(WasmKitError) -> Output {
         try validator.validateRefFunc(functionIndex: functionIndex)
-        pushEmit(.ref(.funcRef), { .refFunc(Instruction.RefFuncOperand(index: functionIndex, result: LVReg($0))) })
+        // A non-null reference of the function's own (canonical) type.
+        let function = try module.functions[validating: Int(functionIndex)]
+        let type = ReferenceType(isNullable: false, heapType: .concrete(typeIndex: function.type.id))
+        pushEmit(.ref(type), { .refFunc(Instruction.RefFuncOperand(index: functionIndex, result: LVReg($0))) })
     }
 
     /// Rejects an instruction of the typed function references proposal unless
@@ -6161,7 +6245,7 @@ extension InstructionTranslator.MetaValue {
     fileprivate var concreteType: WasmTypes.ValueType? {
         switch self {
         case .some(let type): return type
-        case .unknown: return nil
+        case .unknown, .bottomRef: return nil
         }
     }
 }

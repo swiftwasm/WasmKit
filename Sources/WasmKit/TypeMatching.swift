@@ -28,6 +28,13 @@ extension ReferenceType {
 }
 
 extension ValueType {
+    /// Whether the type has a default value: zero for numbers and vectors, null
+    /// for nullable references.
+    var isDefaultable: Bool {
+        guard case .ref(let referenceType) = self else { return true }
+        return referenceType.isNullable
+    }
+
     func isSubtype(of other: ValueType) -> Bool {
         if self == other { return true }
         guard case .ref(let reference) = self, case .ref(let otherReference) = other else { return false }

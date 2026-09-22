@@ -43,6 +43,14 @@ struct InstructionValidator {
         }
     }
 
+    /// Checks that `call_indirect` can call through the table's elements.
+    func validateCallIndirectTable(_ table: UInt32) throws(WasmKitError) {
+        let elementType = try context.tableType(table).elementType
+        guard elementType.isSubtype(of: .funcRef) else {
+            throw WasmKitError(message: .tableElementTypeMismatch(tableType: "\(elementType)", elementType: "funcref"))
+        }
+    }
+
     func validateRefFunc(functionIndex: UInt32) throws(WasmKitError) {
         try context.validateFunctionIndex(functionIndex)
     }
