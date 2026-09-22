@@ -5008,27 +5008,162 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
 
-    // Typed function references instructions. Reject them explicitly: the visitor's
-    // default implementation is a no-op that would leave the value stack out of sync.
+    // MARK: - Typed function references
+
+    /// The type of a nullable reference to the function type at `typeIndex`.
+    private func nullableReference(toType typeIndex: TypeIndex) throws(WasmKitError) -> ValueType {
+        let typeID = try module.typeCanonicalizer.canonicalID(of: typeIndex)
+        return .ref(ReferenceType(isNullable: true, heapType: .concrete(typeIndex: typeID.id)))
+    }
+
+    /// The type of a popped reference once known not to be null: `(ref ht)`, or
+    /// `(ref bot)` for a reference of unknown heap type.
+    private static func nonNull(_ referenceType: ReferenceType?) -> MetaValue {
+        guard let referenceType else { return .bottomRef }
+        return .some(.ref(ReferenceType(isNullable: false, heapType: referenceType.heapType)))
+    }
+
+    /// Pushes back an operand that was just popped, now typed `type`.
+    private mutating func repushOperand(_ source: ValueSource?, type: MetaValue) {
+        switch (source, type) {
+        case (.local(let localIndex), .some(let type)):
+            valueStack.pushLocal(localIndex, type: type)
+        case (.const(let value, _), .some(let type)):
+            valueStack.pushConst(value, type: type)
+        default:
+            _ = valueStack.push(type)
+        }
+    }
+
     mutating func visitCallRef(typeIndex: UInt32) throws(WasmKitError) -> Output {
         try requireFunctionReferences("call_ref")
-        throw WasmKitError("call_ref is not implemented yet")
+        let calleeType = try module.resolveType(typeIndex)
+        let callee = try popVRegOperand(try nullableReference(toType: typeIndex))
+        guard let spAddend = try visitCallLike(calleeType: calleeType) else { return }
+        guard let callee else { return }
+        emit(.callRef(Instruction.CallRefOperand(callee: callee, spAddend: spAddend)))
     }
+
     mutating func visitReturnCallRef(typeIndex: UInt32) throws(WasmKitError) -> Output {
         try requireFunctionReferences("return_call_ref")
-        throw WasmKitError("return_call_ref is not implemented yet")
+        let calleeType = try module.resolveType(typeIndex)
+        try validator.validateReturnCallLike(calleeType: calleeType, callerType: type)
+        let stackTopHeightToCopy = valueStack.slotHeight
+        // Keep the reference on the stack, above the slots the frame header resize moves.
+        guard let callee = try popOnStackOperand(try nullableReference(toType: typeIndex)) else { return }
+
+        // Clean up all exception handlers before the tail call
+        let handlersToUnwind = controlStack.catchHandlersToUnwind(
+            relativeDepth: UInt32(controlStack.numberOfFrames - 1)
+        )
+        if handlersToUnwind > 0 {
+            emit(.catchHandlersEnd(Instruction.CatchHandlersEndOperand(count: handlersToUnwind)))
+        }
+        try prepareFrameHeaderForReturnCall(
+            calleeType: calleeType,
+            // Keep the stack space including the reference slot accessible at the
+            // `return_call_ref` instruction point.
+            stackTopHeightToCopy: stackTopHeightToCopy
+        )
+        emit(.returnCallRef(Instruction.ReturnCallRefOperand(callee: callee)))
+        try markUnreachable()
     }
+
     mutating func visitRefAsNonNull() throws(WasmKitError) -> Output {
         try requireFunctionReferences("ref.as_non_null")
-        throw WasmKitError("ref.as_non_null is not implemented yet")
+        let (referenceType, value) = try popRefOperand()
+        let result = valueStack.push(Self.nonNull(referenceType))
+        guard let value else { return }
+        emit(.refAsNonNull(Instruction.RefAsNonNullOperand(value: LVReg(ensureOnVReg(value)), result: LVReg(result))))
     }
+
     mutating func visitBrOnNull(relativeDepth: UInt32) throws(WasmKitError) -> Output {
         try requireFunctionReferences("br_on_null")
-        throw WasmKitError("br_on_null is not implemented yet")
+        let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
+        // The reference is not passed to the label.
+        let (referenceType, reference) = try popRefOperand()
+        if let reference {
+            try emitBranchOnNullness(
+                relativeDepth: relativeDepth, frame: frame, condition: ensureOnVReg(reference), branchIfNull: true
+            )
+        }
+        try popPushValues(frame.copyTypes)
+        // Not taken: the reference is not null.
+        repushOperand(reference, type: Self.nonNull(referenceType))
     }
+
     mutating func visitBrOnNonNull(relativeDepth: UInt32) throws(WasmKitError) -> Output {
         try requireFunctionReferences("br_on_non_null")
-        throw WasmKitError("br_on_non_null is not implemented yet")
+        let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
+        guard case .ref = frame.copyTypes.last else {
+            throw WasmKitError("br_on_non_null's label must take a reference as its last value, but takes \(frame.copyTypes)")
+        }
+        // Taken: the label gets the reference as non-null, after the other values.
+        let (referenceType, reference) = try popRefOperand()
+        repushOperand(reference, type: Self.nonNull(referenceType))
+        if reference != nil {
+            preserveOnStack(depth: valueStack.valueHeight - frame.valueStackHeight)
+            let condition = ensureOnVReg(valueStack.peek(depth: 0))
+            try emitBranchOnNullness(relativeDepth: relativeDepth, frame: frame, condition: condition, branchIfNull: false)
+        }
+        try popPushValues(frame.copyTypes)
+        // Not taken: the reference was null and is dropped.
+        _ = try popAnyOperand()
+    }
+
+    /// Emits a branch to `label` taken when the reference in `condition` is null
+    /// (`isNull`) or not null.
+    private mutating func emitBranchIf(isNull: Bool, condition: VReg, to label: LabelRef) {
+        let makeInstruction: (Instruction.BrIfOperand) -> Instruction
+        if isNull {
+            makeInstruction = Instruction.brIfNull
+        } else {
+            makeInstruction = Instruction.brIfNotNull
+        }
+        let oldPC = iseqBuilder.insertingPC
+        iseqBuilder.emitWithLabel(makeInstruction, label) { _, selfPC, target in
+            Instruction.BrIfOperand(condition: LVReg(condition), offset: Int32(target.offsetFromHead - selfPC.offsetFromHead))
+        }
+        self.updateInstructionMapping(from: oldPC)
+    }
+
+    /// Emits a branch to the label at `relativeDepth`, taken when the reference in
+    /// `condition` is null (`branchIfNull`) or not null, that copies the label's
+    /// values and ends the catch handlers it leaves on the way.
+    private mutating func emitBranchOnNullness(
+        relativeDepth: UInt32, frame: ControlStack.ControlFrame, condition: VReg, branchIfNull: Bool
+    ) throws(WasmKitError) {
+        let handlersToUnwind = controlStack.catchHandlersToUnwind(relativeDepth: relativeDepth)
+        if frame.copySlotCount == 0 && handlersToUnwind == 0 {
+            emitBranchIf(isNull: branchIfNull, condition: condition, to: frame.continuation)
+            return
+        }
+        preserveOnStack(depth: valueStack.valueHeight - frame.valueStackHeight)
+        // As for `br_if`: skip a landing pad that copies the label's values and
+        // unwinds handlers when the branch is not taken.
+        let onBranchNotTaken = iseqBuilder.allocLabel()
+        let conditionCheckPC = iseqBuilder.insertingPC
+        emitBranchIf(isNull: !branchIfNull, condition: condition, to: onBranchNotTaken)
+        let landingPadPC = iseqBuilder.insertingPC
+        try copyOnBranch(targetFrame: frame)
+        if handlersToUnwind == 0,
+            iseqBuilder.insertingPC.offsetFromHead == landingPadPC.offsetFromHead,
+            iseqBuilder.canRewind(to: conditionCheckPC)
+        {
+            // Nothing to copy after all: branch straight to the label.
+            iseqBuilder.discardUnpinnedLabel(onBranchNotTaken)
+            iseqBuilder.rewind(to: conditionCheckPC)
+            self.rewindInstructionMapping(to: conditionCheckPC)
+            emitBranchIf(isNull: branchIfNull, condition: condition, to: frame.continuation)
+            return
+        }
+        if handlersToUnwind > 0 {
+            emit(.catchHandlersEnd(Instruction.CatchHandlersEndOperand(count: handlersToUnwind)))
+        }
+        try emitBranch(Instruction.br, relativeDepth: relativeDepth) { offset, copyCount, popCount in
+            return offset
+        }
+        try iseqBuilder.pinLabelHere(onBranchNotTaken)
     }
 
     private mutating func visitUnary(_ operand: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws(WasmKitError) {

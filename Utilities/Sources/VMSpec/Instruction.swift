@@ -1805,6 +1805,28 @@ extension VMGen {
         )
         outOfFuelTrap.isTrapPseudoInstruction = true
         instructions += [consumeFuel, outOfFuelTrap]
+        // Typed function references
+        instructions += [
+            Instruction(name: "callRef", documentation: "WebAssembly Core Instruction `call_ref`",
+                        isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+                $0.field(name: "callee", type: .VReg)
+                $0.field(name: "spAddend", type: .VReg)
+            },
+            Instruction(name: "returnCallRef", documentation: "WebAssembly Core Instruction `return_call_ref`",
+                        isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+                $0.field(name: "callee", type: .VReg)
+            },
+            Instruction(name: "refAsNonNull", documentation: "WebAssembly Core Instruction `ref.as_non_null`", mayThrow: true) {
+                $0.field(name: "value", type: .LVReg)
+                $0.field(name: "result", type: .LVReg)
+            },
+            Instruction(
+                name: "brIfNull", documentation: "Conditional pc-relative branch if the condition is a null reference",
+                isControl: true, mayUpdateFrame: false, immediateLayout: .brIfOperand),
+            Instruction(
+                name: "brIfNotNull", documentation: "Conditional pc-relative branch if the condition is not a null reference",
+                isControl: true, mayUpdateFrame: false, immediateLayout: .brIfOperand),
+        ]
         return instructions
     }
 

@@ -70,6 +70,13 @@ extension Execution {
         }
         sp[immediate.result] = UntypedValue(result)
     }
+    mutating func refAsNonNull(sp: Sp, immediate: Instruction.RefAsNonNullOperand) throws {
+        let value = sp[immediate.value]
+        guard !value.isNullRef else {
+            throw Trap(.nullReference)
+        }
+        sp[immediate.result] = value
+    }
     mutating func refFunc(sp: Sp, immediate: Instruction.RefFuncOperand) {
         let function = currentInstance(sp: sp).functions[Int(immediate.index)]
         sp[immediate.result] = UntypedValue(.ref(.function(from: function)))

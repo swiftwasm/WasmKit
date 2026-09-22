@@ -99,6 +99,8 @@
             Instruction.callIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg.zero, spAddend: VReg.zero)).opcodeID,
             Instruction.returnCall(.init(rawCallee: UInt64(0))).opcodeID,
             Instruction.returnCallIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg.zero)).opcodeID,
+            Instruction.callRef(.init(callee: VReg.zero, spAddend: VReg.zero)).opcodeID,
+            Instruction.returnCallRef(.init(callee: VReg.zero)).opcodeID,
         ]
 
         /// Initializes a new debugger state instance.
@@ -658,6 +660,14 @@
             predictNext_brIf(operandPc: operandPc, sp: sp)
         }
 
+        mutating func predictNext_brIfNull(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIf(operandPc: operandPc, sp: sp)
+        }
+
+        mutating func predictNext_brIfNotNull(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIf(operandPc: operandPc, sp: sp)
+        }
+
         /// Fused compare+branch: like `brIf`, both fall-through and the branch
         /// target are possible.
         private mutating func predictNext_brIfCmp(operandPc: Pc) -> [Pc] {
@@ -1042,6 +1052,28 @@
             let callee = op.callee
             guard let entry = calleeEntryPc(callee) else { return [] }
             return [entry]
+        }
+
+        /// The entry of the function a `call_ref`/`return_call_ref` operand refers
+        /// to, or `nil` for a null reference or a host function.
+        private mutating func resolveReferencedCallee(_ callee: VReg, sp: Sp) -> Pc? {
+            let value = sp[callee]
+            guard !value.isNullRef else { return nil }
+            return calleeEntryPc(InternalFunction(bitPattern: Int(value.storage)))
+        }
+
+        mutating func predictNext_callRef(operandPc: Pc, sp: Sp) -> [Pc] {
+            var pc = operandPc
+            let op = Instruction.CallRefOperand.load(from: &pc)
+            guard let target = resolveReferencedCallee(op.callee, sp: sp) else { return [] }
+            return [target]
+        }
+
+        mutating func predictNext_returnCallRef(operandPc: Pc, sp: Sp) -> [Pc] {
+            var pc = operandPc
+            let op = Instruction.ReturnCallRefOperand.load(from: &pc)
+            guard let target = resolveReferencedCallee(op.callee, sp: sp) else { return [] }
+            return [target]
         }
 
         mutating func predictNext_returnCallIndirect(operandPc: Pc, sp: Sp) -> [Pc] {
