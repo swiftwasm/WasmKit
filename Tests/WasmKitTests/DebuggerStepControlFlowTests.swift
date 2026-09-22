@@ -191,6 +191,30 @@
           (func (export "boom") (result i32) unreachable))
         """
 
+    /// `_start` catches the exception `thrower`, from another instance, throws.
+    ///
+    ///   +0 block $h  +2 try_table (catch $e $h)  +8 call $thrower  +10 end  +11 i32.const 1
+    ///   +13 return  +14 end  +15 i32.const 2  +17 drop  +18 i32.const 3  +20 end
+    private let catchesFromLibraryWAT = """
+        (module
+          (import "lib" "e" (tag $e))
+          (import "lib" "thrower" (func $thrower))
+          (func (export "_start") (result i32)
+            (block $h
+              (try_table (catch $e $h)
+                (call $thrower))
+              (return (i32.const 1)))
+            (i32.const 2)
+            (drop)
+            (i32.const 3)))
+        """
+
+    private let throwingLibraryWAT = """
+        (module
+          (tag $e (export "e"))
+          (func (export "thrower") (throw $e)))
+        """
+
     /// Two runs of Wasm instructions, each emitting its bytecode at its last instruction.
     ///
     ///   +0 i32.const 7  +2 local.set $x  |  +4 local.get $x  +6 i32.const 1  +8 i32.add
@@ -369,6 +393,39 @@
                 return
             }
             #expect(values == [.i32(13)])
+        }
+
+        /// Execution comes back from another instance at an exception handler too: a step over a
+        /// call that throws stops where the handler starts, not at the end of the guest.
+        @Test(arguments: testedThreadingModels)
+        func stepOverACallThatThrowsFromAnotherInstanceStopsInTheHandler(
+            threadingModel: EngineConfiguration.ThreadingModel
+        ) throws {
+            let store = makeStore(threadingModel)
+            let library = try parseWasm(bytes: try wat2wasm(throwingLibraryWAT)).instantiate(store: store)
+            var imports = Imports()
+            for name in ["e", "thrower"] {
+                imports.define(module: "lib", name: name, try #require(library.exports[name]))
+            }
+
+            let module = try parseWasm(bytes: try wat2wasm(catchesFromLibraryWAT))
+            var debugger = try Debugger(module: module, store: store, imports: imports)
+            let base = module.functions[0].code.originalAddress
+            let bp = try debugger.enableBreakpoint(address: base + 8)
+
+            try debugger.run()
+            #expect(try stoppedPc(debugger) == bp)
+            try debugger.step()
+            // The catch branches to the `end` of `block $h`.
+            let landing = try reportedPc(debugger)
+            #expect(landing == base + 14, "expected to stop in the handler, got +\(landing - base)")
+
+            try debugger.run()
+            guard case .entrypointReturned(let values) = debugger.state else {
+                Issue.record("expected entrypointReturned, got \(debugger.state)")
+                return
+            }
+            #expect(values == [.i32(3)])
         }
 
         /// Continuing from a breakpoint must hit it again when execution comes back around.

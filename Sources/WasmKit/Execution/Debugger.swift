@@ -659,21 +659,36 @@
         /// debugging, so it has no stop points and may use direct-only instructions. `pc` points just
         /// past the head slot of the instruction about to run, as in ``singleStep(from:reportingBreakpoint:)``.
         ///
-        /// When the frame it runs in returns into the debugged instance, whose return address and
-        /// caller the frame holds, this hands back where stepping resumes. Otherwise the guest runs
-        /// until it stops and this returns `nil`.
+        /// Execution comes back into the debugged instance where the frame it runs in returns, or at
+        /// the handler of a `try_table` in a frame below that catches an exception. When it arrives at
+        /// one of those, in the frame it belongs to, this hands back where stepping resumes. Otherwise
+        /// the guest runs until it stops and this returns `nil`.
         private mutating func runOutsideInstance(sp: Sp, pc: Pc) throws -> (sp: Sp, pc: Pc, head: CodeSlot)? {
-            guard let returnPC = sp.returnPC, let callerSp = sp.previousSP,
-                self.instance.handle.instructionMapping.findWasm(forIseqAddress: returnPC) != nil
-            else {
-                // The frame doesn't return into this instance, so the step becomes a continue.
+            let mapping = self.instance.handle.instructionMapping
+            var exits: [(pc: Pc, sp: Sp)] = []
+            if let returnPC = sp.returnPC, let callerSp = sp.previousSP, mapping.findWasm(forIseqAddress: returnPC) != nil {
+                exits.append((returnPC, callerSp))
+            }
+            for handler in self.execution.exceptionHandlers where mapping.findWasm(forIseqAddress: handler.targetPC) != nil {
+                exits.append((handler.targetPC, handler.sp))
+            }
+            guard !exits.isEmpty else {
+                // Execution doesn't come back into this instance, so the step becomes a continue.
                 try self.runNative(sp: sp, pc: pc.advanced(by: -1))
                 return nil
             }
 
-            let savedHead = returnPC.pointee
-            returnPC.pointee = self.breakpointHeadSlot
-            defer { returnPC.pointee = savedHead }
+            // Exits can share a slot, which is saved once.
+            var savedHeads: [Pc: CodeSlot] = [:]
+            for exit in exits where savedHeads[exit.pc] == nil {
+                savedHeads[exit.pc] = exit.pc.pointee
+                exit.pc.pointee = self.breakpointHeadSlot
+            }
+            defer {
+                for (slot, head) in savedHeads {
+                    slot.pointee = head
+                }
+            }
 
             var sp = sp
             var pc = pc.advanced(by: -1)
@@ -681,16 +696,17 @@
                 do {
                     try self.runNative(sp: sp, pc: pc)
                     return nil
-                } catch let hit as Execution.Breakpoint where hit.pc == returnPC {
+                } catch let hit as Execution.Breakpoint where savedHeads[hit.pc] != nil {
+                    let savedHead = savedHeads[hit.pc].unsafelyUnwrapped
                     // The run loop switched back to this instance's memory without telling us.
                     Execution.CurrentMemory.mayUpdateCurrentInstance(instance: self.instance.handle, md: &self.md, ms: &self.ms)
-                    // Back in the frame that made the call, or at a host breakpoint on the way.
-                    if hit.sp == callerSp || savedHead == self.breakpointHeadSlot {
-                        return (hit.sp, returnPC.advanced(by: 1), savedHead)
+                    // Back in a frame execution was to come back to, or at a host breakpoint on the way.
+                    if exits.contains(where: { $0.pc == hit.pc && $0.sp == hit.sp }) || savedHead == self.breakpointHeadSlot {
+                        return (hit.sp, hit.pc.advanced(by: 1), savedHead)
                     }
-                    // A deeper frame returned to the same address: run past it and keep waiting.
+                    // Another frame got to the same code: run past it and keep waiting.
                     sp = hit.sp
-                    var next = returnPC.advanced(by: 1)
+                    var next = hit.pc.advanced(by: 1)
                     _ = try self.execution.stepInstruction(
                         head: savedHead, threadingModel: self.threadingModel,
                         sp: &sp, pc: &next, md: &self.md, ms: &self.ms
