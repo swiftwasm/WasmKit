@@ -172,6 +172,25 @@
             (i32.mul (local.get 0) (i32.const 3))))
         """
 
+    /// `_start` calls `$pad`, which lies below it in the module, and then `boom` from another
+    /// instance, which traps.
+    ///
+    ///   $pad:   +0 i32.const 1  +2 i32.const 2  +4 i32.add
+    ///   _start: +0 call $pad  +2 drop  +3 call $boom  +5 end
+    private let callsTrappingLibraryWAT = """
+        (module
+          (import "lib" "boom" (func $boom (result i32)))
+          (func $pad (result i32) (i32.const 1) (i32.const 2) (i32.add))
+          (func (export "_start") (result i32)
+            (drop (call $pad))
+            (call $boom)))
+        """
+
+    private let trappingLibraryWAT = """
+        (module
+          (func (export "boom") (result i32) unreachable))
+        """
+
     /// `_start` catches the exception `thrower`, from another instance, throws.
     ///
     ///   +0 block $h  +2 try_table (catch $e $h)  +8 call $thrower  +10 end  +11 i32.const 1
@@ -514,6 +533,28 @@
                 // A caller frame is at its return address: `_start`'s `end`, right after the call.
                 #expect(trap.callStack[1] == startBase + 4, "caller frame should be in _start")
             }
+        }
+
+        /// A trap raised in another instance has no frame in the debugged module, whose code lies
+        /// elsewhere: the innermost frame there is the call that led to it.
+        @Test(arguments: testedThreadingModels)
+        func aTrapInAnotherInstanceIsReportedAtTheCall(threadingModel: EngineConfiguration.ThreadingModel) throws {
+            let store = makeStore(threadingModel)
+            let library = try parseWasm(bytes: try wat2wasm(trappingLibraryWAT)).instantiate(store: store)
+            var imports = Imports()
+            imports.define(module: "lib", name: "boom", try #require(library.exports[function: "boom"]))
+
+            let module = try parseWasm(bytes: try wat2wasm(callsTrappingLibraryWAT))
+            var debugger = try Debugger(module: module, store: store, imports: imports)
+            let startBase = module.functions[1].code.originalAddress
+
+            try debugger.run()
+            guard case .trapped(let trap) = debugger.state else {
+                Issue.record("expected trapped, got \(debugger.state)")
+                return
+            }
+            // The call's frame is at its return address: `_start`'s `end`.
+            #expect(trap.callStack == [startBase + 5])
         }
 
         /// `compilingCall` rewrites its own head slot the first time it runs, over the breakpoint
