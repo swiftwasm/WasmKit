@@ -65,7 +65,7 @@
         /// Steps at the call site and asserts the landing is inside the callee. The callee is defined
         /// before `_start`, so its whole body is below `startBase`; a step-over would stay at or above
         /// the call site. The callee is deliberately NOT compiled beforehand, exercising the cold path
-        /// where the predictor must compile it and its elided first instruction has no reverse mapping.
+        /// where the call compiles it during the step and its elided first instruction has no reverse mapping.
         private func assertStepsInto(_ wat: String, callOffset: Int, features: WasmFeatureSet = []) throws {
             let store = Store(engine: Engine())
             let module = try parseWasm(bytes: try wat2wasm(wat, features: features), features: features)

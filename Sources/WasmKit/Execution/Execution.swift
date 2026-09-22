@@ -747,6 +747,32 @@ extension Execution {
         }
     }
 
+    #if WasmDebuggingSupport
+        /// Runs one instruction the way one turn of ``runTokenThreaded(sp:pc:md:ms:)`` does, under
+        /// either threading model: `head` is its head slot and `pc` points just past it. Returns the
+        /// next instruction's head slot, leaving `pc` just past where that was read.
+        ///
+        /// Every handler body is the same Swift function under both threading models, so running one
+        /// through ``doExecute(_:sp:pc:md:ms:)`` takes no knowledge of what the instruction does.
+        /// The next head slot usually sits right before `pc`, but not always: a `_return` that
+        /// crosses an instance boundary hands over to `returnCrossInstance` without moving `pc`.
+        mutating func stepInstruction(
+            head: CodeSlot, threadingModel: EngineConfiguration.ThreadingModel,
+            sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms
+        ) throws -> CodeSlot {
+            let opcode = Instruction.opcode(ofHeadSlot: head, threadingModel: threadingModel)
+            do {
+                return try doExecute(opcode, sp: &sp, pc: &pc, md: &md, ms: &ms)
+            } catch let exception as WasmKitException {
+                // A matching handler leaves `pc` at the head slot it resumes from.
+                guard handleException(exception, sp: &sp, pc: &pc, md: &md, ms: &ms) else { throw exception }
+                return pc.read(CodeSlot.self)
+            } catch let trap as Trap {
+                throw trap.withBacktrace(Self.captureBacktrace(sp: sp, store: store.value))
+            }
+        }
+    #endif
+
     /// Sets the error trap thrown during execution.
     ///
     /// - Note: This function is called by C instruction handlers at most once.
