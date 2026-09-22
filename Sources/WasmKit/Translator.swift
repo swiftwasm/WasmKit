@@ -5859,6 +5859,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
     mutating func visitMemoryFill(memory: UInt32) throws(WasmKitError) -> Output {
+        //     C.mems[x] = it limits
+        // -----------------------------
+        // C ⊦ memory.fill x : [it i32 it] → []
+        // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
         let addressType = try module.addressType(memoryIndex: memory)
         try pop3Emit((addressType, .i32, addressType)) { values, stack in
             let (size, value, destOffset) = values
