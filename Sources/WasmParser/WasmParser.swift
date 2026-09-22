@@ -574,9 +574,18 @@ extension Parser {
     /// <https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions>
     @inlinable
     mutating func parseMemarg() throws(WasmParserError) -> MemArg {
-        let align: UInt32 = try parseUnsigned()
+        var flags: UInt32 = try parseUnsigned()
+        var memory: UInt32 = 0
+        // With multi-memory, bit 6 of the flags says a memory index follows them.
+        if features.contains(.multiMemory), flags & 0x40 != 0 {
+            guard flags < 0x80 else {
+                throw makeError(.malformedMemArgFlags(flags))
+            }
+            flags &= ~0x40
+            memory = try parseUnsigned()
+        }
         let offset: UInt64 = try features.contains(.memory64) ? parseUnsigned(UInt64.self) : UInt64(parseUnsigned(UInt32.self))
-        return MemArg(offset: offset, align: align)
+        return MemArg(offset: offset, align: flags, memory: memory)
     }
 }
 

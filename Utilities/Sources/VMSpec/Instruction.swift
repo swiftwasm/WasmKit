@@ -1831,6 +1831,21 @@ extension VMGen {
                 name: "brIfNotNull", documentation: "Conditional pc-relative branch if the condition is not a null reference",
                 isControl: true, mayUpdateFrame: false, immediateLayout: .brIfOperand),
         ]
+        // Multi-memory
+        instructions += [
+            Instruction(
+                name: "selectMemory",
+                documentation: """
+                    Point the current memory registers at the given memory of the current instance.
+
+                    Emitted around an instruction that accesses a memory other than 0 (multi-memory);
+                    memory instructions otherwise always access memory 0.
+                    """,
+                useCurrentMemory: .write
+            ) {
+                $0.field(name: "memory", type: .MemoryIndex)
+            }
+        ]
         return instructions
     }
 
