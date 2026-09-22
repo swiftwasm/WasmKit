@@ -9,6 +9,10 @@
             package let wasmPc: Int
             /// Wasm address reported for this stop.
             package var reportedPc: Int
+            /// Whether execution hit a host breakpoint at ``reportedPc``, as opposed to arriving there
+            /// by a step. A breakpoint a step arrives at is hit when execution resumes, without moving,
+            /// like a breakpoint instruction the step has not executed yet.
+            package var isBreakpointHit: Bool
         }
 
         package enum State {
@@ -257,6 +261,12 @@
         package mutating func run() throws {
             switch self.state {
             case .stoppedAtBreakpoint(let breakpoint):
+                // A step can already have gone past every breakpoint in this slot. None of them is at
+                // the current program counter then, so they stay for the next time execution comes by.
+                if self.hostBreakpoints[breakpoint.wasmPc]?.allSatisfy({ $0 < breakpoint.reportedPc }) == true {
+                    try self.runPreservingCurrentBreakpoint()
+                    return
+                }
                 self.disarm(resolved: breakpoint.wasmPc)
                 try self.resume(.runLoop(sp: breakpoint.iseq.sp, pc: breakpoint.iseq.pc))
             case .instantiated:
@@ -281,8 +291,9 @@
             case entrypoint
             /// From the head slot `pc` with the threading model's own run loop.
             case runLoop(sp: Sp, pc: Pc)
-            /// By a single step off `breakpoint`.
-            case singleStep(BreakpointState)
+            /// By a single step off `breakpoint`, reporting the landing as a stop at the host's
+            /// breakpoint there if `reportingBreakpoint`.
+            case singleStep(BreakpointState, reportingBreakpoint: Bool)
         }
 
         /// Runs the guest, recording in ``state`` how it stops: at a breakpoint, with a trap, or by
@@ -303,8 +314,8 @@
                     self.state = .entrypointReturned(result)
                 case .runLoop(let sp, let pc):
                     try self.runNative(sp: sp, pc: pc)
-                case .singleStep(let breakpoint):
-                    try self.singleStep(from: breakpoint)
+                case .singleStep(let breakpoint, let reportingBreakpoint):
+                    try self.singleStep(from: breakpoint, reportingBreakpoint: reportingBreakpoint)
                 }
             } catch let end as Execution.EndOfExecution {
                 // The module successfully executed till the "end of execution" instruction.
@@ -315,7 +326,7 @@
                     }
                 )
             } catch let breakpoint as Execution.Breakpoint {
-                try self.stop(at: breakpoint)
+                try self.stop(at: breakpoint, reportingBreakpoint: true)
             } catch let trap as Trap {
                 let mapping = self.instance.handle.instructionMapping
                 self.state = .trapped(
@@ -331,18 +342,24 @@
 
         /// Records a stop at the head slot `breakpoint.pc`, whether a breakpoint was hit there or a
         /// step landed there.
-        private mutating func stop(at breakpoint: Execution.Breakpoint) throws {
+        ///
+        /// The slot implements a run of Wasm instructions. A stop is reported at the host's lowest
+        /// breakpoint among them if `reportingBreakpoint`, and otherwise at the first of them, which is
+        /// the next instruction a step reaches.
+        private mutating func stop(at breakpoint: Execution.Breakpoint, reportingBreakpoint: Bool) throws {
             let pc = breakpoint.pc
             let mapping = self.instance.handle.instructionMapping
             guard let wasmPc = mapping.findWasm(forIseqAddress: pc) else {
                 throw Error.noReverseInstructionMappingAvailable(pc)
             }
 
+            let hostBreakpoint = reportingBreakpoint ? self.hostBreakpoints[wasmPc]?.min() : nil
             self.state = .stoppedAtBreakpoint(
                 .init(
                     iseq: breakpoint,
                     wasmPc: wasmPc,
-                    reportedPc: self.hostBreakpoints[wasmPc]?.min() ?? mapping.firstWasm(forIseqAddress: pc) ?? wasmPc
+                    reportedPc: hostBreakpoint ?? mapping.firstWasm(forIseqAddress: pc) ?? wasmPc,
+                    isBreakpointHit: hostBreakpoint != nil
                 )
             )
 
@@ -382,11 +399,39 @@
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 return
             }
+            guard !self.hitBreakpointArrivedAt(breakpoint) else { return }
 
-            // Report any remaining breakpoints sharing this slot before resuming.
-            guard !self.reportPendingHostBreakpoint(after: breakpoint) else { return }
+            // The bytecode at a stop implements a run of Wasm instructions, all but the last of which
+            // emitted none of their own. Stepping over one of those runs nothing, but the host still
+            // has to see each of them, and each breakpoint among them: one may be where a source line
+            // starts.
+            let mapping = self.instance.handle.instructionMapping
+            let pendingBreakpoint = self.hostBreakpoints[breakpoint.wasmPc]?.filter { $0 > breakpoint.reportedPc }.min()
+            let nextInstruction = mapping.instructionAddress(after: breakpoint.reportedPc).flatMap {
+                $0 <= breakpoint.wasmPc ? $0 : nil
+            }
+            if let next = [pendingBreakpoint, nextInstruction].compactMap({ $0 }).min() {
+                var breakpoint = breakpoint
+                breakpoint.reportedPc = next
+                breakpoint.isBreakpointHit = false
+                self.state = .stoppedAtBreakpoint(breakpoint)
+                return
+            }
 
-            try self.resume(.singleStep(breakpoint))
+            try self.resume(.singleStep(breakpoint, reportingBreakpoint: false))
+        }
+
+        /// Reports the host breakpoint a step arrived at as hit, without moving. Returns whether there
+        /// was one.
+        private mutating func hitBreakpointArrivedAt(_ breakpoint: BreakpointState) -> Bool {
+            guard !breakpoint.isBreakpointHit,
+                self.hostBreakpoints[breakpoint.wasmPc]?.contains(breakpoint.reportedPc) == true
+            else { return false }
+
+            var breakpoint = breakpoint
+            breakpoint.isBreakpointHit = true
+            self.state = .stoppedAtBreakpoint(breakpoint)
+            return true
         }
 
         /// Reports the next host breakpoint sharing this bytecode slot without resuming execution.
@@ -399,6 +444,7 @@
 
             var breakpoint = breakpoint
             breakpoint.reportedPc = pending
+            breakpoint.isBreakpointHit = true
             self.state = .stoppedAtBreakpoint(breakpoint)
             return true
         }
@@ -407,13 +453,17 @@
         /// the debugger resumes is preserved. If the module is current not stopped at a breakpoint, this function
         /// returns immediately.
         package mutating func runPreservingCurrentBreakpoint() throws {
-            guard case .stoppedAtBreakpoint = self.state else {
+            guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 return
             }
+            guard !self.hitBreakpointArrivedAt(breakpoint) else { return }
 
-            // Stepping runs the instruction under the breakpoint without taking the breakpoint out, and
-            // gets execution off its slot.
-            try self.step()
+            // Report any remaining breakpoints sharing this slot before resuming.
+            guard !self.reportPendingHostBreakpoint(after: breakpoint) else { return }
+
+            // A single step runs the instruction under the breakpoint without taking the breakpoint out,
+            // and gets execution off its slot.
+            try self.resume(.singleStep(breakpoint, reportingBreakpoint: true))
 
             // Landing on a breakpoint the host set is a stop the host is waiting for.
             guard case .stoppedAtBreakpoint(let landed) = self.state,
@@ -549,7 +599,7 @@
         ///
         /// Breakpoints are never taken out. The first instruction runs from the head slot its
         /// breakpoint replaced, and no later one is at a stop point, where breakpoints go.
-        private mutating func singleStep(from breakpoint: BreakpointState) throws {
+        private mutating func singleStep(from breakpoint: BreakpointState, reportingBreakpoint: Bool) throws {
             var sp = breakpoint.iseq.sp
             var pc = breakpoint.iseq.pc.advanced(by: 1)
             // If the breakpoint was externally removed (e.g. via disableBreakpoint while stopped), the
@@ -578,7 +628,7 @@
                 }
             } while !self.isAtStopPoint(head: head, readBefore: pc)
 
-            try self.stop(at: Execution.Breakpoint(sp: sp, pc: pc.advanced(by: -1)))
+            try self.stop(at: Execution.Breakpoint(sp: sp, pc: pc.advanced(by: -1)), reportingBreakpoint: reportingBreakpoint)
         }
 
         /// Whether the instruction about to run, whose head slot `head` was read just before `pc`,
@@ -603,7 +653,7 @@
 
         /// Runs code of another instance, which a single step can't: it was not compiled for
         /// debugging, so it has no stop points and may use direct-only instructions. `pc` points just
-        /// past the head slot of the instruction about to run, as in ``singleStep(from:)``.
+        /// past the head slot of the instruction about to run, as in ``singleStep(from:reportingBreakpoint:)``.
         ///
         /// When the frame it runs in returns into the debugged instance, whose return address and
         /// caller the frame holds, this hands back where stepping resumes. Otherwise the guest runs

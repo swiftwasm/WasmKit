@@ -44,7 +44,9 @@
             #expect(try debugger.getLocal(frameIndex: 0, localIndex: 0) == 10, "callee param $a")
             #expect(try debugger.getLocal(frameIndex: 1, localIndex: 0) == 7, "caller local $c from parent frame")
 
-            // $x is uninitialised until its local.set runs, so step past it before reading.
+            // $x is uninitialised until its local.set runs. A step over `i32.const 99` reaches the
+            // local.set, and one more runs it.
+            try debugger.step()
             try debugger.step()
             #expect(try debugger.getLocal(frameIndex: 0, localIndex: 1) == 99, "callee local $x after local.set")
         }

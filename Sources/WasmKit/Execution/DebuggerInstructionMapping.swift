@@ -17,6 +17,10 @@ struct DebuggerInstructionMapping {
         /// Sorted emitting Wasm addresses for binary search when an address has no direct mapping.
         private var wasmMappings = [Int]()
 
+        /// Sorted addresses of every Wasm instruction in the compiled functions, including those
+        /// that emitted no bytecode of their own.
+        private var instructionAddresses = [Int]()
+
         mutating func add(canonical: Int, emitting: Int, iseq: Pc) {
             // Don't override the existing mapping, only store a new pair if there's no mapping for a given key.
             if self.iseqToWasm[iseq] == nil {
@@ -94,6 +98,20 @@ struct DebuggerInstructionMapping {
         func isStopPoint(_ pc: Pc) -> Bool {
             guard let wasm = self.iseqToWasm[pc] else { return false }
             return self.wasmToIseq[wasm] == pc
+        }
+
+        /// Records the addresses of a function's Wasm instructions, in ascending order.
+        mutating func addInstructionAddresses(_ addresses: [Int]) {
+            guard let first = addresses.first else { return }
+            // Functions compile lazily, in any order, but never overlap.
+            let index = self.instructionAddresses.partitioningIndex { $0 >= first }
+            guard index == self.instructionAddresses.endIndex || self.instructionAddresses[index] != first else { return }
+            self.instructionAddresses.insert(contentsOf: addresses, at: index)
+        }
+
+        /// The address of the Wasm instruction that follows the one at `address`.
+        func instructionAddress(after address: Int) -> Int? {
+            self.instructionAddresses.binarySearch(nextClosestTo: address + 1)
         }
     #endif
 }
