@@ -8,8 +8,8 @@
 
     /// Calls an imported host function. The translator emits `call` (not
     /// `compilingCall`) for any callee outside the current instance, which
-    /// includes every host function, so stepping here exercises the predictor's
-    /// handling of a non-wasm callee.
+    /// includes every host function, so stepping here runs a `call` whose
+    /// callee is not Wasm.
     private let hostCallWAT = """
         (module
           (import "env" "host" (func $host (param i32) (result i32)))
@@ -47,7 +47,7 @@
                 return
             }
 
-            // The step itself is what predicts past the host call.
+            // The step runs the host function inside `call`.
             try debugger.step()
         }
     }
