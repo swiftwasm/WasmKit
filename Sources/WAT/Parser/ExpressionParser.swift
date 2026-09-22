@@ -257,13 +257,16 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
 
         // WAST predication allows omitting some concrete specifiers
         if try parser.takeParenBlockStart("ref.null"), try parser.isEndOfParen() {
+            try parser.expect(.rightParen)
             return .refNull(nil)
         }
         if try parser.takeParenBlockStart("ref.func"), try parser.isEndOfParen() {
+            try parser.expect(.rightParen)
             return .refFunc(functionIndex: nil)
         }
         if try parser.takeParenBlockStart("ref.extern"), try parser.isEndOfParen() {
-            return .refFunc(functionIndex: nil)
+            try parser.expect(.rightParen)
+            return .refExtern(value: nil)
         }
         parser = initialParser
         return nil
