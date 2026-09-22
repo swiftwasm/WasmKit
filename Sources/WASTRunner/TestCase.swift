@@ -450,6 +450,9 @@ extension WASTRunContext {
             features.insert(.functionReferences)
             features.insert(.tailCall)
         }
+        if rootPath.hasSuffix("multi-memory") {
+            features.insert(.multiMemory)
+        }
         if rootPath.hasSuffix("fuel") {
             // A tail call is one of the ways a guest can run forever, so the fuel suite needs it.
             features.insert(.tailCall)
