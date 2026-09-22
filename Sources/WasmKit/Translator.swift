@@ -3074,8 +3074,16 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         assert(initializedElementsIndex == instructions.endIndex)
 
         #if WasmDebuggingSupport
+            // What the function runs before its first instruction, such as the fuel charge for its
+            // body, has no Wasm address of its own, so a trap raised there belongs to that
+            // instruction. Mapped after the instruction's own bytecode, which stays where a
+            // breakpoint or a step stops, since a branch back to the instruction runs that again.
+            var iseqToWasmMapping = self.iseqToWasmMapping
+            if let first = iseqToWasmMapping.first, first.iseq > 0 {
+                iseqToWasmMapping.append((0, first.canonical, first.emitting))
+            }
             var headSlots: [Pc] = []
-            for (iseq, canonical, emitting) in self.iseqToWasmMapping {
+            for (iseq, canonical, emitting) in iseqToWasmMapping {
                 let absoluteIseq = iseq + buffer.baseAddress.unsafelyUnwrapped
                 headSlots.append(absoluteIseq)
                 self.module.withValue {
