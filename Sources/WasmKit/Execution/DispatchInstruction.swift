@@ -445,6 +445,7 @@ extension Execution {
         case 731: return try self.execute_refAsNonNull(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 732: return self.execute_brIfNull(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 733: return self.execute_brIfNotNull(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 734: return self.execute_selectMemory(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -7187,6 +7188,14 @@ extension Execution {
         let immediate = Instruction.BrIfOperand.load(from: &pc.pointee)
         let next: CodeSlot
         (pc.pointee, next) = self.brIfNotNull(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_selectMemory") @inline(__always)
+    mutating func execute_selectMemory(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.SelectMemoryOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        self.selectMemory(sp: sp.pointee, md: &md.pointee, ms: &ms.pointee, immediate: immediate)
         return next
     }
 }

@@ -558,7 +558,13 @@ struct ExpressionEncoder: BinaryInstructionEncoder {
     mutating func encodeImmediates(localIndex: UInt32) { encodeUnsigned(localIndex) }
     mutating func encodeImmediates(typeIndex: UInt32) { encodeUnsigned(typeIndex) }
     mutating func encodeImmediates(memarg: WasmParser.MemArg) {
-        encodeUnsigned(UInt(memarg.align))
+        if memarg.memory == 0 {
+            encodeUnsigned(UInt(memarg.align))
+        } else {
+            // Multi-memory: bit 6 of the flags says the memory index follows them.
+            encodeUnsigned(UInt(memarg.align | 0x40))
+            encodeUnsigned(memarg.memory)
+        }
         encodeUnsigned(memarg.offset)
     }
     mutating func encodeImmediates(lane: UInt8) { encoder.output.append(lane) }
