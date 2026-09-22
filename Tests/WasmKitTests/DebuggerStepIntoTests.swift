@@ -40,6 +40,32 @@
           (elem (i32.const 0) func $callee))
         """
 
+    private let stepInCallRefWAT = """
+        (module
+          (type $t (func (param i32) (result i32)))
+          (func $callee (type $t) (param i32) (result i32) (local $x i32)
+            (local.get $x) (drop)
+            (i32.add (local.get 0) (i32.const 1)))
+          (func (export "_start") (result i32)
+            (i32.const 10)
+            (ref.func $callee)
+            (call_ref $t))
+          (elem declare func $callee))
+        """
+
+    private let stepInReturnCallRefWAT = """
+        (module
+          (type $t (func (param i32) (result i32)))
+          (func $callee (type $t) (param i32) (result i32) (local $x i32)
+            (local.get $x) (drop)
+            (i32.add (local.get 0) (local.get 0)))
+          (func (export "_start") (result i32)
+            (i32.const 21)
+            (ref.func $callee)
+            (return_call_ref $t))
+          (elem declare func $callee))
+        """
+
     /// Zero-argument call: no prep slots, so the breakpoint sits directly on the call head, a
     /// `compilingCall` that rewrites its own head slot when the step runs it.
     private let stepInZeroArgCallWAT = """
@@ -69,7 +95,8 @@
             _ wat: String, callOffset: Int, features: WasmFeatureSet = [],
             threadingModel: EngineConfiguration.ThreadingModel
         ) throws {
-            let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
+            let features = WasmFeatureSet.default.union(features)
+            let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel, features: features)))
             let module = try parseWasm(bytes: try wat2wasm(wat, features: features), features: features)
             var debugger = try Debugger(module: module, store: store, imports: [:])
             let calleeOrigin = module.functions[0].code.originalAddress
@@ -103,6 +130,19 @@
         func stepIntoCallIndirect(threadingModel: EngineConfiguration.ThreadingModel) throws {
             // _start body: i32.const 10 (2) + i32.const 0 (2) + call_indirect (3) + end
             try assertStepsInto(stepInCallIndirectWAT, callOffset: 4, threadingModel: threadingModel)
+        }
+
+        @Test(arguments: testedThreadingModels)
+        func stepIntoCallRef(threadingModel: EngineConfiguration.ThreadingModel) throws {
+            // _start body: i32.const 10 (2) + ref.func (2) + call_ref (2) + end
+            try assertStepsInto(stepInCallRefWAT, callOffset: 4, features: [.functionReferences], threadingModel: threadingModel)
+        }
+
+        @Test(arguments: testedThreadingModels)
+        func stepIntoReturnCallRef(threadingModel: EngineConfiguration.ThreadingModel) throws {
+            // _start body: i32.const 21 (2) + ref.func (2) + return_call_ref (2) + end
+            try assertStepsInto(
+                stepInReturnCallRefWAT, callOffset: 4, features: [.functionReferences, .tailCall], threadingModel: threadingModel)
         }
 
         @Test(arguments: testedThreadingModels)
