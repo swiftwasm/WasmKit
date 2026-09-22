@@ -738,10 +738,10 @@ import WAT
         // Guards against reintroducing `...Shared` opcode variants: shared and non-shared
         // memory must select the same load/store opcodes.
         @Test func loadStoreOpcodeSelection_byMemoryShared() throws {
-            // `dumpFunctions` needs token threading (readable disassembly), but shared memory
-            // needs mprotect (direct threading). Dumping only translates, never executes, so for
-            // the shared case we create the backing under an mprotect engine and *import* it into
-            // the token-threaded dump instance.
+            // The dump runs under token threading, whose listing spells every load and store
+            // alike, but shared memory needs mprotect (direct threading). Dumping only
+            // translates, never executes, so for the shared case we create the backing under an
+            // mprotect engine and *import* it into the token-threaded dump instance.
             func dumpLoadStore(shared: Bool) throws -> String {
                 let dumpEngine = Engine(configuration: .init(threadingModel: .token, features: shared ? [.threads] : []))
                 let dumpStore = Store(engine: dumpEngine)

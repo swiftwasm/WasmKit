@@ -547,17 +547,36 @@ enum VMGen {
 
         """
 
+        let directThreadedOnlyOpcodes = instructions.indices.filter { instructions[$0].isDirectThreadedOnly }
+        output += """
+        extension Instruction {
+            /// The number of opcodes, trap pseudo-instructions included.
+            static let opcodeCount = \(instructions.count)
+
+            /// Whether only the direct-threaded dispatcher implements this instruction;
+            /// `Execution.doExecute` has no case for it.
+            var isDirectThreadedOnly: Bool {
+                switch opcodeID {
+                case \(directThreadedOnlyOpcodes.map(String.init).joined(separator: ", ")): return true
+                default: return false
+                }
+            }
+        }
+
+        """
+
         output += """
         extension Instruction {
             /// Load an instruction from the given program counter.
-            /// - Parameter pc: The program counter to read from.
+            /// - Parameters:
+            ///   - pc: The program counter to read from.
+            ///   - threadingModel: The threading model the instruction sequence was compiled with.
             /// - Returns: The instruction read from the program counter.
-            /// - Precondition: The instruction sequence must be compiled with token threading model.
             ///
             /// Compiled for size: one arm per opcode, used only for disassembly.
             @_optimize(size)
-            static func load(from pc: inout Pc) -> Instruction {
-                let opcode = pc.read(UInt64.self)
+            static func load(from pc: inout Pc, threadingModel: EngineConfiguration.ThreadingModel) -> Instruction {
+                let opcode = Instruction.opcode(ofHeadSlot: pc.read(CodeSlot.self), threadingModel: threadingModel)
                 switch opcode {
 
         """
