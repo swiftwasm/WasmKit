@@ -77,6 +77,8 @@ struct TypeCanonicalizer {
     }
 
     func canonicalize(_ types: [ValueType]) throws(WasmKitError) -> [ValueType] {
+        // Most types refer to no other type; keep them without copying.
+        guard types.contains(where: \.hasConcreteHeapType) else { return types }
         var result: [ValueType] = []
         result.reserveCapacity(types.count)
         for type in types {
@@ -86,7 +88,10 @@ struct TypeCanonicalizer {
     }
 
     func canonicalize(_ type: FunctionType) throws(WasmKitError) -> FunctionType {
-        FunctionType(parameters: try canonicalize(type.parameters), results: try canonicalize(type.results))
+        guard type.parameters.contains(where: \.hasConcreteHeapType) || type.results.contains(where: \.hasConcreteHeapType) else {
+            return type
+        }
+        return FunctionType(parameters: try canonicalize(type.parameters), results: try canonicalize(type.results))
     }
 
     func canonicalize(_ type: GlobalType) throws(WasmKitError) -> GlobalType {
@@ -95,5 +100,13 @@ struct TypeCanonicalizer {
 
     func canonicalize(_ type: TableType) throws(WasmKitError) -> TableType {
         TableType(elementType: try canonicalize(type.elementType), limits: type.limits)
+    }
+}
+
+extension ValueType {
+    /// Whether the type refers to a type in a type section.
+    fileprivate var hasConcreteHeapType: Bool {
+        guard case .ref(let referenceType) = self, case .concrete = referenceType.heapType else { return false }
+        return true
     }
 }

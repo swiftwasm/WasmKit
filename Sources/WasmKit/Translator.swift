@@ -68,8 +68,8 @@ extension InternalInstance {
         return self.types[Int(index)]
     }
     func resolveBlockType(_ blockType: BlockType) throws(WasmKitError) -> FunctionType {
-        if case .type(let valueType) = blockType {
-            return FunctionType(parameters: [], results: [try typeCanonicalizer.canonicalize(valueType)])
+        if case .type(.ref(let referenceType)) = blockType, case .concrete = referenceType.heapType {
+            return FunctionType(parameters: [], results: [.ref(try typeCanonicalizer.canonicalize(referenceType))])
         }
         return try FunctionType(blockType: blockType, typeSection: self.types)
     }
@@ -719,10 +719,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
         mutating func pop(_ expected: ValueType) throws(WasmKitError) -> ValueSource {
             let (value, register) = try pop()
+            // Keep the common exact match inline; this runs for every operand.
+            if case .some(let actual) = value, actual == expected {
+                return register
+            }
             try Self.check(value, matches: expected)
             return register
         }
         /// Checks that a value of type `actual` can be used where `expected` is.
+        @inline(never)
         static func check(_ actual: MetaValue, matches expected: ValueType) throws(WasmKitError) {
             switch actual {
             case .some(let actual):
@@ -2591,9 +2596,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         self.valueStack = ValueStack(stackLayout: stackLayout)
         self.locals = Locals(types: type.parameters + locals)
         self.tracksLocalInitialization = self.locals.hasNonDefaultable
-        self.isLocalInitialized = self.locals.types.enumerated().map { index, localType in
-            index < type.parameters.count || localType.isDefaultable
-        }
+        self.isLocalInitialized =
+            tracksLocalInitialization
+            ? self.locals.types.enumerated().map { index, localType in
+                index < type.parameters.count || localType.isDefaultable
+            } : []
         self.functionIndex = functionIndex
         self.isIntercepting = isIntercepting
         self.constantSlots = ConstSlots(stackLayout: stackLayout)
@@ -2899,7 +2906,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     private func checkStackTop(_ valueTypes: [ValueType]) throws(WasmKitError) {
         for (stackDepth, type) in valueTypes.reversed().enumerated() {
             guard try checkBeforePop(typeHint: type, depth: stackDepth) else { return }
-            try ValueStack.check(valueStack.peekType(depth: stackDepth), matches: type)
+            let actual = valueStack.peekType(depth: stackDepth)
+            if case .some(let actualType) = actual, actualType == type { continue }
+            try ValueStack.check(actual, matches: type)
         }
     }
 
@@ -4975,12 +4984,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     mutating func visitF32Const(value: IEEE754.Float32) -> Output { visitConst(.f32, .f32(value.bitPattern)) }
     mutating func visitF64Const(value: IEEE754.Float64) -> Output { visitConst(.f64, .f64(value.bitPattern)) }
     mutating func visitRefNull(type: HeapType) throws(WasmKitError) {
-        let type = try module.typeCanonicalizer.canonicalize(type)
         // At run time, the null of a concrete (function) type is a null function reference.
         let abstractType: AbstractHeapType
+        var type = type
         switch type {
         case .abstract(let abstract): abstractType = abstract
-        case .concrete: abstractType = .funcRef
+        case .concrete:
+            type = try module.typeCanonicalizer.canonicalize(type)
+            abstractType = .funcRef
         }
         let typeToPush = ReferenceType(isNullable: true, heapType: type)
         pushEmit(.ref(typeToPush), { .refNull(Instruction.RefNullOperand(result: $0, type: abstractType)) })
