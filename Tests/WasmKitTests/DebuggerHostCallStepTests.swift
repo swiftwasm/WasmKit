@@ -25,8 +25,9 @@
         /// `HostFunctionEntity` as a `WasmFunctionEntity` reads unrelated memory:
         /// it either trips `assumeCompiled()`'s precondition or reads past the
         /// allocation, which AddressSanitizer reports as a heap-buffer-overflow.
-        @Test func steppingOverAHostCallDoesNotReadTheCalleeAsWasm() throws {
-            let store = Store(engine: Engine())
+        @Test(arguments: testedThreadingModels)
+        func steppingOverAHostCallDoesNotReadTheCalleeAsWasm(threadingModel: EngineConfiguration.ThreadingModel) throws {
+            let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let module = try parseWasm(bytes: try wat2wasm(hostCallWAT))
 
             var imports = Imports()
