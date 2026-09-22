@@ -330,7 +330,7 @@ extension Execution {
                 let (bytes, overflow) = pageCount.multipliedReportingOverflow(by: UInt64(MemoryEntity.pageSize))
                 try chargeBytesCopied(overflow ? .max : bytes)
             }
-            // The current memory registers hold memory 0.
+            // The current memory registers hold memory 0 (see `selectMemory`).
             if immediate.memory == 0 {
                 CurrentMemory.assign(md: &md, ms: &ms, memory: &memory)
             }
@@ -342,6 +342,15 @@ extension Execution {
             // closed: nesting two entity accesses miscompiles (see `memoryInit`).
             CurrentMemory.mayUpdateCurrentInstance(instance: instance, md: &md, ms: &ms)
         }
+    }
+
+    /// Points the current memory registers at a memory of the current instance.
+    ///
+    /// Memory instructions access the memory the registers hold, memory 0, so the
+    /// translator emits this around an instruction for another memory.
+    mutating func selectMemory(sp: Sp, md: inout Md, ms: inout Ms, immediate: Instruction.SelectMemoryOperand) {
+        let memory = currentInstance(sp: sp).memories[Int(immediate.memory)]
+        CurrentMemory.assign(md: &md, ms: &ms, memory: memory)
     }
     mutating func memoryInit(sp: Sp, immediate: Instruction.MemoryInitOperand) throws {
         let instance = currentInstance(sp: sp)
@@ -518,13 +527,16 @@ extension Execution {
 
     // MARK: - Atomic Wait/Notify
 
-    /// The parking lot for `atomic.wait`/`notify` on the current default memory: the
-    /// shared memory's own lot (shared by all importing threads) when shared.
-    func atomicParkingLot(sp: Sp) -> AtomicParkingLot? {
-        if let memory = currentInstance(sp: sp).memories.first,
-            let lot = memory.withValue({ $0.sharedParkingLot })
-        {
-            return lot
+    /// The parking lot for `atomic.wait`/`notify` on the current memory, the one
+    /// whose base address `md` holds: the shared memory's own lot (shared by all
+    /// importing threads) when shared.
+    func atomicParkingLot(sp: Sp, md: Md) -> AtomicParkingLot? {
+        // The current memory is memory 0 unless `selectMemory` switched it.
+        for memory in currentInstance(sp: sp).memories {
+            let (baseAddress, lot) = memory.withValue { ($0.baseAddress, $0.sharedParkingLot) }
+            if baseAddress == md {
+                return lot
+            }
         }
         return nil
     }
@@ -539,7 +551,7 @@ extension Execution {
         }
         if _fastPath(Execution.isInBounds(address: address, offset: waitOperand.offset, length: 4, ms: ms)) {
             // `atomic.wait` is only valid on a shared memory.
-            guard let parkingLot = atomicParkingLot(sp: sp) else {
+            guard let parkingLot = atomicParkingLot(sp: sp, md: md) else {
                 throw Trap(.message(.atomicWaitOnUnsharedMemory))
             }
             let rawPtr = md.unsafelyUnwrapped.advanced(by: Execution.checkedByteOffset(address))
@@ -594,7 +606,7 @@ extension Execution {
         }
         if _fastPath(Execution.isInBounds(address: address, offset: waitOperand.offset, length: 8, ms: ms)) {
             // `atomic.wait` is only valid on a shared memory.
-            guard let parkingLot = atomicParkingLot(sp: sp) else {
+            guard let parkingLot = atomicParkingLot(sp: sp, md: md) else {
                 throw Trap(.message(.atomicWaitOnUnsharedMemory))
             }
             let rawPtr = md.unsafelyUnwrapped.advanced(by: Execution.checkedByteOffset(address))
@@ -645,7 +657,7 @@ extension Execution {
         let address = Execution.memoryAddress(offset: notifyOperand.offset, index: i)
         if _fastPath(Execution.isInBounds(address: address, offset: notifyOperand.offset, length: 4, ms: ms)) {
             // A non-shared memory can have no waiters, so nothing is woken.
-            guard let parkingLot = atomicParkingLot(sp: sp) else {
+            guard let parkingLot = atomicParkingLot(sp: sp, md: md) else {
                 sp[notifyOperand.result] = .i32(0)
                 return
             }

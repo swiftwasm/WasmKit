@@ -553,7 +553,7 @@ extension Execution {
     enum CurrentMemory {
         /// Assigns the current memory to the given internal memory.
         @inline(__always)
-        private static func assign(md: inout Md, ms: inout Ms, memory: InternalMemory) {
+        static func assign(md: inout Md, ms: inout Ms, memory: InternalMemory) {
             memory.withValue { assign(md: &md, ms: &ms, memory: &$0) }
         }
 

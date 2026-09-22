@@ -178,6 +178,10 @@ extension WasmParserError.Message {
 
     @usableFromInline static let malformedIndirectCall = Self("Malformed indirect call")
 
+    @usableFromInline static func malformedMemArgFlags(_ flags: UInt32) -> Self {
+        Self("malformed memop flags: \(flags)")
+    }
+
     @usableFromInline static func malformedDataSegmentKind(_ kind: UInt32) -> Self {
         Self("Malformed data segment kind: \(kind)")
     }
