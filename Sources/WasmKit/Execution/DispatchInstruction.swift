@@ -9,7 +9,8 @@ import _CWasmKit.InlineCode
 extension Execution {
 
     /// Execute an instruction identified by the opcode.
-    /// Note: This function is only used when using token threading model.
+    /// Note: This function is used by the token-threaded run loop, and by the
+    /// debugger to run a single instruction under either threading model.
     @inline(__always)
     mutating func doExecute(_ opcode: OpcodeID, sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws -> CodeSlot {
         switch opcode {
