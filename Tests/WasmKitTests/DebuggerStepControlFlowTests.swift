@@ -172,6 +172,19 @@
             (i32.mul (local.get 0) (i32.const 3))))
         """
 
+    /// Two runs of Wasm instructions, each emitting its bytecode at its last instruction.
+    ///
+    ///   +0 i32.const 7  +2 local.set $x  |  +4 local.get $x  +6 i32.const 1  +8 i32.add
+    private let foldedRunsWAT = """
+        (module
+          (func (export "_start") (result i32) (local $x i32)
+            i32.const 7
+            local.set $x
+            local.get $x
+            i32.const 1
+            i32.add))
+        """
+
     @Suite
     struct DebuggerStepControlFlowTests {
         private func stoppedPc(_ debugger: borrowing Debugger, sourceLocation: SourceLocation = #_sourceLocation) throws -> Int {
@@ -315,6 +328,68 @@
         @Test(arguments: testedThreadingModels)
         func continueFromThrowHitsItAgain(threadingModel: EngineConfiguration.ThreadingModel) throws {
             try continueHitsAgain(throwInLoopWAT, function: 0, offset: 10, threadingModel: threadingModel)
+        }
+
+        private func reportedPc(_ debugger: borrowing Debugger, sourceLocation: SourceLocation = #_sourceLocation) throws -> Int {
+            guard case .stoppedAtBreakpoint(let bp) = debugger.state else {
+                Issue.record("expected stoppedAtBreakpoint, got \(debugger.state)", sourceLocation: sourceLocation)
+                throw CancellationError()
+            }
+            return bp.reportedPc
+        }
+
+        private func isBreakpointHit(_ debugger: borrowing Debugger) -> Bool {
+            guard case .stoppedAtBreakpoint(let bp) = debugger.state else { return false }
+            return bp.isBreakpointHit
+        }
+
+        /// A step moves one Wasm instruction, as a host debugger expects, even where several share
+        /// one bytecode instruction: those before the last emitted none, so stepping over them runs
+        /// nothing.
+        @Test(arguments: testedThreadingModels)
+        func aStepVisitsEveryWasmInstructionOfAFoldedRun(threadingModel: EngineConfiguration.ThreadingModel) throws {
+            let module = try parseWasm(bytes: try wat2wasm(foldedRunsWAT))
+            var debugger = try Debugger(module: module, store: makeStore(threadingModel), imports: [:])
+            let base = module.functions[0].code.originalAddress
+            try debugger.stopAtEntrypoint()
+            try debugger.run()
+
+            var visited = [try reportedPc(debugger) - base]
+            var xBeforeTheRunThatSetsIt: UInt64?
+            for _ in 0..<4 {
+                if visited.last == 2 { xBeforeTheRunThatSetsIt = try debugger.getLocal(frameIndex: 0, localIndex: 0) }
+                try debugger.step()
+                visited.append(try reportedPc(debugger) - base)
+            }
+            #expect(visited == [0, 2, 4, 6, 8])
+            #expect(xBeforeTheRunThatSetsIt == 0, "stepping over `i32.const 7` must not run the `local.set`")
+            #expect(try debugger.getLocal(frameIndex: 0, localIndex: 0) == 7)
+        }
+
+        /// A step that arrives at a breakpoint has not executed it yet: the breakpoint is hit when
+        /// execution resumes, without moving.
+        @Test(arguments: testedThreadingModels)
+        func aStepArrivesAtABreakpointAndTheNextResumeHitsIt(threadingModel: EngineConfiguration.ThreadingModel) throws {
+            let module = try parseWasm(bytes: try wat2wasm(foldedRunsWAT))
+            var debugger = try Debugger(module: module, store: makeStore(threadingModel), imports: [:])
+            let base = module.functions[0].code.originalAddress
+            try debugger.enableBreakpoint(address: base + 4)
+            try debugger.stopAtEntrypoint()
+            try debugger.run()
+            try debugger.step()
+
+            try debugger.step()
+            #expect(try reportedPc(debugger) == base + 4)
+            let hitOnArrival = isBreakpointHit(debugger)
+            #expect(!hitOnArrival)
+
+            try debugger.step()
+            #expect(try reportedPc(debugger) == base + 4)
+            let hitOnResume = isBreakpointHit(debugger)
+            #expect(hitOnResume)
+
+            try debugger.step()
+            #expect(try reportedPc(debugger) == base + 6)
         }
 
         /// `compilingCall` rewrites its own head slot the first time it runs, over the breakpoint

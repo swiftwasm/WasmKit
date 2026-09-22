@@ -388,6 +388,20 @@
         return bp.wasmPc
     }
 
+    /// Asserts the debugger is stopped at a breakpoint, returning the Wasm address the stop reports.
+    /// A step moves it one Wasm instruction, even within the bytecode of a single ``requireBreakpoint``
+    /// address.
+    private func requireReportedPc(
+        _ debugger: borrowing Debugger,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) throws -> Int {
+        guard case .stoppedAtBreakpoint(let bp) = debugger.state else {
+            try #require(Bool(false), "Expected stoppedAtBreakpoint, got \(debugger.state)", sourceLocation: sourceLocation)
+            fatalError()
+        }
+        return bp.reportedPc
+    }
+
     /// Asserts the debugger's entrypoint has returned, returning the result values.
     @discardableResult
     private func requireReturned(
@@ -418,13 +432,14 @@
 
             try debugger.run()
             let firstExpectedPc = try requireBreakpoint(debugger)
+            let firstReportedPc = try requireReportedPc(debugger)
             #expect(debugger.currentCallStack == [firstExpectedPc])
 
             try debugger.step()
             let secondExpectedPc = try requireBreakpoint(debugger)
             #expect(debugger.currentCallStack == [secondExpectedPc])
 
-            #expect(firstExpectedPc < secondExpectedPc)
+            #expect(firstReportedPc < (try requireReportedPc(debugger)))
 
             try debugger.run()
             let values = try requireReturned(debugger)
@@ -1488,10 +1503,11 @@
 
             try debugger.run()
             #expect(try requireBreakpoint(debugger) == bp)
+            let entry = try requireReportedPc(debugger)
 
             // Stepping resolves through the same addresses.
             try debugger.step()
-            #expect(try requireBreakpoint(debugger) > bp)
+            #expect(try requireReportedPc(debugger) > entry)
         }
     }
 

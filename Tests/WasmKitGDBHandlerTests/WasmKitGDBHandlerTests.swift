@@ -187,9 +187,16 @@
 
                 _ = try h.handle(command: .init(kind: .resumeThreads, arguments: "s:1"))
                 let second = pairs(try h.handle(command: .init(kind: .threadStopInfo, arguments: "")))
-                #expect(second["reason"] == "breakpoint")
+                // A step arrives at the second breakpoint without hitting it, as it would a breakpoint
+                // instruction it has not executed yet.
+                #expect(second["reason"] == "trace")
                 #expect(second["thread-pcs"] == hostHex(higher))
                 #expect(try callStack(h).first == higher)
+
+                // Resuming hits it, without moving.
+                let third = pairs(try h.handle(command: .init(kind: .continue, arguments: "")))
+                #expect(third["reason"] == "breakpoint")
+                #expect(third["thread-pcs"] == hostHex(higher))
             }
         }
 
