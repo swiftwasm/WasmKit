@@ -40,9 +40,8 @@
           (elem (i32.const 0) func $callee))
         """
 
-    /// Zero-argument call: no prep slots, so the breakpoint sits directly on the call head and the
-    /// existing control-head path handles it. Guards that the elided-callee cold path still steps in
-    /// (findWasm on the callee's iseq base is not the step-over fallback).
+    /// Zero-argument call: no prep slots, so the breakpoint sits directly on the call head, a
+    /// `compilingCall` that rewrites its own head slot when the step runs it.
     private let stepInZeroArgCallWAT = """
         (module
           (func $callee (result i32) (local $x i32)
@@ -66,8 +65,11 @@
         /// before `_start`, so its whole body is below `startBase`; a step-over would stay at or above
         /// the call site. The callee is deliberately NOT compiled beforehand, exercising the cold path
         /// where the call compiles it during the step and its elided first instruction has no reverse mapping.
-        private func assertStepsInto(_ wat: String, callOffset: Int, features: WasmFeatureSet = []) throws {
-            let store = Store(engine: Engine())
+        private func assertStepsInto(
+            _ wat: String, callOffset: Int, features: WasmFeatureSet = [],
+            threadingModel: EngineConfiguration.ThreadingModel
+        ) throws {
+            let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let module = try parseWasm(bytes: try wat2wasm(wat, features: features), features: features)
             var debugger = try Debugger(module: module, store: store, imports: [:])
             let calleeOrigin = module.functions[0].code.originalAddress
@@ -85,24 +87,28 @@
             #expect(landing != bp + 1, "must not be a step-over")
         }
 
-        @Test func stepIntoCall() throws {
+        @Test(arguments: testedThreadingModels)
+        func stepIntoCall(threadingModel: EngineConfiguration.ThreadingModel) throws {
             // _start body: i32.const 10 (2) + call (2) + end
-            try assertStepsInto(stepInCallWAT, callOffset: 2)
+            try assertStepsInto(stepInCallWAT, callOffset: 2, threadingModel: threadingModel)
         }
 
-        @Test func stepIntoReturnCall() throws {
+        @Test(arguments: testedThreadingModels)
+        func stepIntoReturnCall(threadingModel: EngineConfiguration.ThreadingModel) throws {
             // _start body: i32.const 21 (2) + return_call (2) + end
-            try assertStepsInto(stepInReturnCallWAT, callOffset: 2, features: [.tailCall])
+            try assertStepsInto(stepInReturnCallWAT, callOffset: 2, features: [.tailCall], threadingModel: threadingModel)
         }
 
-        @Test func stepIntoCallIndirect() throws {
+        @Test(arguments: testedThreadingModels)
+        func stepIntoCallIndirect(threadingModel: EngineConfiguration.ThreadingModel) throws {
             // _start body: i32.const 10 (2) + i32.const 0 (2) + call_indirect (3) + end
-            try assertStepsInto(stepInCallIndirectWAT, callOffset: 4)
+            try assertStepsInto(stepInCallIndirectWAT, callOffset: 4, threadingModel: threadingModel)
         }
 
-        @Test func stepIntoZeroArgCall() throws {
+        @Test(arguments: testedThreadingModels)
+        func stepIntoZeroArgCall(threadingModel: EngineConfiguration.ThreadingModel) throws {
             // _start body: call (2) + end; the call head is the first (only) slot for its wasm address.
-            try assertStepsInto(stepInZeroArgCallWAT, callOffset: 0)
+            try assertStepsInto(stepInZeroArgCallWAT, callOffset: 0, threadingModel: threadingModel)
         }
     }
 

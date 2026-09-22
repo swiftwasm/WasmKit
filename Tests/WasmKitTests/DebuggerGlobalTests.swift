@@ -8,9 +8,9 @@
 
     @Suite
     struct DebuggerGlobalTests {
-        @Test
-        func getGlobalReadsInitializedValue() throws {
-            let store = Store(engine: Engine())
+        @Test(arguments: testedThreadingModels)
+        func getGlobalReadsInitializedValue(threadingModel: EngineConfiguration.ThreadingModel) throws {
+            let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let module = try parseWasm(
                 bytes: try wat2wasm(
                     """

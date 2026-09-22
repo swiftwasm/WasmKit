@@ -25,9 +25,9 @@
 
     @Suite
     struct DebuggerVariableTests {
-        @Test
-        func localValuesSurviveStepIntoAcrossFrames() throws {
-            let store = Store(engine: Engine())
+        @Test(arguments: testedThreadingModels)
+        func localValuesSurviveStepIntoAcrossFrames(threadingModel: EngineConfiguration.ThreadingModel) throws {
+            let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let module = try parseWasm(bytes: try wat2wasm(localsAcrossFramesWAT))
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
