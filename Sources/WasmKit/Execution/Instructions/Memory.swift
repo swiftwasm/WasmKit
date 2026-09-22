@@ -359,7 +359,8 @@ extension Execution {
         let sourceMemory = instance.memories[Int(immediate.sourceMemory)]
         let destIsMemory64 = destinationMemory.withValue { $0.limit.isMemory64 }
         let sourceIsMemory64 = sourceMemory.withValue { $0.limit.isMemory64 }
-        let size = sp[immediate.size].asAddressOffset(destIsMemory64 || sourceIsMemory64)
+        // The size has the smaller of the two memories' address types.
+        let size = sp[immediate.size].asAddressOffset(destIsMemory64 && sourceIsMemory64)
         let source = sp[immediate.sourceOffset].asAddressOffset(sourceIsMemory64)
         let destination = sp[immediate.destOffset].asAddressOffset(destIsMemory64)
         try destinationMemory.copy(from: sourceMemory, sourceOffset: source, destOffset: destination, count: size)
