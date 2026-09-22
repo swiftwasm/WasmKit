@@ -2609,6 +2609,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             #if WasmDebuggingSupport
                 guard self.module.isDebuggable else { return }
 
+                self.instructionAddresses.append(self.binaryOffset)
                 if self.hasEmittedSinceLastInstruction {
                     self.currentRunStartWasm = self.binaryOffset
                     self.hasEmittedSinceLastInstruction = false
@@ -2628,6 +2629,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
         /// Pending mappings from iseq bytecode offsets to their canonical and emitting Wasm addresses.
         var iseqToWasmMapping = [(iseq: Int, canonical: Int, emitting: Int)]()
+
+        /// Addresses of the Wasm instructions visited so far, emitting or not.
+        var instructionAddresses = [Int]()
     #endif
 
     init(
@@ -3133,6 +3137,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                     let absoluteIseq = iseq + buffer.baseAddress.unsafelyUnwrapped
                     $0.instructionMapping.add(canonical: canonical, emitting: emitting, iseq: absoluteIseq)
                 }
+            }
+            if self.module.isDebuggable {
+                let instructionAddresses = self.instructionAddresses
+                self.module.withValue { $0.instructionMapping.addInstructionAddresses(instructionAddresses) }
             }
         #endif
 

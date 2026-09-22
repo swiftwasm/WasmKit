@@ -17,6 +17,12 @@ struct DebuggerInstructionMapping {
         /// Sorted emitting Wasm addresses for binary search when an address has no direct mapping.
         private var wasmMappings = [Int]()
 
+        /// Addresses of every Wasm instruction in the compiled functions, including those that
+        /// emitted no bytecode of their own: one sorted run per function, ordered by its first
+        /// address. Kept per function so that compiling one inserts a single element, wherever its
+        /// code lies among the functions compiled before it.
+        private var instructionAddresses = [[Int]]()
+
         mutating func add(canonical: Int, emitting: Int, iseq: Pc) {
             // Don't override the existing mapping, only store a new pair if there's no mapping for a given key.
             if self.iseqToWasm[iseq] == nil {
@@ -94,6 +100,27 @@ struct DebuggerInstructionMapping {
         func isStopPoint(_ pc: Pc) -> Bool {
             guard let wasm = self.iseqToWasm[pc] else { return false }
             return self.wasmToIseq[wasm] == pc
+        }
+
+        /// Records the addresses of a function's Wasm instructions, in ascending order.
+        mutating func addInstructionAddresses(_ addresses: [Int]) {
+            guard let first = addresses.first else { return }
+            // Functions compile lazily, in any order, but never overlap.
+            let index = self.instructionAddresses.partitioningIndex { $0[0] >= first }
+            guard index == self.instructionAddresses.endIndex || self.instructionAddresses[index][0] != first else { return }
+            self.instructionAddresses.insert(addresses, at: index)
+        }
+
+        /// The address of the Wasm instruction that follows the one at `address`.
+        func instructionAddress(after address: Int) -> Int? {
+            let next = address + 1
+            let index = self.instructionAddresses.partitioningIndex { $0[0] > next }
+            if index > self.instructionAddresses.startIndex,
+                let found = self.instructionAddresses[index - 1].binarySearch(nextClosestTo: next)
+            {
+                return found
+            }
+            return index < self.instructionAddresses.endIndex ? self.instructionAddresses[index][0] : nil
         }
     #endif
 }
