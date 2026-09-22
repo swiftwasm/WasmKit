@@ -165,33 +165,42 @@ struct ModuleValidator {
 }
 
 extension WasmTypes.Reference {
+    /// Whether the reference is a value of the given canonical reference type.
+    func matches(_ type: WasmTypes.ReferenceType) -> Bool {
+        switch (self, type.heapType) {
+        case (.function(let address), .abstract(.funcRef)),
+            (.extern(let address), .abstract(.externRef)),
+            (.exception(let address), .abstract(.exnRef)):
+            return address != nil || type.isNullable
+        case (.function(let address), .concrete(let typeID)):
+            guard let address else { return type.isNullable }
+            return InternalFunction(bitPattern: address).type.id == typeID
+        default:
+            return false
+        }
+    }
+
     /// Checks if the reference type matches the expected type.
     func checkType(_ type: WasmTypes.ReferenceType) throws(WasmKitError) {
-        switch (self, type.heapType, type.isNullable) {
-        case (.function(_?), .funcRef, _): return
-        case (.function(nil), .funcRef, true): return
-        case (.extern(_?), .externRef, _): return
-        case (.extern(nil), .externRef, true): return
-        case (.exception(_?), .exnRef, _): return
-        case (.exception(nil), .exnRef, true): return
-        default:
+        guard matches(type) else {
             throw WasmKitError(message: .expectTypeButGot(expected: "\(type)", got: "\(self)"))
         }
     }
 }
 
 extension Value {
+    /// Whether the value is a value of the given canonical type.
+    func matches(_ type: WasmTypes.ValueType) -> Bool {
+        switch (self, type) {
+        case (.i32, .i32), (.i64, .i64), (.f32, .f32), (.f64, .f64), (.v128, .v128): return true
+        case (.ref(let ref), .ref(let refType)): return ref.matches(refType)
+        default: return false
+        }
+    }
+
     /// Checks if the value type matches the expected type.
     func checkType(_ type: WasmTypes.ValueType) throws(WasmKitError) {
-        switch (self, type) {
-        case (.i32, .i32): return
-        case (.i64, .i64): return
-        case (.f32, .f32): return
-        case (.f64, .f64): return
-        case (.v128, .v128): return
-        case (.ref(let ref), .ref(let refType)):
-            try ref.checkType(refType)
-        default:
+        guard matches(type) else {
             throw WasmKitError(message: .expectTypeButGot(expected: "\(type)", got: "\(self)"))
         }
     }

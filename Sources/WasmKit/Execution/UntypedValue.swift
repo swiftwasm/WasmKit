@@ -122,14 +122,13 @@ struct UntypedValue: Equatable, Hashable {
             return Int(storage)
         }
         switch type.heapType {
-        case .abstract(.funcRef):
+        case .abstract(.funcRef), .concrete:
+            // A concrete heap type is always a function type.
             return .function(decodeOptionalInt())
         case .abstract(.externRef):
             return .extern(decodeOptionalInt())
         case .abstract(.exnRef):
             return .exception(decodeOptionalInt())
-        case .concrete:
-            fatalError("heap type other than `func`, `extern`, and `exn` is not implemented yet")
         }
     }
 

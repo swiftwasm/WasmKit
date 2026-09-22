@@ -123,10 +123,12 @@ extension ConstExpression {
 }
 
 extension WasmParser.ElementSegment {
-    func evaluateInits<C: ConstEvaluationContextProtocol>(context: C) throws -> [Reference] {
+    /// Evaluates the segment's items, checking each against `type`, the
+    /// segment's canonical element type.
+    func evaluateInits<C: ConstEvaluationContextProtocol>(context: C, type: ReferenceType) throws -> [Reference] {
         return try self.initializer.map { expression -> Reference in
             let result = try Self._evaluateInits(context: context, expression: expression)
-            try result.checkType(self.type)
+            try result.checkType(type)
             return result
         }
     }

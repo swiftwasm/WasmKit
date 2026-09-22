@@ -263,11 +263,12 @@ public struct Module: Sendable {
                         )
                     )
                 }
-                guard table.tableType.elementType == element.type else {
+                let elementType = try instance.typeCanonicalizer.canonicalize(element.type)
+                guard elementType.isSubtype(of: table.tableType.elementType) else {
                     throw WasmKitError(
                         kind: .message(
                             .elementSegmentTypeMismatch(
-                                elementType: element.type,
+                                elementType: elementType,
                                 tableElementType: table.tableType.elementType
                             )
                         )
@@ -278,7 +279,7 @@ public struct Module: Sendable {
                 guard let destination = Int(exactly: offset) else {
                     throw Trap(.tableOutOfBounds(Int(clamping: offset)))
                 }
-                let references = try element.evaluateInits(context: constEvalContext)
+                let references = try element.evaluateInits(context: constEvalContext, type: elementType)
                 try table.initialize(
                     references, from: 0, to: destination, count: references.count
                 )

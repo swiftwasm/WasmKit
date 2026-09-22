@@ -68,13 +68,20 @@ extension InternalInstance {
         return self.types[Int(index)]
     }
     func resolveBlockType(_ blockType: BlockType) throws(WasmKitError) -> FunctionType {
-        try FunctionType(blockType: blockType, typeSection: self.types)
+        if case .type(let valueType) = blockType {
+            return FunctionType(parameters: [], results: [try typeCanonicalizer.canonicalize(valueType)])
+        }
+        return try FunctionType(blockType: blockType, typeSection: self.types)
     }
     func functionType(_ index: FunctionIndex, interner: Interner<FunctionType>) throws(WasmKitError) -> FunctionType {
         return try interner.resolve(self.functions[validating: Int(index)].type)
     }
     func globalType(_ index: GlobalIndex) throws(WasmKitError) -> ValueType {
-        return try self.globals[validating: Int(index)].globalType.valueType
+        let globalTypes = self.globalTypes
+        guard Int(index) < globalTypes.count else {
+            throw GlobalEntity.createOutOfBoundsError(index: Int(index), count: globalTypes.count)
+        }
+        return globalTypes[Int(index)].valueType
     }
     func isMemory64(memoryIndex index: MemoryIndex) throws(WasmKitError) -> Bool {
         let memory = try self.memories[validating: Int(index), MemoryEntity.createOutOfBoundsError]
@@ -2536,6 +2543,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         self.iseqBuilder = ISeqBuilder(engineConfiguration: engineConfiguration)
         self.iseqBuilder.tracksAcc = !module.isDebuggable
         self.controlStack = ControlStack()
+        let locals = try module.typeCanonicalizer.canonicalize(locals)
         self.stackLayout = try StackLayout(
             type: type,
             locals: locals,
@@ -4130,6 +4138,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
     mutating func visitTypedSelect(type: WasmTypes.ValueType) throws(WasmKitError) -> Output {
+        let type = try module.typeCanonicalizer.canonicalize(type)
         // Captured before `popVRegOperand`, which resets the last emission.
         let fusable = iseqBuilder.fusableEmission
         let accCandidate = iseqBuilder.accProducer
