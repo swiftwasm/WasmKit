@@ -309,7 +309,8 @@ extension Execution {
     }
 
     mutating func memoryGrow(sp: Sp, md: inout Md, ms: inout Ms, immediate: Instruction.MemoryGrowOperand) throws {
-        let memory = currentInstance(sp: sp).memories[Int(immediate.memory)]
+        let instance = currentInstance(sp: sp)
+        let memory = instance.memories[Int(immediate.memory)]
         try memory.withValue { memory in
             let isMemory64 = memory.limit.isMemory64
 
@@ -329,8 +330,17 @@ extension Execution {
                 let (bytes, overflow) = pageCount.multipliedReportingOverflow(by: UInt64(MemoryEntity.pageSize))
                 try chargeBytesCopied(overflow ? .max : bytes)
             }
-            CurrentMemory.assign(md: &md, ms: &ms, memory: &memory)
+            // The current memory registers hold memory 0.
+            if immediate.memory == 0 {
+                CurrentMemory.assign(md: &md, ms: &ms, memory: &memory)
+            }
             sp[immediate.result] = UntypedValue(oldPageCount)
+        }
+        if immediate.memory != 0 {
+            // The same memory can be imported as memory 0 too, and growing may have
+            // moved its storage. Re-read memory 0 once the grown memory's access is
+            // closed: nesting two entity accesses miscompiles (see `memoryInit`).
+            CurrentMemory.mayUpdateCurrentInstance(instance: instance, md: &md, ms: &ms)
         }
     }
     mutating func memoryInit(sp: Sp, immediate: Instruction.MemoryInitOperand) throws {
