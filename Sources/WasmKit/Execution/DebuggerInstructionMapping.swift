@@ -21,6 +21,9 @@ struct DebuggerInstructionMapping {
         /// that emitted no bytecode of their own.
         private var instructionAddresses = [Int]()
 
+        /// Sorted addresses of every mapped head slot in the compiled functions.
+        private var headSlots = [UInt]()
+
         mutating func add(canonical: Int, emitting: Int, iseq: Pc) {
             // Don't override the existing mapping, only store a new pair if there's no mapping for a given key.
             if self.iseqToWasm[iseq] == nil {
@@ -112,6 +115,26 @@ struct DebuggerInstructionMapping {
         /// The address of the Wasm instruction that follows the one at `address`.
         func instructionAddress(after address: Int) -> Int? {
             self.instructionAddresses.binarySearch(nextClosestTo: address + 1)
+        }
+
+        /// Records the head slots of a function's bytecode.
+        mutating func addHeadSlots(_ pcs: [Pc]) {
+            let slots = pcs.map { UInt(bitPattern: $0) }.sorted()
+            guard let first = slots.first else { return }
+            // Functions compile lazily, in any order, into buffers that never overlap.
+            let index = self.headSlots.partitioningIndex { $0 >= first }
+            guard index == self.headSlots.endIndex || self.headSlots[index] != first else { return }
+            self.headSlots.insert(contentsOf: slots, at: index)
+        }
+
+        /// The Wasm address that emitted the instruction `pc` lies in, or just past: the one whose
+        /// head slot is the last before `pc`.
+        func findWasm(forIseqAddressWithin pc: Pc) -> Int? {
+            let index = self.headSlots.partitioningIndex { $0 >= UInt(bitPattern: pc) }
+            guard index > self.headSlots.startIndex, let head = Pc(bitPattern: self.headSlots[index - 1]) else {
+                return nil
+            }
+            return self.iseqToWasm[head]
         }
     #endif
 }

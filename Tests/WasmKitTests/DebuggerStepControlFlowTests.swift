@@ -185,6 +185,21 @@
             i32.add))
         """
 
+    /// Traps in a callee, below `_start`.
+    ///
+    ///   $f:     +0 local.get 0  +2 drop  +3 unreachable
+    ///   _start: +0 i32.const 1  +2 call $f
+    private let trapInCalleeWAT = """
+        (module
+          (func $f (param i32) (result i32)
+            local.get 0
+            drop
+            unreachable)
+          (func (export "_start") (result i32)
+            i32.const 1
+            call $f))
+        """
+
     @Suite
     struct DebuggerStepControlFlowTests {
         private func stoppedPc(_ debugger: borrowing Debugger, sourceLocation: SourceLocation = #_sourceLocation) throws -> Int {
@@ -390,6 +405,27 @@
 
             try debugger.step()
             #expect(try reportedPc(debugger) == base + 6)
+        }
+
+        /// The innermost frame of a trap is the instruction that raised it, not the call that led there.
+        @Test(arguments: testedThreadingModels)
+        func aTrapReportsTheFrameItWasRaisedIn(threadingModel: EngineConfiguration.ThreadingModel) throws {
+            let module = try parseWasm(bytes: try wat2wasm(trapInCalleeWAT))
+            var debugger = try Debugger(module: module, store: makeStore(threadingModel), imports: [:])
+            let calleeBase = module.functions[0].code.originalAddress
+            let startBase = module.functions[1].code.originalAddress
+
+            try debugger.run()
+            guard case .trapped(let trap) = debugger.state else {
+                Issue.record("expected trapped, got \(debugger.state)")
+                return
+            }
+            #expect(trap.callStack.first == calleeBase + 3, "innermost frame should be `unreachable` in $f")
+            #expect(trap.callStack.count >= 2)
+            if trap.callStack.count >= 2 {
+                // A caller frame is at its return address: `_start`'s `end`, right after the call.
+                #expect(trap.callStack[1] == startBase + 4, "caller frame should be in _start")
+            }
         }
 
         /// `compilingCall` rewrites its own head slot the first time it runs, over the breakpoint

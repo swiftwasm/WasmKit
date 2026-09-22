@@ -3074,15 +3074,20 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         assert(initializedElementsIndex == instructions.endIndex)
 
         #if WasmDebuggingSupport
+            var headSlots: [Pc] = []
             for (iseq, canonical, emitting) in self.iseqToWasmMapping {
+                let absoluteIseq = iseq + buffer.baseAddress.unsafelyUnwrapped
+                headSlots.append(absoluteIseq)
                 self.module.withValue {
-                    let absoluteIseq = iseq + buffer.baseAddress.unsafelyUnwrapped
                     $0.instructionMapping.add(canonical: canonical, emitting: emitting, iseq: absoluteIseq)
                 }
             }
             if self.module.isDebuggable {
                 let instructionAddresses = self.instructionAddresses
-                self.module.withValue { $0.instructionMapping.addInstructionAddresses(instructionAddresses) }
+                self.module.withValue {
+                    $0.instructionMapping.addInstructionAddresses(instructionAddresses)
+                    $0.instructionMapping.addHeadSlots(headSlots)
+                }
             }
         #endif
 

@@ -329,12 +329,16 @@
                 try self.stop(at: breakpoint, reportingBreakpoint: true)
             } catch let trap as Trap {
                 let mapping = self.instance.handle.instructionMapping
+                // The backtrace's addresses are return addresses, so the frame the trap was raised in
+                // comes from the trap site.
+                let trapSite = (trap.backtrace?.trapSite).flatMap { mapping.findWasm(forIseqAddressWithin: $0.address) }
                 self.state = .trapped(
                     .init(
                         description: "Trap: \(trap.reason)",
-                        callStack: (trap.backtrace?.symbols ?? []).compactMap {
-                            mapping.firstWasm(forIseqAddress: $0.address)
-                        }
+                        callStack: (trapSite.map { [$0] } ?? [])
+                            + (trap.backtrace?.symbols ?? []).compactMap {
+                                mapping.firstWasm(forIseqAddress: $0.address)
+                            }
                     )
                 )
             }
