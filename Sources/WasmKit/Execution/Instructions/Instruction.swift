@@ -2394,6 +2394,16 @@ enum Instruction {
     case brIfNull(Instruction.BrIfOperand)
     /// Conditional pc-relative branch if the condition is not a null reference
     case brIfNotNull(Instruction.BrIfOperand)
+    /// Point the current memory registers at the given memory of the current instance.
+    /// 
+    /// Emitted around an instruction that accesses a memory other than 0 (multi-memory);
+    /// memory instructions otherwise always access memory 0.
+    case selectMemory(Instruction.SelectMemoryOperand)
+    /// `selectMemory` around an access to a shared memory, which also moves the trap guard.
+    /// 
+    /// A shared memory's bounds check relies on faults in its guard pages. Kept apart
+    /// from `selectMemory` so that the common handler makes no call and stays a leaf.
+    case selectSharedMemory(Instruction.SelectSharedMemoryOperand)
 }
 
 extension Instruction {
@@ -2608,14 +2618,15 @@ extension Instruction {
         var destOffset: VReg
         var sourceOffset: VReg
         var size: VReg
+        var memory: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             let (segmentIndex, destOffset, sourceOffset) = pc.read((UInt32, VReg, VReg).self)
-            let (size, _, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
-            return Self(segmentIndex: segmentIndex, destOffset: destOffset, sourceOffset: sourceOffset, size: size)
+            let (size, memory) = pc.read((VReg, UInt32).self)
+            return Self(segmentIndex: segmentIndex, destOffset: destOffset, sourceOffset: sourceOffset, size: size, memory: memory)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
             emitSlot { unsafeBitCast(($0.segmentIndex, $0.destOffset, $0.sourceOffset) as (UInt32, VReg, VReg), to: CodeSlot.self) }
-            emitSlot { unsafeBitCast(($0.size, 0, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.size, $0.memory) as (VReg, UInt32), to: CodeSlot.self) }
         }
     }
 
@@ -2640,12 +2651,16 @@ extension Instruction {
         var destOffset: VReg
         var sourceOffset: VReg
         var size: LVReg
+        var destMemory: UInt32
+        var sourceMemory: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             let (destOffset, sourceOffset, size) = pc.read((VReg, VReg, LVReg).self)
-            return Self(destOffset: destOffset, sourceOffset: sourceOffset, size: size)
+            let (destMemory, sourceMemory) = pc.read((UInt32, UInt32).self)
+            return Self(destOffset: destOffset, sourceOffset: sourceOffset, size: size, destMemory: destMemory, sourceMemory: sourceMemory)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
             emitSlot { unsafeBitCast(($0.destOffset, $0.sourceOffset, $0.size) as (VReg, VReg, LVReg), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.destMemory, $0.sourceMemory) as (UInt32, UInt32), to: CodeSlot.self) }
         }
     }
 
@@ -2653,12 +2668,15 @@ extension Instruction {
         var destOffset: VReg
         var value: VReg
         var size: LVReg
+        var memory: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             let (destOffset, value, size) = pc.read((VReg, VReg, LVReg).self)
-            return Self(destOffset: destOffset, value: value, size: size)
+            let (memory, _, _, _, _) = pc.read((UInt32, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(destOffset: destOffset, value: value, size: size, memory: memory)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
             emitSlot { unsafeBitCast(($0.destOffset, $0.value, $0.size) as (VReg, VReg, LVReg), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.memory, 0, 0, 0, 0) as (UInt32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
@@ -3623,6 +3641,40 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.value, $0.result) as (LVReg, LVReg), to: CodeSlot.self) }
         }
     }
+
+    struct SelectMemoryOperand: InstructionImmediate {
+        var memory: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let memory = UInt32(truncatingIfNeeded: word0)
+                return Self(memory: memory)
+            #else
+                let (memory, _, _, _, _) = pc.read((UInt32, UInt8, UInt8, UInt8, UInt8).self)
+                return Self(memory: memory)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.memory, 0, 0, 0, 0) as (UInt32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct SelectSharedMemoryOperand: InstructionImmediate {
+        var memory: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let memory = UInt32(truncatingIfNeeded: word0)
+                return Self(memory: memory)
+            #else
+                let (memory, _, _, _, _) = pc.read((UInt32, UInt8, UInt8, UInt8, UInt8).self)
+                return Self(memory: memory)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.memory, 0, 0, 0, 0) as (UInt32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -4352,6 +4404,8 @@ extension Instruction {
         case .refAsNonNull(let immediate): return immediate
         case .brIfNull(let immediate): return immediate
         case .brIfNotNull(let immediate): return immediate
+        case .selectMemory(let immediate): return immediate
+        case .selectSharedMemory(let immediate): return immediate
         default: return nil
         }
     }
@@ -5085,6 +5139,8 @@ extension Instruction {
         case .refAsNonNull(let immediate): immediate.emit(to: emit)
         case .brIfNull(let immediate): immediate.emit(to: emit)
         case .brIfNotNull(let immediate): immediate.emit(to: emit)
+        case .selectMemory(let immediate): immediate.emit(to: emit)
+        case .selectSharedMemory(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -5828,7 +5884,9 @@ extension Instruction {
         case .returnCallRef: return 730
         case .refAsNonNull: return 731
         case .brIfNull: return 732
-        default: return 733  // .brIfNotNull
+        case .brIfNotNull: return 733
+        case .selectMemory: return 734
+        default: return 735  // .selectSharedMemory
         }
     }
 }
@@ -6577,6 +6635,8 @@ extension Instruction {
         case 731: return .refAsNonNull(Instruction.RefAsNonNullOperand.load(from: &pc))
         case 732: return .brIfNull(Instruction.BrIfOperand.load(from: &pc))
         case 733: return .brIfNotNull(Instruction.BrIfOperand.load(from: &pc))
+        case 734: return .selectMemory(Instruction.SelectMemoryOperand.load(from: &pc))
+        case 735: return .selectSharedMemory(Instruction.SelectSharedMemoryOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -7325,6 +7385,8 @@ extension Instruction {
         case 731: return "refAsNonNull"
         case 732: return "brIfNull"
         case 733: return "brIfNotNull"
+        case 734: return "selectMemory"
+        case 735: return "selectSharedMemory"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }

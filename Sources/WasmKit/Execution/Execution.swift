@@ -558,7 +558,7 @@ extension Execution {
     enum CurrentMemory {
         /// Assigns the current memory to the given internal memory.
         @inline(__always)
-        private static func assign(md: inout Md, ms: inout Ms, memory: InternalMemory) {
+        static func assign(md: inout Md, ms: inout Ms, memory: InternalMemory) {
             memory.withValue { assign(md: &md, ms: &ms, memory: &$0) }
         }
 
@@ -572,6 +572,15 @@ extension Execution {
             // the committed size (the tight software bound).
             ms = UInt(bitPattern: memory.boundsCheckLimit)
             wasmkit_trap_guard_set_current_memory(md, memory.trapGuardReservationSize)
+        }
+
+        /// Assigns the current memory without moving the trap guard, for a memory
+        /// that is not shared: only a shared memory's bounds check relies on faults,
+        /// and the others are checked exactly (see `Execution.selectMemory`).
+        @inline(__always)
+        static func assignKeepingTrapGuard(md: inout Md, ms: inout Ms, memory: inout MemoryEntity) {
+            md = memory.baseAddress
+            ms = UInt(bitPattern: memory.boundsCheckLimit)
         }
 
         /// Assigns the current memory to nil.

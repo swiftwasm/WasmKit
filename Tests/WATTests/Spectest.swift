@@ -26,8 +26,11 @@ enum Spectest {
                 testsuitePath.appendingPathComponent("proposals/tail-call"),
                 testsuitePath.appendingPathComponent("proposals/threads"),
                 testsuitePath.appendingPathComponent("proposals/function-references"),
+                testsuitePath.appendingPathComponent("proposals/multi-memory"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/function-references"),
+                rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/multi-memory"),
+                rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/multi-memory/threads"),
             ].flatMap {
                 try! FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
             }.compactMap { filePath in
@@ -56,6 +59,13 @@ enum Spectest {
         }
         if wast.deletingLastPathComponent().lastPathComponent == "function-references" {
             features.insert(.functionReferences)
+        }
+        if wast.deletingLastPathComponent().lastPathComponent == "multi-memory" {
+            features.insert(.multiMemory)
+        }
+        if wast.deletingLastPathComponent().path.hasSuffix("multi-memory/threads") {
+            features.insert(.multiMemory)
+            features.insert(.threads)
         }
         return features
     }

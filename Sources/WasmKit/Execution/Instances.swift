@@ -962,6 +962,35 @@ extension MemoryEntity: ValidatableEntity {
 
 typealias InternalMemory = EntityHandle<MemoryEntity>
 
+extension InternalMemory {
+    /// Implements `memory.copy` from `sourceMemory` into this memory, which may
+    /// be the same memory.
+    func copy(from sourceMemory: InternalMemory, sourceOffset: UInt64, destOffset: UInt64, count: UInt64) throws {
+        if self == sourceMemory {
+            try withValue { try $0.copy(from: sourceOffset, to: destOffset, count: count) }
+            return
+        }
+        // Read the source's extent before opening this memory's access: reaching
+        // through a second entity handle from inside `withValue` miscompiles in a
+        // release build (see ``Execution/memoryInit(sp:immediate:)``).
+        let (sourceBase, sourceByteCount) = sourceMemory.withValue { ($0.baseAddress, $0.byteCount) }
+        try withValue { destination in
+            let (destinationEnd, destinationOverflow) = destOffset.addingReportingOverflow(count)
+            let (sourceEnd, sourceOverflow) = sourceOffset.addingReportingOverflow(count)
+            guard !destinationOverflow, destinationEnd <= destination.byteCount,
+                !sourceOverflow, sourceEnd <= sourceByteCount
+            else {
+                throw Trap(.memoryOutOfBounds)
+            }
+            let count = Int(count)
+            guard count > 0, let destinationBase = destination.baseAddress, let sourceBase else { return }
+            // Two memories never overlap, so a plain copy is enough.
+            destinationBase.advanced(by: Int(destOffset))
+                .copyMemory(from: sourceBase.advanced(by: Int(sourceOffset)), byteCount: count)
+        }
+    }
+}
+
 /// A WebAssembly `memory` instance.
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#memory-instances>

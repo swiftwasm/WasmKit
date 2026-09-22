@@ -309,7 +309,8 @@ extension Execution {
     }
 
     mutating func memoryGrow(sp: Sp, md: inout Md, ms: inout Ms, immediate: Instruction.MemoryGrowOperand) throws {
-        let memory = currentInstance(sp: sp).memories[Int(immediate.memory)]
+        let instance = currentInstance(sp: sp)
+        let memory = instance.memories[Int(immediate.memory)]
         try memory.withValue { memory in
             let isMemory64 = memory.limit.isMemory64
 
@@ -329,13 +330,40 @@ extension Execution {
                 let (bytes, overflow) = pageCount.multipliedReportingOverflow(by: UInt64(MemoryEntity.pageSize))
                 try chargeBytesCopied(overflow ? .max : bytes)
             }
-            CurrentMemory.assign(md: &md, ms: &ms, memory: &memory)
+            // The current memory registers hold memory 0 (see `selectMemory`).
+            if immediate.memory == 0 {
+                CurrentMemory.assign(md: &md, ms: &ms, memory: &memory)
+            }
             sp[immediate.result] = UntypedValue(oldPageCount)
         }
+        if immediate.memory != 0 {
+            // The same memory can be imported as memory 0 too, and growing may have
+            // moved its storage. Re-read memory 0 once the grown memory's access is
+            // closed: nesting two entity accesses miscompiles (see `memoryInit`).
+            CurrentMemory.mayUpdateCurrentInstance(instance: instance, md: &md, ms: &ms)
+        }
+    }
+
+    /// Points the current memory registers at a memory of the current instance.
+    ///
+    /// Memory instructions access the memory the registers hold, memory 0, so the
+    /// translator emits this around an instruction for another memory. The trap
+    /// guard stays where it is: accesses to a memory that is not shared never
+    /// fault. `selectSharedMemory` moves it too.
+    mutating func selectMemory(sp: Sp, md: inout Md, ms: inout Ms, immediate: Instruction.SelectMemoryOperand) {
+        let memory = currentInstance(sp: sp).memories[Int(immediate.memory)]
+        memory.withValue { CurrentMemory.assignKeepingTrapGuard(md: &md, ms: &ms, memory: &$0) }
+    }
+
+    /// `selectMemory` around an access to a shared memory: its bounds check relies
+    /// on faults in its guard pages, so the trap guard has to cover it.
+    mutating func selectSharedMemory(sp: Sp, md: inout Md, ms: inout Ms, immediate: Instruction.SelectSharedMemoryOperand) {
+        let memory = currentInstance(sp: sp).memories[Int(immediate.memory)]
+        memory.withValue { CurrentMemory.assign(md: &md, ms: &ms, memory: &$0) }
     }
     mutating func memoryInit(sp: Sp, immediate: Instruction.MemoryInitOperand) throws {
         let instance = currentInstance(sp: sp)
-        let memory = instance.memories[0]
+        let memory = instance.memories[Int(immediate.memory)]
         // Read the segment's bytes before opening the memory's access. Reaching
         // through a second entity handle from inside `memory.withValue` -- both
         // of which hand out `inout` access to a raw pointee -- miscompiles in a
@@ -354,18 +382,20 @@ extension Execution {
         segment.withValue { $0.drop() }
     }
     mutating func memoryCopy(sp: Sp, immediate: Instruction.MemoryCopyOperand) throws {
-        let memory = currentInstance(sp: sp).memories[0]
-        try memory.withValue { memory in
-            let isMemory64 = memory.limit.isMemory64
-            let size = sp[immediate.size].asAddressOffset(isMemory64)
-            let source = sp[immediate.sourceOffset].asAddressOffset(isMemory64)
-            let destination = sp[immediate.destOffset].asAddressOffset(isMemory64)
-            try memory.copy(from: source, to: destination, count: size)
-            try chargeBytesCopied(size)
-        }
+        let instance = currentInstance(sp: sp)
+        let destinationMemory = instance.memories[Int(immediate.destMemory)]
+        let sourceMemory = instance.memories[Int(immediate.sourceMemory)]
+        let destIsMemory64 = destinationMemory.withValue { $0.limit.isMemory64 }
+        let sourceIsMemory64 = sourceMemory.withValue { $0.limit.isMemory64 }
+        // The size has the smaller of the two memories' address types.
+        let size = sp[immediate.size].asAddressOffset(destIsMemory64 && sourceIsMemory64)
+        let source = sp[immediate.sourceOffset].asAddressOffset(sourceIsMemory64)
+        let destination = sp[immediate.destOffset].asAddressOffset(destIsMemory64)
+        try destinationMemory.copy(from: sourceMemory, sourceOffset: source, destOffset: destination, count: size)
+        try chargeBytesCopied(size)
     }
     mutating func memoryFill(sp: Sp, immediate: Instruction.MemoryFillOperand) throws {
-        let memory = currentInstance(sp: sp).memories[0]
+        let memory = currentInstance(sp: sp).memories[Int(immediate.memory)]
         try memory.withValue { memoryInstance in
             let isMemory64 = memoryInstance.limit.isMemory64
             let rawCount = sp[immediate.size].asAddressOffset(isMemory64)
@@ -506,13 +536,16 @@ extension Execution {
 
     // MARK: - Atomic Wait/Notify
 
-    /// The parking lot for `atomic.wait`/`notify` on the current default memory: the
-    /// shared memory's own lot (shared by all importing threads) when shared.
-    func atomicParkingLot(sp: Sp) -> AtomicParkingLot? {
-        if let memory = currentInstance(sp: sp).memories.first,
-            let lot = memory.withValue({ $0.sharedParkingLot })
-        {
-            return lot
+    /// The parking lot for `atomic.wait`/`notify` on the current memory, the one
+    /// whose base address `md` holds: the shared memory's own lot (shared by all
+    /// importing threads) when shared.
+    func atomicParkingLot(sp: Sp, md: Md) -> AtomicParkingLot? {
+        // The current memory is memory 0 unless `selectMemory` switched it.
+        for memory in currentInstance(sp: sp).memories {
+            let (baseAddress, lot) = memory.withValue { ($0.baseAddress, $0.sharedParkingLot) }
+            if baseAddress == md {
+                return lot
+            }
         }
         return nil
     }
@@ -527,7 +560,7 @@ extension Execution {
         }
         if _fastPath(Execution.isInBounds(address: address, offset: waitOperand.offset, length: 4, ms: ms)) {
             // `atomic.wait` is only valid on a shared memory.
-            guard let parkingLot = atomicParkingLot(sp: sp) else {
+            guard let parkingLot = atomicParkingLot(sp: sp, md: md) else {
                 throw Trap(.message(.atomicWaitOnUnsharedMemory))
             }
             let rawPtr = md.unsafelyUnwrapped.advanced(by: Execution.checkedByteOffset(address))
@@ -582,7 +615,7 @@ extension Execution {
         }
         if _fastPath(Execution.isInBounds(address: address, offset: waitOperand.offset, length: 8, ms: ms)) {
             // `atomic.wait` is only valid on a shared memory.
-            guard let parkingLot = atomicParkingLot(sp: sp) else {
+            guard let parkingLot = atomicParkingLot(sp: sp, md: md) else {
                 throw Trap(.message(.atomicWaitOnUnsharedMemory))
             }
             let rawPtr = md.unsafelyUnwrapped.advanced(by: Execution.checkedByteOffset(address))
@@ -633,7 +666,7 @@ extension Execution {
         let address = Execution.memoryAddress(offset: notifyOperand.offset, index: i)
         if _fastPath(Execution.isInBounds(address: address, offset: notifyOperand.offset, length: 4, ms: ms)) {
             // A non-shared memory can have no waiters, so nothing is woken.
-            guard let parkingLot = atomicParkingLot(sp: sp) else {
+            guard let parkingLot = atomicParkingLot(sp: sp, md: md) else {
                 sp[notifyOperand.result] = .i32(0)
                 return
             }

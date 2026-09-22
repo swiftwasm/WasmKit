@@ -524,12 +524,6 @@ struct ExpressionEncoder: BinaryInstructionEncoder {
     }
 
     // MARK: Special instructions
-    mutating func visitMemoryInit(dataIndex: UInt32) {
-        encodeInstruction([0xFC, 0x08])
-        encodeImmediates(dataIndex: dataIndex)
-        encodeByte(0x00)  // reserved value
-    }
-
     mutating func visitTypedSelect(type: ValueType) {
         encodeInstruction([0x1C])
         encodeByte(0x01)  // number of result types
@@ -553,13 +547,24 @@ struct ExpressionEncoder: BinaryInstructionEncoder {
         hasDataSegmentInstruction = true
         encodeUnsigned(dataIndex)
     }
+    mutating func encodeImmediates(dataIndex: UInt32, memory: UInt32) {
+        // For memory 0, encoding the memory index yields the single 0x00 the pre-multi-memory reserved byte produced.
+        encodeImmediates(dataIndex: dataIndex)
+        encodeUnsigned(memory)
+    }
     mutating func encodeImmediates(elemIndex: UInt32) { encodeUnsigned(elemIndex) }
     mutating func encodeImmediates(functionIndex: UInt32) { encodeUnsigned(functionIndex) }
     mutating func encodeImmediates(globalIndex: UInt32) { encodeUnsigned(globalIndex) }
     mutating func encodeImmediates(localIndex: UInt32) { encodeUnsigned(localIndex) }
     mutating func encodeImmediates(typeIndex: UInt32) { encodeUnsigned(typeIndex) }
     mutating func encodeImmediates(memarg: WasmParser.MemArg) {
-        encodeUnsigned(UInt(memarg.align))
+        if memarg.memory == 0 {
+            encodeUnsigned(UInt(memarg.align))
+        } else {
+            // Multi-memory: bit 6 of the flags says the memory index follows them.
+            encodeUnsigned(UInt(memarg.align | 0x40))
+            encodeUnsigned(memarg.memory)
+        }
         encodeUnsigned(memarg.offset)
     }
     mutating func encodeImmediates(lane: UInt8) { encoder.output.append(lane) }

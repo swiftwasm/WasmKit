@@ -825,6 +825,7 @@ extension VMGen {
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "sourceOffset", type: .VReg)
             $0.field(name: "size", type: .VReg)
+            $0.field(name: "memory", type: .MemoryIndex)
         },
         Instruction(name: "memoryDataDrop", documentation: "WebAssembly Core Instruction `memory.drop`") {
             $0.field(name: "segmentIndex", type: .UInt32)
@@ -833,11 +834,14 @@ extension VMGen {
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "sourceOffset", type: .VReg)
             $0.field(name: "size", type: .LVReg)
+            $0.field(name: "destMemory", type: .MemoryIndex)
+            $0.field(name: "sourceMemory", type: .MemoryIndex)
         },
         Instruction(name: "memoryFill", documentation: "WebAssembly Core Instruction `memory.fill`", mayThrow: true) {
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "value", type: .VReg)
             $0.field(name: "size", type: .LVReg)
+            $0.field(name: "memory", type: .MemoryIndex)
         },
     ]
 
@@ -1826,6 +1830,33 @@ extension VMGen {
             Instruction(
                 name: "brIfNotNull", documentation: "Conditional pc-relative branch if the condition is not a null reference",
                 isControl: true, mayUpdateFrame: false, immediateLayout: .brIfOperand),
+        ]
+        // Multi-memory
+        instructions += [
+            Instruction(
+                name: "selectMemory",
+                documentation: """
+                    Point the current memory registers at the given memory of the current instance.
+
+                    Emitted around an instruction that accesses a memory other than 0 (multi-memory);
+                    memory instructions otherwise always access memory 0.
+                    """,
+                useCurrentMemory: .write
+            ) {
+                $0.field(name: "memory", type: .MemoryIndex)
+            },
+            Instruction(
+                name: "selectSharedMemory",
+                documentation: """
+                    `selectMemory` around an access to a shared memory, which also moves the trap guard.
+
+                    A shared memory's bounds check relies on faults in its guard pages. Kept apart
+                    from `selectMemory` so that the common handler makes no call and stays a leaf.
+                    """,
+                useCurrentMemory: .write
+            ) {
+                $0.field(name: "memory", type: .MemoryIndex)
+            },
         ]
         return instructions
     }

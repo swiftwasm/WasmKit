@@ -44,10 +44,13 @@ extension Code: Equatable {
 public struct MemArg: Equatable, Sendable {
     public let offset: UInt64
     public let align: UInt32
+    /// The memory the instruction accesses; always 0 without the multi-memory proposal.
+    public let memory: UInt32
 
-    public init(offset: UInt64, align: UInt32) {
+    public init(offset: UInt64, align: UInt32, memory: UInt32 = 0) {
         self.offset = offset
         self.align = align
+        self.memory = memory
     }
 }
 

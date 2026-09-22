@@ -4480,13 +4480,45 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             })
     }
 
+    /// Starts translating an instruction that accesses `memory`, and returns
+    /// whether that memory is 64-bit.
+    ///
+    /// Memory instructions reach memory through the current memory registers,
+    /// which hold memory 0. For another memory, this switches them to it, and
+    /// ``endMemoryAccess(_:)`` switches them back after the instruction.
+    private mutating func beginMemoryAccess(_ memory: UInt32) throws(WasmKitError) -> Bool {
+        let isMemory64 = try module.isMemory64(memoryIndex: memory)
+        if memory != 0 {
+            emitSelectMemory(memory, accessing: memory)
+        }
+        return isMemory64
+    }
+
+    private mutating func endMemoryAccess(_ memory: UInt32) {
+        guard memory != 0 else { return }
+        emitSelectMemory(0, accessing: memory)
+    }
+
+    /// Emits the switch of the current memory to `target` around an access to
+    /// `accessed`. Only a shared memory needs the trap guard moved to it and back.
+    private mutating func emitSelectMemory(_ target: UInt32, accessing accessed: UInt32) {
+        if module.memories[Int(accessed)].limit.shared {
+            emit(.selectSharedMemory(Instruction.SelectSharedMemoryOperand(memory: target)))
+        } else {
+            emit(.selectMemory(Instruction.SelectMemoryOperand(memory: target)))
+        }
+        // Nothing is handed over in the accumulator across the switch.
+        iseqBuilder.resetLastEmission()
+    }
+
     private mutating func visitLoad(
         _ memarg: MemArg,
         _ type: ValueType,
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.LoadOperand) -> Instruction
     ) throws(WasmKitError) {
-        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        let isMemory64 = try beginMemoryAccess(memarg.memory)
+        defer { endMemoryAccess(memarg.memory) }
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         try popPushEmit(.address(isMemory64: isMemory64), type) { value, result in
             let loadOperand = Instruction.LoadOperand(
@@ -4589,7 +4621,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         _ naturalAlignment: Int,
         _ instruction: (Instruction.StoreOperand) -> Instruction
     ) throws(WasmKitError) {
-        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        let isMemory64 = try beginMemoryAccess(memarg.memory)
+        defer { endMemoryAccess(memarg.memory) }
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let value = try popVRegOperand(type)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
@@ -4604,7 +4637,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitLoad(_ load: WasmParser.Instruction.Load, memarg: MemArg) throws(WasmKitError) {
-        if let forms = Self.accLoadForms(load), try !module.isMemory64(memoryIndex: 0),
+        // The accumulator forms work on the current memory as it is, memory 0.
+        if let forms = Self.accLoadForms(load), memarg.memory == 0, try !module.isMemory64(memoryIndex: 0),
             let offset = UInt32(exactly: memarg.offset)
         {
             return try visitAccLoad(load, forms, memarg: memarg, offset: offset)
@@ -4618,7 +4652,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case .v128Load, .v128Load8X8S, .v128Load8X8U, .v128Load16X4S, .v128Load16X4U,
             .v128Load32X2S, .v128Load32X2U, .v128Load8Splat, .v128Load16Splat, .v128Load32Splat,
             .v128Load64Splat, .v128Load32Zero, .v128Load64Zero:
-            let isMemory64 = try module.isMemory64(memoryIndex: 0)
+            let isMemory64 = try beginMemoryAccess(memarg.memory)
+            defer { endMemoryAccess(memarg.memory) }
             try validator.validateMemArg(memarg, naturalAlignment: load.naturalAlignment)
             guard let opcode = SIMDOpcode.fromLoad(load) else { preconditionFailure("missing SIMDOpcode mapping: \(load)") }
             try popPushEmit(.address(isMemory64: isMemory64), .v128) { pointer, result in
@@ -4658,7 +4693,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitStore(_ store: WasmParser.Instruction.Store, memarg: MemArg) throws(WasmKitError) {
-        if let forms = Self.accStoreForms(store), try !module.isMemory64(memoryIndex: 0),
+        // The accumulator forms work on the current memory as it is, memory 0.
+        if let forms = Self.accStoreForms(store), memarg.memory == 0, try !module.isMemory64(memoryIndex: 0),
             let offset = UInt32(exactly: memarg.offset)
         {
             return try visitAccStore(store, forms, memarg: memarg, offset: offset)
@@ -4670,7 +4706,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         case .f32Store: instruction = Instruction.f32Store
         case .f64Store: instruction = Instruction.f64Store
         case .v128Store:
-            let isMemory64 = try module.isMemory64(memoryIndex: 0)
+            let isMemory64 = try beginMemoryAccess(memarg.memory)
+            defer { endMemoryAccess(memarg.memory) }
             try validator.validateMemArg(memarg, naturalAlignment: store.naturalAlignment)
             guard let opcode = SIMDOpcode.fromStore(store) else { preconditionFailure("missing SIMDOpcode mapping: \(store)") }
             let value = try popVRegOperand(.v128)
@@ -4910,7 +4947,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitSimdMemLane(_ simdMemLane: WasmParser.Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws(WasmKitError) {
-        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        let isMemory64 = try beginMemoryAccess(memarg.memory)
+        defer { endMemoryAccess(memarg.memory) }
         guard let opcode = SIMDOpcode.fromSimdMemLane(simdMemLane) else { preconditionFailure("missing SIMDOpcode mapping: \(simdMemLane)") }
         let naturalAlignment: Int
         let laneCount: UInt8
@@ -5811,9 +5849,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         try visitConversion(from, to, instruction)
     }
 
-    mutating func visitMemoryInit(dataIndex: UInt32) throws(WasmKitError) -> Output {
+    mutating func visitMemoryInit(dataIndex: UInt32, memory: UInt32) throws(WasmKitError) -> Output {
         try self.validator.validateDataSegment(dataIndex)
-        let addressType = try module.addressType(memoryIndex: 0)
+        let addressType = try module.addressType(memoryIndex: memory)
         try pop3Emit((.i32, .i32, addressType)) { values, stack in
             let (size, sourceOffset, destOffset) = values
             return .memoryInit(
@@ -5821,7 +5859,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                     segmentIndex: dataIndex,
                     destOffset: destOffset,
                     sourceOffset: sourceOffset,
-                    size: size
+                    size: size,
+                    memory: memory
                 )
             )
         }
@@ -5831,35 +5870,46 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         emit(.memoryDataDrop(Instruction.MemoryDataDropOperand(segmentIndex: dataIndex)))
     }
     mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws(WasmKitError) -> Output {
-        //     C.mems[0] = it limits
-        // -----------------------------
-        // C ⊦ memory.fill : [it i32 it] → []
+        //   C.mems[d] = iN limits   C.mems[s] = iM limits    K = min {N, M}
+        // -----------------------------------------------------------------------------
+        // C |- memory.copy d s : [iN iM iK] -> []
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
-        let addressType = try module.addressType(memoryIndex: 0)
-        try pop3Emit((addressType, addressType, addressType)) { values, stack in
+        let destIsMemory64 = try module.isMemory64(memoryIndex: dstMem)
+        let sourceIsMemory64 = try module.isMemory64(memoryIndex: srcMem)
+        let lengthIsMemory64 = destIsMemory64 && sourceIsMemory64
+        try pop3Emit(
+            (
+                .address(isMemory64: lengthIsMemory64),
+                .address(isMemory64: sourceIsMemory64),
+                .address(isMemory64: destIsMemory64)
+            )
+        ) { values, stack in
             let (size, sourceOffset, destOffset) = values
             return .memoryCopy(
                 Instruction.MemoryCopyOperand(
                     destOffset: destOffset,
                     sourceOffset: sourceOffset,
-                    size: LVReg(size)
+                    size: LVReg(size),
+                    destMemory: dstMem,
+                    sourceMemory: srcMem
                 )
             )
         }
     }
     mutating func visitMemoryFill(memory: UInt32) throws(WasmKitError) -> Output {
-        //     C.mems[0] = it limits
+        //     C.mems[x] = it limits
         // -----------------------------
-        // C ⊦ memory.fill : [it i32 it] → []
+        // C ⊦ memory.fill x : [it i32 it] → []
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
-        let addressType = try module.addressType(memoryIndex: 0)
+        let addressType = try module.addressType(memoryIndex: memory)
         try pop3Emit((addressType, .i32, addressType)) { values, stack in
             let (size, value, destOffset) = values
             return .memoryFill(
                 Instruction.MemoryFillOperand(
                     destOffset: destOffset,
                     value: value,
-                    size: LVReg(size)
+                    size: LVReg(size),
+                    memory: memory
                 )
             )
         }
@@ -5984,7 +6034,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.RmwOperand) -> Instruction
     ) throws(WasmKitError) {
-        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        let isMemory64 = try beginMemoryAccess(memarg.memory)
+        defer { endMemoryAccess(memarg.memory) }
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let value = try popVRegOperand(type)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
@@ -6007,7 +6058,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.RmwOperand) -> Instruction
     ) throws(WasmKitError) {
-        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        let isMemory64 = try beginMemoryAccess(memarg.memory)
+        defer { endMemoryAccess(memarg.memory) }
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let value = try popVRegOperand(resultType)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
@@ -6030,7 +6082,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.RmwOperand) -> Instruction
     ) throws(WasmKitError) {
-        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        let isMemory64 = try beginMemoryAccess(memarg.memory)
+        defer { endMemoryAccess(memarg.memory) }
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let value = try popVRegOperand(resultType)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
@@ -6053,7 +6106,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.RmwOperand) -> Instruction
     ) throws(WasmKitError) {
-        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        let isMemory64 = try beginMemoryAccess(memarg.memory)
+        defer { endMemoryAccess(memarg.memory) }
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let value = try popVRegOperand(resultType)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
@@ -6208,7 +6262,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.CmpxchgOperand) -> Instruction
     ) throws(WasmKitError) {
-        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        let isMemory64 = try beginMemoryAccess(memarg.memory)
+        defer { endMemoryAccess(memarg.memory) }
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let replacement = try popVRegOperand(type)
         let expected = try popVRegOperand(type)
@@ -6233,7 +6288,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.CmpxchgOperand) -> Instruction
     ) throws(WasmKitError) {
-        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        let isMemory64 = try beginMemoryAccess(memarg.memory)
+        defer { endMemoryAccess(memarg.memory) }
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let replacement = try popVRegOperand(resultType)
         let expected = try popVRegOperand(resultType)
@@ -6258,7 +6314,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.CmpxchgOperand) -> Instruction
     ) throws(WasmKitError) {
-        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        let isMemory64 = try beginMemoryAccess(memarg.memory)
+        defer { endMemoryAccess(memarg.memory) }
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let replacement = try popVRegOperand(resultType)
         let expected = try popVRegOperand(resultType)
@@ -6283,7 +6340,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.CmpxchgOperand) -> Instruction
     ) throws(WasmKitError) {
-        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        let isMemory64 = try beginMemoryAccess(memarg.memory)
+        defer { endMemoryAccess(memarg.memory) }
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let replacement = try popVRegOperand(resultType)
         let expected = try popVRegOperand(resultType)
@@ -6325,7 +6383,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitMemoryAtomicWait32(memarg: MemArg) throws(WasmKitError) -> Output {
-        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        let isMemory64 = try beginMemoryAccess(memarg.memory)
+        defer { endMemoryAccess(memarg.memory) }
         try validator.validateMemArg(memarg, naturalAlignment: 4)
         let timeout = try popVRegOperand(.i64)
         let expected = try popVRegOperand(.i32)
@@ -6345,7 +6404,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitMemoryAtomicWait64(memarg: MemArg) throws(WasmKitError) -> Output {
-        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        let isMemory64 = try beginMemoryAccess(memarg.memory)
+        defer { endMemoryAccess(memarg.memory) }
         try validator.validateMemArg(memarg, naturalAlignment: 8)
         let timeout = try popVRegOperand(.i64)
         let expected = try popVRegOperand(.i64)
@@ -6365,7 +6425,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitMemoryAtomicNotify(memarg: MemArg) throws(WasmKitError) -> Output {
-        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        let isMemory64 = try beginMemoryAccess(memarg.memory)
+        defer { endMemoryAccess(memarg.memory) }
         try validator.validateMemArg(memarg, naturalAlignment: 4)
         let count = try popVRegOperand(.i32)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
