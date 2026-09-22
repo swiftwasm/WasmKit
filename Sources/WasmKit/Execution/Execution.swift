@@ -574,6 +574,15 @@ extension Execution {
             wasmkit_trap_guard_set_current_memory(md, memory.trapGuardReservationSize)
         }
 
+        /// Assigns the current memory without moving the trap guard, for a memory
+        /// that is not shared: only a shared memory's bounds check relies on faults,
+        /// and the others are checked exactly (see `Execution.selectMemory`).
+        @inline(__always)
+        static func assignKeepingTrapGuard(md: inout Md, ms: inout Ms, memory: inout MemoryEntity) {
+            md = memory.baseAddress
+            ms = UInt(bitPattern: memory.boundsCheckLimit)
+        }
+
         /// Assigns the current memory to nil.
         @inline(__always)
         static func assignNil(md: inout Md, ms: inout Ms) {

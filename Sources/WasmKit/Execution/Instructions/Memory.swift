@@ -347,10 +347,19 @@ extension Execution {
     /// Points the current memory registers at a memory of the current instance.
     ///
     /// Memory instructions access the memory the registers hold, memory 0, so the
-    /// translator emits this around an instruction for another memory.
+    /// translator emits this around an instruction for another memory. The trap
+    /// guard stays where it is: accesses to a memory that is not shared never
+    /// fault. `selectSharedMemory` moves it too.
     mutating func selectMemory(sp: Sp, md: inout Md, ms: inout Ms, immediate: Instruction.SelectMemoryOperand) {
         let memory = currentInstance(sp: sp).memories[Int(immediate.memory)]
-        CurrentMemory.assign(md: &md, ms: &ms, memory: memory)
+        memory.withValue { CurrentMemory.assignKeepingTrapGuard(md: &md, ms: &ms, memory: &$0) }
+    }
+
+    /// `selectMemory` around an access to a shared memory: its bounds check relies
+    /// on faults in its guard pages, so the trap guard has to cover it.
+    mutating func selectSharedMemory(sp: Sp, md: inout Md, ms: inout Ms, immediate: Instruction.SelectSharedMemoryOperand) {
+        let memory = currentInstance(sp: sp).memories[Int(immediate.memory)]
+        memory.withValue { CurrentMemory.assign(md: &md, ms: &ms, memory: &$0) }
     }
     mutating func memoryInit(sp: Sp, immediate: Instruction.MemoryInitOperand) throws {
         let instance = currentInstance(sp: sp)

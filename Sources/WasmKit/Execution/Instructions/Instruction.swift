@@ -2399,6 +2399,11 @@ enum Instruction {
     /// Emitted around an instruction that accesses a memory other than 0 (multi-memory);
     /// memory instructions otherwise always access memory 0.
     case selectMemory(Instruction.SelectMemoryOperand)
+    /// `selectMemory` around an access to a shared memory, which also moves the trap guard.
+    /// 
+    /// A shared memory's bounds check relies on faults in its guard pages. Kept apart
+    /// from `selectMemory` so that the common handler makes no call and stays a leaf.
+    case selectSharedMemory(Instruction.SelectSharedMemoryOperand)
 }
 
 extension Instruction {
@@ -3653,6 +3658,23 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.memory, 0, 0, 0, 0) as (UInt32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
+
+    struct SelectSharedMemoryOperand: InstructionImmediate {
+        var memory: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let memory = UInt32(truncatingIfNeeded: word0)
+                return Self(memory: memory)
+            #else
+                let (memory, _, _, _, _) = pc.read((UInt32, UInt8, UInt8, UInt8, UInt8).self)
+                return Self(memory: memory)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.memory, 0, 0, 0, 0) as (UInt32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -4383,6 +4405,7 @@ extension Instruction {
         case .brIfNull(let immediate): return immediate
         case .brIfNotNull(let immediate): return immediate
         case .selectMemory(let immediate): return immediate
+        case .selectSharedMemory(let immediate): return immediate
         default: return nil
         }
     }
@@ -5117,6 +5140,7 @@ extension Instruction {
         case .brIfNull(let immediate): immediate.emit(to: emit)
         case .brIfNotNull(let immediate): immediate.emit(to: emit)
         case .selectMemory(let immediate): immediate.emit(to: emit)
+        case .selectSharedMemory(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -5861,7 +5885,8 @@ extension Instruction {
         case .refAsNonNull: return 731
         case .brIfNull: return 732
         case .brIfNotNull: return 733
-        default: return 734  // .selectMemory
+        case .selectMemory: return 734
+        default: return 735  // .selectSharedMemory
         }
     }
 }
@@ -6611,6 +6636,7 @@ extension Instruction {
         case 732: return .brIfNull(Instruction.BrIfOperand.load(from: &pc))
         case 733: return .brIfNotNull(Instruction.BrIfOperand.load(from: &pc))
         case 734: return .selectMemory(Instruction.SelectMemoryOperand.load(from: &pc))
+        case 735: return .selectSharedMemory(Instruction.SelectSharedMemoryOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -7360,6 +7386,7 @@ extension Instruction {
         case 732: return "brIfNull"
         case 733: return "brIfNotNull"
         case 734: return "selectMemory"
+        case 735: return "selectSharedMemory"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }

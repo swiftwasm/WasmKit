@@ -4489,16 +4489,25 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     private mutating func beginMemoryAccess(_ memory: UInt32) throws(WasmKitError) -> Bool {
         let isMemory64 = try module.isMemory64(memoryIndex: memory)
         if memory != 0 {
-            emit(.selectMemory(Instruction.SelectMemoryOperand(memory: memory)))
-            // Nothing is handed over in the accumulator across the switch.
-            iseqBuilder.resetLastEmission()
+            emitSelectMemory(memory, accessing: memory)
         }
         return isMemory64
     }
 
     private mutating func endMemoryAccess(_ memory: UInt32) {
         guard memory != 0 else { return }
-        emit(.selectMemory(Instruction.SelectMemoryOperand(memory: 0)))
+        emitSelectMemory(0, accessing: memory)
+    }
+
+    /// Emits the switch of the current memory to `target` around an access to
+    /// `accessed`. Only a shared memory needs the trap guard moved to it and back.
+    private mutating func emitSelectMemory(_ target: UInt32, accessing accessed: UInt32) {
+        if module.memories[Int(accessed)].limit.shared {
+            emit(.selectSharedMemory(Instruction.SelectSharedMemoryOperand(memory: target)))
+        } else {
+            emit(.selectMemory(Instruction.SelectMemoryOperand(memory: target)))
+        }
+        // Nothing is handed over in the accumulator across the switch.
         iseqBuilder.resetLastEmission()
     }
 
