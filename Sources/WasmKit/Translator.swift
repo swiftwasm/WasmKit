@@ -3092,9 +3092,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             }
             if self.module.isDebuggable {
                 let instructionAddresses = self.instructionAddresses
+                let codeEnd = buffer.baseAddress.unsafelyUnwrapped + buffer.count
                 self.module.withValue {
                     $0.instructionMapping.addInstructionAddresses(instructionAddresses)
-                    $0.instructionMapping.addHeadSlots(headSlots)
+                    $0.instructionMapping.addHeadSlots(headSlots, end: codeEnd)
                 }
             }
         #endif
