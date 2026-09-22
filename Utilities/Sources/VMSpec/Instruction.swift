@@ -1844,7 +1844,19 @@ extension VMGen {
                 useCurrentMemory: .write
             ) {
                 $0.field(name: "memory", type: .MemoryIndex)
-            }
+            },
+            Instruction(
+                name: "selectSharedMemory",
+                documentation: """
+                    `selectMemory` around an access to a shared memory, which also moves the trap guard.
+
+                    A shared memory's bounds check relies on faults in its guard pages. Kept apart
+                    from `selectMemory` so that the common handler makes no call and stays a leaf.
+                    """,
+                useCurrentMemory: .write
+            ) {
+                $0.field(name: "memory", type: .MemoryIndex)
+            },
         ]
         return instructions
     }
