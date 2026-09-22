@@ -26,6 +26,7 @@ enum Spectest {
                 testsuitePath.appendingPathComponent("proposals/tail-call"),
                 testsuitePath.appendingPathComponent("proposals/threads"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
+                rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/function-references"),
             ].flatMap {
                 try! FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
             }.compactMap { filePath in
@@ -51,6 +52,9 @@ enum Spectest {
         }
         if wast.deletingLastPathComponent().path.hasSuffix("proposals/threads") {
             features.insert(.threads)
+        }
+        if wast.deletingLastPathComponent().lastPathComponent == "function-references" {
+            features.insert(.functionReferences)
         }
         return features
     }

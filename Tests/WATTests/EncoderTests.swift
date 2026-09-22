@@ -15,11 +15,12 @@ struct EncoderTests {
         "--enable-threads"
     ]
 
-    /// Features enabled only for the given files. With function references
-    /// enabled, wast2json writes element segments as expressions rather than
-    /// function indices, so the encoder's output would no longer match elsewhere.
-    private static let wast2jsonFileFeatures: [String: [String]] = [
-        "function_references.wast": ["--enable-function-references"]
+    /// Features enabled only for the files in the given directories. With
+    /// function references enabled, wast2json writes element segments as
+    /// expressions rather than function indices, so the encoder's output would
+    /// no longer match elsewhere.
+    private static let wast2jsonDirectoryFeatures: [String: [String]] = [
+        "function-references": ["--enable-function-references"]
     ]
 
     // MARK: - Supporting Types
@@ -372,7 +373,7 @@ struct EncoderTests {
         private func runWast2Json(wast2json: URL, wastFile: URL, json: URL) throws {
             var arguments = [wastFile.path]
             arguments.append(contentsOf: Self.wast2jsonFeatures)
-            arguments.append(contentsOf: Self.wast2jsonFileFeatures[wastFile.lastPathComponent] ?? [])
+            arguments.append(contentsOf: Self.wast2jsonDirectoryFeatures[wastFile.deletingLastPathComponent().lastPathComponent] ?? [])
             arguments.append(contentsOf: ["-o", json.path])
 
             let process = try Process.run(wast2json, arguments: arguments)

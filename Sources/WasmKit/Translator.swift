@@ -4906,21 +4906,35 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         pushEmit(.ref(.funcRef), { .refFunc(Instruction.RefFuncOperand(index: functionIndex, result: LVReg($0))) })
     }
 
+    /// Rejects an instruction of the typed function references proposal unless
+    /// the module was parsed with that feature. The binary parser decodes these
+    /// opcodes unconditionally.
+    private func requireFunctionReferences(_ instruction: String) throws(WasmKitError) {
+        guard module.features.contains(.functionReferences) else {
+            throw WasmKitError("\(instruction) requires the function-references feature")
+        }
+    }
+
     // Typed function references instructions. Reject them explicitly: the visitor's
     // default implementation is a no-op that would leave the value stack out of sync.
     mutating func visitCallRef(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        try requireFunctionReferences("call_ref")
         throw WasmKitError("call_ref is not implemented yet")
     }
     mutating func visitReturnCallRef(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        try requireFunctionReferences("return_call_ref")
         throw WasmKitError("return_call_ref is not implemented yet")
     }
     mutating func visitRefAsNonNull() throws(WasmKitError) -> Output {
+        try requireFunctionReferences("ref.as_non_null")
         throw WasmKitError("ref.as_non_null is not implemented yet")
     }
     mutating func visitBrOnNull(relativeDepth: UInt32) throws(WasmKitError) -> Output {
+        try requireFunctionReferences("br_on_null")
         throw WasmKitError("br_on_null is not implemented yet")
     }
     mutating func visitBrOnNonNull(relativeDepth: UInt32) throws(WasmKitError) -> Output {
+        try requireFunctionReferences("br_on_non_null")
         throw WasmKitError("br_on_non_null is not implemented yet")
     }
 

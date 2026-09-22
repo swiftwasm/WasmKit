@@ -444,6 +444,12 @@ extension WASTRunContext {
         if rootPath.hasSuffix("proposals/exception-handling") {
             features.insert(.exceptionHandling)
         }
+        if rootPath.hasSuffix("function-references") {
+            // Covers the proposal's spec tests and WasmKit's own tests for it; both
+            // include `return_call_ref`.
+            features.insert(.functionReferences)
+            features.insert(.tailCall)
+        }
         if rootPath.hasSuffix("fuel") {
             // A tail call is one of the ways a guest can run forever, so the fuel suite needs it.
             features.insert(.tailCall)

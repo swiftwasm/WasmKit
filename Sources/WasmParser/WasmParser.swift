@@ -160,6 +160,8 @@ public struct WasmFeatureSet: OptionSet, Sendable {
         case simd
         /// The WebAssembly exception handling proposal
         case exceptionHandling
+        /// The WebAssembly typed function references proposal
+        case functionReferences
 
         /// The bit this proposal occupies in a feature set. The values are part
         /// of the stored representation, so they must stay stable.
@@ -172,6 +174,7 @@ public struct WasmFeatureSet: OptionSet, Sendable {
             case .tailCall: 3
             case .simd: 4
             case .exceptionHandling: 5
+            case .functionReferences: 6
             }
         }
     }
@@ -200,6 +203,9 @@ public struct WasmFeatureSet: OptionSet, Sendable {
     /// The WebAssembly exception handling proposal
     @_alwaysEmitIntoClient
     public static var exceptionHandling: WasmFeatureSet { WasmFeatureSet(.exceptionHandling) }
+    /// The WebAssembly typed function references proposal
+    @_alwaysEmitIntoClient
+    public static var functionReferences: WasmFeatureSet { WasmFeatureSet(.functionReferences) }
 
     /// The default feature set
     public static let `default`: WasmFeatureSet = [.referenceTypes, .exceptionHandling]
@@ -346,8 +352,15 @@ extension ByteStream {
     @usableFromInline
     mutating func parseReferenceType(byte: UInt8, features: WasmFeatureSet) throws(WasmParserError) -> ReferenceType? {
         switch byte {
-        case 0x63: return try ReferenceType(isNullable: true, heapType: parseHeapType())
-        case 0x64: return try ReferenceType(isNullable: false, heapType: parseHeapType())
+        case 0x63:
+            let heapType = try parseHeapType()
+            // Without typed function references, `0x63` only spells out a
+            // nullable abstract type such as `funcref`.
+            if case .concrete = heapType, !features.contains(.functionReferences) { return nil }
+            return ReferenceType(isNullable: true, heapType: heapType)
+        case 0x64:
+            guard features.contains(.functionReferences) else { return nil }
+            return try ReferenceType(isNullable: false, heapType: parseHeapType())
         case 0x69:
             guard features.contains(.exceptionHandling) else { return nil }
             return .exnRef

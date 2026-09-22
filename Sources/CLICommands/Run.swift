@@ -614,6 +614,7 @@ extension WasmFeatureSet.Feature {
         case .tailCall: "tail-call"
         case .simd: "simd"
         case .exceptionHandling: "exception-handling"
+        case .functionReferences: "function-references"
         }
     }
 }
