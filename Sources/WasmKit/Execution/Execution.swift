@@ -106,8 +106,8 @@ struct Execution: ~Copyable {
         return Backtrace(symbols: symbols)
     }
 
-    /// Lays the callee's frame-initialisation image (zeroed locals followed by
-    /// the constant pool) over the new frame's local/constant area.
+    /// Lays the callee's frame-initialisation image (the locals' default values
+    /// followed by the constant pool) over the new frame's local/constant area.
     ///
     /// The image is one contiguous buffer built at translation time, so this is a
     /// single copy rather than a `memset` of the locals plus a `memcpy` of the

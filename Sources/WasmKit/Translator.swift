@@ -19,13 +19,19 @@ class ISeqAllocator {
         return buffer
     }
 
-    /// Allocates the frame-initialisation image of a function: `zeroSlots` zero
-    /// slots (the non-parameter locals, which the spec requires to start at zero)
-    /// followed by the constant pool.
-    func allocateFrameInit(zeroSlots: Int, constants: [UntypedValue]) -> UnsafeBufferPointer<UntypedValue> {
-        let buffer = UnsafeMutableBufferPointer<UntypedValue>.allocate(capacity: zeroSlots + constants.count)
+    /// Allocates the frame-initialisation image of a function: `localSlots`
+    /// slots holding the default values of the non-parameter locals (zero, or
+    /// null for the slots listed in `nullReferenceSlots`) followed by the
+    /// constant pool.
+    func allocateFrameInit(
+        localSlots: Int, nullReferenceSlots: [Int], constants: [UntypedValue]
+    ) -> UnsafeBufferPointer<UntypedValue> {
+        let buffer = UnsafeMutableBufferPointer<UntypedValue>.allocate(capacity: localSlots + constants.count)
         buffer.initialize(repeating: UntypedValue.default)
-        _ = UnsafeMutableBufferPointer(rebasing: buffer[zeroSlots...]).initialize(fromContentsOf: constants)
+        for slot in nullReferenceSlots {
+            buffer[slot] = UntypedValue.nullReference
+        }
+        _ = UnsafeMutableBufferPointer(rebasing: buffer[localSlots...]).initialize(fromContentsOf: constants)
         self.buffers.append(UnsafeMutableRawBufferPointer(buffer))
         return UnsafeBufferPointer(buffer)
     }
@@ -319,6 +325,15 @@ struct StackLayout {
 
     func isParameter(_ index: LocalIndex) -> Bool {
         index < frameHeader.type.parameters.count
+    }
+
+    /// The slot indices of the non-parameter locals holding references, which
+    /// start out null rather than zero.
+    var nonParameterReferenceLocalSlots: [Int] {
+        zip(localTypes, nonParameterLocalSlotOffsets).compactMap { type, offset in
+            guard case .ref = type else { return nil }
+            return offset
+        }
     }
 
     func constReg(_ index: Int) -> VReg {
@@ -2993,7 +3008,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         #endif
 
         let frameInit = allocator.allocateFrameInit(
-            zeroSlots: stackLayout.numberOfNonParameterLocalSlots,
+            localSlots: stackLayout.numberOfNonParameterLocalSlots,
+            nullReferenceSlots: stackLayout.nonParameterReferenceLocalSlots,
             constants: self.constantSlots.values
         )
         return InstructionSequence(
