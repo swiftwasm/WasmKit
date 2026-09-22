@@ -200,6 +200,37 @@
             call $f))
         """
 
+    /// A fuel charge heads each region fuel metering prices: a function body, a loop body and each
+    /// arm of an `if`. `$f` takes both arms over the loop's two iterations.
+    private let fuelRegionsWAT = """
+        (module
+          (func $f (param $x i32) (result i32)
+            local.get $x
+            i32.const 1
+            i32.and
+            if (result i32)
+              i32.const 10
+            else
+              i32.const 20
+            end)
+          (func (export "_start") (result i32) (local $i i32) (local $sum i32)
+            loop $l
+              local.get $sum
+              local.get $i
+              call $f
+              i32.add
+              local.set $sum
+              local.get $i
+              i32.const 1
+              i32.add
+              local.tee $i
+              i32.const 2
+              i32.lt_s
+              br_if $l
+            end
+            local.get $sum))
+        """
+
     @Suite
     struct DebuggerStepControlFlowTests {
         private func stoppedPc(_ debugger: borrowing Debugger, sourceLocation: SourceLocation = #_sourceLocation) throws -> Int {
@@ -445,6 +476,57 @@
 
             try debugger.runPreservingCurrentBreakpoint()
             #expect(try stoppedPc(debugger) == bp, "the second iteration should stop at the call again")
+        }
+
+        private func makeMeteredStore(_ threadingModel: EngineConfiguration.ThreadingModel, fuel: UInt64) -> Store {
+            let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel, fuelMetering: true)))
+            store.fuel = Fuel(remaining: fuel)
+            return store
+        }
+
+        /// The Wasm addresses each step stops at, from the entrypoint until it returns.
+        private func stepThrough(_ wat: String, store: Store) throws -> [Int] {
+            let module = try parseWasm(bytes: try wat2wasm(wat))
+            var debugger = try Debugger(module: module, store: store, imports: [:])
+            try debugger.stopAtEntrypoint()
+            try debugger.run()
+            var stops: [Int] = []
+            while case .stoppedAtBreakpoint(let stop) = debugger.state, stops.count < 1000 {
+                stops.append(stop.reportedPc)
+                try debugger.step()
+            }
+            guard case .entrypointReturned = debugger.state else {
+                Issue.record("expected the entrypoint to return, got \(debugger.state)")
+                return stops
+            }
+            return stops
+        }
+
+        /// A fuel charge is an instruction of its own at the head of a region, with no Wasm
+        /// instruction to show for it. A step passes over it, so steps stop at the same places with
+        /// fuel metering as without.
+        @Test(arguments: testedThreadingModels)
+        func fuelChargesDoNotChangeWhereStepsStop(threadingModel: EngineConfiguration.ThreadingModel) throws {
+            let unmetered = try stepThrough(fuelRegionsWAT, store: makeStore(threadingModel))
+            let metered = try stepThrough(fuelRegionsWAT, store: makeMeteredStore(threadingModel, fuel: 1_000_000))
+            #expect(metered == unmetered)
+        }
+
+        /// Running out of fuel under the debugger is a trap, raised in the frame that ran out.
+        @Test(arguments: testedThreadingModels)
+        func runningOutOfFuelTraps(threadingModel: EngineConfiguration.ThreadingModel) throws {
+            let module = try parseWasm(bytes: try wat2wasm(fuelRegionsWAT))
+            var debugger = try Debugger(module: module, store: makeMeteredStore(threadingModel, fuel: 0), imports: [:])
+            let startBase = module.functions[1].code.originalAddress
+
+            try debugger.run()
+            guard case .trapped(let trap) = debugger.state else {
+                Issue.record("expected trapped, got \(debugger.state)")
+                return
+            }
+            // The charge for the entrypoint's body is the first to fail. It runs before the body's
+            // first instruction, and counts as part of it.
+            #expect(trap.callStack == [startBase])
         }
     }
 
