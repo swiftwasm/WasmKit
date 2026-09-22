@@ -27,6 +27,7 @@ struct SpectestTests {
             Self.testsuite.appendingPathComponent("proposals/extended-const").path,
             Self.testsuite.appendingPathComponent("proposals/relaxed-simd").path,
             Self.testsuite.appendingPathComponent("proposals/function-references").path,
+            Self.testsuite.appendingPathComponent("proposals/multi-memory").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/memory64").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/function-references").path,
