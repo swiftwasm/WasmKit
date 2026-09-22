@@ -392,6 +392,33 @@ extension Instruction {
             return opcodeID
         }
     }
+
+    /// The opcode whose handler `slot`, the first slot of an emitted instruction, dispatches to.
+    ///
+    /// Takes the slot's value rather than its address, so that a caller can pass the head slot a
+    /// breakpoint replaced. Opcodes sharing a direct-threaded handler (see `handlerIdentity` in
+    /// VMSpec) come back as the first of them, which runs the same body.
+    static func opcode(ofHeadSlot slot: CodeSlot, threadingModel: EngineConfiguration.ThreadingModel) -> OpcodeID {
+        switch threadingModel {
+        case .direct:
+            guard let opcode = directHeadSlotOpcodes[slot] else {
+                preconditionFailure("Not a direct-threaded head slot: \(slot)")
+            }
+            return opcode
+        case .token:
+            return slot
+        }
+    }
+
+    /// Reverse of ``handler(opcodeID:)``, built on first use.
+    private static let directHeadSlotOpcodes: [CodeSlot: OpcodeID] = {
+        var opcodes = [CodeSlot: OpcodeID]()
+        // Downward, so that the first opcode sharing a handler is the one left in the map.
+        for opcode in (0..<OpcodeID(opcodeCount)).reversed() {
+            opcodes[CodeSlot(handler(opcodeID: opcode))] = opcode
+        }
+        return opcodes
+    }()
 }
 
 // MARK: - Instruction printing support
@@ -404,6 +431,7 @@ extension Instruction {
 
             guard let cursorStart = instructions.baseAddress else { return }
             let cursorEnd = cursorStart.advanced(by: instructions.count)
+            let threadingModel = context.function.store.engine.configuration.threadingModel
 
             var cursor = cursorStart
             while cursor < cursorEnd {
@@ -413,7 +441,7 @@ extension Instruction {
                     hexOffset = "0" + hexOffset
                 }
                 target.write("0x\(hexOffset): ")
-                let instruction = Instruction.load(from: &cursor)
+                let instruction = Instruction.load(from: &cursor, threadingModel: threadingModel)
                 context.print(
                     instruction: instruction,
                     instructionOffset: cursor - cursorStart,

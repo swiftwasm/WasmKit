@@ -1967,12 +1967,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// the slot stays written, so it only has to be the last thing in the
         /// buffer, which ``accProducer`` checks.
         private var lastAccAndSlot: AccProducer?
-        /// Off for a debuggable module: an accumulator is live only between one
-        /// instruction and the next, and a resume re-enters the dispatch loop
-        /// with a fresh one, so a stop anywhere in a hand-off loses the value.
-        /// A relinked producer also reads as a separate guest instruction from
-        /// the consumer.
-        var tracksAcc = true
+        /// Whether to emit instructions only the direct-threaded dispatcher
+        /// implements (`Instruction.isDirectThreadedOnly`), such as the
+        /// accumulator forms. Off under token threading, and for a debuggable
+        /// module: the debugger steps it through `Execution.doExecute`, which
+        /// has no case for them, and resuming between an accumulator's
+        /// producer and its consumer would start with a fresh accumulator.
+        let emitsDirectOnlyInstructions: Bool
         /// A copy emitted right after an accumulator producer, which hands
         /// the accumulator on untouched once fused with a following write of
         /// the producer's result.
@@ -1989,8 +1990,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
         let engineConfiguration: EngineConfiguration
 
-        init(engineConfiguration: EngineConfiguration) {
+        init(engineConfiguration: EngineConfiguration, isDebuggable: Bool) {
             self.engineConfiguration = engineConfiguration
+            self.emitsDirectOnlyInstructions = engineConfiguration.threadingModel == .direct && !isDebuggable
+        }
+
+        /// The head slot of `instruction`, which must be one this builder may emit.
+        private func headSlot(of instruction: Instruction) -> CodeSlot {
+            assert(emitsDirectOnlyInstructions || !instruction.isDirectThreadedOnly, "\(instruction) is direct-threaded only")
+            return instruction.headSlot(threadingModel: engineConfiguration.threadingModel)
         }
 
         func assertDanglingLabels() throws(WasmKitError) {
@@ -2013,7 +2021,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
         private mutating func assign(at index: Int, _ instruction: Instruction) {
             trace("assign: \(instruction)")
-            let headSlot = instruction.headSlot(threadingModel: engineConfiguration.threadingModel)
+            let headSlot = headSlot(of: instruction)
             trace("        [\(index)] = 0x\(String(headSlot, radix: 16))")
             self.instructions[index] = headSlot
             var slots: [CodeSlot] = []
@@ -2042,7 +2050,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// Records what the instruction just emitted offers to the accumulator
         /// hand-off.
         mutating func recordAcc(_ records: AccRecords) {
-            guard tracksAcc else { return }
+            guard emitsDirectOnlyInstructions else { return }
             lastAccRecords = records
             hasLastAcc = true
         }
@@ -2090,10 +2098,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// The last emitted instruction when it can produce its result into the
         /// accumulator instead.
         ///
-        /// Direct threading only: the token-threaded dispatcher has no
-        /// accumulator.
+        /// Only where ``emitsDirectOnlyInstructions``: the token-threaded
+        /// dispatcher has no accumulator.
         fileprivate var accProducer: AccProducer? {
-            guard engineConfiguration.threadingModel == .direct else { return nil }
+            guard emitsDirectOnlyInstructions else { return nil }
             if let lastEmission, let acc = lastAcc?.producer {
                 return AccProducer(position: lastEmission.position, end: lastEmission.end, form: acc)
             }
@@ -2201,7 +2209,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// Records that `source` was just copied to `dest` right after
         /// `producer`.
         mutating func recordCopy(after producer: AccProducer, source: VReg, dest: VReg) {
-            guard tracksAcc else { return }
+            guard emitsDirectOnlyInstructions else { return }
             copyAfterAcc = (producer, source, dest, insertingPC)
         }
 
@@ -2221,7 +2229,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             else { return false }
             let newInstruction = resultRelink(newResult)
             assign(at: lastEmission.position.offsetFromHead, newInstruction)
-            if tracksAcc, let form = lastAcc?.producer, form.hasAccAndSlotForm {
+            if emitsDirectOnlyInstructions, let form = lastAcc?.producer, form.hasAccAndSlotForm {
                 lastAccAndSlot = AccProducer(
                     position: lastEmission.position, end: lastEmission.end, form: form.relinked(to: newResult), keepsSlot: true)
             }
@@ -2255,7 +2263,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         ) {
             let position = insertingPC
             trace("emitInstruction: \(instruction)")
-            emitSlot(instruction.headSlot(threadingModel: engineConfiguration.threadingModel))
+            emitSlot(headSlot(of: instruction))
             var slots: [CodeSlot] = []
             instruction.emitImmediate(to: { slots.append($0) })
             for slot in slots { emitSlot(slot) }
@@ -2547,6 +2555,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             #if WasmDebuggingSupport
                 guard self.module.isDebuggable else { return }
 
+                self.instructionAddresses.append(self.binaryOffset)
                 if self.hasEmittedSinceLastInstruction {
                     self.currentRunStartWasm = self.binaryOffset
                     self.hasEmittedSinceLastInstruction = false
@@ -2566,6 +2575,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
         /// Pending mappings from iseq bytecode offsets to their canonical and emitting Wasm addresses.
         var iseqToWasmMapping = [(iseq: Int, canonical: Int, emitting: Int)]()
+
+        /// Addresses of the Wasm instructions visited so far, emitting or not.
+        var instructionAddresses = [Int]()
     #endif
 
     init(
@@ -2584,8 +2596,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         self.engineConfiguration = engineConfiguration
         self.type = type
         self.module = module
-        self.iseqBuilder = ISeqBuilder(engineConfiguration: engineConfiguration)
-        self.iseqBuilder.tracksAcc = !module.isDebuggable
+        self.iseqBuilder = ISeqBuilder(engineConfiguration: engineConfiguration, isDebuggable: module.isDebuggable)
         self.controlStack = ControlStack()
         let locals = try module.typeCanonicalizer.canonicalize(locals)
         self.stackLayout = try StackLayout(
@@ -2696,9 +2707,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     @discardableResult
     private mutating func emitCopyStack(from source: VReg, to dest: VReg) -> Bool {
         guard source != dest else { return false }
-        if engineConfiguration.threadingModel == .direct, !module.isDebuggable,
-            let previous = iseqBuilder.pairableCopy(reading: source)
-        {
+        if iseqBuilder.emitsDirectOnlyInstructions, let previous = iseqBuilder.pairableCopy(reading: source) {
             iseqBuilder.rewind(to: previous.position)
             self.rewindInstructionMapping(to: previous.position)
             emit(.copyStack2(Instruction.CopyStack2Operand(source0: previous.source, dest0: previous.dest, source1: source, dest1: dest)))
@@ -3065,10 +3074,28 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         assert(initializedElementsIndex == instructions.endIndex)
 
         #if WasmDebuggingSupport
-            for (iseq, canonical, emitting) in self.iseqToWasmMapping {
+            // What the function runs before its first instruction, such as the fuel charge for its
+            // body, has no Wasm address of its own, so a trap raised there belongs to that
+            // instruction. Mapped after the instruction's own bytecode, which stays where a
+            // breakpoint or a step stops, since a branch back to the instruction runs that again.
+            var iseqToWasmMapping = self.iseqToWasmMapping
+            if let first = iseqToWasmMapping.first, first.iseq > 0 {
+                iseqToWasmMapping.append((0, first.canonical, first.emitting))
+            }
+            var headSlots: [Pc] = []
+            for (iseq, canonical, emitting) in iseqToWasmMapping {
+                let absoluteIseq = iseq + buffer.baseAddress.unsafelyUnwrapped
+                headSlots.append(absoluteIseq)
                 self.module.withValue {
-                    let absoluteIseq = iseq + buffer.baseAddress.unsafelyUnwrapped
                     $0.instructionMapping.add(canonical: canonical, emitting: emitting, iseq: absoluteIseq)
+                }
+            }
+            if self.module.isDebuggable {
+                let instructionAddresses = self.instructionAddresses
+                let codeEnd = buffer.baseAddress.unsafelyUnwrapped + buffer.count
+                self.module.withValue {
+                    $0.instructionMapping.addInstructionAddresses(instructionAddresses)
+                    $0.instructionMapping.addHeadSlots(headSlots, end: codeEnd)
                 }
             }
         #endif
@@ -3570,7 +3597,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     private mutating func fuseCompareIntoSelect(
         _ candidate: FusableEmission?, condition: VReg, onTrue: VReg, onFalse: VReg
     ) -> ((VReg) -> Instruction)? {
-        guard engineConfiguration.threadingModel == .direct,
+        guard iseqBuilder.emitsDirectOnlyInstructions,
             let candidate, candidate.result == condition, candidate.prefix == nil, iseqBuilder.canRewind(to: candidate),
             let factory = Self.selectCmpFactory(for: candidate.condition, onTrue: onTrue, onFalse: onFalse)
         else { return nil }
@@ -5367,7 +5394,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // A constant operand is carried in the instruction when nothing above
         // folded: a superinstruction removes a dispatch and the accumulator a
         // frame-slot round trip, which both beat the one load an immediate saves.
-        if emitsImmediateOperands, let form = immediateBinaryForm(type, op, lhs: lhsSource, rhs: rhsSource) {
+        if iseqBuilder.emitsDirectOnlyInstructions, let form = immediateBinaryForm(type, op, lhs: lhsSource, rhs: rhsSource) {
             let forms = form.forms
             let lhs = form.lhs
             let imm = form.imm
@@ -5400,12 +5427,6 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         if accForms != nil || floatAccForms != nil {
             iseqBuilder.recordAcc(AccRecords(producer: .binary(type: type, op: op, lhs: lhs, rhs: rhs, result: result)))
         }
-    }
-
-    /// Immediate-operand forms are emitted under direct threading only; the
-    /// token-threaded dispatcher has no cases for them.
-    private var emitsImmediateOperands: Bool {
-        engineConfiguration.threadingModel == .direct
     }
 
     /// The 32-bit immediate encoding `raw` as an operand of `type`: every `i32`
@@ -5456,7 +5477,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let result = valueStack.push(.i32)
         guard let lhsSource, let rhsSource else { return }
         // Compare against a constant carried in the instruction.
-        if emitsImmediateOperands, case .compare(let kind, _, _) = makeCondition(.zero, .zero) {
+        if iseqBuilder.emitsDirectOnlyInstructions, case .compare(let kind, _, _) = makeCondition(.zero, .zero) {
             var immediate: (kind: FusedCmpKind, lhs: VReg, imm: Int32)?
             if let raw = rhsSource.constant, let imm = Self.immediateEncoding(of: raw, as: operand) {
                 immediate = (kind, ensureOnVReg(lhsSource), imm)

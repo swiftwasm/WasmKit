@@ -9,6 +9,10 @@
             package let wasmPc: Int
             /// Wasm address reported for this stop.
             package var reportedPc: Int
+            /// Whether execution hit a host breakpoint at ``reportedPc``, as opposed to arriving there
+            /// by a step. A breakpoint a step arrives at is hit when execution resumes, without moving,
+            /// like a breakpoint instruction the step has not executed yet.
+            package var isBreakpointHit: Bool
         }
 
         package enum State {
@@ -63,11 +67,6 @@
         /// Breakpoints requested by the host, keyed by resolved address. Multiple requests may share a slot.
         private var hostBreakpoints = [Int: Set<Int>]()
 
-        /// Resolved Wasm addresses armed to bound the single-instruction step in progress. Every
-        /// address execution can reach from the current one has to be armed, and all of them come
-        /// down again once the step lands, except where the host wants a breakpoint too.
-        private var stepBreakpoints = Set<Int>()
-
         package var armedBreakpointAddresses: Set<Int> { Set(self.armedBreakpoints.keys) }
 
         package private(set) var state: State
@@ -86,22 +85,8 @@
         /// into the defining binary, not this one.
         private let functionAddresses: [(address: Int, instanceFunctionIndex: Int)]
 
-        /// Reverse map from a head code slot to its opcode ID, used for resolving
-        /// which control-flow instruction is at a breakpoint site.
-        /// For token threading the head slot is the opcode ID itself; for direct
-        /// threading it is a function pointer that we map back.
-        private let headSlotToOpcodeID: [CodeSlot: OpcodeID]
-
-        private static let callFamilyOpcodes: Set<OpcodeID> = [
-            Instruction.call(.init(rawCallee: UInt64(0), spAddend: VReg.zero)).opcodeID,
-            Instruction.compilingCall(.init(rawCallee: UInt64(0), spAddend: VReg.zero)).opcodeID,
-            Instruction.internalCall(.init(rawCallee: UInt64(0), spAddend: VReg.zero)).opcodeID,
-            Instruction.callIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg.zero, spAddend: VReg.zero)).opcodeID,
-            Instruction.returnCall(.init(rawCallee: UInt64(0))).opcodeID,
-            Instruction.returnCallIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg.zero)).opcodeID,
-            Instruction.callRef(.init(callee: VReg.zero, spAddend: VReg.zero)).opcodeID,
-            Instruction.returnCallRef(.init(callee: VReg.zero)).opcodeID,
-        ]
+        /// The head slot of the `breakpoint` instruction, which an armed breakpoint puts in the bytecode.
+        private let breakpointHeadSlot: CodeSlot
 
         /// Initializes a new debugger state instance.
         /// - Parameters:
@@ -136,10 +121,7 @@
             )
             self.threadingModel = store.engine.configuration.threadingModel
             self.endOfExecution = Instruction.endOfExecution(.init()).headSlot(threadingModel: threadingModel)
-
-            self.headSlotToOpcodeID = Instruction.buildControlHeadSlotMap(
-                threadingModel: self.threadingModel
-            )
+            self.breakpointHeadSlot = Instruction.breakpoint(.init()).headSlot(threadingModel: threadingModel)
 
             self.state = .instantiated
         }
@@ -209,12 +191,12 @@
             guard self.armedBreakpoints[resolved] == nil else { return }
 
             self.armedBreakpoints[resolved] = (iseq: iseq, originalHeadSlot: iseq.pointee)
-            iseq.pointee = Instruction.breakpoint(.init()).headSlot(threadingModel: self.threadingModel)
+            iseq.pointee = self.breakpointHeadSlot
         }
 
         /// Takes the breakpoint at an already resolved Wasm address out of the bytecode, restoring
-        /// the instruction it replaced. Leaves ``hostBreakpoints`` and ``stepBreakpoints`` alone: it
-        /// is the bytecode half of a breakpoint, not the request for one.
+        /// the instruction it replaced. Leaves ``hostBreakpoints`` alone: it is the bytecode half of
+        /// a breakpoint, not the request for one.
         private mutating func disarm(resolved: Int) {
             guard let armed = self.armedBreakpoints.removeValue(forKey: resolved) else { return }
 
@@ -258,8 +240,6 @@
             guard self.hostBreakpoints[wasm]?.isEmpty ?? true else { return }
 
             self.hostBreakpoints[wasm] = nil
-            guard !self.stepBreakpoints.contains(wasm) else { return }
-
             self.disarm(resolved: wasm)
         }
 
@@ -267,7 +247,6 @@
         /// again.
         package mutating func removeAllBreakpoints() {
             self.hostBreakpoints.removeAll()
-            self.stepBreakpoints.removeAll()
             for armed in self.armedBreakpoints.values {
                 armed.iseq.pointee = armed.originalHeadSlot
             }
@@ -280,33 +259,50 @@
         /// breakpoint is triggered or all remaining instructions are executed. If the module is not
         /// stopped at a breakpoint, this function returns immediately.
         package mutating func run() throws {
+            switch self.state {
+            case .stoppedAtBreakpoint(let breakpoint):
+                // A step can already have gone past every breakpoint in this slot. None of them is at
+                // the current program counter then, so they stay for the next time execution comes by.
+                if self.hostBreakpoints[breakpoint.wasmPc]?.allSatisfy({ $0 < breakpoint.reportedPc }) == true {
+                    try self.runPreservingCurrentBreakpoint()
+                    return
+                }
+                self.disarm(resolved: breakpoint.wasmPc)
+                try self.resume(.runLoop(sp: breakpoint.iseq.sp, pc: breakpoint.iseq.pc))
+            case .instantiated:
+                try self.resume(.entrypoint)
+
+            case .exited:
+                // The guest is gone, so there is nothing to resume.
+                return
+
+            case .trapped:
+                // The guest trapped, so there is nothing to resume.
+                return
+
+            case .entrypointReturned:
+                fatalError("Restarting a Wasm module from the debugger is not implemented yet.")
+            }
+        }
+
+        /// How ``resume(_:)`` runs the guest.
+        private enum Resumption {
+            /// From the start of the entrypoint.
+            case entrypoint
+            /// From the head slot `pc` with the threading model's own run loop.
+            case runLoop(sp: Sp, pc: Pc)
+            /// By a single step off `breakpoint`, reporting the landing as a stop at the host's
+            /// breakpoint there if `reportingBreakpoint`.
+            case singleStep(BreakpointState, reportingBreakpoint: Bool)
+        }
+
+        /// Runs the guest, recording in ``state`` how it stops: at a breakpoint, with a trap, or by
+        /// returning from the entrypoint.
+        private mutating func resume(_ resumption: Resumption) throws {
             do {
-                switch self.state {
-                case .stoppedAtBreakpoint(let breakpoint):
-                    self.disarm(resolved: breakpoint.wasmPc)
-                    self.execution.resetError()
-
-                    let iseq = breakpoint.iseq
-                    var sp = iseq.sp
-                    var pc = iseq.pc
-
-                    do {
-                        switch self.threadingModel {
-                        case .direct:
-                            try self.execution.runDirectThreaded(sp: sp, pc: pc, md: md, ms: ms)
-                        case .token:
-                            try self.execution.runTokenThreaded(sp: &sp, pc: &pc, md: &md, ms: &ms)
-                        }
-                    } catch let end as Execution.EndOfExecution {
-                        // The module successfully executed till the "end of execution" instruction.
-                        let type = self.entrypointFunction.type
-                        self.state = .entrypointReturned(
-                            type.results.enumerated().map { (i, type) in
-                                end.sp[VReg(slotIndex: i)].cast(to: type)
-                            }
-                        )
-                    }
-                case .instantiated:
+                switch resumption {
+                case .entrypoint:
+                    // The entrypoint returns to `endOfExecution`, so its frame keeps this address.
                     let result = try self.execution.executeWasm(
                         threadingModel: self.threadingModel,
                         function: self.entrypointFunction.handle,
@@ -316,80 +312,130 @@
                         pc: &self.endOfExecution
                     )
                     self.state = .entrypointReturned(result)
-
-                case .exited:
-                    // The guest is gone, so there is nothing to resume.
-                    return
-
-                case .trapped:
-                    // The guest trapped, so there is nothing to resume.
-                    return
-
-                case .entrypointReturned:
-                    fatalError("Restarting a Wasm module from the debugger is not implemented yet.")
+                case .runLoop(let sp, let pc):
+                    try self.runNative(sp: sp, pc: pc)
+                case .singleStep(let breakpoint, let reportingBreakpoint):
+                    try self.singleStep(from: breakpoint, reportingBreakpoint: reportingBreakpoint)
                 }
+            } catch let end as Execution.EndOfExecution {
+                // The module successfully executed till the "end of execution" instruction.
+                let type = self.entrypointFunction.type
+                self.state = .entrypointReturned(
+                    type.results.enumerated().map { (i, type) in
+                        end.sp[VReg(slotIndex: i)].cast(to: type)
+                    }
+                )
             } catch let breakpoint as Execution.Breakpoint {
-                let pc = breakpoint.pc
-                let mapping = self.instance.handle.instructionMapping
-                guard let wasmPc = mapping.findWasm(forIseqAddress: pc) else {
-                    throw Error.noReverseInstructionMappingAvailable(pc)
-                }
-
-                self.state = .stoppedAtBreakpoint(
-                    .init(
-                        iseq: breakpoint,
-                        wasmPc: wasmPc,
-                        reportedPc: self.hostBreakpoints[wasmPc]?.min() ?? mapping.firstWasm(forIseqAddress: pc) ?? wasmPc
-                    )
-                )
-
-                guard let currentFunction = breakpoint.sp.currentFunction else {
-                    throw Error.unknownCurrentFunctionAtBreakpoint(breakpoint.sp)
-                }
-                Execution.CurrentMemory.mayUpdateCurrentInstance(
-                    instance: currentFunction.instance,
-                    md: &self.md,
-                    ms: &self.ms
-                )
-                // ms may include uncommitted guard pages that fault outside the trap guard.
-                self.linearMemoryByteCount = currentFunction.instance.memories.first?.byteCount ?? 0
+                try self.stop(at: breakpoint, reportingBreakpoint: true)
             } catch let trap as Trap {
                 let mapping = self.instance.handle.instructionMapping
+                // The backtrace's addresses are return addresses, so the frame the trap was raised in
+                // comes from the trap site.
+                let trapSite = (trap.backtrace?.trapSite).flatMap { mapping.findWasm(forIseqAddressWithin: $0.address) }
                 self.state = .trapped(
                     .init(
                         description: "Trap: \(trap.reason)",
-                        callStack: (trap.backtrace?.symbols ?? []).compactMap {
-                            mapping.firstWasm(forIseqAddress: $0.address)
-                        }
+                        callStack: (trapSite.map { [$0] } ?? [])
+                            + (trap.backtrace?.symbols ?? []).compactMap {
+                                mapping.firstWasm(forIseqAddress: $0.address)
+                            }
                     )
                 )
             }
         }
 
+        /// Records a stop at the head slot `breakpoint.pc`, whether a breakpoint was hit there or a
+        /// step landed there.
+        ///
+        /// The slot implements a run of Wasm instructions. A stop is reported at the host's lowest
+        /// breakpoint among them if `reportingBreakpoint`, and otherwise at the first of them, which is
+        /// the next instruction a step reaches.
+        private mutating func stop(at breakpoint: Execution.Breakpoint, reportingBreakpoint: Bool) throws {
+            let pc = breakpoint.pc
+            let mapping = self.instance.handle.instructionMapping
+            guard let wasmPc = mapping.findWasm(forIseqAddress: pc) else {
+                throw Error.noReverseInstructionMappingAvailable(pc)
+            }
+
+            let hostBreakpoint = reportingBreakpoint ? self.hostBreakpoints[wasmPc]?.min() : nil
+            self.state = .stoppedAtBreakpoint(
+                .init(
+                    iseq: breakpoint,
+                    wasmPc: wasmPc,
+                    reportedPc: hostBreakpoint ?? mapping.firstWasm(forIseqAddress: pc) ?? wasmPc,
+                    isBreakpointHit: hostBreakpoint != nil
+                )
+            )
+
+            guard let currentFunction = breakpoint.sp.currentFunction else {
+                throw Error.unknownCurrentFunctionAtBreakpoint(breakpoint.sp)
+            }
+            Execution.CurrentMemory.mayUpdateCurrentInstance(
+                instance: currentFunction.instance,
+                md: &self.md,
+                ms: &self.ms
+            )
+            // ms may include uncommitted guard pages that fault outside the trap guard.
+            self.linearMemoryByteCount = currentFunction.instance.memories.first?.byteCount ?? 0
+        }
+
+        /// Runs the guest from the head slot `pc` with the threading model's own run loop until it
+        /// stops.
+        private mutating func runNative(sp: Sp, pc: Pc) throws {
+            self.execution.resetError()
+            var sp = sp
+            var pc = pc
+            switch self.threadingModel {
+            case .direct:
+                try self.execution.runDirectThreaded(sp: sp, pc: pc, md: self.md, ms: self.ms)
+            case .token:
+                try self.execution.runTokenThreaded(sp: &sp, pc: &pc, md: &self.md, ms: &self.ms)
+            }
+        }
+
         /// Steps by a single Wasm instruction in the module instantiated by the debugger stopped at a breakpoint.
-        /// The current breakpoint is disabled and new breakpoints are put on the next instruction (or instructions in case
-        /// of multiple possible execution branches). After breakpoints setup, execution is resumed until suspension.
-        /// Every breakpoint the step needed comes down again once it lands, and the breakpoint it stepped off
-        /// goes back in, so a step leaves the host's breakpoints exactly as it found them.
+        /// The guest runs one internal instruction at a time until it reaches the start of a Wasm instruction,
+        /// wherever execution goes: into a callee, back to a caller, past a host call, or to an exception
+        /// handler. Breakpoints stay in the bytecode throughout, so a step leaves the host's breakpoints exactly
+        /// as it found them.
         /// If the module is not stopped at a breakpoint, this function returns immediately.
         package mutating func step() throws {
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 return
             }
+            guard !self.hitBreakpointArrivedAt(breakpoint) else { return }
 
-            // Report any remaining breakpoints sharing this slot before resuming.
-            guard !self.reportPendingHostBreakpoint(after: breakpoint) else { return }
-
-            // Clear step-specific breakpoints even if execution fails.
-            defer { self.clearStepBreakpoints() }
-
-            try self.setNextInstructionBreakpoints(breakpoint: breakpoint)
-            try self.run()
-            self.clearStepBreakpoints()
-            // Re-arm directly to avoid recording the resolved address as a new host request.
-            if self.hostBreakpoints[breakpoint.wasmPc] != nil {
-                self.arm(resolved: breakpoint.wasmPc, iseq: breakpoint.iseq.pc)
+            // The bytecode at a stop implements a run of Wasm instructions, all but the last of which
+            // emitted none of their own. Stepping over one of those runs nothing, but the host still
+            // has to see each of them, and each breakpoint among them: one may be where a source line
+            // starts.
+            let mapping = self.instance.handle.instructionMapping
+            let pendingBreakpoint = self.hostBreakpoints[breakpoint.wasmPc]?.filter { $0 > breakpoint.reportedPc }.min()
+            let nextInstruction = mapping.instructionAddress(after: breakpoint.reportedPc).flatMap {
+                $0 <= breakpoint.wasmPc ? $0 : nil
             }
+            if let next = [pendingBreakpoint, nextInstruction].compactMap({ $0 }).min() {
+                var breakpoint = breakpoint
+                breakpoint.reportedPc = next
+                breakpoint.isBreakpointHit = false
+                self.state = .stoppedAtBreakpoint(breakpoint)
+                return
+            }
+
+            try self.resume(.singleStep(breakpoint, reportingBreakpoint: false))
+        }
+
+        /// Reports the host breakpoint a step arrived at as hit, without moving. Returns whether there
+        /// was one.
+        private mutating func hitBreakpointArrivedAt(_ breakpoint: BreakpointState) -> Bool {
+            guard !breakpoint.isBreakpointHit,
+                self.hostBreakpoints[breakpoint.wasmPc]?.contains(breakpoint.reportedPc) == true
+            else { return false }
+
+            var breakpoint = breakpoint
+            breakpoint.isBreakpointHit = true
+            self.state = .stoppedAtBreakpoint(breakpoint)
+            return true
         }
 
         /// Reports the next host breakpoint sharing this bytecode slot without resuming execution.
@@ -402,6 +448,7 @@
 
             var breakpoint = breakpoint
             breakpoint.reportedPc = pending
+            breakpoint.isBreakpointHit = true
             self.state = .stoppedAtBreakpoint(breakpoint)
             return true
         }
@@ -410,13 +457,17 @@
         /// the debugger resumes is preserved. If the module is current not stopped at a breakpoint, this function
         /// returns immediately.
         package mutating func runPreservingCurrentBreakpoint() throws {
-            guard case .stoppedAtBreakpoint = self.state else {
+            guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 return
             }
+            guard !self.hitBreakpointArrivedAt(breakpoint) else { return }
 
-            // A bounded single step is what gets execution out of the slot the resumed-from breakpoint
-            // occupies, which is the precondition for putting that breakpoint back.
-            try self.step()
+            // Report any remaining breakpoints sharing this slot before resuming.
+            guard !self.reportPendingHostBreakpoint(after: breakpoint) else { return }
+
+            // A single step runs the instruction under the breakpoint without taking the breakpoint out,
+            // and gets execution off its slot.
+            try self.resume(.singleStep(breakpoint, reportingBreakpoint: true))
 
             // Landing on a breakpoint the host set is a stop the host is waiting for.
             guard case .stoppedAtBreakpoint(let landed) = self.state,
@@ -546,563 +597,127 @@
             return result
         }
 
-        /// Arms a breakpoint that only exists to bound the step in progress.
-        private mutating func armStepBreakpoint(address: Int) throws {
-            let (iseq, wasm) = try self.findIseq(forWasmAddress: address)
-            self.stepBreakpoints.insert(wasm)
-            self.arm(resolved: wasm, iseq: iseq)
-        }
-
-        /// Takes down the breakpoints that bounded a step that has landed. Only one of them is where
-        /// execution went, and none of them are the host's, so leaving any behind stops the program at
-        /// an address nothing asked about.
-        private mutating func clearStepBreakpoints() {
-            let armedForStep = self.stepBreakpoints
-            self.stepBreakpoints.removeAll()
-            for resolved in armedForStep where self.hostBreakpoints[resolved] == nil {
-                self.disarm(resolved: resolved)
+        /// Runs the guest one internal instruction at a time from `breakpoint`, following wherever
+        /// execution goes, until the next instruction to run is at a stop point: the first head slot of
+        /// a Wasm instruction. Records the stop there.
+        ///
+        /// Breakpoints are never taken out. The first instruction runs from the head slot its
+        /// breakpoint replaced, and no later one is at a stop point, where breakpoints go.
+        private mutating func singleStep(from breakpoint: BreakpointState, reportingBreakpoint: Bool) throws {
+            var sp = breakpoint.iseq.sp
+            var pc = breakpoint.iseq.pc.advanced(by: 1)
+            // If the breakpoint was externally removed (e.g. via disableBreakpoint while stopped), the
+            // original instruction has already been restored, so read it directly. Bound with `if let`:
+            // `armedBreakpoints[key]?.originalHeadSlot` in a mutating method reads a stale value for a
+            // missing key at -Onone (Swift 6.3.2).
+            var head: CodeSlot
+            if let armed = self.armedBreakpoints[breakpoint.wasmPc] {
+                head = armed.originalHeadSlot
+            } else {
+                head = breakpoint.iseq.pc.pointee
             }
-        }
-
-        /// Analyzes the control-flow instruction at the given breakpoint and sets breakpoints
-        /// at all possible next instruction locations.
-        private mutating func setNextInstructionBreakpoints(breakpoint: BreakpointState) throws {
-            // If the breakpoint was externally removed (e.g. via disableBreakpoint
-            // while stopped), the original instruction has already been restored at the
-            // iseq PC, so read it directly.
-            let savedHead = self.armedBreakpoints[breakpoint.wasmPc]?.originalHeadSlot ?? breakpoint.iseq.pc.pointee
-            let operandPc = breakpoint.iseq.pc.advanced(by: 1)
-            let sp = breakpoint.iseq.sp
-
-            if let opcodeID = headSlotToOpcodeID[savedHead],
-                let targets = Instruction.predictNextPcs(
-                    opcodeID: opcodeID, operandPc: operandPc, sp: sp,
-                    predictor: &self
+            var isFirst = true
+            repeat {
+                head = try self.execution.stepInstruction(
+                    head: head, threadingModel: self.threadingModel,
+                    sp: &sp, pc: &pc, md: &self.md, ms: &self.ms
                 )
-            {
-                // Control instruction with predicted targets.
-                // Empty targets means terminal (unreachable, endOfExecution) — no breakpoints to set.
-                for pc in targets {
-                    if let wasmAddr = self.instance.handle.instructionMapping.findWasm(forIseqAddress: pc) {
-                        try self.armStepBreakpoint(address: wasmAddr)
-                    }
+                if isFirst {
+                    self.restoreBreakpointIfOverwritten(at: breakpoint.wasmPc)
+                    isFirst = false
                 }
-                return
-            }
+                if let function = sp.currentFunction, function.instance != self.instance.handle {
+                    guard let back = try self.runOutsideInstance(sp: sp, pc: pc) else { return }
+                    (sp, pc, head) = back
+                }
+            } while !self.isAtStopPoint(head: head, readBefore: pc)
 
-            // The head slot is non-control because a call with args maps its wasm address to a
-            // prep slot, not the call.
-            if let calleeEntry = self.stepInTargetIfCall(breakpoint: breakpoint) {
-                try self.armStepBreakpoint(address: calleeEntry)
-                return
-            }
-
-            // Non-control instruction: fall back to next Wasm address
-            try self.armStepBreakpoint(address: breakpoint.wasmPc + 1)
+            try self.stop(at: Execution.Breakpoint(sp: sp, pc: pc.advanced(by: -1)), reportingBreakpoint: reportingBreakpoint)
         }
 
-        /// The call is the last iseq emit for its wasm address (prep slots come first), so `lastIseq`
-        /// points at the real call head, never an operand. Callee resolution, including the
-        /// indirect-call runtime table index, is left to the existing `predictNext_*` predictors, which
-        /// also compile the callee. Their iseq base may be an elided instruction with no reverse wasm
-        /// mapping, so it is mapped through the callee function's originalAddress; enableBreakpoint then
-        /// forward-resolves that to the first emitted instruction.
-        private mutating func stepInTargetIfCall(breakpoint: BreakpointState) -> Int? {
+        /// Whether the instruction about to run, whose head slot `head` was read just before `pc`,
+        /// is at a stop point.
+        private func isAtStopPoint(head: CodeSlot, readBefore pc: Pc) -> Bool {
+            let slot = pc.advanced(by: -1)
+            // A `_return` leaving the instance hands over to `returnCrossInstance` without moving
+            // `pc`, so the slot is only where the next instruction is if it holds `head`.
+            return slot.pointee == head && self.instance.handle.instructionMapping.isStopPoint(slot)
+        }
+
+        /// Puts back the breakpoint at `resolved` if the instruction under it overwrote it:
+        /// `compilingCall` rewrites its own head slot to `internalCall` the first time it runs.
+        private mutating func restoreBreakpointIfOverwritten(at resolved: Int) {
+            guard let armed = self.armedBreakpoints[resolved], armed.iseq.pointee != self.breakpointHeadSlot else {
+                return
+            }
+
+            self.armedBreakpoints[resolved] = (iseq: armed.iseq, originalHeadSlot: armed.iseq.pointee)
+            armed.iseq.pointee = self.breakpointHeadSlot
+        }
+
+        /// Runs code of another instance, which a single step can't: it was not compiled for
+        /// debugging, so it has no stop points and may use direct-only instructions. `pc` points just
+        /// past the head slot of the instruction about to run, as in ``singleStep(from:reportingBreakpoint:)``.
+        ///
+        /// Execution comes back into the debugged instance where the frame it runs in returns, or at
+        /// the handler of a `try_table` in a frame below that catches an exception. When it arrives at
+        /// one of those, in the frame it belongs to, this hands back where stepping resumes. Otherwise
+        /// the guest runs until it stops and this returns `nil`.
+        private mutating func runOutsideInstance(sp: Sp, pc: Pc) throws -> (sp: Sp, pc: Pc, head: CodeSlot)? {
             let mapping = self.instance.handle.instructionMapping
-            guard let headPc = mapping.lastIseq(forWasmAddress: breakpoint.wasmPc),
-                // Equal means the breakpoint already sits on the head; the control-head path handled it.
-                headPc != breakpoint.iseq.pc,
-                let opcodeID = headSlotToOpcodeID[headPc.pointee],
-                Self.callFamilyOpcodes.contains(opcodeID),
-                let targets = Instruction.predictNextPcs(
-                    opcodeID: opcodeID, operandPc: headPc.advanced(by: 1), sp: breakpoint.iseq.sp,
-                    predictor: &self
-                ),
-                // Empty for a host/imported or unresolvable callee.
-                let calleeIseq = targets.first
-            else { return nil }
-
-            return self.wasmOrigin(ofIseqBase: calleeIseq)
-        }
-
-        private func wasmOrigin(ofIseqBase base: Pc) -> Int? {
-            for entry in self.functionAddresses {
-                let iseq: InstructionSequence
-                switch self.instance.handle.functions[entry.instanceFunctionIndex].wasm.code {
-                case .debuggable(_, let compiled), .compiled(let compiled): iseq = compiled
-                case .uncompiled: continue
-                }
-                if iseq.instructions.baseAddress == base { return entry.address }
+            var exits: [(pc: Pc, sp: Sp)] = []
+            if let returnPC = sp.returnPC, let callerSp = sp.previousSP, mapping.findWasm(forIseqAddress: returnPC) != nil {
+                exits.append((returnPC, callerSp))
             }
-            return nil
+            for handler in self.execution.exceptionHandlers where mapping.findWasm(forIseqAddress: handler.targetPC) != nil {
+                exits.append((handler.targetPC, handler.sp))
+            }
+            guard !exits.isEmpty else {
+                // Execution doesn't come back into this instance, so the step becomes a continue.
+                try self.runNative(sp: sp, pc: pc.advanced(by: -1))
+                return nil
+            }
+
+            // Exits can share a slot, which is saved once.
+            var savedHeads: [Pc: CodeSlot] = [:]
+            for exit in exits where savedHeads[exit.pc] == nil {
+                savedHeads[exit.pc] = exit.pc.pointee
+                exit.pc.pointee = self.breakpointHeadSlot
+            }
+            defer {
+                for (slot, head) in savedHeads {
+                    slot.pointee = head
+                }
+            }
+
+            var sp = sp
+            var pc = pc.advanced(by: -1)
+            while true {
+                do {
+                    try self.runNative(sp: sp, pc: pc)
+                    return nil
+                } catch let hit as Execution.Breakpoint where savedHeads[hit.pc] != nil {
+                    let savedHead = savedHeads[hit.pc].unsafelyUnwrapped
+                    // The run loop switched back to this instance's memory without telling us.
+                    Execution.CurrentMemory.mayUpdateCurrentInstance(instance: self.instance.handle, md: &self.md, ms: &self.ms)
+                    // Back in a frame execution was to come back to, or at a host breakpoint on the way.
+                    if exits.contains(where: { $0.pc == hit.pc && $0.sp == hit.sp }) || savedHead == self.breakpointHeadSlot {
+                        return (hit.sp, hit.pc.advanced(by: 1), savedHead)
+                    }
+                    // Another frame got to the same code: run past it and keep waiting.
+                    sp = hit.sp
+                    var next = hit.pc.advanced(by: 1)
+                    _ = try self.execution.stepInstruction(
+                        head: savedHead, threadingModel: self.threadingModel,
+                        sp: &sp, pc: &next, md: &self.md, ms: &self.ms
+                    )
+                    pc = next.advanced(by: -1)
+                }
+            }
         }
 
         deinit {
             self.valueStack.deallocate()
-        }
-    }
-
-    extension Debugger: NextInstructionPredictor {
-        mutating func predictNext_br(operandPc: Pc, sp: Sp) -> [Pc] {
-            var pc = operandPc
-            let offset = Instruction.BrOperand.load(from: &pc)
-            return [pc.advanced(by: Int(offset))]
-        }
-
-        mutating func predictNext_brIf(operandPc: Pc, sp: Sp) -> [Pc] {
-            var pc = operandPc
-            let op = Instruction.BrIfOperand.load(from: &pc)
-            // Both fall-through (pc after operand) and branch target are possible
-            return [pc, pc.advanced(by: Int(op.offset))]
-        }
-
-        mutating func predictNext_brIfNot(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIf(operandPc: operandPc, sp: sp)
-        }
-
-        mutating func predictNext_brIfNull(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIf(operandPc: operandPc, sp: sp)
-        }
-
-        mutating func predictNext_brIfNotNull(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIf(operandPc: operandPc, sp: sp)
-        }
-
-        /// Fused compare+branch: like `brIf`, both fall-through and the branch
-        /// target are possible.
-        private mutating func predictNext_brIfCmp(operandPc: Pc) -> [Pc] {
-            var pc = operandPc
-            let op = Instruction.BrIfCmpOperand.load(from: &pc)
-            return [pc, pc.advanced(by: Int(op.offset))]
-        }
-        mutating func predictNext_brIfI32Eq(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32Ne(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32LtS(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32LtU(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32GtS(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32GtU(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32LeS(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32LeU(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32GeS(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32GeU(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64Eq(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64Ne(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64LtS(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64LtU(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64GtS(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64GtU(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64LeS(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64LeU(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64GeS(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64GeU(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-
-        // Fused float compare+branch (both polarities). Same immediate layout
-        // as the integer forms, so the same predictor applies.
-        mutating func predictNext_brIfF32Eq(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfF32Ne(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfF32Lt(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfF32Le(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfNotF32Lt(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfNotF32Le(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfF64Eq(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfF64Ne(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfF64Lt(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfF64Le(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfNotF64Lt(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfNotF64Le(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-
-        // Fused bit-test+branch (both polarities, both widths). Same immediate
-        // layout as the compare forms, so the same predictor applies.
-        mutating func predictNext_brIfI32And(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfNotI32And(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64And(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfNotI64And(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmp(operandPc: operandPc)
-        }
-
-        // Accumulator branch forms: fall through, or take the offset.
-        private mutating func predictNext_brIfAccCmp(operandPc: Pc) -> [Pc] {
-            var pc = operandPc
-            let op = Instruction.BrIfAccCmpOperand.load(from: &pc)
-            return [pc, pc.advanced(by: Int(op.offset))]
-        }
-        mutating func predictNext_brIfI32EqAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32NeAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32LtSAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32LtUAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32GtSAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32GtUAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32LeSAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32LeUAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32GeSAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32GeUAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64EqAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64NeAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64LtSAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64LtUAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64GtSAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64GtUAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64LeSAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64LeUAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64GeSAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64GeUAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            var pc = operandPc
-            let op = Instruction.BrIfAccOperand.load(from: &pc)
-            return [pc, pc.advanced(by: Int(op.offset))]
-        }
-        mutating func predictNext_brIfNotAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAcc(operandPc: operandPc, sp: sp)
-        }
-        private mutating func predictNext_brIfCmpImm(operandPc: Pc) -> [Pc] {
-            var pc = operandPc
-            let op = Instruction.BrIfCmpImmOperand.load(from: &pc)
-            return [pc, pc.advanced(by: Int(op.offset))]
-        }
-        mutating func predictNext_brIfI32EqImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32NeImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32LtSImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32LtUImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32GtSImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32GtUImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32LeSImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32LeUImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32GeSImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32GeUImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64EqImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64NeImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64LtSImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64LtUImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64GtSImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64GtUImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64LeSImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64LeUImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64GeSImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64GeUImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI32AndImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfNotI32AndImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfI64AndImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfNotI64AndImm(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfCmpImm(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfF64EqAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfF64NeAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfF64LtAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfF64LeAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfF64GtAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfF64GeAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfNotF64LtAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfNotF64LeAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfNotF64GtAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-        mutating func predictNext_brIfNotF64GeAcc(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_brIfAccCmp(operandPc: operandPc)
-        }
-
-        mutating func predictNext_brTable(operandPc: Pc, sp: Sp) -> [Pc] {
-            var pc = operandPc
-            let op = Instruction.BrTableOperand.load(from: &pc)
-            return (0..<Int(op.count)).map { pc.advanced(by: Int(op.baseAddress[$0].offset)) }
-        }
-
-        /// Resolves the entry PC of a call target, compiling it if needed.
-        ///
-        /// Returns `nil` when there is nothing to step into: a host function, or
-        /// a callee whose compilation fails. `call` is emitted for host
-        /// functions and for wasm functions in another instance, so neither
-        /// "is wasm" nor "is compiled" can be assumed here.
-        private mutating func calleeEntryPc(_ callee: InternalFunction) -> Pc? {
-            guard callee.isWasm else { return nil }
-            _ = try? callee.wasm.ensureCompiled(store: StoreRef(self.store))
-            guard let iseq = callee.compiledIseq() else { return nil }
-            return iseq.instructions.baseAddress
-        }
-
-        mutating func predictNext_call(operandPc: Pc, sp: Sp) -> [Pc] {
-            var pc = operandPc
-            let op = Instruction.CallOperand.load(from: &pc)
-            guard let entry = calleeEntryPc(op.callee) else { return [] }
-            return [entry]
-        }
-
-        mutating func predictNext_compilingCall(operandPc: Pc, sp: Sp) -> [Pc] {
-            var pc = operandPc
-            let op = Instruction.CallOperand.load(from: &pc)
-            guard let entry = calleeEntryPc(op.callee) else { return [] }
-            return [entry]
-        }
-
-        mutating func predictNext_internalCall(operandPc: Pc, sp: Sp) -> [Pc] {
-            predictNext_call(operandPc: operandPc, sp: sp)
-        }
-
-        mutating func predictNext__return(operandPc: Pc, sp: Sp) -> [Pc] {
-            // returnPC is stored at sp[-2], with a flag in its low bit.
-            return sp.returnPC.map { [$0] } ?? []
-        }
-
-        mutating func predictNext_returnCrossInstance(operandPc: Pc, sp: Sp) -> [Pc] {
-            // `returnCrossInstance` is only ever reached from `_return` and pops
-            // the same frame, so it lands in the same place.
-            predictNext__return(operandPc: operandPc, sp: sp)
-        }
-
-        /// Resolves a callee function from a table and returns its iseq base address.
-        /// Returns `nil` if the callee is a host function or the resolution fails.
-        private mutating func resolveIndirectCallee(
-            tableIndex: UInt32, index: VReg, sp: Sp
-        ) -> Pc? {
-            let callerInstance = self.instance.handle
-            let table = callerInstance.tables[Int(tableIndex)]
-            let value = sp[index].asAddressOffset(table.limits.isMemory64)
-            guard let elementIndex = Int(exactly: value),
-                elementIndex < table.elementCount
-            else { return nil }
-            let rawBitPattern = table.rawElement(at: elementIndex)
-            guard rawBitPattern != 0 else { return nil }
-            let function = InternalFunction(bitPattern: rawBitPattern)
-            return calleeEntryPc(function)
-        }
-
-        mutating func predictNext_callIndirect(operandPc: Pc, sp: Sp) -> [Pc] {
-            var pc = operandPc
-            let op = Instruction.CallIndirectOperand.load(from: &pc)
-            guard let target = resolveIndirectCallee(tableIndex: op.tableIndex, index: op.index, sp: sp) else {
-                return []
-            }
-            return [target]
-        }
-
-        mutating func predictNext_returnCall(operandPc: Pc, sp: Sp) -> [Pc] {
-            var pc = operandPc
-            let op = Instruction.ReturnCallOperand.load(from: &pc)
-            let callee = op.callee
-            guard let entry = calleeEntryPc(callee) else { return [] }
-            return [entry]
-        }
-
-        /// The entry of the function a `call_ref`/`return_call_ref` operand refers
-        /// to, or `nil` for a null reference or a host function.
-        private mutating func resolveReferencedCallee(_ callee: VReg, sp: Sp) -> Pc? {
-            let value = sp[callee]
-            guard !value.isNullRef else { return nil }
-            return calleeEntryPc(InternalFunction(bitPattern: Int(value.storage)))
-        }
-
-        mutating func predictNext_callRef(operandPc: Pc, sp: Sp) -> [Pc] {
-            var pc = operandPc
-            let op = Instruction.CallRefOperand.load(from: &pc)
-            guard let target = resolveReferencedCallee(op.callee, sp: sp) else { return [] }
-            return [target]
-        }
-
-        mutating func predictNext_returnCallRef(operandPc: Pc, sp: Sp) -> [Pc] {
-            var pc = operandPc
-            let op = Instruction.ReturnCallRefOperand.load(from: &pc)
-            guard let target = resolveReferencedCallee(op.callee, sp: sp) else { return [] }
-            return [target]
-        }
-
-        mutating func predictNext_returnCallIndirect(operandPc: Pc, sp: Sp) -> [Pc] {
-            var pc = operandPc
-            let op = Instruction.ReturnCallIndirectOperand.load(from: &pc)
-            guard let target = resolveIndirectCallee(tableIndex: op.tableIndex, index: op.index, sp: sp) else {
-                return []
-            }
-            return [target]
-        }
-
-        // Terminal instructions — no successor exists
-        mutating func predictNext_unreachable(operandPc: Pc, sp: Sp) -> [Pc] { [] }
-        mutating func predictNext_endOfExecution(operandPc: Pc, sp: Sp) -> [Pc] { [] }
-        // Raises the out-of-fuel trap, so nothing follows it.
-        mutating func predictNext_outOfFuelTrap(operandPc: Pc, sp: Sp) -> [Pc] { [] }
-        mutating func predictNext_breakpoint(operandPc: Pc, sp: Sp) -> [Pc] { [] }
-
-        // Exception-handling instructions — destination depends on which handler
-        // catches at runtime, so static prediction is not possible.
-        mutating func predictNext_throwTag(operandPc: Pc, sp: Sp) -> [Pc] { [] }
-        mutating func predictNext_throwRef(operandPc: Pc, sp: Sp) -> [Pc] { [] }
-
-        // `catchHandlers` registers exception handlers and falls through to the
-        // immediately-following instruction.
-        mutating func predictNext_catchHandlers(operandPc: Pc, sp: Sp) -> [Pc] {
-            var pc = operandPc
-            _ = Instruction.CatchHandlersOperand.load(from: &pc)
-            return [pc]
         }
     }
 

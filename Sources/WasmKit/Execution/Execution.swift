@@ -13,7 +13,7 @@ struct Execution: ~Copyable {
     /// The error trap thrown during execution.
     /// This property must not be assigned to be non-nil more than once.
     /// - Note: If the trap is set, it must be released manually.
-    private var trap: (error: UnsafeRawPointer, sp: Sp)? = nil
+    private var trap: (error: UnsafeRawPointer, sp: Sp, pc: Pc)? = nil
 
     /// The stack of active exception handlers for `try_table` blocks.
     var exceptionHandlers: [ExceptionHandler] = []
@@ -91,7 +91,9 @@ struct Execution: ~Copyable {
         }
     }
 
-    static func captureBacktrace(sp: Sp, store: Store) -> Backtrace {
+    /// - Parameter pc: Where the trap was raised: just past the head slot of the trapping instruction,
+    ///   or further into it. `nil` when that is not known.
+    static func captureBacktrace(sp: Sp, pc: Pc? = nil, store: Store) -> Backtrace {
         let callStack = CallStack(sp: sp)
         var symbols: [Backtrace.Symbol] = []
 
@@ -103,7 +105,7 @@ struct Execution: ~Copyable {
             let symbolName = store.nameRegistry.symbolicate(.wasm(function))
             symbols.append(.init(name: symbolName, address: frame.pc))
         }
-        return Backtrace(symbols: symbols)
+        return Backtrace(symbols: symbols, trapSite: pc.map { .init(name: symbols.first?.name, address: $0) })
     }
 
     /// Lays the callee's frame-initialisation image (the locals' default values
@@ -696,7 +698,7 @@ extension Execution {
                         wasmkit_tc_start(handler, sp, pc, md, ms, execution)
                     #endif
                 }
-                guard let (rawError, trappingSp) = self.trap else { return }
+                guard let (rawError, trappingSp, trappingPc) = self.trap else { return }
                 let error = unsafeBitCast(rawError, to: Error.self)
                 // Manually release the error object because the trap is caught in C and
                 // held as a raw pointer.
@@ -713,7 +715,7 @@ extension Execution {
                     throw error
                 }
                 // Attach backtrace if the thrown error is a trap
-                throw trap.withBacktrace(Self.captureBacktrace(sp: trappingSp, store: store.value))
+                throw trap.withBacktrace(Self.captureBacktrace(sp: trappingSp, pc: trappingPc, store: store.value))
             }
         #endif
     }
@@ -742,20 +744,49 @@ extension Execution {
                 }
                 throw exception
             } catch let trap as Trap {
-                throw trap.withBacktrace(Self.captureBacktrace(sp: sp, store: store.value))
+                throw trap.withBacktrace(Self.captureBacktrace(sp: sp, pc: pc, store: store.value))
             }
         }
     }
+
+    #if WasmDebuggingSupport
+        /// Runs one instruction the way one turn of ``runTokenThreaded(sp:pc:md:ms:)`` does, under
+        /// either threading model: `head` is its head slot and `pc` points just past it. Returns the
+        /// next instruction's head slot, leaving `pc` just past where that was read.
+        ///
+        /// Every handler body is the same Swift function under both threading models, so running one
+        /// through ``doExecute(_:sp:pc:md:ms:)`` takes no knowledge of what the instruction does.
+        /// The next head slot usually sits right before `pc`, but not always: a `_return` that
+        /// crosses an instance boundary hands over to `returnCrossInstance` without moving `pc`.
+        mutating func stepInstruction(
+            head: CodeSlot, threadingModel: EngineConfiguration.ThreadingModel,
+            sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms
+        ) throws -> CodeSlot {
+            let opcode = Instruction.opcode(ofHeadSlot: head, threadingModel: threadingModel)
+            do {
+                return try doExecute(opcode, sp: &sp, pc: &pc, md: &md, ms: &ms)
+            } catch let exception as WasmKitException {
+                // A matching handler leaves `pc` at the head slot it resumes from.
+                guard handleException(exception, sp: &sp, pc: &pc, md: &md, ms: &ms) else { throw exception }
+                return pc.read(CodeSlot.self)
+            } catch let trap as Trap {
+                throw trap.withBacktrace(Self.captureBacktrace(sp: sp, pc: pc, store: store.value))
+            }
+        }
+    #endif
 
     /// Sets the error trap thrown during execution.
     ///
     /// - Note: This function is called by C instruction handlers at most once.
     /// It's used only when direct threading is enabled.
-    /// - Parameter trap: The error trap thrown during execution.
+    /// - Parameters:
+    ///   - rawError: The error trap thrown during execution.
+    ///   - sp: The stack pointer of the frame that raised it.
+    ///   - pc: Where it was raised, just past the head slot of the raising instruction or further in.
     @_silgen_name("wasmkit_execution_state_set_error")
-    mutating func setError(_ rawError: UnsafeRawPointer, sp: Sp) {
+    mutating func setError(_ rawError: UnsafeRawPointer, sp: Sp, pc: Pc) {
         precondition(self.trap == nil)
-        self.trap = (rawError, sp)
+        self.trap = (rawError, sp, pc)
     }
 
     /// Used by the debugger to resume execution after breakpoints.

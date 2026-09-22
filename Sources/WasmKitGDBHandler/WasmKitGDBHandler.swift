@@ -278,9 +278,12 @@
             return (addressInProtocolSpace, bytes)
         }
 
-        /// Matches on the resolved address that caused the trap, rather than the reported address.
+        /// Whether the stop is a hit of a breakpoint the host asked for at the reported address. A stop's
+        /// bytecode can implement several Wasm instructions, and a step through them passes over the
+        /// others without any breakpoint having been hit; a step that arrives at a breakpoint has not
+        /// hit it yet either.
         private func isStoppedAtUserBreakpoint(_ breakpoint: Debugger.BreakpointState) -> Bool {
-            self.userBreakpoints.contains { $0.value == breakpoint.wasmPc }
+            breakpoint.isBreakpointHit && self.userBreakpoints[breakpoint.reportedPc] == breakpoint.wasmPc
         }
 
         var currentThreadStopInfo: GDBTargetResponse.Kind {

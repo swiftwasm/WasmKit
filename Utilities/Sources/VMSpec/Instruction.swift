@@ -89,9 +89,6 @@ extension VMGen {
         ///
         /// The identity must describe the *raw* slot-to-slot behaviour of the handler,
         /// so it has to be derived from the same fields that generate the body.
-        /// Control instructions must never share an identity: the debugger maps a
-        /// direct-threaded head slot back to an opcode ID, which requires handlers of
-        /// control instructions to be distinct.
         var handlerIdentity: String? = nil
 
         /// Whether the handler body can return the head slot of a trap pseudo-instruction

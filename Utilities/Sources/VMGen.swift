@@ -46,10 +46,6 @@ enum VMGen {
                 owners[inst.name] = inst
                 continue
             }
-            precondition(
-                !inst.isControl,
-                "\(inst.name): control instructions must not share a handler; the debugger maps head slots back to opcode IDs"
-            )
             guard let canonical = canonicalOfIdentity[identity] else {
                 canonicalOfIdentity[identity] = inst
                 owners[inst.name] = inst
@@ -89,7 +85,8 @@ enum VMGen {
             extension Execution {
 
                 /// Execute an instruction identified by the opcode.
-                /// Note: This function is only used when using token threading model.
+                /// Note: This function is used by the token-threaded run loop, and by the
+                /// debugger to run a single instruction under either threading model.
                 @inline(__always)
                 mutating func doExecute(_ \(doExecuteParams.map { "\($0.label): \($0.isInout ? "inout " : "")\($0.type)" }.joined(separator: ", "))) throws -> CodeSlot {
                     switch opcode {
@@ -547,17 +544,36 @@ enum VMGen {
 
         """
 
+        let directThreadedOnlyOpcodes = instructions.indices.filter { instructions[$0].isDirectThreadedOnly }
+        output += """
+        extension Instruction {
+            /// The number of opcodes, trap pseudo-instructions included.
+            static let opcodeCount = \(instructions.count)
+
+            /// Whether only the direct-threaded dispatcher implements this instruction;
+            /// `Execution.doExecute` has no case for it.
+            var isDirectThreadedOnly: Bool {
+                switch opcodeID {
+                case \(directThreadedOnlyOpcodes.map(String.init).joined(separator: ", ")): return true
+                default: return false
+                }
+            }
+        }
+
+        """
+
         output += """
         extension Instruction {
             /// Load an instruction from the given program counter.
-            /// - Parameter pc: The program counter to read from.
+            /// - Parameters:
+            ///   - pc: The program counter to read from.
+            ///   - threadingModel: The threading model the instruction sequence was compiled with.
             /// - Returns: The instruction read from the program counter.
-            /// - Precondition: The instruction sequence must be compiled with token threading model.
             ///
             /// Compiled for size: one arm per opcode, used only for disassembly.
             @_optimize(size)
-            static func load(from pc: inout Pc) -> Instruction {
-                let opcode = pc.read(UInt64.self)
+            static func load(from pc: inout Pc, threadingModel: EngineConfiguration.ThreadingModel) -> Instruction {
+                let opcode = Instruction.opcode(ofHeadSlot: pc.read(CodeSlot.self), threadingModel: threadingModel)
                 switch opcode {
 
         """
@@ -603,87 +619,6 @@ enum VMGen {
         #endif // EngineStats
 
         """
-        return output
-    }
-
-    static func generateNextInstructionPredictor(instructions: [Instruction]) -> String {
-        let controlInstructions = instructions.enumerated().filter { $0.element.isControl }
-
-        var output = """
-
-        #if WasmDebuggingSupport
-
-        /// A protocol for predicting the next instruction(s) that will execute after a control-flow instruction.
-        ///
-        /// Each `isControl` instruction in VMSpec gets a dedicated method in this protocol.
-        /// Adding a new control instruction automatically adds a new protocol requirement,
-        /// so any conforming type will fail to compile until it implements the new prediction.
-        protocol NextInstructionPredictor: ~Copyable {
-
-        """
-        for (_, inst) in controlInstructions {
-            output += "    mutating func predictNext_\(inst.name)(operandPc: Pc, sp: Sp) -> [Pc]\n"
-        }
-        output += """
-        }
-
-        extension Instruction {
-            /// Dispatches to the appropriate `NextInstructionPredictor` method based on the opcode ID.
-            /// - Returns: The predicted next Pc(s), or `nil` if the opcode is not a control instruction.
-            static func predictNextPcs(
-                opcodeID: OpcodeID, operandPc: Pc, sp: Sp,
-                predictor: inout some NextInstructionPredictor & ~Copyable
-            ) -> [Pc]? {
-                switch opcodeID {
-
-        """
-        for (opcode, inst) in controlInstructions {
-            output += "        case \(opcode): return predictor.predictNext_\(inst.name)(operandPc: operandPc, sp: sp)\n"
-        }
-        output += """
-                default: return nil
-                }
-            }
-
-            /// Builds a map from head code slot to opcode ID for all control-flow instructions.
-            ///
-            /// This is generated so that adding a new `isControl` instruction automatically
-            /// includes it in the map without manual updates.
-            static func buildControlHeadSlotMap(
-                threadingModel: EngineConfiguration.ThreadingModel
-            ) -> [CodeSlot: OpcodeID] {
-                var map = [CodeSlot: OpcodeID]()
-
-        """
-        for (_, inst) in controlInstructions {
-            let dummyExpr: String
-            if let layout = inst.immediateLayout {
-                let fields = layout.fields.map { field in
-                    "\(field.name): \(field.type.zeroLiteral)"
-                }.joined(separator: ", ")
-                dummyExpr = ".\(inst.name)(.init(\(fields)))"
-            } else if let immediate = inst.immediate {
-                // Simple immediate type (e.g. BrOperand = Int32)
-                dummyExpr = ".\(inst.name)(\(immediate.type)(0))"
-            } else {
-                dummyExpr = ".\(inst.name)(Instruction.NoOperand())"
-            }
-            output += """
-                        do {
-                            let inst = Instruction\(dummyExpr)
-                            map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
-                        }
-
-            """
-        }
-        output += """
-                    return map
-                }
-            }
-
-            #endif // WasmDebuggingSupport
-
-            """
         return output
     }
 
@@ -914,7 +849,7 @@ enum VMGen {
                 INLINE_CALL next = wasmkit_execute_\(inst.name)(\(bodyParams.map { "&\($0.label)" }.joined(separator: ", ")), state, &error);\n
             """
             if inst.mayThrow {
-                output += "    if (error) return wasmkit_execution_state_set_error(error, sp, state);\n"
+                output += "    if (error) return wasmkit_execution_state_set_error(error, sp, pc, state);\n"
             }
             // An accumulator is only live between a producer and the handler
             // right after it, so a handler that does not use one passes on an
@@ -1054,7 +989,6 @@ enum VMGen {
             GeneratedFile(
                 projectSources + ["WasmKit", "Execution", "Instructions", "Instruction.swift"],
                 header + generateEnumDefinition(instructions: instructions)
-                + generateNextInstructionPredictor(instructions: instructions)
             ),
         ]
 
