@@ -25,10 +25,7 @@ package struct Explore: ParsableCommand {
 
     package func run() throws {
         let module = try parseWasm(filePath: path)
-        // Instruction dumping requires token threading model for now
-        let configuration = EngineConfiguration(threadingModel: .token)
-        let engine = Engine(configuration: configuration)
-        let store = Store(engine: engine)
+        let store = Store(engine: Engine())
 
         var imports: Imports = [:]
         for importEntry in module.imports {
