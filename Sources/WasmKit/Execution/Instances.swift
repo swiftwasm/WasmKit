@@ -376,7 +376,8 @@ struct TableEntity: ~Copyable {
         Self.reference(elements[index], type: tableType.elementType)
     }
 
-    init(_ tableType: TableType, resourceLimiter: any ResourceLimiter) throws {
+    /// Creates a table whose elements start as `initialValue`, or null.
+    init(_ tableType: TableType, initialValue: Reference? = nil, resourceLimiter: any ResourceLimiter) throws {
         // The validator caps a declared table size at `UInt32.max`, which still
         // exceeds `Int` on a 32-bit host, so the conversion has to be checked.
         guard let numberOfElements = Int(exactly: tableType.limits.min) else {
@@ -385,7 +386,14 @@ struct TableEntity: ~Copyable {
         guard try resourceLimiter.limitTableGrowth(to: numberOfElements) else {
             throw Trap(.initialTableSizeExceedsLimit(numberOfElements: numberOfElements))
         }
-        elements = try TableElements(count: numberOfElements)
+        var elements = try TableElements(count: numberOfElements)
+        if let initialValue {
+            let raw = Self.rawValue(initialValue)
+            if raw != 0 {
+                elements.withUnsafeMutableBufferPointer { $0.update(repeating: raw) }
+            }
+        }
+        self.elements = elements
         self.tableType = tableType
     }
 

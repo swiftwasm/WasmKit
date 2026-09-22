@@ -9,6 +9,9 @@
 ;; A function type with a (ref null $t) parameter.
 (assert_malformed (module binary "\00\61\73\6d\01\00\00\00\01\09\02\60\00\00\60\01\63\00\00") "malformed value type")
 
+;; A funcref table with an initializer, `(table 1 funcref (ref.null func))`.
+(assert_malformed (module binary "\00\61\73\6d\01\00\00\00\04\09\01\40\00\70\00\01\d0\70\0b") "malformed table")
+
 ;; 0x63 followed by an abstract heap type is only the long form of funcref.
 (module binary "\00\61\73\6d\01\00\00\00\01\06\01\60\01\63\70\00")
 

@@ -22,7 +22,7 @@ struct InstructionValidator {
     func validateTableInit(elemIndex: UInt32, table: UInt32) throws(WasmKitError) {
         let tableType = try context.tableType(table)
         let elementType = try context.elementType(elemIndex)
-        guard tableType.elementType == elementType else {
+        guard elementType.isSubtype(of: tableType.elementType) else {
             throw WasmKitError(
                 message: .tableElementTypeMismatch(tableType: "\(tableType.elementType)", elementType: "\(elementType)")
             )
@@ -32,7 +32,7 @@ struct InstructionValidator {
     func validateTableCopy(dest: UInt32, source: UInt32) throws(WasmKitError) {
         let tableType1 = try context.tableType(source)
         let tableType2 = try context.tableType(dest)
-        guard tableType1.elementType == tableType2.elementType else {
+        guard tableType1.elementType.isSubtype(of: tableType2.elementType) else {
             throw WasmKitError(
                 message:
                     .tableElementTypeMismatch(
@@ -57,7 +57,7 @@ struct InstructionValidator {
     }
 
     func validateReturnCallLike(calleeType: FunctionType, callerType: FunctionType) throws(WasmKitError) {
-        guard calleeType.results == callerType.results else {
+        guard calleeType.results.isSubtype(of: callerType.results) else {
             throw WasmKitError(
                 message: .typeMismatchOnReturnCall(expected: callerType.results, actual: calleeType.results)
             )
@@ -85,6 +85,12 @@ struct ModuleValidator {
         }
         for tableType in module.tableTypes {
             try Self.checkTableType(tableType, features: module.features)
+        }
+        for (tableType, initializer) in zip(module.internalTables, module.tableInitializers) {
+            // Without an initializer, elements start out null.
+            guard initializer != nil || tableType.elementType.isNullable else {
+                throw WasmKitError(message: .nonNullableTableWithoutInitializer(elementType: tableType.elementType))
+            }
         }
         for tagTypeIndex in module.tagTypes {
             let tagType = try Module.resolveType(tagTypeIndex, typeSection: module.types)

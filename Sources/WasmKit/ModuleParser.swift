@@ -22,7 +22,7 @@ func parseModule<Source: ByteStreamSource>(parser: consuming WasmParser.Parser<S
     var types: [FunctionType] = []
     var typeIndices: [TypeIndex] = []
     var codes: [Code] = []
-    var tables: [TableType] = []
+    var tables: [WasmParser.Table] = []
     var memories: [MemoryType] = []
     var globals: [WasmParser.Global] = []
     var tags: [WasmParser.Tag] = []
@@ -46,7 +46,7 @@ func parseModule<Source: ByteStreamSource>(parser: consuming WasmParser.Parser<S
         case .functionSection(let types):
             typeIndices = types
         case .tableSection(let tableSection):
-            tables = tableSection.map { $0.type }
+            tables = tableSection
         case .memorySection(let memorySection):
             memories = memorySection.map { $0.type }
         case .globalSection(let globalSection):

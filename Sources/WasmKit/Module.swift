@@ -69,6 +69,9 @@ public struct Module: Sendable {
     let importedFunctionTypes: [TypeIndex]
     let memoryTypes: [MemoryType]
     let tableTypes: [TableType]
+    /// The initializer of each table defined in the module, `nil` for a table
+    /// whose elements start out null.
+    let tableInitializers: [ConstExpression?]
     let tagTypes: [TypeIndex]
     let features: WasmFeatureSet
     let dataCount: UInt32?
@@ -83,7 +86,7 @@ public struct Module: Sendable {
         exports: [Export],
         globals: [WasmParser.Global],
         memories: [MemoryType],
-        tables: [TableType],
+        tables: [WasmParser.Table],
         tags: [WasmParser.Tag] = [],
         customSections: [CustomSection],
         features: WasmFeatureSet,
@@ -118,7 +121,8 @@ public struct Module: Sendable {
         self.types = types
         self.importedFunctionTypes = importedFunctionTypes
         self.memoryTypes = memoryTypes + memories
-        self.tableTypes = tableTypes + tables
+        self.tableTypes = tableTypes + tables.map(\.type)
+        self.tableInitializers = tables.map(\.initializer)
         self.tagTypes = tagTypes + tags.map { $0.type }
     }
 

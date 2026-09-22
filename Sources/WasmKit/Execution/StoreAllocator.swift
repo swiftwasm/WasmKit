@@ -422,11 +422,37 @@ extension StoreAllocator {
             }
         )
 
+        var functionRefs: Set<InternalFunction> = []
+        let constEvalContext = ConstEvaluationContext(
+            functions: functions,
+            globals: importedGlobals.map { $0.value },
+            onFunctionReferenced: { function in
+                functionRefs.insert(function)
+            }
+        )
+        // Constant expressions can only read imported globals.
+        let constTypeContext = ConstExpressionTypeContext(
+            canonicalizer: canonicalizer, functions: functions, globalTypes: importedGlobalTypes
+        )
+
         // Step 3.
         let tables = try allocateEntities(
             imports: importedTables,
-            internals: module.internalTables,
-            allocateHandle: { t, _ in try allocate(tableType: canonicalizer.canonicalize(t), resourceLimiter: resourceLimiter) }
+            internals: Array(zip(module.internalTables, module.tableInitializers)),
+            allocateHandle: { table, _ in
+                let (tableType, initializer) = table
+                let canonicalType = try canonicalizer.canonicalize(tableType)
+                var initialValue: Reference?
+                if let initializer {
+                    let expectedType = ValueType.ref(canonicalType.elementType)
+                    try initializer.checkType(expectedType, context: constTypeContext)
+                    guard case .ref(let reference) = try initializer.evaluate(context: constEvalContext, expectedType: expectedType) else {
+                        preconditionFailure("a reference-typed constant expression produced a non-reference")
+                    }
+                    initialValue = reference
+                }
+                return try allocate(tableType: canonicalType, initialValue: initialValue, resourceLimiter: resourceLimiter)
+            }
         )
 
         // Step 4.
@@ -436,21 +462,13 @@ extension StoreAllocator {
             allocateHandle: { m, _ in try allocate(memoryType: m, engineConfiguration: engine.configuration, resourceLimiter: resourceLimiter) }
         )
 
-        var functionRefs: Set<InternalFunction> = []
         // Step 5.
-        let constEvalContext = ConstEvaluationContext(
-            functions: functions,
-            globals: importedGlobals.map { $0.value },
-            onFunctionReferenced: { function in
-                functionRefs.insert(function)
-            }
-        )
-
         let globals = try allocateEntities(
             imports: importedGlobals,
             internals: module.globals,
             allocateHandle: { global, _ in
                 let globalType = try canonicalizer.canonicalize(global.type)
+                try global.initializer.checkType(globalType.valueType, context: constTypeContext)
                 let initialValue = try global.initializer.evaluate(
                     context: constEvalContext, expectedType: globalType.valueType
                 )
@@ -472,6 +490,9 @@ extension StoreAllocator {
             for (index, element) in module.elements.enumerated() {
                 // TODO: Avoid evaluating element expr twice in `Module.instantiate` and here.
                 let elementType = try canonicalizer.canonicalize(element.type)
+                for item in element.initializer {
+                    try item.checkType(.ref(elementType), context: constTypeContext)
+                }
                 var references = try element.evaluateInits(context: constEvalContext, type: elementType)
                 switch element.mode {
                 case .active, .declarative:
@@ -590,8 +611,8 @@ extension StoreAllocator {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-table>
-    func allocate(tableType: TableType, resourceLimiter: any ResourceLimiter) throws -> InternalTable {
-        let pointer = try tables.allocate(initializing: TableEntity(tableType, resourceLimiter: resourceLimiter))
+    func allocate(tableType: TableType, initialValue: Reference? = nil, resourceLimiter: any ResourceLimiter) throws -> InternalTable {
+        let pointer = try tables.allocate(initializing: TableEntity(tableType, initialValue: initialValue, resourceLimiter: resourceLimiter))
         return InternalTable(unsafe: pointer)
     }
 

@@ -464,15 +464,8 @@ extension ByteStream {
     /// <https://webassembly.github.io/spec/core/binary/types.html#table-types>
     @inlinable
     mutating func parseTableType(features: WasmFeatureSet) throws(WasmParserError) -> TableType {
-        let elementType: ReferenceType
         let b = try consumeAny()
-
-        switch b {
-        case 0x70:
-            elementType = .funcRef
-        case 0x6F:
-            elementType = .externRef
-        default:
+        guard let elementType = try parseReferenceType(byte: b, features: features) else {
             throw WasmParserError(
                 kind: .parserUnexpectedByte(b, expected: [0x6F, 0x70]),
                 offset: currentIndex
@@ -905,8 +898,25 @@ extension Parser {
     /// <https://webassembly.github.io/spec/core/binary/modules.html#table-section>
     @usableFromInline
     mutating func parseTableSection() throws(WasmParserError) -> [Table] {
-        let features = self.features
-        return try parseVector { (s) throws(WasmParserError) in try Table(type: s.parseTableType(features: features)) }
+        let count: UInt32 = try parseUnsigned()
+        var tables: [Table] = []
+        for _ in 0..<count {
+            // A table type starts with a reference type, which is never 0x40, so
+            // 0x40 introduces a table with an initializer (typed function references).
+            guard features.contains(.functionReferences), try stream.peek() == 0x40 else {
+                tables.append(Table(type: try stream.parseTableType(features: features)))
+                continue
+            }
+            _ = try stream.consumeAny()
+            let reserved = try stream.consumeAny()
+            guard reserved == 0x00 else {
+                throw makeError(.zeroExpected(actual: reserved))
+            }
+            let type = try stream.parseTableType(features: features)
+            let initializer = try parseConstExpression()
+            tables.append(Table(type: type, initializer: initializer))
+        }
+        return tables
     }
 
     /// > Note:
@@ -1002,6 +1012,9 @@ extension Parser {
                 }
 
                 type = refType
+            } else if features.contains(.functionReferences) && !flag.contains(.usesExpressions) {
+                // A segment listing function indices only holds non-null functions.
+                type = ReferenceType(isNullable: false, heapType: .funcRef)
             } else {
                 type = .funcRef
             }

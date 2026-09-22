@@ -153,6 +153,10 @@ extension WasmKitError.Message {
         Self("shared memory must have maximum")
     }
 
+    static func nonNullableTableWithoutInitializer(elementType: ReferenceType) -> Self {
+        Self("type mismatch: a table of \(elementType) needs an initializer")
+    }
+
     static var referenceTypesFeatureRequiredForNonFuncrefTables: Self {
         Self("reference-types feature is required for non-funcref tables")
     }
