@@ -4699,6 +4699,24 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         pushEmit(.ref(.funcRef), { .refFunc(Instruction.RefFuncOperand(index: functionIndex, result: LVReg($0))) })
     }
 
+    // Typed function references instructions. Reject them explicitly: the visitor's
+    // default implementation is a no-op that would leave the value stack out of sync.
+    mutating func visitCallRef(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("call_ref is not implemented yet")
+    }
+    mutating func visitReturnCallRef(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("return_call_ref is not implemented yet")
+    }
+    mutating func visitRefAsNonNull() throws(WasmKitError) -> Output {
+        throw WasmKitError("ref.as_non_null is not implemented yet")
+    }
+    mutating func visitBrOnNull(relativeDepth: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("br_on_null is not implemented yet")
+    }
+    mutating func visitBrOnNonNull(relativeDepth: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("br_on_non_null is not implemented yet")
+    }
+
     private mutating func visitUnary(_ operand: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws(WasmKitError) {
         try popPushEmit(operand, operand) { value, result in
             return instruction(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))

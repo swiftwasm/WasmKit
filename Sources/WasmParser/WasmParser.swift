@@ -625,11 +625,7 @@ extension Parser: BinaryInstructionDecoder {
         return (blockType, TryCatch(catches: catches))
     }
     @inlinable mutating func visitCall() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
-    @inlinable mutating func visitCallRef() throws(WasmParserError) -> UInt32 {
-        // TODO reference types checks
-        // traps on nil
-        try parseUnsigned()
-    }
+    @inlinable mutating func visitCallRef() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
 
     @inlinable mutating func visitCallIndirect() throws(WasmParserError) -> (typeIndex: UInt32, tableIndex: UInt32) {
         let typeIndex: TypeIndex = try parseUnsigned()
@@ -654,7 +650,7 @@ extension Parser: BinaryInstructionDecoder {
     }
 
     @inlinable mutating func visitReturnCallRef() throws(WasmParserError) -> UInt32 {
-        return 0
+        try parseUnsigned()
     }
 
     @inlinable mutating func visitTypedSelect() throws(WasmParserError) -> WasmTypes.ValueType {
@@ -698,12 +694,8 @@ extension Parser: BinaryInstructionDecoder {
     @inlinable mutating func visitRefNull() throws(WasmParserError) -> WasmTypes.HeapType {
         return try stream.parseHeapType()
     }
-    @inlinable mutating func visitBrOnNull() throws(WasmParserError) -> UInt32 {
-        return 0
-    }
-    @inlinable mutating func visitBrOnNonNull() throws(WasmParserError) -> UInt32 {
-        return 0
-    }
+    @inlinable mutating func visitBrOnNull() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitBrOnNonNull() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
 
     @inlinable mutating func visitRefFunc() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
     @inlinable mutating func visitMemoryInit() throws(WasmParserError) -> UInt32 {
