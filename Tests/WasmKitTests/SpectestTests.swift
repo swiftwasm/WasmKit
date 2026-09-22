@@ -43,7 +43,8 @@ struct SpectestTests {
     static var sharedMemoryTestPaths: [String] {
         guard sharedMemorySupported else { return [] }
         return [
-            Self.testsuite.appendingPathComponent("proposals/threads").path
+            Self.testsuite.appendingPathComponent("proposals/threads").path,
+            Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/multi-memory/threads").path,
         ]
     }
 

@@ -453,6 +453,11 @@ extension WASTRunContext {
         if rootPath.hasSuffix("multi-memory") {
             features.insert(.multiMemory)
         }
+        if rootPath.hasSuffix("multi-memory/threads") {
+            // Shared memories at a non-zero index.
+            features.insert(.multiMemory)
+            features.insert(.threads)
+        }
         if rootPath.hasSuffix("fuel") {
             // A tail call is one of the ways a guest can run forever, so the fuel suite needs it.
             features.insert(.tailCall)
