@@ -23,6 +23,10 @@ struct DebuggerInstructionMapping {
         /// code lies among the functions compiled before it.
         private var instructionAddresses = [[Int]]()
 
+        /// Mapped head slots of the compiled functions: one sorted run per function, ordered by its
+        /// first slot.
+        private var headSlots = [[UInt]]()
+
         mutating func add(canonical: Int, emitting: Int, iseq: Pc) {
             // Don't override the existing mapping, only store a new pair if there's no mapping for a given key.
             if self.iseqToWasm[iseq] == nil {
@@ -121,6 +125,27 @@ struct DebuggerInstructionMapping {
                 return found
             }
             return index < self.instructionAddresses.endIndex ? self.instructionAddresses[index][0] : nil
+        }
+
+        /// Records the head slots of a function's bytecode.
+        mutating func addHeadSlots(_ pcs: [Pc]) {
+            let slots = pcs.map { UInt(bitPattern: $0) }.sorted()
+            guard let first = slots.first else { return }
+            // Functions compile lazily, in any order, into buffers that never overlap.
+            let index = self.headSlots.partitioningIndex { $0[0] >= first }
+            guard index == self.headSlots.endIndex || self.headSlots[index][0] != first else { return }
+            self.headSlots.insert(slots, at: index)
+        }
+
+        /// The Wasm address that emitted the instruction `pc` lies in, or just past: the one whose
+        /// head slot is the last before `pc`.
+        func findWasm(forIseqAddressWithin pc: Pc) -> Int? {
+            let pc = UInt(bitPattern: pc)
+            let function = self.headSlots.partitioningIndex { $0[0] >= pc }
+            guard function > self.headSlots.startIndex else { return nil }
+            let slots = self.headSlots[function - 1]
+            guard let head = Pc(bitPattern: slots[slots.partitioningIndex { $0 >= pc } - 1]) else { return nil }
+            return self.iseqToWasm[head]
         }
     #endif
 }

@@ -849,7 +849,7 @@ enum VMGen {
                 INLINE_CALL next = wasmkit_execute_\(inst.name)(\(bodyParams.map { "&\($0.label)" }.joined(separator: ", ")), state, &error);\n
             """
             if inst.mayThrow {
-                output += "    if (error) return wasmkit_execution_state_set_error(error, sp, state);\n"
+                output += "    if (error) return wasmkit_execution_state_set_error(error, sp, pc, state);\n"
             }
             // An accumulator is only live between a producer and the handler
             // right after it, so a handler that does not use one passes on an
