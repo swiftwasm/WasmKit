@@ -549,8 +549,7 @@ struct ExpressionEncoder: BinaryInstructionEncoder {
     }
     mutating func encodeImmediates(dataIndex: UInt32, memory: UInt32) {
         // For memory 0, encoding the memory index yields the single 0x00 the pre-multi-memory reserved byte produced.
-        hasDataSegmentInstruction = true
-        encodeUnsigned(dataIndex)
+        encodeImmediates(dataIndex: dataIndex)
         encodeUnsigned(memory)
     }
     mutating func encodeImmediates(elemIndex: UInt32) { encodeUnsigned(elemIndex) }
