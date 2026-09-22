@@ -7,6 +7,8 @@ add_wasmkit_library(WasmKit
   SIMDOpcode.swift
   Translator.swift
   Validator.swift
+  TypeCanonicalization.swift
+  TypeMatching.swift
   WasmKitError.swift
   ResourceLimiter.swift
   Execution/SharedMemory.swift

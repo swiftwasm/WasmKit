@@ -69,6 +69,9 @@ public struct Module: Sendable {
     let importedFunctionTypes: [TypeIndex]
     let memoryTypes: [MemoryType]
     let tableTypes: [TableType]
+    /// The initializer of each table defined in the module, `nil` for a table
+    /// whose elements start out null.
+    let tableInitializers: [ConstExpression?]
     let tagTypes: [TypeIndex]
     let features: WasmFeatureSet
     let dataCount: UInt32?
@@ -83,7 +86,7 @@ public struct Module: Sendable {
         exports: [Export],
         globals: [WasmParser.Global],
         memories: [MemoryType],
-        tables: [TableType],
+        tables: [WasmParser.Table],
         tags: [WasmParser.Tag] = [],
         customSections: [CustomSection],
         features: WasmFeatureSet,
@@ -118,7 +121,8 @@ public struct Module: Sendable {
         self.types = types
         self.importedFunctionTypes = importedFunctionTypes
         self.memoryTypes = memoryTypes + memories
-        self.tableTypes = tableTypes + tables
+        self.tableTypes = tableTypes + tables.map(\.type)
+        self.tableInitializers = tables.map(\.initializer)
         self.tagTypes = tagTypes + tags.map { $0.type }
     }
 
@@ -263,11 +267,12 @@ public struct Module: Sendable {
                         )
                     )
                 }
-                guard table.tableType.elementType == element.type else {
+                let elementType = try instance.typeCanonicalizer.canonicalize(element.type)
+                guard elementType.isSubtype(of: table.tableType.elementType) else {
                     throw WasmKitError(
                         kind: .message(
                             .elementSegmentTypeMismatch(
-                                elementType: element.type,
+                                elementType: elementType,
                                 tableElementType: table.tableType.elementType
                             )
                         )
@@ -278,7 +283,7 @@ public struct Module: Sendable {
                 guard let destination = Int(exactly: offset) else {
                     throw Trap(.tableOutOfBounds(Int(clamping: offset)))
                 }
-                let references = try element.evaluateInits(context: constEvalContext)
+                let references = try element.evaluateInits(context: constEvalContext, type: elementType)
                 try table.initialize(
                     references, from: 0, to: destination, count: references.count
                 )

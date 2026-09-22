@@ -281,16 +281,7 @@ extension InternalFunction {
 
     private func check(expectedTypes: [ValueType], values: [Value]) -> Bool {
         guard expectedTypes.count == values.count else { return false }
-        for (expected, value) in zip(expectedTypes, values) {
-            switch (expected, value) {
-            case (.i32, .i32), (.i64, .i64), (.f32, .f32), (.f64, .f64), (.v128, .v128),
-                (.ref(.funcRef), .ref(.function)), (.ref(.externRef), .ref(.extern)),
-                (.ref(.exnRef), .ref(.exception)):
-                break
-            default: return false
-            }
-        }
-        return true
+        return zip(values, expectedTypes).allSatisfy { $0.matches($1) }
     }
 
     private func check(functionType: FunctionType, parameters: [Value]) throws {

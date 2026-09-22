@@ -2384,6 +2384,16 @@ enum Instruction {
     /// Control-shaped so that it receives the program counter, which it records for a
     /// future resumable-call API before throwing.
     case outOfFuelTrap(NoOperand)
+    /// WebAssembly Core Instruction `call_ref`
+    case callRef(Instruction.CallRefOperand)
+    /// WebAssembly Core Instruction `return_call_ref`
+    case returnCallRef(Instruction.ReturnCallRefOperand)
+    /// WebAssembly Core Instruction `ref.as_non_null`
+    case refAsNonNull(Instruction.RefAsNonNullOperand)
+    /// Conditional pc-relative branch if the condition is a null reference
+    case brIfNull(Instruction.BrIfOperand)
+    /// Conditional pc-relative branch if the condition is not a null reference
+    case brIfNotNull(Instruction.BrIfOperand)
 }
 
 extension Instruction {
@@ -3578,6 +3588,41 @@ extension Instruction {
             emitSlot { $0.raw }
         }
     }
+
+    struct CallRefOperand: InstructionImmediate {
+        var callee: VReg
+        var spAddend: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (callee, spAddend, _, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(callee: callee, spAddend: spAddend)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.callee, $0.spAddend, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct ReturnCallRefOperand: InstructionImmediate {
+        var callee: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (callee, _, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(callee: callee)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.callee, 0, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct RefAsNonNullOperand: InstructionImmediate {
+        var value: LVReg
+        var result: LVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (value, result) = pc.read((LVReg, LVReg).self)
+            return Self(value: value, result: result)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.value, $0.result) as (LVReg, LVReg), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -4302,6 +4347,11 @@ extension Instruction {
         case .i64Load32SWithCopy(let immediate): return immediate
         case .i64Load32UWithCopy(let immediate): return immediate
         case .consumeFuel(let immediate): return immediate
+        case .callRef(let immediate): return immediate
+        case .returnCallRef(let immediate): return immediate
+        case .refAsNonNull(let immediate): return immediate
+        case .brIfNull(let immediate): return immediate
+        case .brIfNotNull(let immediate): return immediate
         default: return nil
         }
     }
@@ -5030,6 +5080,11 @@ extension Instruction {
         case .i64Load32SWithCopy(let immediate): immediate.emit(to: emit)
         case .i64Load32UWithCopy(let immediate): immediate.emit(to: emit)
         case .consumeFuel(let immediate): immediate.emit(to: emit)
+        case .callRef(let immediate): immediate.emit(to: emit)
+        case .returnCallRef(let immediate): immediate.emit(to: emit)
+        case .refAsNonNull(let immediate): immediate.emit(to: emit)
+        case .brIfNull(let immediate): immediate.emit(to: emit)
+        case .brIfNotNull(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -5768,7 +5823,12 @@ extension Instruction {
         case .i64Load32SWithCopy: return 725
         case .i64Load32UWithCopy: return 726
         case .consumeFuel: return 727
-        default: return 728  // .outOfFuelTrap
+        case .outOfFuelTrap: return 728
+        case .callRef: return 729
+        case .returnCallRef: return 730
+        case .refAsNonNull: return 731
+        case .brIfNull: return 732
+        default: return 733  // .brIfNotNull
         }
     }
 }
@@ -6512,6 +6572,11 @@ extension Instruction {
         case 726: return .i64Load32UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
         case 727: return .consumeFuel(Instruction.ConsumeFuelOperand.load(from: &pc))
         case 728: return .outOfFuelTrap(NoOperand())
+        case 729: return .callRef(Instruction.CallRefOperand.load(from: &pc))
+        case 730: return .returnCallRef(Instruction.ReturnCallRefOperand.load(from: &pc))
+        case 731: return .refAsNonNull(Instruction.RefAsNonNullOperand.load(from: &pc))
+        case 732: return .brIfNull(Instruction.BrIfOperand.load(from: &pc))
+        case 733: return .brIfNotNull(Instruction.BrIfOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -7255,6 +7320,11 @@ extension Instruction {
         case 726: return "i64Load32UWithCopy"
         case 727: return "consumeFuel"
         case 728: return "outOfFuelTrap"
+        case 729: return "callRef"
+        case 730: return "returnCallRef"
+        case 731: return "refAsNonNull"
+        case 732: return "brIfNull"
+        case 733: return "brIfNotNull"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
@@ -7380,6 +7450,10 @@ protocol NextInstructionPredictor: ~Copyable {
     mutating func predictNext_brIfI64AndImm(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_brIfNotI64AndImm(operandPc: Pc, sp: Sp) -> [Pc]
     mutating func predictNext_outOfFuelTrap(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_callRef(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_returnCallRef(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfNull(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfNotNull(operandPc: Pc, sp: Sp) -> [Pc]
 }
 
 extension Instruction {
@@ -7501,6 +7575,10 @@ extension Instruction {
         case 616: return predictor.predictNext_brIfI64AndImm(operandPc: operandPc, sp: sp)
         case 617: return predictor.predictNext_brIfNotI64AndImm(operandPc: operandPc, sp: sp)
         case 728: return predictor.predictNext_outOfFuelTrap(operandPc: operandPc, sp: sp)
+        case 729: return predictor.predictNext_callRef(operandPc: operandPc, sp: sp)
+        case 730: return predictor.predictNext_returnCallRef(operandPc: operandPc, sp: sp)
+        case 732: return predictor.predictNext_brIfNull(operandPc: operandPc, sp: sp)
+        case 733: return predictor.predictNext_brIfNotNull(operandPc: operandPc, sp: sp)
         default: return nil
         }
     }
@@ -7955,6 +8033,22 @@ extension Instruction {
             }
             do {
                 let inst = Instruction.outOfFuelTrap(Instruction.NoOperand())
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.callRef(.init(callee: VReg.zero, spAddend: VReg.zero))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.returnCallRef(.init(callee: VReg.zero))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfNull(.init(condition: LVReg.zero, offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfNotNull(.init(condition: LVReg.zero, offset: Int32(0)))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
         return map

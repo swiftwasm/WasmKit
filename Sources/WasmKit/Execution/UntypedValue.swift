@@ -7,11 +7,15 @@ struct UntypedValue: Equatable, Hashable {
     /// The internal storage of the value.
     let storage: UInt64
 
-    /// The default value of WebAssembly local variables.
-    /// This property assumes that the default value of any type has the same
-    /// untyped representation.
+    /// The default value of numeric and vector WebAssembly local variables.
+    /// References default to ``nullReference`` instead.
     static var `default`: UntypedValue {
         UntypedValue(storage: 0)
+    }
+
+    /// The null value of any reference type.
+    static var nullReference: UntypedValue {
+        UntypedValue(storage: isNullMaskPattern)
     }
 
     /// The mask pattern to check if the value is a null reference.
@@ -118,14 +122,13 @@ struct UntypedValue: Equatable, Hashable {
             return Int(storage)
         }
         switch type.heapType {
-        case .abstract(.funcRef):
+        case .abstract(.funcRef), .concrete:
+            // A concrete heap type is always a function type.
             return .function(decodeOptionalInt())
         case .abstract(.externRef):
             return .extern(decodeOptionalInt())
         case .abstract(.exnRef):
             return .exception(decodeOptionalInt())
-        case .concrete:
-            fatalError("heap type other than `func`, `extern`, and `exn` is not implemented yet")
         }
     }
 

@@ -48,7 +48,8 @@ jobs:
       - uses: actions/checkout@v6
       - id: setup-development
         run: |
-          brew install wabt jemalloc
+          brew install jemalloc
+          ./CI/install-wabt.sh
           curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg && \
             installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
 

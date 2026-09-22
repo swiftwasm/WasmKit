@@ -9,11 +9,18 @@ struct EncoderTests {
 
     // MARK: - Constants
 
+    // Memory64, tail calls, extended constant expressions and exceptions are
+    // enabled by default since wabt 1.0.42, which also removed their flags.
     private static let wast2jsonFeatures = [
-        "--enable-memory64",
-        "--enable-tail-call",
-        "--enable-threads",
-        "--enable-extended-const",
+        "--enable-threads"
+    ]
+
+    /// Features enabled only for the files in the given directories. With
+    /// function references enabled, wast2json writes element segments as
+    /// expressions rather than function indices, so the encoder's output would
+    /// no longer match elsewhere.
+    private static let wast2jsonDirectoryFeatures: [String: [String]] = [
+        "function-references": ["--enable-function-references"]
     ]
 
     // MARK: - Supporting Types
@@ -309,13 +316,8 @@ struct EncoderTests {
         @Test(
             arguments: Spectest.wastFiles(
                 include: [],
-                exclude: [
-                    // Uses tags; wast2json is not run with `--enable-exceptions` here
-                    // and the encoder orders the type section differently for them.
-                    "br_if_landing_pad_try_table.wast",
-                    // Uses typed references; wast2json is not run with `--enable-function-references`.
-                    "function_references.wast",
-                ]
+                // The encoder orders the type section differently from wast2json for tags.
+                exclude: ["br_if_landing_pad_try_table.wast"]
             )
         )
         func spectest(wastFile: URL) throws {
@@ -371,6 +373,7 @@ struct EncoderTests {
         private func runWast2Json(wast2json: URL, wastFile: URL, json: URL) throws {
             var arguments = [wastFile.path]
             arguments.append(contentsOf: Self.wast2jsonFeatures)
+            arguments.append(contentsOf: Self.wast2jsonDirectoryFeatures[wastFile.deletingLastPathComponent().lastPathComponent] ?? [])
             arguments.append(contentsOf: ["-o", json.path])
 
             let process = try Process.run(wast2json, arguments: arguments)

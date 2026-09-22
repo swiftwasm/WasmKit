@@ -68,11 +68,17 @@ extension EntityHandle: ValidatableEntity where T: ValidatableEntity, T: ~Copyab
 }
 
 package struct InstanceEntity /* : ~Copyable */ {
+    /// The canonical signature of each type in the module's type section.
     var types: [FunctionType]
+    /// The canonical type ID of each type in the module's type section.
+    var typeIDs: [InternedFuncType]
     var functions: ImmutableArray<InternalFunction>
     var tables: ImmutableArray<InternalTable>
     var memories: ImmutableArray<InternalMemory>
     var globals: ImmutableArray<InternalGlobal>
+    /// The canonical type of each global as this module declares it. An imported
+    /// immutable global may hold a value of a subtype.
+    var globalTypes: [GlobalType]
     var tags: ImmutableArray<InternalTag>
     var elementSegments: ImmutableArray<InternalElementSegment>
     var dataSegments: ImmutableArray<InternalDataSegment>
@@ -87,10 +93,12 @@ package struct InstanceEntity /* : ~Copyable */ {
     static var empty: InstanceEntity {
         InstanceEntity(
             types: [],
+            typeIDs: [],
             functions: ImmutableArray(),
             tables: ImmutableArray(),
             memories: ImmutableArray(),
             globals: ImmutableArray(),
+            globalTypes: [],
             tags: ImmutableArray(),
             elementSegments: ImmutableArray(),
             dataSegments: ImmutableArray(),
@@ -368,14 +376,8 @@ struct TableEntity: ~Copyable {
         Self.reference(elements[index], type: tableType.elementType)
     }
 
-    init(_ tableType: TableType, resourceLimiter: any ResourceLimiter) throws {
-        switch tableType.elementType.heapType {
-        case .abstract(.funcRef), .abstract(.externRef), .abstract(.exnRef):
-            break
-        case .concrete:
-            throw Trap(.unimplemented(feature: "heap type other than `func`, `extern`, and `exn`"))
-        }
-
+    /// Creates a table whose elements start as `initialValue`, or null.
+    init(_ tableType: TableType, initialValue: Reference? = nil, resourceLimiter: any ResourceLimiter) throws {
         // The validator caps a declared table size at `UInt32.max`, which still
         // exceeds `Int` on a 32-bit host, so the conversion has to be checked.
         guard let numberOfElements = Int(exactly: tableType.limits.min) else {
@@ -384,7 +386,14 @@ struct TableEntity: ~Copyable {
         guard try resourceLimiter.limitTableGrowth(to: numberOfElements) else {
             throw Trap(.initialTableSizeExceedsLimit(numberOfElements: numberOfElements))
         }
-        elements = try TableElements(count: numberOfElements)
+        var elements = try TableElements(count: numberOfElements)
+        if let initialValue {
+            let raw = Self.rawValue(initialValue)
+            if raw != 0 {
+                elements.withUnsafeMutableBufferPointer { $0.update(repeating: raw) }
+            }
+        }
+        self.elements = elements
         self.tableType = tableType
     }
 
@@ -1205,7 +1214,7 @@ public struct Tag: Equatable {
     ///   - store: The store to allocate the tag instance in.
     ///   - type: The function type describing the tag's parameters.
     public init(store: Store, type: FunctionType) {
-        let handle = store.allocator.allocate(tagType: type, engine: store.engine)
+        let handle = store.allocator.allocate(tagType: store.engine.internType(type))
         self.init(handle: handle, allocator: store.allocator)
     }
 }
@@ -1307,10 +1316,12 @@ enum InternalExternalValue {
 extension InternalInstance {
     var instructionMapping: DebuggerInstructionMapping { withValue { $0.instructionMapping } }
     var types: [FunctionType] { withValue { $0.types } }
+    var typeCanonicalizer: TypeCanonicalizer { TypeCanonicalizer(typeIDs: withValue { $0.typeIDs }) }
     var functions: ImmutableArray<InternalFunction> { withValue { $0.functions } }
     var tables: ImmutableArray<InternalTable> { withValue { $0.tables } }
     var memories: ImmutableArray<InternalMemory> { withValue { $0.memories } }
     var globals: ImmutableArray<InternalGlobal> { withValue { $0.globals } }
+    var globalTypes: [GlobalType] { withValue { $0.globalTypes } }
     var tags: ImmutableArray<InternalTag> { withValue { $0.tags } }
     var elementSegments: ImmutableArray<InternalElementSegment> { withValue { $0.elementSegments } }
     var dataSegments: ImmutableArray<InternalDataSegment> { withValue { $0.dataSegments } }

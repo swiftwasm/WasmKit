@@ -161,6 +161,8 @@ struct WatParser {
         var type: UnresolvedType<TableType>
         var importNames: ImportNames?
         var inlineElement: ElementDecl?
+        /// The constant expression giving every element its initial value, if any.
+        var initializer: Lexer?
     }
 
     struct ElementDecl: NamedFieldDecl {
@@ -185,6 +187,10 @@ struct WatParser {
         var mode: Mode
         var type: UnresolvedType<ReferenceType>
         var indices: Indices
+        /// Whether the segment was written as `func` followed by function
+        /// indices (or its abbreviation), whose type depends on the features:
+        /// `(ref func)` with typed function references, `funcref` without.
+        var isFunctionIndexList = false
     }
 
     struct ExportDecl {
@@ -309,6 +315,7 @@ struct WatParser {
             let importNames = try inlineImport()
             let type: UnresolvedType<TableType>
             var inlineElement: ElementDecl?
+            var initializer: Lexer?
             let isMemory64 = try expectAddressSpaceType()
 
             // elemexpr ::= '(' 'item' expr ')' | '(' instr ')'
@@ -352,25 +359,23 @@ struct WatParser {
                     )
                 }
             } else {
-                var tableType = try tableType(isMemory64: isMemory64)
-                if try parser.peek(.leftParen) != nil {
-                    let (numberOfItems, indices) = try parseExprList()
-                    inlineElement = ElementDecl(
-                        mode: .inline, type: tableType.map({ $0.elementType }), indices: indices
-                    )
-                    tableType = tableType.map {
-                        var value = $0
-                        value.limits.min = numberOfItems
-                        return value
-                    }
+                type = try tableType(isMemory64: isMemory64)
+                // Typed function references: a constant expression after the table
+                // type gives every element its initial value.
+                if importNames == nil, try !parser.isEndOfParen() {
+                    initializer = parser.lexer
                 }
-                type = tableType
             }
             kind = .table(
                 TableDecl(
-                    id: id, exports: exports, type: type, importNames: importNames, inlineElement: inlineElement
+                    id: id, exports: exports, type: type, importNames: importNames, inlineElement: inlineElement,
+                    initializer: initializer
                 ))
-            try parser.expect(.rightParen)
+            if initializer != nil {
+                try parser.skipParenBlock()
+            } else {
+                try parser.expect(.rightParen)
+            }
         case "memory":
             let WASM_PAGE_SIZE: Int = 65536
             func alignUp(_ offset: Int, to align: Int) -> Int {
@@ -484,21 +489,25 @@ struct WatParser {
             //            | funcidx* (iff the tableuse is omitted)
             let indices: ElementDecl.Indices
             let type: UnresolvedType<ReferenceType>
+            var isFunctionIndexList = false
             if let refType = try takeRefType() {
                 indices = .elementExprList(parser.lexer)
                 type = refType
             } else if try parser.takeKeyword("func") {
                 indices = .functionList(parser.lexer)
                 type = UnresolvedType(.funcRef)
+                isFunctionIndexList = true
             } else {
                 // Try to parse as function list (abbreviated form)
                 // This works even with a table use, as long as no ref type is specified
                 indices = .functionList(parser.lexer)
                 type = UnresolvedType(.funcRef)
+                isFunctionIndexList = true
             }
 
             try parser.skipParenBlock()
-            kind = .element(ElementDecl(id: id, mode: mode, type: type, indices: indices))
+            kind = .element(
+                ElementDecl(id: id, mode: mode, type: type, indices: indices, isFunctionIndexList: isFunctionIndexList))
         case "data":
             let id = try parser.takeId()
             let memory = try memoryUse()

@@ -114,6 +114,10 @@ package enum TrapReason: Error, CustomStringConvertible, Sendable {
     case invalidConversionToInteger
     /// Execution consumed all of the fuel budgeted by ``Store/fuel``
     case outOfFuel
+    /// `call_ref` or `return_call_ref` called a null function reference.
+    case nullFunctionReference
+    /// `ref.as_non_null` was given a null reference.
+    case nullReference
 
     /// The description of the trap reason.
     package var description: String {
@@ -136,6 +140,10 @@ package enum TrapReason: Error, CustomStringConvertible, Sendable {
             return "invalid conversion to integer"
         case .outOfFuel:
             return "out of fuel"
+        case .nullFunctionReference:
+            return "null function reference"
+        case .nullReference:
+            return "null reference"
         case .indirectCallToNull(let elementIndex):
             return "indirect call to null element (uninitialized element \(elementIndex))"
         case .typeMismatchCall(let actual, let expected):

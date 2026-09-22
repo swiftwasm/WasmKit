@@ -444,6 +444,12 @@ extension WASTRunContext {
         if rootPath.hasSuffix("proposals/exception-handling") {
             features.insert(.exceptionHandling)
         }
+        if rootPath.hasSuffix("function-references") {
+            // Covers the proposal's spec tests and WasmKit's own tests for it; both
+            // include `return_call_ref`.
+            features.insert(.functionReferences)
+            features.insert(.tailCall)
+        }
         if rootPath.hasSuffix("fuel") {
             // A tail call is one of the ways a guest can run forever, so the fuel suite needs it.
             features.insert(.tailCall)
@@ -540,7 +546,11 @@ extension Value {
             return rhs.map { lhs == $0 } ?? true
         case (.ref(.extern(nil)), .refNull(.abstract(.externRef))),
             (.ref(.function(nil)), .refNull(.abstract(.funcRef))),
-            (.ref(.exception(nil)), .refNull(.abstract(.exnRef))):
+            (.ref(.function(nil)), .refNull(.concrete)),
+            (.ref(.exception(nil)), .refNull(.abstract(.exnRef))),
+            (.ref(.extern(nil)), .refNull(nil)),
+            (.ref(.function(nil)), .refNull(nil)),
+            (.ref(.exception(nil)), .refNull(nil)):
             return true
         case (_, .either(let candidates)):
             // Relaxed-SIMD non-determinism: match if the actual equals any candidate.

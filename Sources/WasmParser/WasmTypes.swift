@@ -177,9 +177,13 @@ public typealias ConstExpression = [Instruction]
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#tables>
 public struct Table: Equatable, Sendable {
     public let type: TableType
+    /// The value every element starts with, or `nil` for null. Only tables of
+    /// the typed function references proposal have one.
+    public let initializer: ConstExpression?
 
-    public init(type: TableType) {
+    public init(type: TableType, initializer: ConstExpression? = nil) {
         self.type = type
+        self.initializer = initializer
     }
 }
 

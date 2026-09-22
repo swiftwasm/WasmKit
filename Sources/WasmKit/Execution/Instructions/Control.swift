@@ -218,6 +218,57 @@ extension Execution {
         return pc.next()
     }
 
+    /// The function a `call_ref`/`return_call_ref` operand refers to.
+    ///
+    /// Read before the call sets up the callee's frame, whose header may overlap
+    /// the operand's slot.
+    @inline(__always)
+    private func functionReference(sp: Sp, callee: VReg) throws -> InternalFunction {
+        let value = sp[callee]
+        guard !value.isNullRef else {
+            throw Trap(.nullFunctionReference)
+        }
+        return InternalFunction(bitPattern: Int(value.storage))
+    }
+
+    mutating func callRef(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CallRefOperand) throws -> (Pc, CodeSlot) {
+        var pc = pc
+        let function = try functionReference(sp: sp, callee: immediate.callee)
+        (pc, sp) = try invoke(
+            function: function,
+            callerInstance: currentInstance(sp: sp),
+            spAddend: immediate.spAddend,
+            sp: sp, pc: pc, md: &md, ms: &ms
+        )
+        return pc.next()
+    }
+
+    mutating func returnCallRef(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.ReturnCallRefOperand) throws -> (Pc, CodeSlot) {
+        var pc = pc
+        let function = try functionReference(sp: sp, callee: immediate.callee)
+        (pc, sp) = try tailInvoke(
+            function: function,
+            callerInstance: currentInstance(sp: sp),
+            sp: sp, pc: pc, md: &md, ms: &ms
+        )
+        return pc.next()
+    }
+
+    mutating func brIfNull(sp: Sp, pc: Pc, immediate: Instruction.BrIfOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for the rationale.
+        guard _fastPath(sp[immediate.condition].isNullRef) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    mutating func brIfNotNull(sp: Sp, pc: Pc, immediate: Instruction.BrIfOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for the rationale.
+        guard _fastPath(!sp[immediate.condition].isNullRef) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+
     mutating func resizeFrameHeader(sp: inout Sp, immediate: Instruction.ResizeFrameHeaderOperand) throws {
         // The params/results space are resized by `delta` slots and the rest of the
         // frame is copied to the new location. See the following diagram for the

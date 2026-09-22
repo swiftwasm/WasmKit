@@ -440,6 +440,11 @@ extension Execution {
         case 726: return try self.executeToken_i32LoadWithCopy(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 727: return try self.executeToken_consumeFuel(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 728: return try self.execute_outOfFuelTrap(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 729: return try self.execute_callRef(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 730: return try self.execute_returnCallRef(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 731: return try self.execute_refAsNonNull(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 732: return self.execute_brIfNull(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 733: return self.execute_brIfNotNull(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -7146,6 +7151,42 @@ extension Execution {
     mutating func execute_outOfFuelTrap(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let next: CodeSlot
         (pc.pointee, next) = try self.outOfFuelTrap(sp: sp.pointee, pc: pc.pointee)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_callRef") @inline(__always)
+    mutating func execute_callRef(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
+        let immediate = Instruction.CallRefOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = try self.callRef(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_returnCallRef") @inline(__always)
+    mutating func execute_returnCallRef(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
+        let immediate = Instruction.ReturnCallRefOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = try self.returnCallRef(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_refAsNonNull") @inline(__always)
+    mutating func execute_refAsNonNull(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
+        let immediate = Instruction.RefAsNonNullOperand.load(from: &pc.pointee)
+        try self.refAsNonNull(sp: sp.pointee, immediate: immediate)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfNull") @inline(__always)
+    mutating func execute_brIfNull(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfNull(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_brIfNotNull") @inline(__always)
+    mutating func execute_brIfNotNull(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.BrIfOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.brIfNotNull(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
         return next
     }
 }
