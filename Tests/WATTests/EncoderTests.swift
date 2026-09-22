@@ -309,9 +309,13 @@ struct EncoderTests {
         @Test(
             arguments: Spectest.wastFiles(
                 include: [],
-                // Uses tags; wast2json is not run with `--enable-exceptions` here
-                // and the encoder orders the type section differently for them.
-                exclude: ["br_if_landing_pad_try_table.wast"]
+                exclude: [
+                    // Uses tags; wast2json is not run with `--enable-exceptions` here
+                    // and the encoder orders the type section differently for them.
+                    "br_if_landing_pad_try_table.wast",
+                    // Uses typed references; wast2json is not run with `--enable-function-references`.
+                    "function_references.wast",
+                ]
             )
         )
         func spectest(wastFile: URL) throws {
