@@ -24,8 +24,8 @@ struct DebuggerInstructionMapping {
         private var instructionAddresses = [[Int]]()
 
         /// Mapped head slots of the compiled functions: one sorted run per function, ordered by its
-        /// first slot.
-        private var headSlots = [[UInt]]()
+        /// first slot, with the end of the function's bytecode, just past its last slot.
+        private var headSlots = [(slots: [UInt], end: UInt)]()
 
         mutating func add(canonical: Int, emitting: Int, iseq: Pc) {
             // Don't override the existing mapping, only store a new pair if there's no mapping for a given key.
@@ -127,24 +127,28 @@ struct DebuggerInstructionMapping {
             return index < self.instructionAddresses.endIndex ? self.instructionAddresses[index][0] : nil
         }
 
-        /// Records the head slots of a function's bytecode.
-        mutating func addHeadSlots(_ pcs: [Pc]) {
+        /// Records the head slots of a function's bytecode, which ends just before `end`.
+        mutating func addHeadSlots(_ pcs: [Pc], end: Pc) {
             let slots = pcs.map { UInt(bitPattern: $0) }.sorted()
             guard let first = slots.first else { return }
             // Functions compile lazily, in any order, into buffers that never overlap.
-            let index = self.headSlots.partitioningIndex { $0[0] >= first }
-            guard index == self.headSlots.endIndex || self.headSlots[index][0] != first else { return }
-            self.headSlots.insert(slots, at: index)
+            let index = self.headSlots.partitioningIndex { $0.slots[0] >= first }
+            guard index == self.headSlots.endIndex || self.headSlots[index].slots[0] != first else { return }
+            self.headSlots.insert((slots, UInt(bitPattern: end)), at: index)
         }
 
         /// The Wasm address that emitted the instruction `pc` lies in, or just past: the one whose
-        /// head slot is the last before `pc`.
+        /// head slot is the last before `pc` in the same function. `nil` for code outside the compiled
+        /// functions, such as another instance's.
         func findWasm(forIseqAddressWithin pc: Pc) -> Int? {
             let pc = UInt(bitPattern: pc)
-            let function = self.headSlots.partitioningIndex { $0[0] >= pc }
+            let function = self.headSlots.partitioningIndex { $0.slots[0] >= pc }
             guard function > self.headSlots.startIndex else { return nil }
-            let slots = self.headSlots[function - 1]
-            guard let head = Pc(bitPattern: slots[slots.partitioningIndex { $0 >= pc } - 1]) else { return nil }
+            let (slots, end) = self.headSlots[function - 1]
+            // Just past the last slot still counts as the function's.
+            guard pc <= end else { return nil }
+            let head = slots[slots.partitioningIndex { $0 >= pc } - 1]
+            guard let head = Pc(bitPattern: head) else { return nil }
             return self.iseqToWasm[head]
         }
     #endif
