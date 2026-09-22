@@ -232,7 +232,19 @@ extension WAT.WatParser.ElementDecl {
         var tableIndex: UInt32? = nil
         var isPassive = false
         var hasTableIndex = false
-        let type = try type.resolve(wat.types)
+        // The element type a segment of function indices (flags 0-3) has: with
+        // typed function references, such a segment only holds non-null functions.
+        let indexListType: ReferenceType =
+            wat.features.contains(.functionReferences) ? ReferenceType(isNullable: false, heapType: .funcRef) : .funcRef
+        let type = isFunctionIndexList ? indexListType : try self.type.resolve(wat.types)
+
+        var collector = ElementExprCollector()
+        try collector.parse(indices: indices, wat: &wat)
+        // Use the function index representation when it gives the segment its type.
+        let useExpression = !collector.isAllRefFunc || type != indexListType
+        // Without an explicit type, the segment has this one (flags 0 and 4).
+        let implicitType = useExpression ? ReferenceType.funcRef : indexListType
+
         switch self.mode {
         case .active(let table, _):
             let index: Int?
@@ -241,7 +253,7 @@ extension WAT.WatParser.ElementDecl {
             } else {
                 index = nil
             }
-            if type != .funcRef || (index != nil && index != 0) {
+            if type != implicitType || (index != nil && index != 0) {
                 // has index
                 flags |= 0b0010
                 tableIndex = UInt32(index ?? 0)
@@ -259,12 +271,6 @@ extension WAT.WatParser.ElementDecl {
             fatalError("Inline element segment should be replaced with active mode")
         }
 
-        var collector = ElementExprCollector()
-        try collector.parse(indices: indices, wat: &wat)
-        var useExpression: Bool {
-            // if all instructions are ref.func, use function indices representation
-            return !collector.isAllRefFunc || type != .funcRef
-        }
         if useExpression {
             // use expression
             flags |= 0b0100
@@ -363,6 +369,20 @@ extension WatParser.GlobalDecl {
             fatalError("imported global declaration should not be encoded here")
         }
         try encoder.writeExpression(lexer: &expr, wat: &wat)
+    }
+}
+
+extension WatParser.TableDecl {
+    func encode(to encoder: inout Encoder, wat: inout Wat) throws(WatParserError) {
+        let type = try self.type.resolve(wat.types)
+        guard var initializer else {
+            type.encode(to: &encoder)
+            return
+        }
+        // A table with an initializer (typed function references).
+        encoder.output.append(contentsOf: [0x40, 0x00])
+        type.encode(to: &encoder)
+        try encoder.writeExpression(lexer: &initializer, wat: &wat)
     }
 }
 
@@ -691,7 +711,7 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     if !tables.isEmpty {
         try encoder.section(id: 0x04) { encoder throws(WatParserError) in
             try encoder.encodeVector(tables) { table, encoder throws(WatParserError) in
-                try table.type.resolve(module.types).encode(to: &encoder)
+                try table.encode(to: &encoder, wat: &module)
             }
         }
     }
