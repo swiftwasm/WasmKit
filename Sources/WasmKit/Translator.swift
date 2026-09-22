@@ -2803,6 +2803,16 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         return ensureOnVReg(op)
     }
 
+    /// Pops an operand of any reference type, or returns nil for a missing
+    /// operand of an unreachable, polymorphic stack.
+    private mutating func popRefOperand() throws(WasmKitError) -> ValueSource? {
+        guard try checkBeforePop(typeHint: nil) else {
+            return nil
+        }
+        iseqBuilder.resetLastEmission()
+        return try valueStack.popRef()
+    }
+
     private mutating func popAnyOperand() throws(WasmKitError) -> (MetaValue, ValueSource?) {
         guard try checkBeforePop(typeHint: nil) else {
             return (.unknown, nil)
@@ -3814,8 +3824,19 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     private mutating func visitCallLike(calleeType: FunctionType) throws(WasmKitError) -> VReg? {
+        var hasAllParameters = true
         for parameter in calleeType.parameters.reversed() {
-            guard (try popOnStackOperand(parameter)) != nil else { return nil }
+            if try popOnStackOperand(parameter) == nil {
+                hasAllParameters = false
+            }
+        }
+        guard hasAllParameters else {
+            // The arguments came from an unreachable, polymorphic stack. Nothing
+            // needs emitting, but the results still take part in validation.
+            for result in calleeType.results {
+                _ = valueStack.push(result)
+            }
+            return nil
         }
 
         let spAddendSlots =
@@ -4875,8 +4896,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         pushEmit(.ref(typeToPush), { .refNull(Instruction.RefNullOperand(result: $0, type: abstractType)) })
     }
     mutating func visitRefIsNull() throws(WasmKitError) -> Output {
-        let value = try valueStack.popRef()
+        let value = try popRefOperand()
         let result = valueStack.push(.i32)
+        guard let value else { return }
         emit(.refIsNull(Instruction.RefIsNullOperand(value: LVReg(ensureOnVReg(value)), result: LVReg(result))))
     }
     mutating func visitRefFunc(functionIndex: UInt32) throws(WasmKitError) -> Output {
