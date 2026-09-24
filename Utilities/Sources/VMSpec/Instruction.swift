@@ -1658,7 +1658,9 @@ extension VMGen {
                         slots placed after the header
                         """,
                         mayThrow: true, mayUpdateFrame: true) {
-                $0.field(name: "delta", type: .VReg)
+                // Wide enough for a frame whose locals were moved below `sp` (see
+                // `StackLayout.frameShift`).
+                $0.field(name: "delta", type: .LVReg)
                 // A slot *count*, not a register, so it stays an unscaled index.
                 $0.field(name: "sizeToCopy", type: .UInt16)
             },

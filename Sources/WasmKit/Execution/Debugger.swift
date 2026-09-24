@@ -464,13 +464,10 @@
                     throw Debugger.Error.stackLocalIndexOOB(localIndex)
                 }
 
-                if localIndex < functionType.parameters.count {
-                    let localIndex = Int(localIndex) - 4
-                    return frame.sp[localIndex].storage
-                } else {
-                    let localIndex = Int(localIndex) - functionType.parameters.count
-                    return frame.sp[localIndex].storage
+                let stackLayout = try wasm.withValue { code in
+                    try StackLayout(type: functionType, locals: code.locals, codeSize: code.expression.count)
                 }
+                return frame.sp[stackLayout.localSlotIndex(LocalIndex(localIndex))].storage
             }
 
             throw Error.stackFrameIndexOOB(frameIndex)

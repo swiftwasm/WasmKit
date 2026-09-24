@@ -2477,14 +2477,14 @@ extension Instruction {
     }
 
     struct ResizeFrameHeaderOperand: InstructionImmediate {
-        var delta: VReg
+        var delta: LVReg
         var sizeToCopy: UInt16
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let (delta, sizeToCopy, _, _, _, _) = pc.read((VReg, UInt16, UInt8, UInt8, UInt8, UInt8).self)
+            let (delta, sizeToCopy, _, _) = pc.read((LVReg, UInt16, UInt8, UInt8).self)
             return Self(delta: delta, sizeToCopy: sizeToCopy)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { unsafeBitCast(($0.delta, $0.sizeToCopy, 0, 0, 0, 0) as (VReg, UInt16, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.delta, $0.sizeToCopy, 0, 0) as (LVReg, UInt16, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 

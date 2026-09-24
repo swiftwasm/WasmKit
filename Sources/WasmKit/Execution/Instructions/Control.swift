@@ -297,7 +297,7 @@ extension Execution {
         //                                      \ |        ...          |                   |
         //                                       \|---------------------|                  -+
         let newSp = UnsafeMutableRawPointer(sp)
-            .advanced(by: Int(immediate.delta.byteOffset))
+            .advanced(by: Int(immediate.delta.value))
             .assumingMemoryBound(to: StackSlot.self)
         try checkStackBoundary(newSp)
         let oldFrameHeader = sp.advanced(by: -FrameHeaderLayout.numberOfSavingSlots)

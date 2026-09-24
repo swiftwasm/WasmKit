@@ -228,11 +228,21 @@ struct FrameHeaderLayout {
     }
 
     func paramReg(_ index: Int) -> VReg {
-        VReg(slotIndex: paramSlotOffsets[index] - size)
+        VReg(slotIndex: paramSlotIndex(index))
     }
 
     func returnReg(_ index: Int) -> VReg {
-        VReg(slotIndex: resultSlotOffsets[index] - size)
+        VReg(slotIndex: returnSlotIndex(index))
+    }
+
+    /// The slot index of a parameter relative to `sp`.
+    func paramSlotIndex(_ index: Int) -> Int {
+        paramSlotOffsets[index] - size
+    }
+
+    /// The slot index of a result relative to `sp`.
+    func returnSlotIndex(_ index: Int) -> Int {
+        resultSlotOffsets[index] - size
     }
 
     internal static func size(of: FunctionType) -> Int {
@@ -289,15 +299,56 @@ struct StackLayout {
     let localTypes: [WasmTypes.ValueType]
     private let nonParameterLocalSlotOffsets: [Int]
     let numberOfNonParameterLocalSlots: Int
+    /// How many slots the prologue moves `sp` up by; zero for most functions.
+    ///
+    /// A ``VReg`` reaches only a few thousand slots either side of `sp`, and the
+    /// value stack has to stay within that reach: a call places the callee's frame
+    /// right on top of it, so nothing of this frame can live above it. Unoptimized
+    /// code can declare thousands of locals, which would push the value stack out
+    /// of reach. Such a function instead moves `sp` past its locals on entry, with
+    /// a copy of the saved slots right below the new `sp` so that returning,
+    /// unwinding and backtraces see an ordinary frame:
+    ///
+    /// ```
+    /// | Offset from the new SP          | Description             |
+    /// |---------------------------------|-------------------------|
+    /// | SP-shift-(header size)          | Param/result slots      |
+    /// | ...                             | ...                     |
+    /// | SP-shift-1                      | Saved slots (original)  |
+    /// | SP-shift                        | Local variable 0        |
+    /// | ...                             | ...                     |
+    /// | SP-4                            | Local variable N        |
+    /// | SP-3...SP-1                     | Saved slots (copied)    |
+    /// | SP+0                            | Const 0                 |
+    /// | ...                             | ...                     |
+    /// | SP+C                            | Value stack 0           |
+    /// ```
+    ///
+    /// Locals (and parameters and results) that are still out of a ``VReg``'s
+    /// reach are accessed with `copyStack`, whose operands are 32-bit. See
+    /// ``isWide(slotIndex:slotCount:)``.
+    let frameShift: Int
+
+    /// The slot index of the first constant slot.
+    var constantBaseSlotIndex: Int {
+        frameShift > 0 ? 0 : numberOfNonParameterLocalSlots
+    }
 
     /// The slot index of the first value-stack slot, i.e. right after the
     /// locals and the constant pool.
     var stackRegBaseSlotIndex: Int {
-        return numberOfNonParameterLocalSlots + constantSlotSize
+        return constantBaseSlotIndex + constantSlotSize
     }
 
     var stackRegBase: VReg {
         return VReg(slotIndex: stackRegBaseSlotIndex)
+    }
+
+    /// The number of slots from the `sp` a function is entered with to its
+    /// first constant slot, all of which the frame-initialization image sets to
+    /// their default values.
+    var numberOfZeroInitializedSlots: Int {
+        frameShift > 0 ? frameShift : numberOfNonParameterLocalSlots
     }
 
     init(type: FunctionType, locals: [WasmTypes.ValueType], codeSize: Int) throws(WasmKitError) {
@@ -310,24 +361,60 @@ struct StackLayout {
         // This is a heuristic value to balance the fast access to constants
         // and the size of stack frame. Cap the slot size to avoid size explosion.
         self.constantSlotSize = min(max(codeSize / 20, 4), 128)
-        let (maxSlots, overflow) = self.constantSlotSize.addingReportingOverflow(numberOfNonParameterLocalSlots)
-        guard !overflow, VReg.canRepresent(slotIndex: maxSlots) else {
-            // The locals and the constant pool alone already reach past what a
-            // `VReg` can address. See ``VReg`` for the range and why it is small.
+        // Leave at least half of the positive range to the value stack.
+        if numberOfNonParameterLocalSlots + constantSlotSize <= VReg.maxSlotIndex / 2 {
+            self.frameShift = 0
+        } else {
+            self.frameShift = numberOfNonParameterLocalSlots + FrameHeaderLayout.numberOfSavingSlots
+        }
+        guard LVReg.canRepresent(slotIndex: -(frameShift + frameHeader.size)) else {
             throw WasmKitError(
-                "The frame of this function is too large for the interpreter: its locals and constant pool "
-                    + "need \(maxSlots) slots, but only \(VReg.maxSlotIndex) are addressable"
+                "The frame of this function is too large for the interpreter: its locals need "
+                    + "\(numberOfNonParameterLocalSlots) slots"
             )
         }
     }
 
-    func localReg(_ index: LocalIndex) -> VReg {
+    /// Whether the slots `slotIndex..<slotIndex+slotCount` are out of a
+    /// ``VReg``'s reach, and have to be accessed with a wide `copyStack`.
+    static func isWide(slotIndex: Int, slotCount: Int) -> Bool {
+        !VReg.canRepresent(slotIndex: slotIndex) || !VReg.canRepresent(slotIndex: slotIndex + slotCount - 1)
+    }
+
+    /// The slot index of a local relative to `sp`.
+    func localSlotIndex(_ index: LocalIndex) -> Int {
         if isParameter(index) {
-            return frameHeader.paramReg(Int(index))
+            return frameHeader.paramSlotIndex(Int(index)) - frameShift
         } else {
             let nonParamIndex = Int(index) - frameHeader.type.parameters.count
-            return VReg(slotIndex: nonParameterLocalSlotOffsets[nonParamIndex])
+            return nonParameterLocalSlotOffsets[nonParamIndex] - frameShift
         }
+    }
+
+    /// The slot index of a result relative to `sp`.
+    func returnSlotIndex(_ index: Int) -> Int {
+        frameHeader.returnSlotIndex(index) - frameShift
+    }
+
+    /// Whether a local is out of a ``VReg``'s reach. See ``frameShift``.
+    ///
+    /// `false` for an index that is out of bounds, which is left for validation
+    /// to reject.
+    func isWideLocal(_ index: LocalIndex) -> Bool {
+        guard frameShift > 0, Int(index) < frameHeader.type.parameters.count + localTypes.count else { return false }
+        let slotCount: Int
+        if isParameter(index) {
+            slotCount = frameHeader.type.parameters[Int(index)].stackSlotCount
+        } else {
+            slotCount = localTypes[Int(index) - frameHeader.type.parameters.count].stackSlotCount
+        }
+        return Self.isWide(slotIndex: localSlotIndex(index), slotCount: slotCount)
+    }
+
+    /// The register of a local that is within a ``VReg``'s reach.
+    func localReg(_ index: LocalIndex) -> VReg {
+        assert(!isWideLocal(index), "local \(index) is out of a VReg's reach")
+        return VReg(slotIndex: localSlotIndex(index))
     }
 
     func isParameter(_ index: LocalIndex) -> Bool {
@@ -344,13 +431,13 @@ struct StackLayout {
     }
 
     func constReg(_ index: Int) -> VReg {
-        return VReg(slotIndex: numberOfNonParameterLocalSlots + index)
+        return VReg(slotIndex: constantBaseSlotIndex + index)
     }
 
     #if Disassembler
         func dump<Target: TextOutputStream>(to target: inout Target, iseq: InstructionSequence) {
             let frameHeaderSize = FrameHeaderLayout.size(of: frameHeader.type)
-            let slotMinIndex = -frameHeaderSize
+            let slotMinIndex = -frameHeaderSize - frameShift
             let slotMaxIndex = stackRegBaseSlotIndex - 1
             let slotIndexWidth = max(String(slotMinIndex).count, String(slotMaxIndex).count)
             func writeSlot(_ target: inout Target, _ index: Int, _ description: String) {
@@ -373,21 +460,26 @@ struct StackLayout {
                 if i < frameHeader.type.results.count {
                     descriptions.append("Result \(i)")
                 }
-                writeSlot(&target, i - frameHeaderSize, descriptions.joined(separator: ", "))
+                writeSlot(&target, i - frameHeaderSize - frameShift, descriptions.joined(separator: ", "))
             }
 
             for (i, name) in savedItems.enumerated() {
-                writeSlot(&target, i - savedItems.count, "Saved \(name)")
+                writeSlot(&target, i - savedItems.count - frameShift, "Saved \(name)")
             }
 
-            var localSlot = 0
+            var localSlot = -frameShift
             for (i, t) in localTypes.enumerated() {
                 writeSlot(&target, localSlot, "Local \(i) (\(t))")
                 localSlot += t.stackSlotCount
             }
-            for i in 0..<(iseq.frameInit.count - numberOfNonParameterLocalSlots) {
-                let value = iseq.frameInit[numberOfNonParameterLocalSlots + i]
-                writeSlot(&target, numberOfNonParameterLocalSlots + i, "Const \(i) = \(value)")
+            if frameShift > 0 {
+                for (i, name) in savedItems.enumerated() {
+                    writeSlot(&target, i - savedItems.count, "Saved \(name) (moved)")
+                }
+            }
+            for i in 0..<(iseq.frameInit.count - numberOfZeroInitializedSlots) {
+                let value = iseq.frameInit[numberOfZeroInitializedSlots + i]
+                writeSlot(&target, constantBaseSlotIndex + i, "Const \(i) = \(value)")
             }
         }
     #endif  // Disassembler
@@ -2620,9 +2712,6 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
 
-    private func returnReg(_ index: Int) -> VReg {
-        return stackLayout.frameHeader.returnReg(index)
-    }
     private func localReg(_ index: LocalIndex) -> VReg {
         return stackLayout.localReg(index)
     }
@@ -2715,6 +2804,30 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             iseqBuilder.recordCopy(after: producer, source: source, dest: dest)
         }
         return true
+    }
+
+    /// Copies a value between two slots either of which may be out of a
+    /// ``VReg``'s reach; `copyStack` takes 32-bit operands.
+    private mutating func emitWideCopyValueSlots(_ type: ValueType, fromSlotIndex source: Int, toSlotIndex dest: Int) {
+        for offset in 0..<type.stackSlotCount {
+            emit(
+                .copyStack(
+                    Instruction.CopyStackOperand(
+                        source: LVReg(slotIndex: source + offset),
+                        dest: LVReg(slotIndex: dest + offset)
+                    )))
+        }
+    }
+
+    /// Copies a value into a slot that may be out of a ``VReg``'s reach, such
+    /// as a result slot of a frame with a ``StackLayout/frameShift``.
+    @discardableResult
+    private mutating func emitCopyValueSlots(_ type: ValueType, from source: VReg, toSlotIndex dest: Int) -> Bool {
+        if StackLayout.isWide(slotIndex: dest, slotCount: type.stackSlotCount) {
+            emitWideCopyValueSlots(type, fromSlotIndex: Int(source.slotIndex), toSlotIndex: dest)
+            return true
+        }
+        return emitCopyValueSlots(type, from: source, to: VReg(slotIndex: dest))
     }
 
     @discardableResult
@@ -2913,14 +3026,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     private mutating func visitReturnLike() throws(WasmKitError) {
-        try copyValuesIntoResultSlots(self.type.results, frameHeader: stackLayout.frameHeader)
+        try copyValuesIntoResultSlots(self.type.results)
     }
 
     /// Pop values from the stack and copy them to the return slots.
     ///
     /// - Parameter valueTypes: The types of the values to copy.
-    private mutating func copyValuesIntoResultSlots(_ valueTypes: [ValueType], frameHeader: FrameHeaderLayout) throws(WasmKitError) {
-        var copies: [(source: VReg, dest: VReg, type: ValueType)] = []
+    private mutating func copyValuesIntoResultSlots(_ valueTypes: [ValueType]) throws(WasmKitError) {
+        var copies: [(source: VReg, dest: Int, type: ValueType)] = []
         for (index, resultType) in valueTypes.enumerated().reversed() {
             guard let operand = try popOperand(resultType) else { continue }
             var source = ensureOnVReg(operand)
@@ -2931,11 +3044,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 emitCopyValueSlots(resultType, from: localReg(localIndex), to: copyTo)
                 source = copyTo
             }
-            let dest = frameHeader.returnReg(index)
+            let dest = stackLayout.returnSlotIndex(index)
             copies.append((source, dest, resultType))
         }
         for (source, dest, type) in copies {
-            emitCopyValueSlots(type, from: source, to: dest)
+            emitCopyValueSlots(type, from: source, toSlotIndex: dest)
         }
     }
 
@@ -2976,7 +3089,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             let dest: VReg
             if case .block(root: true) = frame.kind {
                 guard frame.copySlotCount > 0 else { continue }
-                dest = returnReg(0) + VReg(slotIndex: copyCount - 1 - i)
+                let destSlotIndex = stackLayout.returnSlotIndex(0) + copyCount - 1 - i
+                if StackLayout.isWide(slotIndex: destSlotIndex, slotCount: 1) {
+                    emitWideCopyValueSlots(.i64, fromSlotIndex: Int(source.slotIndex), toSlotIndex: destSlotIndex)
+                    emittedCopy = true
+                    continue
+                }
+                dest = VReg(slotIndex: destSlotIndex)
             } else {
                 dest = destBase + VReg(slotIndex: copyCount - 1 - i)
             }
@@ -3016,7 +3135,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     /// of the widest call, whichever reaches further.
     private var frameSlotIndexExtent: (lowest: Int, highest: Int) {
         (
-            lowest: -stackLayout.frameHeader.size,
+            // A shifted frame reaches its header and locals with wide copies
+            // where a `VReg` cannot.
+            lowest: stackLayout.frameShift > 0 ? -FrameHeaderLayout.numberOfSavingSlots : -stackLayout.frameHeader.size,
             highest: max(maxFrameSlotIndex, stackLayout.stackRegBaseSlotIndex + valueStack.maxSlotHeight)
         )
     }
@@ -3074,13 +3195,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         #endif
 
         let frameInit = allocator.allocateFrameInit(
-            localSlots: stackLayout.numberOfNonParameterLocalSlots,
+            localSlots: stackLayout.numberOfZeroInitializedSlots,
             nullReferenceSlots: stackLayout.nonParameterReferenceLocalSlots,
             constants: self.constantSlots.values
         )
         return InstructionSequence(
             instructions: buffer,
-            maxStackHeight: stackLayout.stackRegBaseSlotIndex + valueStack.maxSlotHeight,
+            maxStackHeight: stackLayout.frameShift + stackLayout.stackRegBaseSlotIndex + valueStack.maxSlotHeight,
             frameInit: frameInit
         )
     }
@@ -3113,6 +3234,17 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
     /// Translate a Wasm expression into a sequence of instructions.
     consuming func translate(code: Code) throws(WasmKitError) -> InstructionSequence {
+        if stackLayout.frameShift > 0 {
+            // Move `sp` past the locals, taking the saved slots along. See
+            // `StackLayout.frameShift`.
+            emit(
+                .resizeFrameHeader(
+                    Instruction.ResizeFrameHeaderOperand(
+                        delta: LVReg(slotIndex: stackLayout.frameShift),
+                        sizeToCopy: UInt16(FrameHeaderLayout.numberOfSavingSlots)
+                    )))
+            iseqBuilder.resetLastEmission()
+        }
         if isIntercepting {
             // Emit `onEnter` instruction at the beginning of the function
             emit(.onEnter(functionIndex))
@@ -3956,23 +4088,26 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     ///     return-call-like instruction point.
     private mutating func prepareFrameHeaderForReturnCall(calleeType: FunctionType, stackTopHeightToCopy: Int) throws(WasmKitError) {
         let calleeFrameHeader = FrameHeaderLayout(type: calleeType)
-        if calleeType == self.type {
+        if calleeType == self.type, stackLayout.frameShift == 0 {
             // Fast path: If the callee and the caller have the same signature, we can
             // skip reconstructing the frame header and we can just copy the parameters.
         } else {
             // Ensure all parameters are on stack to avoid conflicting with the next resize.
+            // In a shifted frame, this also takes them out of the locals, which the
+            // resize leaves behind.
             preserveOnStack(depth: calleeType.parameters.count)
             // Resize the current frame header while moving stack slots after the header
-            // to the resized positions
+            // to the resized positions. A shifted frame moves `sp` back to where the
+            // function was entered, as the callee's frame header has to be right below it.
             let newHeaderSize = FrameHeaderLayout.size(of: calleeType)
-            let delta = newHeaderSize - FrameHeaderLayout.size(of: type)
+            let delta = newHeaderSize - FrameHeaderLayout.size(of: type) - stackLayout.frameShift
             let slotsToCopy =
                 FrameHeaderLayout.numberOfSavingSlots + stackLayout.stackRegBaseSlotIndex + stackTopHeightToCopy
             self.maxFrameSlotIndex = max(self.maxFrameSlotIndex, slotsToCopy)
-            guard VReg.canRepresent(slotIndex: delta), let sizeToCopy = UInt16(exactly: slotsToCopy) else {
+            guard LVReg.canRepresent(slotIndex: delta), let sizeToCopy = UInt16(exactly: slotsToCopy) else {
                 throw WasmKitError("The frame header of a return_call is too large to encode")
             }
-            emit(.resizeFrameHeader(Instruction.ResizeFrameHeaderOperand(delta: VReg(slotIndex: delta), sizeToCopy: sizeToCopy)))
+            emit(.resizeFrameHeader(Instruction.ResizeFrameHeaderOperand(delta: LVReg(slotIndex: delta), sizeToCopy: sizeToCopy)))
         }
         try copyValuesIntoParamSlots(calleeType.parameters, frameHeader: calleeFrameHeader)
     }
@@ -4267,13 +4402,21 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         )
     }
     mutating func visitLocalGet(localIndex: UInt32) throws(WasmKitError) -> Output {
-        iseqBuilder.dropResultRelink()
         if tracksLocalInitialization {
             _ = try locals.type(of: localIndex)
             guard isLocalInitialized[Int(localIndex)] else {
                 throw WasmKitError(message: .uninitializedLocal(localIndex))
             }
         }
+        if stackLayout.isWideLocal(localIndex) {
+            // Out of a `VReg`'s reach, so the value cannot stay a reference to
+            // the local's slot: copy it onto the stack.
+            let type = try locals.type(of: localIndex)
+            let result = valueStack.push(type)
+            emitWideCopyValueSlots(type, fromSlotIndex: stackLayout.localSlotIndex(localIndex), toSlotIndex: Int(result.slotIndex))
+            return
+        }
+        iseqBuilder.dropResultRelink()
         try valueStack.pushLocal(localIndex, locals: &locals)
     }
 
@@ -4289,6 +4432,42 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     private mutating func resetInitializedLocals(to height: Int) {
         while initializedLocals.count > height {
             isLocalInitialized[Int(initializedLocals.removeLast())] = false
+        }
+    }
+
+    /// Lowering of `local.set` and `local.tee` for a local out of a ``VReg``'s
+    /// reach. Such a local is never referenced from the value stack (see
+    /// ``visitLocalGet(localIndex:)``), so there is nothing to preserve.
+    private mutating func visitWideLocalSetOrTee(localIndex: UInt32, isTee: Bool) throws(WasmKitError) {
+        let type = try locals.type(of: localIndex)
+        markLocalInitialized(localIndex)
+        guard try checkBeforePop(typeHint: type) else {
+            if isTee { _ = valueStack.push(type) }
+            return
+        }
+        let op = try valueStack.pop(type)
+        let dest = stackLayout.localSlotIndex(localIndex)
+        if case .const(let value, _) = op {
+            // Constants are written straight into the slot, which the 32/64-bit
+            // result operands of `const32`/`const64` reach.
+            if type == .i32 || type == .f32 {
+                emit(.const32(Instruction.Const32Operand(value: UInt32(value.storage), result: LVReg(slotIndex: dest))))
+            } else {
+                emit(.const64(Instruction.Const64Operand(value: value, result: LLVReg(storage: Int64(dest * MemoryLayout<StackSlot>.size)))))
+            }
+        } else if try controlStack.currentFrame().reachable {
+            let value = ensureOnVReg(op)
+            emitWideCopyValueSlots(type, fromSlotIndex: Int(value.slotIndex), toSlotIndex: dest)
+        }
+        guard isTee else { return }
+        // Leave the value where it was.
+        switch op {
+        case .vreg:
+            _ = valueStack.push(type)
+        case .local(let sourceIndex):
+            try valueStack.pushLocal(sourceIndex, locals: &locals)
+        case .const(let value, let type):
+            valueStack.pushConst(value, type: type)
         }
     }
     /// Shared lowering of `local.set` and `local.tee`. `local.tee` differs
@@ -4351,9 +4530,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         emitCopyValueSlots(type, from: value, to: result)
     }
     mutating func visitLocalSet(localIndex: UInt32) throws(WasmKitError) -> Output {
+        if stackLayout.isWideLocal(localIndex) {
+            return try visitWideLocalSetOrTee(localIndex: localIndex, isTee: false)
+        }
         try visitLocalSetOrTee(localIndex: localIndex)
     }
     mutating func visitLocalTee(localIndex: UInt32) throws(WasmKitError) -> Output {
+        if stackLayout.isWideLocal(localIndex) {
+            return try visitWideLocalSetOrTee(localIndex: localIndex, isTee: true)
+        }
         try visitLocalSetOrTee(localIndex: localIndex)
         _ = try valueStack.pushLocal(localIndex, locals: &locals)
     }
