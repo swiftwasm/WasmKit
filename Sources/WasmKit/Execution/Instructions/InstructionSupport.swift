@@ -104,6 +104,18 @@ struct LVReg: Equatable, ShiftedVReg, CustomStringConvertible {
         self.value = storage
     }
 
+    /// Creates a register from a slot index relative to `sp`, which must be
+    /// representable (see ``canRepresent(slotIndex:)``).
+    init(slotIndex: Int) {
+        self.value = Int32(slotIndex * MemoryLayout<StackSlot>.size)
+    }
+
+    /// Whether `slotIndex` can be represented without truncation.
+    static func canRepresent(slotIndex: Int) -> Bool {
+        let (byteOffset, overflow) = slotIndex.multipliedReportingOverflow(by: MemoryLayout<StackSlot>.size)
+        return !overflow && Int32(exactly: byteOffset) != nil
+    }
+
     /// The register at slot index zero, i.e. `sp` itself.
     static let zero = LVReg(storage: 0)
 

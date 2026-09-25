@@ -643,12 +643,25 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     var hasDataSegmentInstruction = false
     var functionLabelNames: [[(Int, String)]] = []
 
+    // Implicit types are added to the type section in source order, so a tag's
+    // type is resolved right before the first function defined after it.
+    let tagDefinitions = module.tagsMap.definitions()
+    func resolveTagTypes(upTo definedFunctionCount: Int) throws(WatParserError) {
+        while tagSection.count < tagDefinitions.count,
+            module.definedFunctionCountsBeforeTags[tagSection.count] <= definedFunctionCount
+        {
+            let typeIndex = try module.types.resolveIndex(use: tagDefinitions[tagSection.count].typeUse)
+            tagSection.append(UInt32(typeIndex))
+        }
+    }
+
     if !functions.isEmpty {
         try codeEncoder.section(id: 0x0A) { encoder throws(WatParserError) in
             try encoder.encodeVector(
                 functions,
                 encodeElement: { source, encoder throws(WatParserError) in
                     let (locals, function) = source
+                    try resolveTagTypes(upTo: functionSection.count)
                     var exprEncoder = ExpressionEncoder()
                     // Encode locals
                     var localsEntries: [(type: ValueType, count: UInt32)] = []
@@ -676,12 +689,7 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
         }
     }
 
-    // Pre-resolve tag type indices so their types are in the type section.
-    let tagDefinitions = module.tagsMap.definitions()
-    for tag in tagDefinitions {
-        let typeIndex = try module.types.resolveIndex(use: tag.typeUse)
-        tagSection.append(UInt32(typeIndex))
-    }
+    try resolveTagTypes(upTo: functions.count)
 
     // Section 1: Type section
     if !module.types.isEmpty {
