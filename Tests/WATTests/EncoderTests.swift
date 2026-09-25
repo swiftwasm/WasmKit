@@ -314,11 +314,7 @@ struct EncoderTests {
 
     #if !(os(iOS) || os(watchOS) || os(tvOS) || os(visionOS))
         @Test(
-            arguments: Spectest.wastFiles(
-                include: [],
-                // The encoder orders the type section differently from wast2json for tags.
-                exclude: ["br_if_landing_pad_try_table.wast"]
-            )
+            arguments: Spectest.wastFiles(include: [], exclude: [])
         )
         func spectest(wastFile: URL) throws {
             guard let wast2json = TestSupport.lookupExecutable("wast2json") else {
