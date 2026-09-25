@@ -77,6 +77,9 @@ public struct Wat {
     let memories: NameMapping<WatParser.MemoryDecl>
     let globals: NameMapping<WatParser.GlobalDecl>
     let tagsMap: NameMapping<WatParser.TagDecl>
+    /// For each defined tag, the number of functions defined before it, so that
+    /// the encoder adds implicit types to the type section in source order.
+    let definedFunctionCountsBeforeTags: [Int]
     let elementsMap: NameMapping<WatParser.ElementDecl>
     let data: NameMapping<WatParser.DataSegmentDecl>
     let start: FunctionIndex?
@@ -96,6 +99,7 @@ public struct Wat {
             memories: NameMapping<WatParser.MemoryDecl>(),
             globals: NameMapping<WatParser.GlobalDecl>(),
             tagsMap: NameMapping<WatParser.TagDecl>(),
+            definedFunctionCountsBeforeTags: [],
             elementsMap: NameMapping<WatParser.ElementDecl>(),
             data: NameMapping<WatParser.DataSegmentDecl>(),
             start: nil,
@@ -302,6 +306,8 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
     var dataSegmentsMap = NameMapping<WatParser.DataSegmentDecl>()
     var globalsMap = NameMapping<WatParser.GlobalDecl>()
     var tagsMap = NameMapping<WatParser.TagDecl>()
+    var definedFunctionCount = 0
+    var definedFunctionCountsBeforeTags: [Int] = []
     var start: Parser.IndexOrId?
 
     var exportDecls: [WatParser.ExportDecl] = []
@@ -348,7 +354,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
             let index = try functionsMap.add(decl)
             addExports(decl.exports, index: index, kind: .function)
             switch decl.kind {
-            case .definition: break
+            case .definition: definedFunctionCount += 1
             case .imported(let importNames):
                 addImport(importNames) { () throws(WatParserError) in
                     let typeIndex = try typesMap.resolveIndex(use: decl.typeUse)
@@ -395,7 +401,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
             let index = try tagsMap.add(decl)
             addExports(decl.exports, index: index, kind: .tag)
             switch decl.kind {
-            case .definition: break
+            case .definition: definedFunctionCountsBeforeTags.append(definedFunctionCount)
             case .imported(let importNames):
                 addImport(importNames) { () throws(WatParserError) in
                     let typeIndex = try typesMap.resolveIndex(use: decl.typeUse)
@@ -456,6 +462,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
         memories: memoriesMap,
         globals: globalsMap,
         tagsMap: tagsMap,
+        definedFunctionCountsBeforeTags: definedFunctionCountsBeforeTags,
         elementsMap: elementSegmentsMap,
         data: dataSegmentsMap,
         start: startIndex,
