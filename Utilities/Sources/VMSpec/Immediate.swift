@@ -379,9 +379,13 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "raw", type: .UInt64)
     }
 
+    // `arguments` is the slot of the first argument, i.e. the start of the
+    // callee's parameter area, and `spAddend` is the callee's `sp` when it is
+    // a Wasm function: `arguments` plus its `StackLayout.entryOffset`.
     static let call = Self(name: "CallOperand") {
         $0.field(name: "rawCallee", type: .UInt64)
-        $0.field(name: "spAddend", type: .VReg)
+        $0.field(name: "arguments", type: .VReg)
+        $0.field(name: "spAddend", type: .LVReg)
     }
 
     static let v128Const = Self(name: "V128ConstOperand") {

@@ -146,7 +146,7 @@ struct HostFunctionEntity {
     /// preface.
     let parameterTypes: [ValueType]
     let resultTypes: [ValueType]
-    let layout: FrameHeaderLayout
+    let layout: ParameterAreaLayout
     /// Always the buffer-based form. A host function written against the
     /// array-based API is wrapped in one of these when it is created, so the
     /// engine has a single shape to call and only the functions that want

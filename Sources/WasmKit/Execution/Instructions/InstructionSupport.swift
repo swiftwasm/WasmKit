@@ -104,6 +104,18 @@ struct LVReg: Equatable, ShiftedVReg, CustomStringConvertible {
         self.value = storage
     }
 
+    /// Creates a register from a slot index relative to `sp`, which must be
+    /// representable (see ``canRepresent(slotIndex:)``).
+    init(slotIndex: Int) {
+        self.value = Int32(slotIndex * MemoryLayout<StackSlot>.size)
+    }
+
+    /// Whether `slotIndex` can be represented without truncation.
+    static func canRepresent(slotIndex: Int) -> Bool {
+        let (byteOffset, overflow) = slotIndex.multipliedReportingOverflow(by: MemoryLayout<StackSlot>.size)
+        return !overflow && Int32(exactly: byteOffset) != nil
+    }
+
     /// The register at slot index zero, i.e. `sp` itself.
     static let zero = LVReg(storage: 0)
 
@@ -289,8 +301,8 @@ extension Instruction.CatchHandlersOperand {
 }
 
 extension Instruction.CallOperand {
-    init(callee: InternalFunction, spAddend: VReg) {
-        self.init(rawCallee: UInt64(UInt(bitPattern: callee.bitPattern)), spAddend: spAddend)
+    init(callee: InternalFunction, arguments: VReg, spAddend: LVReg) {
+        self.init(rawCallee: UInt64(UInt(bitPattern: callee.bitPattern)), arguments: arguments, spAddend: spAddend)
     }
 
     var callee: InternalFunction {
@@ -300,8 +312,8 @@ extension Instruction.CallOperand {
 
 extension Instruction.CallIndirectOperand {
 
-    init(tableIndex: UInt32, type: InternedFuncType, index: VReg, spAddend: VReg) {
-        self.init(tableIndex: tableIndex, rawType: type.id, index: index, spAddend: spAddend)
+    init(tableIndex: UInt32, type: InternedFuncType, index: VReg, arguments: VReg) {
+        self.init(tableIndex: tableIndex, rawType: type.id, index: index, arguments: arguments)
     }
 
     var type: InternedFuncType {
@@ -310,8 +322,8 @@ extension Instruction.CallIndirectOperand {
 }
 
 extension Instruction.ReturnCallOperand {
-    init(callee: InternalFunction) {
-        self.init(rawCallee: UInt64(UInt(bitPattern: callee.bitPattern)))
+    init(callee: InternalFunction, arguments: VReg, frameBase: LVReg) {
+        self.init(rawCallee: UInt64(UInt(bitPattern: callee.bitPattern)), arguments: arguments, frameBase: frameBase)
     }
 
     var callee: InternalFunction {
@@ -321,8 +333,8 @@ extension Instruction.ReturnCallOperand {
 
 extension Instruction.ReturnCallIndirectOperand {
 
-    init(tableIndex: UInt32, type: InternedFuncType, index: VReg) {
-        self.init(tableIndex: tableIndex, rawType: type.id, index: index)
+    init(tableIndex: UInt32, type: InternedFuncType, index: VReg, arguments: VReg, frameBase: LVReg) {
+        self.init(tableIndex: tableIndex, rawType: type.id, index: index, arguments: arguments, frameBase: frameBase)
     }
 
     var type: InternedFuncType {
@@ -430,7 +442,7 @@ extension Instruction {
         var nameRegistry: NameRegistry
 
         func reg<R: FixedWidthInteger>(_ reg: R) -> String {
-            let adjusted = R(FrameHeaderLayout.size(of: function.type)) + reg
+            let adjusted = R(StackLayout.numberOfSavingSlots) + reg
             if shouldColor {
                 let regColor = adjusted < 15 ? "\u{001B}[3\(adjusted + 1)m" : ""
                 return "\(regColor)reg:\(reg)\u{001B}[0m"
@@ -475,7 +487,7 @@ extension Instruction {
         ) where Target: TextOutputStream {
             // Local helpers capture only what they need, so rendering a
             // register does not retain the whole context.
-            let frameHeaderSize = FrameHeaderLayout.size(of: function.type)
+            let frameHeaderSize = StackLayout.numberOfSavingSlots
             let shouldColor = self.shouldColor
             func regCore(_ reg: Int) -> String {
                 let adjusted = frameHeaderSize + reg
@@ -621,13 +633,13 @@ extension Instruction {
             case .v128Const(let op):
                 target.write("\(reg(op.result)) = v128.const lo:\(hex(op.lo)) hi:\(hex(op.hi))")
             case .call(let op):
-                target.write("call \(callee(op.callee)), sp: +\(op.spAddend)")
+                target.write("call \(callee(op.callee)), args: \(reg(op.arguments))")
             case .callIndirect(let op):
-                target.write("call_indirect \(reg(op.index)), \(op.tableIndex), (func_ty id:\(op.type.id)), sp: +\(op.spAddend)")
+                target.write("call_indirect \(reg(op.index)), \(op.tableIndex), (func_ty id:\(op.type.id)), args: \(reg(op.arguments))")
             case .compilingCall(let op):
-                target.write("compiling_call \(callee(op.callee)), sp: +\(op.spAddend)")
+                target.write("compiling_call \(callee(op.callee)), args: \(reg(op.arguments))")
             case .returnCall(let op):
-                target.write("return_call \(callee(op.callee))")
+                target.write("return_call \(callee(op.callee)), args: \(reg(op.arguments)), base: \(reg(op.frameBase))")
             case .i32Load(let op): load("i32.load", op)
             case .i64Load(let op): load("i64.load", op)
             case .f32Load(let op): load("f32.load", op)

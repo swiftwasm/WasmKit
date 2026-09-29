@@ -1651,26 +1651,24 @@ extension VMGen {
                 $0.field(name: "tableIndex", type: .UInt32)
                 $0.field(name: "rawType", type: .UInt32)
                 $0.field(name: "index", type: .VReg)
-                $0.field(name: "spAddend", type: .VReg)
+                $0.field(name: "arguments", type: .VReg)
             },
-            Instruction(name: "resizeFrameHeader", documentation: """
-                        Resize the frame header by increasing param/result slots and copying `sizeToCopy`
-                        slots placed after the header
-                        """,
-                        mayThrow: true, mayUpdateFrame: true) {
-                $0.field(name: "delta", type: .VReg)
-                // A slot *count*, not a register, so it stays an unscaled index.
-                $0.field(name: "sizeToCopy", type: .UInt16)
-            },
+            // A tail call's `arguments` is the slot of its first argument, and
+            // `frameBase` is where the parameter area of the current frame
+            // starts, which is where the callee's parameter area goes.
             Instruction(name: "returnCall", documentation: "WebAssembly Core Instruction `return_call`",
                         isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
                 $0.field(name: "rawCallee", type: .UInt64)
+                $0.field(name: "arguments", type: .VReg)
+                $0.field(name: "frameBase", type: .LVReg)
             },
             Instruction(name: "returnCallIndirect", documentation: "WebAssembly Core Instruction `return_call_indirect`",
                         isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
                 $0.field(name: "tableIndex", type: .UInt32)
                 $0.field(name: "rawType", type: .UInt32)
                 $0.field(name: "index", type: .VReg)
+                $0.field(name: "arguments", type: .VReg)
+                $0.field(name: "frameBase", type: .LVReg)
             },
             Instruction(name: "unreachable", documentation: "WebAssembly Core Instruction `unreachable`",
                         isControl: true, mayThrow: true),
@@ -1810,11 +1808,13 @@ extension VMGen {
             Instruction(name: "callRef", documentation: "WebAssembly Core Instruction `call_ref`",
                         isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
                 $0.field(name: "callee", type: .VReg)
-                $0.field(name: "spAddend", type: .VReg)
+                $0.field(name: "arguments", type: .VReg)
             },
             Instruction(name: "returnCallRef", documentation: "WebAssembly Core Instruction `return_call_ref`",
                         isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
                 $0.field(name: "callee", type: .VReg)
+                $0.field(name: "arguments", type: .VReg)
+                $0.field(name: "frameBase", type: .LVReg)
             },
             Instruction(name: "refAsNonNull", documentation: "WebAssembly Core Instruction `ref.as_non_null`", mayThrow: true) {
                 $0.field(name: "value", type: .LVReg)

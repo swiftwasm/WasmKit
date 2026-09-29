@@ -106,8 +106,9 @@ struct Execution: ~Copyable {
         return Backtrace(symbols: symbols)
     }
 
-    /// Lays the callee's frame-initialisation image (the locals' default values
-    /// followed by the constant pool) over the new frame's local/constant area.
+    /// Lays the callee's frame-initialisation image (its constants and the
+    /// locals' default values) over the slots right below the new frame's saved
+    /// slots.
     ///
     /// The image is one contiguous buffer built at translation time, so this is a
     /// single copy rather than a `memset` of the locals plus a `memcpy` of the
@@ -116,61 +117,57 @@ struct Execution: ~Copyable {
     /// costs several times the copy itself.
     @inline(__always)
     private func initializeFrame(sp: Sp, iseq: InstructionSequence) {
-        let image = iseq.frameInit
-        guard let src = image.baseAddress else { return }
-        let count = image.count
-        let dst = UnsafeMutableRawPointer(sp).assumingMemoryBound(to: UntypedValue.self)
+        // The image has the same offsets from its anchor as from `sp`: it starts
+        // at `offset` and ends at the saved slots, `savedSlots`. The head is
+        // copied at the register offset and the tail at constant ones, so no
+        // address has to be computed. See ``InstructionSequence/frameInitAnchor``.
+        let offset = iseq.frameInitOffset
+        let src = iseq.frameInitAnchor
+        let dst = UnsafeMutableRawPointer(sp)
+        let savedSlots = -StackLayout.numberOfSavingSlots * MemoryLayout<UntypedValue>.stride
         // Straight-line, overlapping head/tail copies. Written out rather than
         // looped so that no loop remains for the optimizer to turn back into a
         // `memcpy` call.
-        if count >= 8 {
-            if count > 16 {
+        if offset <= savedSlots - 64 {
+            if offset < savedSlots - 128 {
                 // `copyMemory` rather than `update(from:count:)`: the latter emits
                 // an overlap check that is dead here (the image lives in the iseq
                 // allocation, never on the VM stack).
-                UnsafeMutableRawPointer(dst).copyMemory(
-                    from: UnsafeRawPointer(src), byteCount: count * MemoryLayout<UntypedValue>.stride
-                )
+                (dst + offset).copyMemory(from: src + offset, byteCount: savedSlots &- offset)
                 return
             }
-            Self.copy8(dst, src, 0)
-            Self.copy8(dst, src, count - 8)
-        } else if count >= 4 {
-            Self.copy4(dst, src, 0)
-            Self.copy4(dst, src, count - 4)
-        } else if count >= 2 {
-            Self.copyPair(dst, src, 0)
-            Self.copyPair(dst, src, count - 2)
-        } else if count == 1 {
-            dst[0] = src[0]
+            Self.copy64(dst, src, offset)
+            Self.copy64(dst, src, savedSlots - 64)
+        } else if offset <= savedSlots - 32 {
+            Self.copy32(dst, src, offset)
+            Self.copy32(dst, src, savedSlots - 32)
+        } else if offset <= savedSlots - 16 {
+            Self.copy16(dst, src, offset)
+            Self.copy16(dst, src, savedSlots - 16)
+        } else if offset == savedSlots - 8 {
+            (dst + offset).storeBytes(of: src.load(fromByteOffset: offset, as: UInt64.self), as: UInt64.self)
         }
     }
 
-    /// Copies two slots as one 16-byte unit, so this lowers to a single vector
+    /// Copies 16 bytes as one unit, so this lowers to a single vector
     /// load/store pair -- `ldr q`/`str q` on arm64, `movups` on x86-64 -- rather
     /// than two scalar ones.
     @inline(__always)
-    private static func copyPair(
-        _ dst: UnsafeMutablePointer<UntypedValue>, _ src: UnsafePointer<UntypedValue>, _ o: Int
-    ) {
-        let bytes = UnsafeRawPointer(src + o).loadUnaligned(as: SIMD2<UInt64>.self)
-        UnsafeMutableRawPointer(dst + o).storeBytes(of: bytes, as: SIMD2<UInt64>.self)
+    private static func copy16(_ dst: UnsafeMutableRawPointer, _ src: UnsafeRawPointer, _ o: Int) {
+        let bytes = src.loadUnaligned(fromByteOffset: o, as: SIMD2<UInt64>.self)
+        dst.storeBytes(of: bytes, toByteOffset: o, as: SIMD2<UInt64>.self)
     }
 
     @inline(__always)
-    private static func copy4(
-        _ dst: UnsafeMutablePointer<UntypedValue>, _ src: UnsafePointer<UntypedValue>, _ o: Int
-    ) {
-        copyPair(dst, src, o)
-        copyPair(dst, src, o + 2)
+    private static func copy32(_ dst: UnsafeMutableRawPointer, _ src: UnsafeRawPointer, _ o: Int) {
+        copy16(dst, src, o)
+        copy16(dst, src, o &+ 16)
     }
 
     @inline(__always)
-    private static func copy8(
-        _ dst: UnsafeMutablePointer<UntypedValue>, _ src: UnsafePointer<UntypedValue>, _ o: Int
-    ) {
-        copy4(dst, src, o)
-        copy4(dst, src, o + 4)
+    private static func copy64(_ dst: UnsafeMutableRawPointer, _ src: UnsafeRawPointer, _ o: Int) {
+        copy32(dst, src, o)
+        copy32(dst, src, o &+ 32)
     }
 
     /// Pushes a new call frame to the VM stack.
@@ -182,15 +179,9 @@ struct Execution: ~Copyable {
     func pushFrame(
         iseq: InstructionSequence,
         function: EntityHandle<WasmFunctionEntity>,
-        sp: Sp, returnPC: Pc,
-        spAddend: VReg,
+        sp: Sp, newSp: Sp, returnPC: Pc,
         needsMemoryRestoreOnReturn: Bool
     ) throws -> Sp {
-        // `spAddend` is a pre-shifted byte offset, so this is a plain byte add
-        // rather than a shifted one.
-        let newSp = UnsafeMutableRawPointer(sp)
-            .advanced(by: Int(spAddend.byteOffset))
-            .assumingMemoryBound(to: StackSlot.self)
         try checkStackBoundary(newSp.advanced(by: iseq.maxStackHeight))
         initializeFrame(sp: newSp, iseq: iseq)
         newSp.previousSP = sp
@@ -262,6 +253,12 @@ typealias Sp = UnsafeMutablePointer<StackSlot>
 typealias Pc = UnsafeMutablePointer<CodeSlot>
 
 extension Sp {
+    /// The stack pointer `reg` addresses from this one.
+    @inline(__always)
+    func advanced<R: ShiftedVReg>(by reg: R) -> Sp {
+        UnsafeMutableRawPointer(self).advanced(by: Int(reg.value)).assumingMemoryBound(to: StackSlot.self)
+    }
+
     subscript<R: FixedWidthInteger>(_ index: R) -> UntypedValue {
         get {
             return UntypedValue(storage: self[Int(index)])
@@ -459,15 +456,15 @@ private func runRoot(
 ) throws -> [Value] {
     // Advance the stack pointer to be able to reference negative indices
     // for saving slots.
-    let sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
+    let sp = sp.advanced(by: StackLayout.numberOfSavingSlots)
     // Mark root stack pointer and current function as nil.
     sp.previousSP = nil
     sp.currentFunction = nil
-    let layout = FrameHeaderLayout(type: type)
-    try FrameHeaderLayout.checkFitsVRegRange(layout.size)
+    // The callee's parameter area starts at `sp`.
+    let layout = ParameterAreaLayout(type: type)
+    try ParameterAreaLayout.checkFitsVRegRange(layout.size)
     for (index, argument) in arguments.enumerated() {
-        let reg = VReg(slotIndex: layout.size) + layout.paramReg(index)
-        sp.storeValue(argument, at: reg, type: type.parameters[index])
+        sp.storeValue(argument, at: layout.paramReg(index), type: type.parameters[index])
     }
 
     try withUnsafeTemporaryAllocation(of: CodeSlot.self, capacity: 2) { rootISeq in
@@ -482,8 +479,7 @@ private func runRoot(
         )
     }
     return type.results.enumerated().map { (i, resultType) in
-        let reg = VReg(slotIndex: layout.size) + layout.returnReg(i)
-        return sp.loadValue(at: reg, type: resultType)
+        sp.loadValue(at: layout.resultReg(i), type: resultType)
     }
 }
 
@@ -528,15 +524,15 @@ extension Execution {
         ) throws -> [Value] {
             // Advance the stack pointer to be able to reference negative indices
             // for saving slots.
-            let sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
+            let sp = sp.advanced(by: StackLayout.numberOfSavingSlots)
             // Mark root stack pointer and current function as nil.
             sp.previousSP = nil
             sp.currentFunction = nil
-            let layout = FrameHeaderLayout(type: type)
-            try FrameHeaderLayout.checkFitsVRegRange(layout.size)
+            // The callee's parameter area starts at `sp`.
+            let layout = ParameterAreaLayout(type: type)
+            try ParameterAreaLayout.checkFitsVRegRange(layout.size)
             for (index, argument) in arguments.enumerated() {
-                let reg = VReg(slotIndex: layout.size) + layout.paramReg(index)
-                sp.storeValue(argument, at: reg, type: type.parameters[index])
+                sp.storeValue(argument, at: layout.paramReg(index), type: type.parameters[index])
             }
 
             try self.execute(
@@ -547,8 +543,7 @@ extension Execution {
             )
 
             return type.results.enumerated().map { (i, resultType) in
-                let reg = VReg(slotIndex: layout.size) + layout.returnReg(i)
-                return sp.loadValue(at: reg, type: resultType)
+                sp.loadValue(at: layout.resultReg(i), type: resultType)
             }
         }
 
@@ -630,7 +625,7 @@ extension Execution {
         (pc, sp) = try invoke(
             function: handle,
             callerInstance: nil,
-            spAddend: VReg(slotIndex: FrameHeaderLayout.size(of: type)),
+            arguments: .zero,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         do {
@@ -768,66 +763,191 @@ extension Execution {
         guard sp < stackEnd else { throw Trap(.callStackExhausted) }
     }
 
+    /// Calls `function` whose parameter area starts at `arguments`.
+    ///
+    /// Used where the callee is not known until now, so neither is where its
+    /// `sp` goes: indirect calls and the root frame.
+    ///
     /// Returns the new program counter and stack pointer.
     @inline(never)
     func invoke(
         function: InternalFunction,
         callerInstance: InternalInstance?,
-        spAddend: VReg,
+        arguments: VReg,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
         if function.isWasm {
+            let callee = function.wasm
+            let iseq = try callee.ensureCompiled(store: store)
             return try invokeWasmFunction(
-                function: function.wasm, callerInstance: callerInstance,
-                spAddend: spAddend, sp: sp, pc: pc, md: &md, ms: &ms
+                function: callee, iseq: iseq, callerInstance: callerInstance,
+                sp: sp, newSp: sp.advanced(by: arguments).advanced(by: iseq.entryOffset),
+                pc: pc, md: &md, ms: &ms
             )
         } else {
-            try invokeHostFunction(function: function.host, sp: sp, spAddend: spAddend)
-            // A host function may re-enter the guest and grow the caller's
-            // default memory. A malloc-backed memory moves when it grows, so the
-            // cached base and bound would otherwise be left dangling.
-            if let instance = sp.currentInstance {
-                CurrentMemory.mayUpdateCurrentInstance(instance: instance, md: &md, ms: &ms)
-            }
-            return (pc, sp)
+            return try invokeHostFunction(
+                function: function.host, parameterArea: sp.advanced(by: arguments),
+                sp: sp, pc: pc, md: &md, ms: &ms
+            )
         }
     }
 
+    /// Calls `function`, whose `sp` is at `spAddend` if it is a Wasm function
+    /// and whose parameter area starts at `arguments`.
+    ///
+    /// Returns the new program counter and stack pointer.
+    @inline(never)
+    func invoke(
+        function: InternalFunction,
+        callerInstance: InternalInstance?,
+        arguments: VReg, spAddend: LVReg,
+        sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
+    ) throws -> (Pc, Sp) {
+        if function.isWasm {
+            let callee = function.wasm
+            return try invokeWasmFunction(
+                function: callee, iseq: callee.ensureCompiled(store: store), callerInstance: callerInstance,
+                sp: sp, newSp: sp.advanced(by: spAddend),
+                pc: pc, md: &md, ms: &ms
+            )
+        } else {
+            return try invokeHostFunction(
+                function: function.host, parameterArea: sp.advanced(by: arguments),
+                sp: sp, pc: pc, md: &md, ms: &ms
+            )
+        }
+    }
+
+    @inline(__always)
+    private func invokeHostFunction(
+        function: EntityHandle<HostFunctionEntity>, parameterArea: Sp,
+        sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
+    ) throws -> (Pc, Sp) {
+        try invokeHostFunction(function: function, sp: sp, parameterArea: parameterArea)
+        // A host function may re-enter the guest and grow the caller's
+        // default memory. A malloc-backed memory moves when it grows, so the
+        // cached base and bound would otherwise be left dangling.
+        if let instance = sp.currentInstance {
+            CurrentMemory.mayUpdateCurrentInstance(instance: instance, md: &md, ms: &ms)
+        }
+        return (pc, sp)
+    }
+
+    /// Calls `function` in place of the current frame.
+    ///
+    /// The callee's parameter area starts where the current frame's does, at
+    /// `frameBase`. The arguments are moved there from `arguments`, and the
+    /// callee's `sp` is placed past its own parameter area and locals, with the
+    /// saved slots moved along. See `Documentation/StackLayout.md`.
     @inline(never)
     func tailInvoke(
         function: InternalFunction,
         callerInstance: InternalInstance?,
+        arguments: VReg,
+        frameBase: LVReg,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
+        let parameterArea = sp.advanced(by: frameBase)
+        let argumentSlots = sp.advanced(by: arguments)
         if function.isWasm {
             return try tailInvokeWasmFunction(
                 function: function.wasm, callerInstance: callerInstance,
+                parameterArea: parameterArea, argumentSlots: argumentSlots,
                 sp: sp, md: &md, ms: &ms
             )
         } else {
-            try invokeHostFunction(function: function.host, sp: sp, spAddend: .zero)
-            if let instance = sp.currentInstance {
+            let host = function.host
+            let layout = host.layout
+            try ParameterAreaLayout.checkFitsVRegRange(layout.size)
+            let newSp = parameterArea.advanced(by: layout.size + StackLayout.numberOfSavingSlots)
+            try checkStackBoundary(newSp)
+            let saved = SavedSlots(of: sp)
+            Self.moveArguments(from: argumentSlots, to: parameterArea, slotCount: layout.parameterSlotCount)
+            saved.store(below: newSp)
+            try invokeHostFunction(function: host, sp: newSp, parameterArea: parameterArea)
+            if let instance = newSp.currentInstance {
                 CurrentMemory.mayUpdateCurrentInstance(instance: instance, md: &md, ms: &ms)
             }
-            return (pc, sp)
+            // The next instruction returns from the new frame.
+            return (pc, newSp)
         }
     }
 
-    /// Executes the given wasm function while overwriting the current frame.
-    ///
-    /// Precondition: The frame header must be already resized to be compatible
-    /// with the callee's frame header layout.
+    /// The three saved slots of a frame, held while a tail call moves the frame.
+    private struct SavedSlots {
+        let function: StackSlot
+        let returnPC: StackSlot
+        let sp: StackSlot
+
+        init(of sp: Sp) {
+            self.function = sp[-3]
+            self.returnPC = sp[-2]
+            self.sp = sp[-1]
+        }
+
+        func store(below sp: Sp) {
+            sp[-3] = function
+            sp[-2] = returnPC
+            sp[-1] = self.sp
+        }
+    }
+
+    /// Moves the arguments of a tail call to the start of the parameter area.
+    @inline(__always)
+    private static func moveArguments(from argumentSlots: Sp, to parameterArea: Sp, slotCount: Int) {
+        // The arguments are always above the parameter area, so a forward copy
+        // is safe even where the two overlap. There are usually only a few:
+        // copy up to four straight-line, each read before the write that may
+        // land on it, and loop only past that.
+        switch slotCount {
+        case 0:
+            return
+        case 1:
+            parameterArea[0] = argumentSlots[0]
+        case 2:
+            let (a0, a1) = (argumentSlots[0], argumentSlots[1])
+            parameterArea[0] = a0
+            parameterArea[1] = a1
+        case 3:
+            let (a0, a1, a2) = (argumentSlots[0], argumentSlots[1], argumentSlots[2])
+            parameterArea[0] = a0
+            parameterArea[1] = a1
+            parameterArea[2] = a2
+        default:
+            var i = 0
+            while i < slotCount {
+                parameterArea[i] = argumentSlots[i]
+                i &+= 1
+            }
+        }
+    }
+
+    /// Executes the given wasm function in place of the current frame.
     @inline(__always)
     private func tailInvokeWasmFunction(
         function: EntityHandle<WasmFunctionEntity>,
         callerInstance: InternalInstance?,
+        parameterArea: Sp, argumentSlots: Sp,
         sp: Sp, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
         let iseq = try function.ensureCompiled(store: store)
-        try checkStackBoundary(sp.advanced(by: iseq.maxStackHeight))
-        sp.currentFunction = function
-
-        initializeFrame(sp: sp, iseq: iseq)
+        let newSp = parameterArea.advanced(by: iseq.entryOffset)
+        try checkStackBoundary(newSp.advanced(by: iseq.maxStackHeight))
+        if newSp == sp {
+            // The callee's frame has the same shape, e.g. a function calling
+            // itself: the arguments and the frame-initialization image end below
+            // the saved slots, which stay where they are.
+            Self.moveArguments(from: argumentSlots, to: parameterArea, slotCount: iseq.parameterSlotCount)
+            initializeFrame(sp: newSp, iseq: iseq)
+        } else {
+            // Read the saved slots before anything moves: the arguments and the
+            // frame-initialization image may both land on them.
+            let saved = SavedSlots(of: sp)
+            Self.moveArguments(from: argumentSlots, to: parameterArea, slotCount: iseq.parameterSlotCount)
+            initializeFrame(sp: newSp, iseq: iseq)
+            saved.store(below: newSp)
+        }
+        newSp.currentFunction = function
 
         let calleeInstance = function.instance
         if calleeInstance != callerInstance {
@@ -836,30 +956,28 @@ extension Execution {
             // no longer holds: force the restore on return. Leaving the flag
             // alone when the instance does not change keeps a chain of
             // intra-module tail calls on the fast return path.
-            sp.rawReturnPC |= Sp.returnPCNeedsMemoryRestore
+            newSp.rawReturnPC |= Sp.returnPCNeedsMemoryRestore
             Execution.CurrentMemory.mayUpdateCurrentInstance(instance: calleeInstance, md: &md, ms: &ms)
         }
-        return (iseq.baseAddress, sp)
+        return (iseq.baseAddress, newSp)
     }
 
-    /// Executes the given WebAssembly function.
+    /// Executes the given WebAssembly function with its `sp` at `newSp`.
     @inline(__always)
     private func invokeWasmFunction(
         function: EntityHandle<WasmFunctionEntity>,
+        iseq: InstructionSequence,
         callerInstance: InternalInstance?,
-        spAddend: VReg,
-        sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
+        sp: Sp, newSp: Sp, pc: Pc, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
-        let iseq = try function.ensureCompiled(store: store)
-
         let calleeInstance = function.instance
         let switchesInstance = calleeInstance != callerInstance
         let newSp = try pushFrame(
             iseq: iseq,
             function: function,
             sp: sp,
+            newSp: newSp,
             returnPC: pc,
-            spAddend: spAddend,
             needsMemoryRestoreOnReturn: switchesInstance
         )
         if switchesInstance {
@@ -874,14 +992,14 @@ extension Execution {
     /// stack pointer nor the program counter.
     @inline(never)
     private func invokeHostFunction(
-        function: EntityHandle<HostFunctionEntity>, sp: Sp, spAddend: VReg
+        function: EntityHandle<HostFunctionEntity>, sp: Sp, parameterArea: Sp
     ) throws {
         let parameterTypes = function.parameterTypes
         let resultTypes = function.resultTypes
         let layout = function.layout
-        // A Wasm function's frame header is checked when the function is
-        // translated; a host function is never translated, so check it here.
-        try FrameHeaderLayout.checkFitsVRegRange(layout.size)
+        // A Wasm function's frame is checked when the function is translated; a
+        // host function is never translated, so check its parameter area here.
+        try ParameterAreaLayout.checkFitsVRegRange(layout.size)
         // Built at exact capacity rather than through `enumerated().map`.
         // That map has no count to reserve from -- `EnumeratedSequence` is a
         // Sequence, not a Collection -- so it grew the array by appending and
@@ -904,8 +1022,8 @@ extension Execution {
             for index in 0..<parameterTypes.count {
                 parameters.initializeElement(
                     at: index,
-                    to: sp.loadValue(
-                        at: spAddend + layout.paramReg(index), type: parameterTypes[index]))
+                    to: parameterArea.loadValue(
+                        at: layout.paramReg(index), type: parameterTypes[index]))
             }
             defer { parameters.deinitialize() }
 
@@ -924,8 +1042,8 @@ extension Execution {
                 defer { results.deinitialize() }
                 try implementation(caller, UnsafeBufferPointer(parameters), results)
                 for index in 0..<resultTypes.count {
-                    sp.storeValue(
-                        results[index], at: spAddend + layout.returnReg(index),
+                    parameterArea.storeValue(
+                        results[index], at: layout.resultReg(index),
                         type: resultTypes[index])
                 }
             }

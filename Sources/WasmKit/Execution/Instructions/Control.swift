@@ -100,7 +100,7 @@ extension Execution {
         (pc, sp) = try invoke(
             function: immediate.callee,
             callerInstance: currentInstance(sp: sp),
-            spAddend: immediate.spAddend,
+            arguments: immediate.arguments, spAddend: immediate.spAddend,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()
@@ -120,8 +120,7 @@ extension Execution {
         sp = try pushFrame(
             iseq: iseq,
             function: instance,
-            sp: sp, returnPC: pc,
-            spAddend: internalCallOperand.spAddend,
+            sp: sp, newSp: sp.advanced(by: internalCallOperand.spAddend), returnPC: pc,
             needsMemoryRestoreOnReturn: false
         )
         pc = iseq.baseAddress
@@ -188,7 +187,7 @@ extension Execution {
         (pc, sp) = try invoke(
             function: function,
             callerInstance: callerInstance,
-            spAddend: immediate.spAddend,
+            arguments: immediate.arguments,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()
@@ -199,6 +198,7 @@ extension Execution {
         (pc, sp) = try tailInvoke(
             function: immediate.callee,
             callerInstance: currentInstance(sp: sp),
+            arguments: immediate.arguments, frameBase: immediate.frameBase,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()
@@ -213,6 +213,7 @@ extension Execution {
         (pc, sp) = try tailInvoke(
             function: function,
             callerInstance: callerInstance,
+            arguments: immediate.arguments, frameBase: immediate.frameBase,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()
@@ -237,7 +238,7 @@ extension Execution {
         (pc, sp) = try invoke(
             function: function,
             callerInstance: currentInstance(sp: sp),
-            spAddend: immediate.spAddend,
+            arguments: immediate.arguments,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()
@@ -249,6 +250,7 @@ extension Execution {
         (pc, sp) = try tailInvoke(
             function: function,
             callerInstance: currentInstance(sp: sp),
+            arguments: immediate.arguments, frameBase: immediate.frameBase,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()
@@ -267,43 +269,6 @@ extension Execution {
             return pc.next()
         }
         return pc.advanced(by: Int(immediate.offset)).next()
-    }
-
-    mutating func resizeFrameHeader(sp: inout Sp, immediate: Instruction.ResizeFrameHeaderOperand) throws {
-        // The params/results space are resized by `delta` slots and the rest of the
-        // frame is copied to the new location. See the following diagram for the
-        // layout of the frame before and after the resize operation:
-        //
-        //
-        //              |--------BEFORE-------|   |--------AFTER--------|
-        //              |  Params  | Results  |   |  Params  | Results  |
-        //              |  ...     |   ...    |   |  ...     |   ...    |
-        // Old Header ->|---------------------|\  |  ...     |   ...    |              -+
-        //              |         Sp          | \ |  ...     |   ...    |               | delta
-        //              |---------------------|  \|---------------------|<- New Header -+  -+
-        //              |         Pc          |   |         Sp          |                   |
-        //              |---------------------|   |---------------------|                   |
-        //              |     Current Func    | C |         Pc          |                   |
-        //     Old Sp ->|---------------------| O |---------------------|                   |
-        //              |       Locals        | P |     Current Func    |                   |
-        //              |        ...          | Y |---------------------|<- New Sp          |
-        //              |---------------------|   |       Locals        |                   | sizeToCopy
-        //              |        Consts       |   |        ...          |                   |
-        //              |        ...          |   |---------------------|                   |
-        //              |---------------------|   |        Consts       |                   |
-        //              |     Value Stack     |   |        ...          |                   |
-        //              |        ...          |   |---------------------|                   |
-        //              |---------------------|\  |     Value Stack     |                   |
-        //                                      \ |        ...          |                   |
-        //                                       \|---------------------|                  -+
-        let newSp = UnsafeMutableRawPointer(sp)
-            .advanced(by: Int(immediate.delta.byteOffset))
-            .assumingMemoryBound(to: StackSlot.self)
-        try checkStackBoundary(newSp)
-        let oldFrameHeader = sp.advanced(by: -FrameHeaderLayout.numberOfSavingSlots)
-        let newFrameHeader = newSp.advanced(by: -FrameHeaderLayout.numberOfSavingSlots)
-        newFrameHeader.update(from: oldFrameHeader, count: Int(immediate.sizeToCopy))
-        sp = newSp
     }
 
     mutating func onEnter(sp: Sp, immediate: Instruction.OnEnterOperand) {
