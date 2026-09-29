@@ -98,7 +98,7 @@ This section describes the high-level design of the register-based interpreter.
 Most of each VM instruction correspond to a single WebAssembly instruction, but they encode their operand and result registers into the instruction itself. For example, `Instruction.i32Add(lhs: Reg, rhs: Reg, result: Reg)` corresponds to the `i32.add` WebAssembly instruction, and it takes two registers as input and produces one register as output.
 Exceptions are "provider" instructions, such as `local.get`, `{i32,i64,f32,f64}.const`, etc., which are no-ops at runtime. They are encoded as registers in instruction operands, so thre is no corresponding VM instruction for them.
 
-A *register* in this context is a 64-bit slot in the stack frame that can uniformly hold any of the WebAssembly value types (i32, i64, f32, f64, ref). The register is identified by a 16-bit index.
+A *register* in this context is a 64-bit slot in the stack frame that can uniformly hold any of the WebAssembly value types (i32, i64, f32, f64, ref). The register is identified by its offset from the frame's stack pointer (see [StackLayout.md](StackLayout.md#slots-and-registers)).
 
 ### Translation
 
@@ -162,51 +162,7 @@ You can see translated VM instructions by running the `wasmkit-cli explore` comm
 
 ### Stack frame layout
 
-See doc comments on `StackLayout` type. The stack frame layout design is heavily inspired by stitch WebAssembly interpreter[^4].
-
-Basically, the stack frame consists of four parts: frame header, locals, dynamic stack, and constant pool.
-
-1. The frame header contains the saved stack pointer, return address, current instance, and value slots for parameters and return values. 
-2. The locals part contains the local variables of the current function.
-3. The constant pool part contains the constant values
-    - The size of the constant pool is determined by a heuristic based on the Wasm-level code size. The translation pass determines the size at the beginning of the translation process to statically know value slot indices without fixing up them at the end of the translation process.
-4. The dynamic stack part contains the dynamic stack values, which are the intermediate values produced by the WebAssembly instructions.
-    - The size of the dynamic stack is the maximum height of the stack determined by the translation pass and is fixed at the end of the translation process.
-
-#### Slots vs values
-
-WasmKit’s runtime stack is indexed in **64-bit slots** (`StackSlot == UInt64`). Most Wasm value types occupy one slot, but `v128` occupies **two consecutive slots**:
-
-- `i32/i64/f32/f64/ref`: 1 slot
-- `v128`: 2 slots (`lo` then `hi`)
-
-Register indices always refer to the **first slot** of a value (for `v128`, `reg` is the `lo` slot and `reg+1` is the `hi` slot).
-
-This affects:
-
-- Frame header sizing (parameters/results are sized in slots, not “number of values”)
-- Local layout (locals are laid out in slots; `v128` locals reserve 2 slots)
-- Dynamic stack height (computed in slots)
-
-#### Example layout (with `v128`)
-
-For a function with `(param i32 v128) (result v128)` and one local `i64`, the slot layout looks like:
-
-| Slot offset | Description |
-|---:|---|
-| `-(H)+0` | Param/Result region (`i32` param0) |
-| `-(H)+1` | Param/Result region (`v128` param1 lo / result0 lo) |
-| `-(H)+2` | Param/Result region (`v128` param1 hi / result0 hi) |
-| `-3` | Saved Instance |
-| `-2` | Saved PC |
-| `-1` | Saved SP |
-| `0` | Local 0 (`i64`) |
-| `1` | Const pool (first constant slot, if any) |
-| `…` | Dynamic stack (slot-addressed) |
-
-Where `H` is the total frame header size in slots (param/result region + saving slots).
-
-Value slots in the frame header, locals, dynamic stack, and constant pool are all accessible by the register index (slot index).
+See [StackLayout.md](StackLayout.md) for the stack frame layout, calls and tail calls. The stack frame layout design is heavily inspired by stitch WebAssembly interpreter[^4].
 
 ### Instruction encoding
 
