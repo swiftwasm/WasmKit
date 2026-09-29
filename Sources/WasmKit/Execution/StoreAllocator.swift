@@ -602,7 +602,7 @@ extension StoreAllocator {
                 type: engine.internType(type),
                 parameterTypes: type.parameters,
                 resultTypes: type.results,
-                layout: FrameHeaderLayout(type: type),
+                layout: ParameterAreaLayout(type: type),
                 implementation: implementation
             )
         )

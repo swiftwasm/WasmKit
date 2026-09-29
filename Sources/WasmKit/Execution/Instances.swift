@@ -1371,7 +1371,7 @@ extension EntityHandle<HostFunctionEntity> {
     var type: InternedFuncType { withValue { $0.type } }
     var parameterTypes: [ValueType] { withValue { $0.parameterTypes } }
     var resultTypes: [ValueType] { withValue { $0.resultTypes } }
-    var layout: FrameHeaderLayout { withValue { $0.layout } }
+    var layout: ParameterAreaLayout { withValue { $0.layout } }
     var implementation: Function.RawImplementation { withValue { $0.implementation } }
 }
 

@@ -29,9 +29,6 @@ enum Instruction {
     case internalCall(Instruction.CallOperand)
     /// WebAssembly Core Instruction `call_indirect`
     case callIndirect(Instruction.CallIndirectOperand)
-    /// Resize the frame header by increasing param/result slots and copying `sizeToCopy`
-    /// slots placed after the header
-    case resizeFrameHeader(Instruction.ResizeFrameHeaderOperand)
     /// WebAssembly Core Instruction `return_call`
     case returnCall(Instruction.ReturnCallOperand)
     /// WebAssembly Core Instruction `return_call_indirect`
@@ -2448,15 +2445,16 @@ extension Instruction {
 
     struct CallOperand: InstructionImmediate {
         var rawCallee: UInt64
-        var spAddend: VReg
+        var arguments: VReg
+        var spAddend: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             let (rawCallee) = pc.read((UInt64).self)
-            let (spAddend, _, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
-            return Self(rawCallee: rawCallee, spAddend: spAddend)
+            let (arguments, spAddend) = pc.read((VReg, LVReg).self)
+            return Self(rawCallee: rawCallee, arguments: arguments, spAddend: spAddend)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
             emitSlot { $0.rawCallee }
-            emitSlot { unsafeBitCast(($0.spAddend, 0, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.arguments, $0.spAddend) as (VReg, LVReg), to: CodeSlot.self) }
         }
     }
 
@@ -2464,38 +2462,30 @@ extension Instruction {
         var tableIndex: UInt32
         var rawType: UInt32
         var index: VReg
-        var spAddend: VReg
+        var arguments: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             let (tableIndex, rawType) = pc.read((UInt32, UInt32).self)
-            let (index, spAddend, _, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
-            return Self(tableIndex: tableIndex, rawType: rawType, index: index, spAddend: spAddend)
+            let (index, arguments, _, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(tableIndex: tableIndex, rawType: rawType, index: index, arguments: arguments)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
             emitSlot { unsafeBitCast(($0.tableIndex, $0.rawType) as (UInt32, UInt32), to: CodeSlot.self) }
-            emitSlot { unsafeBitCast(($0.index, $0.spAddend, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
-        }
-    }
-
-    struct ResizeFrameHeaderOperand: InstructionImmediate {
-        var delta: VReg
-        var sizeToCopy: UInt16
-        @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let (delta, sizeToCopy, _, _, _, _) = pc.read((VReg, UInt16, UInt8, UInt8, UInt8, UInt8).self)
-            return Self(delta: delta, sizeToCopy: sizeToCopy)
-        }
-        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { unsafeBitCast(($0.delta, $0.sizeToCopy, 0, 0, 0, 0) as (VReg, UInt16, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.index, $0.arguments, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
     struct ReturnCallOperand: InstructionImmediate {
         var rawCallee: UInt64
+        var arguments: VReg
+        var frameBase: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             let (rawCallee) = pc.read((UInt64).self)
-            return Self(rawCallee: rawCallee)
+            let (arguments, frameBase) = pc.read((VReg, LVReg).self)
+            return Self(rawCallee: rawCallee, arguments: arguments, frameBase: frameBase)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
             emitSlot { $0.rawCallee }
+            emitSlot { unsafeBitCast(($0.arguments, $0.frameBase) as (VReg, LVReg), to: CodeSlot.self) }
         }
     }
 
@@ -2503,14 +2493,16 @@ extension Instruction {
         var tableIndex: UInt32
         var rawType: UInt32
         var index: VReg
+        var arguments: VReg
+        var frameBase: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             let (tableIndex, rawType) = pc.read((UInt32, UInt32).self)
-            let (index, _, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
-            return Self(tableIndex: tableIndex, rawType: rawType, index: index)
+            let (index, arguments, frameBase) = pc.read((VReg, VReg, LVReg).self)
+            return Self(tableIndex: tableIndex, rawType: rawType, index: index, arguments: arguments, frameBase: frameBase)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
             emitSlot { unsafeBitCast(($0.tableIndex, $0.rawType) as (UInt32, UInt32), to: CodeSlot.self) }
-            emitSlot { unsafeBitCast(($0.index, 0, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.index, $0.arguments, $0.frameBase) as (VReg, VReg, LVReg), to: CodeSlot.self) }
         }
     }
 
@@ -3591,24 +3583,26 @@ extension Instruction {
 
     struct CallRefOperand: InstructionImmediate {
         var callee: VReg
-        var spAddend: VReg
+        var arguments: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let (callee, spAddend, _, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
-            return Self(callee: callee, spAddend: spAddend)
+            let (callee, arguments, _, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(callee: callee, arguments: arguments)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { unsafeBitCast(($0.callee, $0.spAddend, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.callee, $0.arguments, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
     struct ReturnCallRefOperand: InstructionImmediate {
         var callee: VReg
+        var arguments: VReg
+        var frameBase: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let (callee, _, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
-            return Self(callee: callee)
+            let (callee, arguments, frameBase) = pc.read((VReg, VReg, LVReg).self)
+            return Self(callee: callee, arguments: arguments, frameBase: frameBase)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { unsafeBitCast(($0.callee, 0, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.callee, $0.arguments, $0.frameBase) as (VReg, VReg, LVReg), to: CodeSlot.self) }
         }
     }
 
@@ -3637,7 +3631,6 @@ extension Instruction {
         case .compilingCall(let immediate): return immediate
         case .internalCall(let immediate): return immediate
         case .callIndirect(let immediate): return immediate
-        case .resizeFrameHeader(let immediate): return immediate
         case .returnCall(let immediate): return immediate
         case .returnCallIndirect(let immediate): return immediate
         case .br(let immediate): return immediate
@@ -4370,7 +4363,6 @@ extension Instruction {
         case .compilingCall(let immediate): immediate.emit(to: emit)
         case .internalCall(let immediate): immediate.emit(to: emit)
         case .callIndirect(let immediate): immediate.emit(to: emit)
-        case .resizeFrameHeader(let immediate): immediate.emit(to: emit)
         case .returnCall(let immediate): immediate.emit(to: emit)
         case .returnCallIndirect(let immediate): immediate.emit(to: emit)
         case .br(let immediate): immediate.emit(to: emit)
@@ -5104,731 +5096,730 @@ extension Instruction {
         case .compilingCall: return 6
         case .internalCall: return 7
         case .callIndirect: return 8
-        case .resizeFrameHeader: return 9
-        case .returnCall: return 10
-        case .returnCallIndirect: return 11
-        case .unreachable: return 12
-        case .nop: return 13
-        case .br: return 14
-        case .brIf: return 15
-        case .brIfNot: return 16
-        case .brTable: return 17
-        case ._return: return 18
-        case .endOfExecution: return 19
-        case .i32Load: return 20
-        case .i64Load: return 21
-        case .f32Load: return 22
-        case .f64Load: return 23
-        case .i32Load8S: return 24
-        case .i32Load8U: return 25
-        case .i32Load16S: return 26
-        case .i32Load16U: return 27
-        case .i64Load8S: return 28
-        case .i64Load8U: return 29
-        case .i64Load16S: return 30
-        case .i64Load16U: return 31
-        case .i64Load32S: return 32
-        case .i64Load32U: return 33
-        case .i32Store: return 34
-        case .i64Store: return 35
-        case .f32Store: return 36
-        case .f64Store: return 37
-        case .i32Store8: return 38
-        case .i32Store16: return 39
-        case .i64Store8: return 40
-        case .i64Store16: return 41
-        case .i64Store32: return 42
-        case .memorySize: return 43
-        case .memoryGrow: return 44
-        case .memoryInit: return 45
-        case .memoryDataDrop: return 46
-        case .memoryCopy: return 47
-        case .memoryFill: return 48
-        case .v128Const: return 49
-        case .i8x16Shuffle: return 50
-        case .simd: return 51
-        case .const32: return 52
-        case .const64: return 53
-        case .i32Add: return 54
-        case .i64Add: return 55
-        case .i32Sub: return 56
-        case .i64Sub: return 57
-        case .i32Mul: return 58
-        case .i64Mul: return 59
-        case .i32And: return 60
-        case .i64And: return 61
-        case .i32Or: return 62
-        case .i64Or: return 63
-        case .i32Xor: return 64
-        case .i64Xor: return 65
-        case .i32Shl: return 66
-        case .i64Shl: return 67
-        case .i32ShrS: return 68
-        case .i64ShrS: return 69
-        case .i32ShrU: return 70
-        case .i64ShrU: return 71
-        case .i32Rotl: return 72
-        case .i64Rotl: return 73
-        case .i32Rotr: return 74
-        case .i64Rotr: return 75
-        case .i32DivS: return 76
-        case .i64DivS: return 77
-        case .i32DivU: return 78
-        case .i64DivU: return 79
-        case .i32RemS: return 80
-        case .i64RemS: return 81
-        case .i32RemU: return 82
-        case .i64RemU: return 83
-        case .i32Eq: return 84
-        case .i64Eq: return 85
-        case .i32Ne: return 86
-        case .i64Ne: return 87
-        case .i32LtS: return 88
-        case .i64LtS: return 89
-        case .i32LtU: return 90
-        case .i64LtU: return 91
-        case .i32GtS: return 92
-        case .i64GtS: return 93
-        case .i32GtU: return 94
-        case .i64GtU: return 95
-        case .i32LeS: return 96
-        case .i64LeS: return 97
-        case .i32LeU: return 98
-        case .i64LeU: return 99
-        case .i32GeS: return 100
-        case .i64GeS: return 101
-        case .i32GeU: return 102
-        case .i64GeU: return 103
-        case .i32Clz: return 104
-        case .i64Clz: return 105
-        case .i32Ctz: return 106
-        case .i64Ctz: return 107
-        case .i32Popcnt: return 108
-        case .i64Popcnt: return 109
-        case .i32Eqz: return 110
-        case .i64Eqz: return 111
-        case .i32WrapI64: return 112
-        case .i64ExtendI32S: return 113
-        case .i64ExtendI32U: return 114
-        case .i32Extend8S: return 115
-        case .i64Extend8S: return 116
-        case .i32Extend16S: return 117
-        case .i64Extend16S: return 118
-        case .i64Extend32S: return 119
-        case .i32TruncF32S: return 120
-        case .i32TruncF32U: return 121
-        case .i32TruncSatF32S: return 122
-        case .i32TruncSatF32U: return 123
-        case .i32TruncF64S: return 124
-        case .i32TruncF64U: return 125
-        case .i32TruncSatF64S: return 126
-        case .i32TruncSatF64U: return 127
-        case .i64TruncF32S: return 128
-        case .i64TruncF32U: return 129
-        case .i64TruncSatF32S: return 130
-        case .i64TruncSatF32U: return 131
-        case .i64TruncF64S: return 132
-        case .i64TruncF64U: return 133
-        case .i64TruncSatF64S: return 134
-        case .i64TruncSatF64U: return 135
-        case .f32ConvertI32S: return 136
-        case .f32ConvertI32U: return 137
-        case .f32ConvertI64S: return 138
-        case .f32ConvertI64U: return 139
-        case .f64ConvertI32S: return 140
-        case .f64ConvertI32U: return 141
-        case .f64ConvertI64S: return 142
-        case .f64ConvertI64U: return 143
-        case .f32ReinterpretI32: return 144
-        case .f64ReinterpretI64: return 145
-        case .i32ReinterpretF32: return 146
-        case .i64ReinterpretF64: return 147
-        case .f32Add: return 148
-        case .f64Add: return 149
-        case .f32Sub: return 150
-        case .f64Sub: return 151
-        case .f32Mul: return 152
-        case .f64Mul: return 153
-        case .f32Div: return 154
-        case .f64Div: return 155
-        case .f32Min: return 156
-        case .f64Min: return 157
-        case .f32Max: return 158
-        case .f64Max: return 159
-        case .f32CopySign: return 160
-        case .f64CopySign: return 161
-        case .f32Eq: return 162
-        case .f64Eq: return 163
-        case .f32Ne: return 164
-        case .f64Ne: return 165
-        case .f32Lt: return 166
-        case .f64Lt: return 167
-        case .f32Gt: return 168
-        case .f64Gt: return 169
-        case .f32Le: return 170
-        case .f64Le: return 171
-        case .f32Ge: return 172
-        case .f64Ge: return 173
-        case .f32Abs: return 174
-        case .f64Abs: return 175
-        case .f32Neg: return 176
-        case .f64Neg: return 177
-        case .f32Ceil: return 178
-        case .f64Ceil: return 179
-        case .f32Floor: return 180
-        case .f64Floor: return 181
-        case .f32Trunc: return 182
-        case .f64Trunc: return 183
-        case .f32Nearest: return 184
-        case .f64Nearest: return 185
-        case .f32Sqrt: return 186
-        case .f64Sqrt: return 187
-        case .f64PromoteF32: return 188
-        case .f32DemoteF64: return 189
-        case .select: return 190
-        case .refNull: return 191
-        case .refIsNull: return 192
-        case .refFunc: return 193
-        case .tableGet: return 194
-        case .tableSet: return 195
-        case .tableSize: return 196
-        case .tableGrow: return 197
-        case .tableFill: return 198
-        case .tableCopy: return 199
-        case .tableInit: return 200
-        case .tableElementDrop: return 201
-        case .onEnter: return 202
-        case .onExit: return 203
-        case .breakpoint: return 204
-        case .i32AtomicLoad: return 205
-        case .i64AtomicLoad: return 206
-        case .i32AtomicLoad8U: return 207
-        case .i32AtomicLoad16U: return 208
-        case .i64AtomicLoad8U: return 209
-        case .i64AtomicLoad16U: return 210
-        case .i64AtomicLoad32U: return 211
-        case .i32AtomicStore: return 212
-        case .i64AtomicStore: return 213
-        case .i32AtomicStore8: return 214
-        case .i32AtomicStore16: return 215
-        case .i64AtomicStore8: return 216
-        case .i64AtomicStore16: return 217
-        case .i64AtomicStore32: return 218
-        case .i32AtomicRmwAdd: return 219
-        case .i64AtomicRmwAdd: return 220
-        case .i32AtomicRmwSub: return 221
-        case .i64AtomicRmwSub: return 222
-        case .i32AtomicRmwAnd: return 223
-        case .i64AtomicRmwAnd: return 224
-        case .i32AtomicRmwOr: return 225
-        case .i64AtomicRmwOr: return 226
-        case .i32AtomicRmwXor: return 227
-        case .i64AtomicRmwXor: return 228
-        case .i32AtomicRmwXchg: return 229
-        case .i64AtomicRmwXchg: return 230
-        case .i32AtomicRmw8AddU: return 231
-        case .i64AtomicRmw8AddU: return 232
-        case .i32AtomicRmw8SubU: return 233
-        case .i64AtomicRmw8SubU: return 234
-        case .i32AtomicRmw8AndU: return 235
-        case .i64AtomicRmw8AndU: return 236
-        case .i32AtomicRmw8OrU: return 237
-        case .i64AtomicRmw8OrU: return 238
-        case .i32AtomicRmw8XorU: return 239
-        case .i64AtomicRmw8XorU: return 240
-        case .i32AtomicRmw8XchgU: return 241
-        case .i64AtomicRmw8XchgU: return 242
-        case .i32AtomicRmw16AddU: return 243
-        case .i64AtomicRmw16AddU: return 244
-        case .i32AtomicRmw16SubU: return 245
-        case .i64AtomicRmw16SubU: return 246
-        case .i32AtomicRmw16AndU: return 247
-        case .i64AtomicRmw16AndU: return 248
-        case .i32AtomicRmw16OrU: return 249
-        case .i64AtomicRmw16OrU: return 250
-        case .i32AtomicRmw16XorU: return 251
-        case .i64AtomicRmw16XorU: return 252
-        case .i32AtomicRmw16XchgU: return 253
-        case .i64AtomicRmw16XchgU: return 254
-        case .i64AtomicRmw32AddU: return 255
-        case .i64AtomicRmw32SubU: return 256
-        case .i64AtomicRmw32AndU: return 257
-        case .i64AtomicRmw32OrU: return 258
-        case .i64AtomicRmw32XorU: return 259
-        case .i64AtomicRmw32XchgU: return 260
-        case .i32AtomicRmwCmpxchg: return 261
-        case .i64AtomicRmwCmpxchg: return 262
-        case .i32AtomicRmw8CmpxchgU: return 263
-        case .i32AtomicRmw16CmpxchgU: return 264
-        case .i64AtomicRmw8CmpxchgU: return 265
-        case .i64AtomicRmw16CmpxchgU: return 266
-        case .i64AtomicRmw32CmpxchgU: return 267
-        case .memoryAtomicWait32: return 268
-        case .memoryAtomicWait64: return 269
-        case .memoryAtomicNotify: return 270
-        case .atomicFence: return 271
-        case .throwTag: return 272
-        case .throwRef: return 273
-        case .catchHandlers: return 274
-        case .catchHandlersEnd: return 275
-        case .brIfI32Eq: return 276
-        case .brIfI32Ne: return 277
-        case .brIfI32LtS: return 278
-        case .brIfI32LtU: return 279
-        case .brIfI32GtS: return 280
-        case .brIfI32GtU: return 281
-        case .brIfI32LeS: return 282
-        case .brIfI32LeU: return 283
-        case .brIfI32GeS: return 284
-        case .brIfI32GeU: return 285
-        case .brIfI64Eq: return 286
-        case .brIfI64Ne: return 287
-        case .brIfI64LtS: return 288
-        case .brIfI64LtU: return 289
-        case .brIfI64GtS: return 290
-        case .brIfI64GtU: return 291
-        case .brIfI64LeS: return 292
-        case .brIfI64LeU: return 293
-        case .brIfI64GeS: return 294
-        case .brIfI64GeU: return 295
-        case .returnCrossInstance: return 296
-        case .memoryOutOfBoundsTrap: return 297
-        case .unalignedAtomicTrap: return 298
-        case .brIfF32Eq: return 299
-        case .brIfF32Ne: return 300
-        case .brIfF32Lt: return 301
-        case .brIfF32Le: return 302
-        case .brIfNotF32Lt: return 303
-        case .brIfNotF32Le: return 304
-        case .brIfF64Eq: return 305
-        case .brIfF64Ne: return 306
-        case .brIfF64Lt: return 307
-        case .brIfF64Le: return 308
-        case .brIfNotF64Lt: return 309
-        case .brIfNotF64Le: return 310
-        case .f32AddAdd: return 311
-        case .f32AddSub: return 312
-        case .f32AddMul: return 313
-        case .f32SubAdd: return 314
-        case .f32SubSub: return 315
-        case .f32SubMul: return 316
-        case .f32MulAdd: return 317
-        case .f32MulSub: return 318
-        case .f32MulMul: return 319
-        case .f64AddAdd: return 320
-        case .f64AddSub: return 321
-        case .f64AddMul: return 322
-        case .f64SubAdd: return 323
-        case .f64SubSub: return 324
-        case .f64SubMul: return 325
-        case .f64MulAdd: return 326
-        case .f64MulSub: return 327
-        case .f64MulMul: return 328
-        case .brIfI32And: return 329
-        case .brIfNotI32And: return 330
-        case .brIfI64And: return 331
-        case .brIfNotI64And: return 332
-        case .i32ShlAdd: return 333
-        case .i32MulAdd: return 334
-        case .i32AddAdd: return 335
-        case .i32AndAdd: return 336
-        case .i32ShrUAnd: return 337
-        case .i32OrAnd: return 338
-        case .i32ShrUAdd: return 339
-        case .i32SubAnd: return 340
-        case .i32ShlOr: return 341
-        case .i32AddAnd: return 342
-        case .i32ShrUOr: return 343
-        case .i32XorShrU: return 344
-        case .i32AddSub: return 345
-        case .i32XorShl: return 346
-        case .i32SubAdd: return 347
-        case .i32AndShl: return 348
-        case .i64XorRotl: return 349
-        case .i64MulAdd: return 350
-        case .i64ShlAnd: return 351
-        case .i64AndMul: return 352
-        case .i64ShlOr: return 353
-        case .i64XorAnd: return 354
-        case .i64MulXor: return 355
-        case .i64AndXor: return 356
-        case .i64RotlXor: return 357
-        case .i64SubAnd: return 358
-        case .i64XorXor: return 359
-        case .i64OrOr: return 360
-        case .i64ShrUAnd: return 361
-        case .i64AndAnd: return 362
-        case .i64XorMul: return 363
-        case .i64XorShrU: return 364
-        case .i32MulSubRev: return 365
-        case .i32AddToAcc: return 366
-        case .i32SubToAcc: return 367
-        case .i32MulToAcc: return 368
-        case .i32AndToAcc: return 369
-        case .i32OrToAcc: return 370
-        case .i32XorToAcc: return 371
-        case .i32ShlToAcc: return 372
-        case .i32ShrSToAcc: return 373
-        case .i32ShrUToAcc: return 374
-        case .i32RotlToAcc: return 375
-        case .i32RotrToAcc: return 376
-        case .i64AddToAcc: return 377
-        case .i64SubToAcc: return 378
-        case .i64MulToAcc: return 379
-        case .i64AndToAcc: return 380
-        case .i64OrToAcc: return 381
-        case .i64XorToAcc: return 382
-        case .i64ShlToAcc: return 383
-        case .i64ShrSToAcc: return 384
-        case .i64ShrUToAcc: return 385
-        case .i64RotlToAcc: return 386
-        case .i64RotrToAcc: return 387
-        case .i32AddFromAcc: return 388
-        case .i32SubFromAcc: return 389
-        case .i32MulFromAcc: return 390
-        case .i32AndFromAcc: return 391
-        case .i32OrFromAcc: return 392
-        case .i32XorFromAcc: return 393
-        case .i32ShlFromAcc: return 394
-        case .i32ShrSFromAcc: return 395
-        case .i32ShrUFromAcc: return 396
-        case .i32RotlFromAcc: return 397
-        case .i32RotrFromAcc: return 398
-        case .i64AddFromAcc: return 399
-        case .i64SubFromAcc: return 400
-        case .i64MulFromAcc: return 401
-        case .i64AndFromAcc: return 402
-        case .i64OrFromAcc: return 403
-        case .i64XorFromAcc: return 404
-        case .i64ShlFromAcc: return 405
-        case .i64ShrSFromAcc: return 406
-        case .i64ShrUFromAcc: return 407
-        case .i64RotlFromAcc: return 408
-        case .i64RotrFromAcc: return 409
-        case .i32AddInAcc: return 410
-        case .i32SubInAcc: return 411
-        case .i32MulInAcc: return 412
-        case .i32AndInAcc: return 413
-        case .i32OrInAcc: return 414
-        case .i32XorInAcc: return 415
-        case .i32ShlInAcc: return 416
-        case .i32ShrSInAcc: return 417
-        case .i32ShrUInAcc: return 418
-        case .i32RotlInAcc: return 419
-        case .i32RotrInAcc: return 420
-        case .i64AddInAcc: return 421
-        case .i64SubInAcc: return 422
-        case .i64MulInAcc: return 423
-        case .i64AndInAcc: return 424
-        case .i64OrInAcc: return 425
-        case .i64XorInAcc: return 426
-        case .i64ShlInAcc: return 427
-        case .i64ShrSInAcc: return 428
-        case .i64ShrUInAcc: return 429
-        case .i64RotlInAcc: return 430
-        case .i64RotrInAcc: return 431
-        case .brIfI32EqAcc: return 432
-        case .brIfI32NeAcc: return 433
-        case .brIfI32LtSAcc: return 434
-        case .brIfI32LtUAcc: return 435
-        case .brIfI32GtSAcc: return 436
-        case .brIfI32GtUAcc: return 437
-        case .brIfI32LeSAcc: return 438
-        case .brIfI32LeUAcc: return 439
-        case .brIfI32GeSAcc: return 440
-        case .brIfI32GeUAcc: return 441
-        case .brIfI64EqAcc: return 442
-        case .brIfI64NeAcc: return 443
-        case .brIfI64LtSAcc: return 444
-        case .brIfI64LtUAcc: return 445
-        case .brIfI64GtSAcc: return 446
-        case .brIfI64GtUAcc: return 447
-        case .brIfI64LeSAcc: return 448
-        case .brIfI64LeUAcc: return 449
-        case .brIfI64GeSAcc: return 450
-        case .brIfI64GeUAcc: return 451
-        case .brIfAcc: return 452
-        case .brIfNotAcc: return 453
-        case .globalGetToAcc: return 454
-        case .i32LoadToAcc: return 455
-        case .i64LoadToAcc: return 456
-        case .f32LoadToAcc: return 457
-        case .f64LoadToAcc: return 458
-        case .i32Load8SToAcc: return 459
-        case .i32Load8UToAcc: return 460
-        case .i32Load16SToAcc: return 461
-        case .i32Load16UToAcc: return 462
-        case .i64Load8SToAcc: return 463
-        case .i64Load8UToAcc: return 464
-        case .i64Load16SToAcc: return 465
-        case .i64Load16UToAcc: return 466
-        case .i64Load32SToAcc: return 467
-        case .i64Load32UToAcc: return 468
-        case .i32LoadFromAcc: return 469
-        case .i64LoadFromAcc: return 470
-        case .f32LoadFromAcc: return 471
-        case .f64LoadFromAcc: return 472
-        case .i32Load8SFromAcc: return 473
-        case .i32Load8UFromAcc: return 474
-        case .i32Load16SFromAcc: return 475
-        case .i32Load16UFromAcc: return 476
-        case .i64Load8SFromAcc: return 477
-        case .i64Load8UFromAcc: return 478
-        case .i64Load16SFromAcc: return 479
-        case .i64Load16UFromAcc: return 480
-        case .i64Load32SFromAcc: return 481
-        case .i64Load32UFromAcc: return 482
-        case .i32LoadInAcc: return 483
-        case .i64LoadInAcc: return 484
-        case .f32LoadInAcc: return 485
-        case .f64LoadInAcc: return 486
-        case .i32Load8SInAcc: return 487
-        case .i32Load8UInAcc: return 488
-        case .i32Load16SInAcc: return 489
-        case .i32Load16UInAcc: return 490
-        case .i64Load8SInAcc: return 491
-        case .i64Load8UInAcc: return 492
-        case .i64Load16SInAcc: return 493
-        case .i64Load16UInAcc: return 494
-        case .i64Load32SInAcc: return 495
-        case .i64Load32UInAcc: return 496
-        case .i32StoreFromAcc: return 497
-        case .i64StoreFromAcc: return 498
-        case .f32StoreFromAcc: return 499
-        case .f64StoreFromAcc: return 500
-        case .i32Store8FromAcc: return 501
-        case .i32Store16FromAcc: return 502
-        case .i64Store8FromAcc: return 503
-        case .i64Store16FromAcc: return 504
-        case .i64Store32FromAcc: return 505
-        case .i32StoreAddrFromAcc: return 506
-        case .i64StoreAddrFromAcc: return 507
-        case .f32StoreAddrFromAcc: return 508
-        case .f64StoreAddrFromAcc: return 509
-        case .i32Store8AddrFromAcc: return 510
-        case .i32Store16AddrFromAcc: return 511
-        case .i64Store8AddrFromAcc: return 512
-        case .i64Store16AddrFromAcc: return 513
-        case .i64Store32AddrFromAcc: return 514
-        case .f64AddToAcc: return 515
-        case .f64AddFromAcc: return 516
-        case .f64AddInAcc: return 517
-        case .f64SubToAcc: return 518
-        case .f64SubFromAcc: return 519
-        case .f64SubInAcc: return 520
-        case .f64SubFromAccRev: return 521
-        case .f64SubInAccRev: return 522
-        case .f64MulToAcc: return 523
-        case .f64MulFromAcc: return 524
-        case .f64MulInAcc: return 525
-        case .f64DivToAcc: return 526
-        case .f64DivFromAcc: return 527
-        case .f64DivInAcc: return 528
-        case .f64DivFromAccRev: return 529
-        case .f64DivInAccRev: return 530
-        case .f64AddAddToAcc: return 531
-        case .f64AddSubToAcc: return 532
-        case .f64AddMulToAcc: return 533
-        case .f64SubAddToAcc: return 534
-        case .f64SubSubToAcc: return 535
-        case .f64SubMulToAcc: return 536
-        case .f64MulAddToAcc: return 537
-        case .f64MulSubToAcc: return 538
-        case .f64MulMulToAcc: return 539
-        case .brIfF64EqAcc: return 540
-        case .brIfF64NeAcc: return 541
-        case .brIfF64LtAcc: return 542
-        case .brIfF64LeAcc: return 543
-        case .brIfF64GtAcc: return 544
-        case .brIfF64GeAcc: return 545
-        case .brIfNotF64LtAcc: return 546
-        case .brIfNotF64LeAcc: return 547
-        case .brIfNotF64GtAcc: return 548
-        case .brIfNotF64GeAcc: return 549
-        case .f64SqrtToAcc: return 550
-        case .f64LoadToFAcc: return 551
-        case .f64LoadFromAccToFAcc: return 552
-        case .f64StoreFromFAcc: return 553
-        case .i32AddImm: return 554
-        case .i32MulImm: return 555
-        case .i32AndImm: return 556
-        case .i32OrImm: return 557
-        case .i32XorImm: return 558
-        case .i32ShlImm: return 559
-        case .i32ShrSImm: return 560
-        case .i32ShrUImm: return 561
-        case .i32RotlImm: return 562
-        case .i32RotrImm: return 563
-        case .i64AddImm: return 564
-        case .i64MulImm: return 565
-        case .i64AndImm: return 566
-        case .i64OrImm: return 567
-        case .i64XorImm: return 568
-        case .i64ShlImm: return 569
-        case .i64ShrSImm: return 570
-        case .i64ShrUImm: return 571
-        case .i64RotlImm: return 572
-        case .i64RotrImm: return 573
-        case .i32EqImm: return 574
-        case .i32NeImm: return 575
-        case .i32LtSImm: return 576
-        case .i32LtUImm: return 577
-        case .i32GtSImm: return 578
-        case .i32GtUImm: return 579
-        case .i32LeSImm: return 580
-        case .i32LeUImm: return 581
-        case .i32GeSImm: return 582
-        case .i32GeUImm: return 583
-        case .i64EqImm: return 584
-        case .i64NeImm: return 585
-        case .i64LtSImm: return 586
-        case .i64LtUImm: return 587
-        case .i64GtSImm: return 588
-        case .i64GtUImm: return 589
-        case .i64LeSImm: return 590
-        case .i64LeUImm: return 591
-        case .i64GeSImm: return 592
-        case .i64GeUImm: return 593
-        case .brIfI32EqImm: return 594
-        case .brIfI32NeImm: return 595
-        case .brIfI32LtSImm: return 596
-        case .brIfI32LtUImm: return 597
-        case .brIfI32GtSImm: return 598
-        case .brIfI32GtUImm: return 599
-        case .brIfI32LeSImm: return 600
-        case .brIfI32LeUImm: return 601
-        case .brIfI32GeSImm: return 602
-        case .brIfI32GeUImm: return 603
-        case .brIfI64EqImm: return 604
-        case .brIfI64NeImm: return 605
-        case .brIfI64LtSImm: return 606
-        case .brIfI64LtUImm: return 607
-        case .brIfI64GtSImm: return 608
-        case .brIfI64GtUImm: return 609
-        case .brIfI64LeSImm: return 610
-        case .brIfI64LeUImm: return 611
-        case .brIfI64GeSImm: return 612
-        case .brIfI64GeUImm: return 613
-        case .brIfI32AndImm: return 614
-        case .brIfNotI32AndImm: return 615
-        case .brIfI64AndImm: return 616
-        case .brIfNotI64AndImm: return 617
-        case .i32AddImmToAcc: return 618
-        case .i32MulImmToAcc: return 619
-        case .i32AndImmToAcc: return 620
-        case .i32OrImmToAcc: return 621
-        case .i32XorImmToAcc: return 622
-        case .i32ShlImmToAcc: return 623
-        case .i32ShrSImmToAcc: return 624
-        case .i32ShrUImmToAcc: return 625
-        case .i32RotlImmToAcc: return 626
-        case .i32RotrImmToAcc: return 627
-        case .i64AddImmToAcc: return 628
-        case .i64MulImmToAcc: return 629
-        case .i64AndImmToAcc: return 630
-        case .i64OrImmToAcc: return 631
-        case .i64XorImmToAcc: return 632
-        case .i64ShlImmToAcc: return 633
-        case .i64ShrSImmToAcc: return 634
-        case .i64ShrUImmToAcc: return 635
-        case .i64RotlImmToAcc: return 636
-        case .i64RotrImmToAcc: return 637
-        case .i32AddToAccAndSlot: return 638
-        case .i32SubToAccAndSlot: return 639
-        case .i32MulToAccAndSlot: return 640
-        case .i32AndToAccAndSlot: return 641
-        case .i32OrToAccAndSlot: return 642
-        case .i32XorToAccAndSlot: return 643
-        case .i32ShlToAccAndSlot: return 644
-        case .i32ShrSToAccAndSlot: return 645
-        case .i32ShrUToAccAndSlot: return 646
-        case .i32RotlToAccAndSlot: return 647
-        case .i32RotrToAccAndSlot: return 648
-        case .i64AddToAccAndSlot: return 649
-        case .i64SubToAccAndSlot: return 650
-        case .i64MulToAccAndSlot: return 651
-        case .i64AndToAccAndSlot: return 652
-        case .i64OrToAccAndSlot: return 653
-        case .i64XorToAccAndSlot: return 654
-        case .i64ShlToAccAndSlot: return 655
-        case .i64ShrSToAccAndSlot: return 656
-        case .i64ShrUToAccAndSlot: return 657
-        case .i64RotlToAccAndSlot: return 658
-        case .i64RotrToAccAndSlot: return 659
-        case .i32AddImmToAccAndSlot: return 660
-        case .i32MulImmToAccAndSlot: return 661
-        case .i32AndImmToAccAndSlot: return 662
-        case .i32OrImmToAccAndSlot: return 663
-        case .i32XorImmToAccAndSlot: return 664
-        case .i32ShlImmToAccAndSlot: return 665
-        case .i32ShrSImmToAccAndSlot: return 666
-        case .i32ShrUImmToAccAndSlot: return 667
-        case .i32RotlImmToAccAndSlot: return 668
-        case .i32RotrImmToAccAndSlot: return 669
-        case .i64AddImmToAccAndSlot: return 670
-        case .i64MulImmToAccAndSlot: return 671
-        case .i64AndImmToAccAndSlot: return 672
-        case .i64OrImmToAccAndSlot: return 673
-        case .i64XorImmToAccAndSlot: return 674
-        case .i64ShlImmToAccAndSlot: return 675
-        case .i64ShrSImmToAccAndSlot: return 676
-        case .i64ShrUImmToAccAndSlot: return 677
-        case .i64RotlImmToAccAndSlot: return 678
-        case .i64RotrImmToAccAndSlot: return 679
-        case .i32LoadToAccAndSlot: return 680
-        case .i64LoadToAccAndSlot: return 681
-        case .f32LoadToAccAndSlot: return 682
-        case .f64LoadToAccAndSlot: return 683
-        case .i32Load8SToAccAndSlot: return 684
-        case .i32Load8UToAccAndSlot: return 685
-        case .i32Load16SToAccAndSlot: return 686
-        case .i32Load16UToAccAndSlot: return 687
-        case .i64Load8SToAccAndSlot: return 688
-        case .i64Load8UToAccAndSlot: return 689
-        case .i64Load16SToAccAndSlot: return 690
-        case .i64Load16UToAccAndSlot: return 691
-        case .i64Load32SToAccAndSlot: return 692
-        case .i64Load32UToAccAndSlot: return 693
-        case .copyStackAccToSlot: return 694
-        case .selectAcc: return 695
-        case .copyStack2: return 696
-        case .selectI32Eq: return 697
-        case .selectI32LtS: return 698
-        case .selectI32LtU: return 699
-        case .selectI32EqImm: return 700
-        case .selectI32LtSImm: return 701
-        case .selectI32LtUImm: return 702
-        case .selectI32GtSImm: return 703
-        case .selectI32GtUImm: return 704
-        case .selectI64Eq: return 705
-        case .selectI64LtS: return 706
-        case .selectI64LtU: return 707
-        case .selectI64EqImm: return 708
-        case .selectI64LtSImm: return 709
-        case .selectI64LtUImm: return 710
-        case .selectI64GtSImm: return 711
-        case .selectI64GtUImm: return 712
-        case .i32LoadWithCopy: return 713
-        case .i64LoadWithCopy: return 714
-        case .f32LoadWithCopy: return 715
-        case .f64LoadWithCopy: return 716
-        case .i32Load8SWithCopy: return 717
-        case .i32Load8UWithCopy: return 718
-        case .i32Load16SWithCopy: return 719
-        case .i32Load16UWithCopy: return 720
-        case .i64Load8SWithCopy: return 721
-        case .i64Load8UWithCopy: return 722
-        case .i64Load16SWithCopy: return 723
-        case .i64Load16UWithCopy: return 724
-        case .i64Load32SWithCopy: return 725
-        case .i64Load32UWithCopy: return 726
-        case .consumeFuel: return 727
-        case .outOfFuelTrap: return 728
-        case .callRef: return 729
-        case .returnCallRef: return 730
-        case .refAsNonNull: return 731
-        case .brIfNull: return 732
-        default: return 733  // .brIfNotNull
+        case .returnCall: return 9
+        case .returnCallIndirect: return 10
+        case .unreachable: return 11
+        case .nop: return 12
+        case .br: return 13
+        case .brIf: return 14
+        case .brIfNot: return 15
+        case .brTable: return 16
+        case ._return: return 17
+        case .endOfExecution: return 18
+        case .i32Load: return 19
+        case .i64Load: return 20
+        case .f32Load: return 21
+        case .f64Load: return 22
+        case .i32Load8S: return 23
+        case .i32Load8U: return 24
+        case .i32Load16S: return 25
+        case .i32Load16U: return 26
+        case .i64Load8S: return 27
+        case .i64Load8U: return 28
+        case .i64Load16S: return 29
+        case .i64Load16U: return 30
+        case .i64Load32S: return 31
+        case .i64Load32U: return 32
+        case .i32Store: return 33
+        case .i64Store: return 34
+        case .f32Store: return 35
+        case .f64Store: return 36
+        case .i32Store8: return 37
+        case .i32Store16: return 38
+        case .i64Store8: return 39
+        case .i64Store16: return 40
+        case .i64Store32: return 41
+        case .memorySize: return 42
+        case .memoryGrow: return 43
+        case .memoryInit: return 44
+        case .memoryDataDrop: return 45
+        case .memoryCopy: return 46
+        case .memoryFill: return 47
+        case .v128Const: return 48
+        case .i8x16Shuffle: return 49
+        case .simd: return 50
+        case .const32: return 51
+        case .const64: return 52
+        case .i32Add: return 53
+        case .i64Add: return 54
+        case .i32Sub: return 55
+        case .i64Sub: return 56
+        case .i32Mul: return 57
+        case .i64Mul: return 58
+        case .i32And: return 59
+        case .i64And: return 60
+        case .i32Or: return 61
+        case .i64Or: return 62
+        case .i32Xor: return 63
+        case .i64Xor: return 64
+        case .i32Shl: return 65
+        case .i64Shl: return 66
+        case .i32ShrS: return 67
+        case .i64ShrS: return 68
+        case .i32ShrU: return 69
+        case .i64ShrU: return 70
+        case .i32Rotl: return 71
+        case .i64Rotl: return 72
+        case .i32Rotr: return 73
+        case .i64Rotr: return 74
+        case .i32DivS: return 75
+        case .i64DivS: return 76
+        case .i32DivU: return 77
+        case .i64DivU: return 78
+        case .i32RemS: return 79
+        case .i64RemS: return 80
+        case .i32RemU: return 81
+        case .i64RemU: return 82
+        case .i32Eq: return 83
+        case .i64Eq: return 84
+        case .i32Ne: return 85
+        case .i64Ne: return 86
+        case .i32LtS: return 87
+        case .i64LtS: return 88
+        case .i32LtU: return 89
+        case .i64LtU: return 90
+        case .i32GtS: return 91
+        case .i64GtS: return 92
+        case .i32GtU: return 93
+        case .i64GtU: return 94
+        case .i32LeS: return 95
+        case .i64LeS: return 96
+        case .i32LeU: return 97
+        case .i64LeU: return 98
+        case .i32GeS: return 99
+        case .i64GeS: return 100
+        case .i32GeU: return 101
+        case .i64GeU: return 102
+        case .i32Clz: return 103
+        case .i64Clz: return 104
+        case .i32Ctz: return 105
+        case .i64Ctz: return 106
+        case .i32Popcnt: return 107
+        case .i64Popcnt: return 108
+        case .i32Eqz: return 109
+        case .i64Eqz: return 110
+        case .i32WrapI64: return 111
+        case .i64ExtendI32S: return 112
+        case .i64ExtendI32U: return 113
+        case .i32Extend8S: return 114
+        case .i64Extend8S: return 115
+        case .i32Extend16S: return 116
+        case .i64Extend16S: return 117
+        case .i64Extend32S: return 118
+        case .i32TruncF32S: return 119
+        case .i32TruncF32U: return 120
+        case .i32TruncSatF32S: return 121
+        case .i32TruncSatF32U: return 122
+        case .i32TruncF64S: return 123
+        case .i32TruncF64U: return 124
+        case .i32TruncSatF64S: return 125
+        case .i32TruncSatF64U: return 126
+        case .i64TruncF32S: return 127
+        case .i64TruncF32U: return 128
+        case .i64TruncSatF32S: return 129
+        case .i64TruncSatF32U: return 130
+        case .i64TruncF64S: return 131
+        case .i64TruncF64U: return 132
+        case .i64TruncSatF64S: return 133
+        case .i64TruncSatF64U: return 134
+        case .f32ConvertI32S: return 135
+        case .f32ConvertI32U: return 136
+        case .f32ConvertI64S: return 137
+        case .f32ConvertI64U: return 138
+        case .f64ConvertI32S: return 139
+        case .f64ConvertI32U: return 140
+        case .f64ConvertI64S: return 141
+        case .f64ConvertI64U: return 142
+        case .f32ReinterpretI32: return 143
+        case .f64ReinterpretI64: return 144
+        case .i32ReinterpretF32: return 145
+        case .i64ReinterpretF64: return 146
+        case .f32Add: return 147
+        case .f64Add: return 148
+        case .f32Sub: return 149
+        case .f64Sub: return 150
+        case .f32Mul: return 151
+        case .f64Mul: return 152
+        case .f32Div: return 153
+        case .f64Div: return 154
+        case .f32Min: return 155
+        case .f64Min: return 156
+        case .f32Max: return 157
+        case .f64Max: return 158
+        case .f32CopySign: return 159
+        case .f64CopySign: return 160
+        case .f32Eq: return 161
+        case .f64Eq: return 162
+        case .f32Ne: return 163
+        case .f64Ne: return 164
+        case .f32Lt: return 165
+        case .f64Lt: return 166
+        case .f32Gt: return 167
+        case .f64Gt: return 168
+        case .f32Le: return 169
+        case .f64Le: return 170
+        case .f32Ge: return 171
+        case .f64Ge: return 172
+        case .f32Abs: return 173
+        case .f64Abs: return 174
+        case .f32Neg: return 175
+        case .f64Neg: return 176
+        case .f32Ceil: return 177
+        case .f64Ceil: return 178
+        case .f32Floor: return 179
+        case .f64Floor: return 180
+        case .f32Trunc: return 181
+        case .f64Trunc: return 182
+        case .f32Nearest: return 183
+        case .f64Nearest: return 184
+        case .f32Sqrt: return 185
+        case .f64Sqrt: return 186
+        case .f64PromoteF32: return 187
+        case .f32DemoteF64: return 188
+        case .select: return 189
+        case .refNull: return 190
+        case .refIsNull: return 191
+        case .refFunc: return 192
+        case .tableGet: return 193
+        case .tableSet: return 194
+        case .tableSize: return 195
+        case .tableGrow: return 196
+        case .tableFill: return 197
+        case .tableCopy: return 198
+        case .tableInit: return 199
+        case .tableElementDrop: return 200
+        case .onEnter: return 201
+        case .onExit: return 202
+        case .breakpoint: return 203
+        case .i32AtomicLoad: return 204
+        case .i64AtomicLoad: return 205
+        case .i32AtomicLoad8U: return 206
+        case .i32AtomicLoad16U: return 207
+        case .i64AtomicLoad8U: return 208
+        case .i64AtomicLoad16U: return 209
+        case .i64AtomicLoad32U: return 210
+        case .i32AtomicStore: return 211
+        case .i64AtomicStore: return 212
+        case .i32AtomicStore8: return 213
+        case .i32AtomicStore16: return 214
+        case .i64AtomicStore8: return 215
+        case .i64AtomicStore16: return 216
+        case .i64AtomicStore32: return 217
+        case .i32AtomicRmwAdd: return 218
+        case .i64AtomicRmwAdd: return 219
+        case .i32AtomicRmwSub: return 220
+        case .i64AtomicRmwSub: return 221
+        case .i32AtomicRmwAnd: return 222
+        case .i64AtomicRmwAnd: return 223
+        case .i32AtomicRmwOr: return 224
+        case .i64AtomicRmwOr: return 225
+        case .i32AtomicRmwXor: return 226
+        case .i64AtomicRmwXor: return 227
+        case .i32AtomicRmwXchg: return 228
+        case .i64AtomicRmwXchg: return 229
+        case .i32AtomicRmw8AddU: return 230
+        case .i64AtomicRmw8AddU: return 231
+        case .i32AtomicRmw8SubU: return 232
+        case .i64AtomicRmw8SubU: return 233
+        case .i32AtomicRmw8AndU: return 234
+        case .i64AtomicRmw8AndU: return 235
+        case .i32AtomicRmw8OrU: return 236
+        case .i64AtomicRmw8OrU: return 237
+        case .i32AtomicRmw8XorU: return 238
+        case .i64AtomicRmw8XorU: return 239
+        case .i32AtomicRmw8XchgU: return 240
+        case .i64AtomicRmw8XchgU: return 241
+        case .i32AtomicRmw16AddU: return 242
+        case .i64AtomicRmw16AddU: return 243
+        case .i32AtomicRmw16SubU: return 244
+        case .i64AtomicRmw16SubU: return 245
+        case .i32AtomicRmw16AndU: return 246
+        case .i64AtomicRmw16AndU: return 247
+        case .i32AtomicRmw16OrU: return 248
+        case .i64AtomicRmw16OrU: return 249
+        case .i32AtomicRmw16XorU: return 250
+        case .i64AtomicRmw16XorU: return 251
+        case .i32AtomicRmw16XchgU: return 252
+        case .i64AtomicRmw16XchgU: return 253
+        case .i64AtomicRmw32AddU: return 254
+        case .i64AtomicRmw32SubU: return 255
+        case .i64AtomicRmw32AndU: return 256
+        case .i64AtomicRmw32OrU: return 257
+        case .i64AtomicRmw32XorU: return 258
+        case .i64AtomicRmw32XchgU: return 259
+        case .i32AtomicRmwCmpxchg: return 260
+        case .i64AtomicRmwCmpxchg: return 261
+        case .i32AtomicRmw8CmpxchgU: return 262
+        case .i32AtomicRmw16CmpxchgU: return 263
+        case .i64AtomicRmw8CmpxchgU: return 264
+        case .i64AtomicRmw16CmpxchgU: return 265
+        case .i64AtomicRmw32CmpxchgU: return 266
+        case .memoryAtomicWait32: return 267
+        case .memoryAtomicWait64: return 268
+        case .memoryAtomicNotify: return 269
+        case .atomicFence: return 270
+        case .throwTag: return 271
+        case .throwRef: return 272
+        case .catchHandlers: return 273
+        case .catchHandlersEnd: return 274
+        case .brIfI32Eq: return 275
+        case .brIfI32Ne: return 276
+        case .brIfI32LtS: return 277
+        case .brIfI32LtU: return 278
+        case .brIfI32GtS: return 279
+        case .brIfI32GtU: return 280
+        case .brIfI32LeS: return 281
+        case .brIfI32LeU: return 282
+        case .brIfI32GeS: return 283
+        case .brIfI32GeU: return 284
+        case .brIfI64Eq: return 285
+        case .brIfI64Ne: return 286
+        case .brIfI64LtS: return 287
+        case .brIfI64LtU: return 288
+        case .brIfI64GtS: return 289
+        case .brIfI64GtU: return 290
+        case .brIfI64LeS: return 291
+        case .brIfI64LeU: return 292
+        case .brIfI64GeS: return 293
+        case .brIfI64GeU: return 294
+        case .returnCrossInstance: return 295
+        case .memoryOutOfBoundsTrap: return 296
+        case .unalignedAtomicTrap: return 297
+        case .brIfF32Eq: return 298
+        case .brIfF32Ne: return 299
+        case .brIfF32Lt: return 300
+        case .brIfF32Le: return 301
+        case .brIfNotF32Lt: return 302
+        case .brIfNotF32Le: return 303
+        case .brIfF64Eq: return 304
+        case .brIfF64Ne: return 305
+        case .brIfF64Lt: return 306
+        case .brIfF64Le: return 307
+        case .brIfNotF64Lt: return 308
+        case .brIfNotF64Le: return 309
+        case .f32AddAdd: return 310
+        case .f32AddSub: return 311
+        case .f32AddMul: return 312
+        case .f32SubAdd: return 313
+        case .f32SubSub: return 314
+        case .f32SubMul: return 315
+        case .f32MulAdd: return 316
+        case .f32MulSub: return 317
+        case .f32MulMul: return 318
+        case .f64AddAdd: return 319
+        case .f64AddSub: return 320
+        case .f64AddMul: return 321
+        case .f64SubAdd: return 322
+        case .f64SubSub: return 323
+        case .f64SubMul: return 324
+        case .f64MulAdd: return 325
+        case .f64MulSub: return 326
+        case .f64MulMul: return 327
+        case .brIfI32And: return 328
+        case .brIfNotI32And: return 329
+        case .brIfI64And: return 330
+        case .brIfNotI64And: return 331
+        case .i32ShlAdd: return 332
+        case .i32MulAdd: return 333
+        case .i32AddAdd: return 334
+        case .i32AndAdd: return 335
+        case .i32ShrUAnd: return 336
+        case .i32OrAnd: return 337
+        case .i32ShrUAdd: return 338
+        case .i32SubAnd: return 339
+        case .i32ShlOr: return 340
+        case .i32AddAnd: return 341
+        case .i32ShrUOr: return 342
+        case .i32XorShrU: return 343
+        case .i32AddSub: return 344
+        case .i32XorShl: return 345
+        case .i32SubAdd: return 346
+        case .i32AndShl: return 347
+        case .i64XorRotl: return 348
+        case .i64MulAdd: return 349
+        case .i64ShlAnd: return 350
+        case .i64AndMul: return 351
+        case .i64ShlOr: return 352
+        case .i64XorAnd: return 353
+        case .i64MulXor: return 354
+        case .i64AndXor: return 355
+        case .i64RotlXor: return 356
+        case .i64SubAnd: return 357
+        case .i64XorXor: return 358
+        case .i64OrOr: return 359
+        case .i64ShrUAnd: return 360
+        case .i64AndAnd: return 361
+        case .i64XorMul: return 362
+        case .i64XorShrU: return 363
+        case .i32MulSubRev: return 364
+        case .i32AddToAcc: return 365
+        case .i32SubToAcc: return 366
+        case .i32MulToAcc: return 367
+        case .i32AndToAcc: return 368
+        case .i32OrToAcc: return 369
+        case .i32XorToAcc: return 370
+        case .i32ShlToAcc: return 371
+        case .i32ShrSToAcc: return 372
+        case .i32ShrUToAcc: return 373
+        case .i32RotlToAcc: return 374
+        case .i32RotrToAcc: return 375
+        case .i64AddToAcc: return 376
+        case .i64SubToAcc: return 377
+        case .i64MulToAcc: return 378
+        case .i64AndToAcc: return 379
+        case .i64OrToAcc: return 380
+        case .i64XorToAcc: return 381
+        case .i64ShlToAcc: return 382
+        case .i64ShrSToAcc: return 383
+        case .i64ShrUToAcc: return 384
+        case .i64RotlToAcc: return 385
+        case .i64RotrToAcc: return 386
+        case .i32AddFromAcc: return 387
+        case .i32SubFromAcc: return 388
+        case .i32MulFromAcc: return 389
+        case .i32AndFromAcc: return 390
+        case .i32OrFromAcc: return 391
+        case .i32XorFromAcc: return 392
+        case .i32ShlFromAcc: return 393
+        case .i32ShrSFromAcc: return 394
+        case .i32ShrUFromAcc: return 395
+        case .i32RotlFromAcc: return 396
+        case .i32RotrFromAcc: return 397
+        case .i64AddFromAcc: return 398
+        case .i64SubFromAcc: return 399
+        case .i64MulFromAcc: return 400
+        case .i64AndFromAcc: return 401
+        case .i64OrFromAcc: return 402
+        case .i64XorFromAcc: return 403
+        case .i64ShlFromAcc: return 404
+        case .i64ShrSFromAcc: return 405
+        case .i64ShrUFromAcc: return 406
+        case .i64RotlFromAcc: return 407
+        case .i64RotrFromAcc: return 408
+        case .i32AddInAcc: return 409
+        case .i32SubInAcc: return 410
+        case .i32MulInAcc: return 411
+        case .i32AndInAcc: return 412
+        case .i32OrInAcc: return 413
+        case .i32XorInAcc: return 414
+        case .i32ShlInAcc: return 415
+        case .i32ShrSInAcc: return 416
+        case .i32ShrUInAcc: return 417
+        case .i32RotlInAcc: return 418
+        case .i32RotrInAcc: return 419
+        case .i64AddInAcc: return 420
+        case .i64SubInAcc: return 421
+        case .i64MulInAcc: return 422
+        case .i64AndInAcc: return 423
+        case .i64OrInAcc: return 424
+        case .i64XorInAcc: return 425
+        case .i64ShlInAcc: return 426
+        case .i64ShrSInAcc: return 427
+        case .i64ShrUInAcc: return 428
+        case .i64RotlInAcc: return 429
+        case .i64RotrInAcc: return 430
+        case .brIfI32EqAcc: return 431
+        case .brIfI32NeAcc: return 432
+        case .brIfI32LtSAcc: return 433
+        case .brIfI32LtUAcc: return 434
+        case .brIfI32GtSAcc: return 435
+        case .brIfI32GtUAcc: return 436
+        case .brIfI32LeSAcc: return 437
+        case .brIfI32LeUAcc: return 438
+        case .brIfI32GeSAcc: return 439
+        case .brIfI32GeUAcc: return 440
+        case .brIfI64EqAcc: return 441
+        case .brIfI64NeAcc: return 442
+        case .brIfI64LtSAcc: return 443
+        case .brIfI64LtUAcc: return 444
+        case .brIfI64GtSAcc: return 445
+        case .brIfI64GtUAcc: return 446
+        case .brIfI64LeSAcc: return 447
+        case .brIfI64LeUAcc: return 448
+        case .brIfI64GeSAcc: return 449
+        case .brIfI64GeUAcc: return 450
+        case .brIfAcc: return 451
+        case .brIfNotAcc: return 452
+        case .globalGetToAcc: return 453
+        case .i32LoadToAcc: return 454
+        case .i64LoadToAcc: return 455
+        case .f32LoadToAcc: return 456
+        case .f64LoadToAcc: return 457
+        case .i32Load8SToAcc: return 458
+        case .i32Load8UToAcc: return 459
+        case .i32Load16SToAcc: return 460
+        case .i32Load16UToAcc: return 461
+        case .i64Load8SToAcc: return 462
+        case .i64Load8UToAcc: return 463
+        case .i64Load16SToAcc: return 464
+        case .i64Load16UToAcc: return 465
+        case .i64Load32SToAcc: return 466
+        case .i64Load32UToAcc: return 467
+        case .i32LoadFromAcc: return 468
+        case .i64LoadFromAcc: return 469
+        case .f32LoadFromAcc: return 470
+        case .f64LoadFromAcc: return 471
+        case .i32Load8SFromAcc: return 472
+        case .i32Load8UFromAcc: return 473
+        case .i32Load16SFromAcc: return 474
+        case .i32Load16UFromAcc: return 475
+        case .i64Load8SFromAcc: return 476
+        case .i64Load8UFromAcc: return 477
+        case .i64Load16SFromAcc: return 478
+        case .i64Load16UFromAcc: return 479
+        case .i64Load32SFromAcc: return 480
+        case .i64Load32UFromAcc: return 481
+        case .i32LoadInAcc: return 482
+        case .i64LoadInAcc: return 483
+        case .f32LoadInAcc: return 484
+        case .f64LoadInAcc: return 485
+        case .i32Load8SInAcc: return 486
+        case .i32Load8UInAcc: return 487
+        case .i32Load16SInAcc: return 488
+        case .i32Load16UInAcc: return 489
+        case .i64Load8SInAcc: return 490
+        case .i64Load8UInAcc: return 491
+        case .i64Load16SInAcc: return 492
+        case .i64Load16UInAcc: return 493
+        case .i64Load32SInAcc: return 494
+        case .i64Load32UInAcc: return 495
+        case .i32StoreFromAcc: return 496
+        case .i64StoreFromAcc: return 497
+        case .f32StoreFromAcc: return 498
+        case .f64StoreFromAcc: return 499
+        case .i32Store8FromAcc: return 500
+        case .i32Store16FromAcc: return 501
+        case .i64Store8FromAcc: return 502
+        case .i64Store16FromAcc: return 503
+        case .i64Store32FromAcc: return 504
+        case .i32StoreAddrFromAcc: return 505
+        case .i64StoreAddrFromAcc: return 506
+        case .f32StoreAddrFromAcc: return 507
+        case .f64StoreAddrFromAcc: return 508
+        case .i32Store8AddrFromAcc: return 509
+        case .i32Store16AddrFromAcc: return 510
+        case .i64Store8AddrFromAcc: return 511
+        case .i64Store16AddrFromAcc: return 512
+        case .i64Store32AddrFromAcc: return 513
+        case .f64AddToAcc: return 514
+        case .f64AddFromAcc: return 515
+        case .f64AddInAcc: return 516
+        case .f64SubToAcc: return 517
+        case .f64SubFromAcc: return 518
+        case .f64SubInAcc: return 519
+        case .f64SubFromAccRev: return 520
+        case .f64SubInAccRev: return 521
+        case .f64MulToAcc: return 522
+        case .f64MulFromAcc: return 523
+        case .f64MulInAcc: return 524
+        case .f64DivToAcc: return 525
+        case .f64DivFromAcc: return 526
+        case .f64DivInAcc: return 527
+        case .f64DivFromAccRev: return 528
+        case .f64DivInAccRev: return 529
+        case .f64AddAddToAcc: return 530
+        case .f64AddSubToAcc: return 531
+        case .f64AddMulToAcc: return 532
+        case .f64SubAddToAcc: return 533
+        case .f64SubSubToAcc: return 534
+        case .f64SubMulToAcc: return 535
+        case .f64MulAddToAcc: return 536
+        case .f64MulSubToAcc: return 537
+        case .f64MulMulToAcc: return 538
+        case .brIfF64EqAcc: return 539
+        case .brIfF64NeAcc: return 540
+        case .brIfF64LtAcc: return 541
+        case .brIfF64LeAcc: return 542
+        case .brIfF64GtAcc: return 543
+        case .brIfF64GeAcc: return 544
+        case .brIfNotF64LtAcc: return 545
+        case .brIfNotF64LeAcc: return 546
+        case .brIfNotF64GtAcc: return 547
+        case .brIfNotF64GeAcc: return 548
+        case .f64SqrtToAcc: return 549
+        case .f64LoadToFAcc: return 550
+        case .f64LoadFromAccToFAcc: return 551
+        case .f64StoreFromFAcc: return 552
+        case .i32AddImm: return 553
+        case .i32MulImm: return 554
+        case .i32AndImm: return 555
+        case .i32OrImm: return 556
+        case .i32XorImm: return 557
+        case .i32ShlImm: return 558
+        case .i32ShrSImm: return 559
+        case .i32ShrUImm: return 560
+        case .i32RotlImm: return 561
+        case .i32RotrImm: return 562
+        case .i64AddImm: return 563
+        case .i64MulImm: return 564
+        case .i64AndImm: return 565
+        case .i64OrImm: return 566
+        case .i64XorImm: return 567
+        case .i64ShlImm: return 568
+        case .i64ShrSImm: return 569
+        case .i64ShrUImm: return 570
+        case .i64RotlImm: return 571
+        case .i64RotrImm: return 572
+        case .i32EqImm: return 573
+        case .i32NeImm: return 574
+        case .i32LtSImm: return 575
+        case .i32LtUImm: return 576
+        case .i32GtSImm: return 577
+        case .i32GtUImm: return 578
+        case .i32LeSImm: return 579
+        case .i32LeUImm: return 580
+        case .i32GeSImm: return 581
+        case .i32GeUImm: return 582
+        case .i64EqImm: return 583
+        case .i64NeImm: return 584
+        case .i64LtSImm: return 585
+        case .i64LtUImm: return 586
+        case .i64GtSImm: return 587
+        case .i64GtUImm: return 588
+        case .i64LeSImm: return 589
+        case .i64LeUImm: return 590
+        case .i64GeSImm: return 591
+        case .i64GeUImm: return 592
+        case .brIfI32EqImm: return 593
+        case .brIfI32NeImm: return 594
+        case .brIfI32LtSImm: return 595
+        case .brIfI32LtUImm: return 596
+        case .brIfI32GtSImm: return 597
+        case .brIfI32GtUImm: return 598
+        case .brIfI32LeSImm: return 599
+        case .brIfI32LeUImm: return 600
+        case .brIfI32GeSImm: return 601
+        case .brIfI32GeUImm: return 602
+        case .brIfI64EqImm: return 603
+        case .brIfI64NeImm: return 604
+        case .brIfI64LtSImm: return 605
+        case .brIfI64LtUImm: return 606
+        case .brIfI64GtSImm: return 607
+        case .brIfI64GtUImm: return 608
+        case .brIfI64LeSImm: return 609
+        case .brIfI64LeUImm: return 610
+        case .brIfI64GeSImm: return 611
+        case .brIfI64GeUImm: return 612
+        case .brIfI32AndImm: return 613
+        case .brIfNotI32AndImm: return 614
+        case .brIfI64AndImm: return 615
+        case .brIfNotI64AndImm: return 616
+        case .i32AddImmToAcc: return 617
+        case .i32MulImmToAcc: return 618
+        case .i32AndImmToAcc: return 619
+        case .i32OrImmToAcc: return 620
+        case .i32XorImmToAcc: return 621
+        case .i32ShlImmToAcc: return 622
+        case .i32ShrSImmToAcc: return 623
+        case .i32ShrUImmToAcc: return 624
+        case .i32RotlImmToAcc: return 625
+        case .i32RotrImmToAcc: return 626
+        case .i64AddImmToAcc: return 627
+        case .i64MulImmToAcc: return 628
+        case .i64AndImmToAcc: return 629
+        case .i64OrImmToAcc: return 630
+        case .i64XorImmToAcc: return 631
+        case .i64ShlImmToAcc: return 632
+        case .i64ShrSImmToAcc: return 633
+        case .i64ShrUImmToAcc: return 634
+        case .i64RotlImmToAcc: return 635
+        case .i64RotrImmToAcc: return 636
+        case .i32AddToAccAndSlot: return 637
+        case .i32SubToAccAndSlot: return 638
+        case .i32MulToAccAndSlot: return 639
+        case .i32AndToAccAndSlot: return 640
+        case .i32OrToAccAndSlot: return 641
+        case .i32XorToAccAndSlot: return 642
+        case .i32ShlToAccAndSlot: return 643
+        case .i32ShrSToAccAndSlot: return 644
+        case .i32ShrUToAccAndSlot: return 645
+        case .i32RotlToAccAndSlot: return 646
+        case .i32RotrToAccAndSlot: return 647
+        case .i64AddToAccAndSlot: return 648
+        case .i64SubToAccAndSlot: return 649
+        case .i64MulToAccAndSlot: return 650
+        case .i64AndToAccAndSlot: return 651
+        case .i64OrToAccAndSlot: return 652
+        case .i64XorToAccAndSlot: return 653
+        case .i64ShlToAccAndSlot: return 654
+        case .i64ShrSToAccAndSlot: return 655
+        case .i64ShrUToAccAndSlot: return 656
+        case .i64RotlToAccAndSlot: return 657
+        case .i64RotrToAccAndSlot: return 658
+        case .i32AddImmToAccAndSlot: return 659
+        case .i32MulImmToAccAndSlot: return 660
+        case .i32AndImmToAccAndSlot: return 661
+        case .i32OrImmToAccAndSlot: return 662
+        case .i32XorImmToAccAndSlot: return 663
+        case .i32ShlImmToAccAndSlot: return 664
+        case .i32ShrSImmToAccAndSlot: return 665
+        case .i32ShrUImmToAccAndSlot: return 666
+        case .i32RotlImmToAccAndSlot: return 667
+        case .i32RotrImmToAccAndSlot: return 668
+        case .i64AddImmToAccAndSlot: return 669
+        case .i64MulImmToAccAndSlot: return 670
+        case .i64AndImmToAccAndSlot: return 671
+        case .i64OrImmToAccAndSlot: return 672
+        case .i64XorImmToAccAndSlot: return 673
+        case .i64ShlImmToAccAndSlot: return 674
+        case .i64ShrSImmToAccAndSlot: return 675
+        case .i64ShrUImmToAccAndSlot: return 676
+        case .i64RotlImmToAccAndSlot: return 677
+        case .i64RotrImmToAccAndSlot: return 678
+        case .i32LoadToAccAndSlot: return 679
+        case .i64LoadToAccAndSlot: return 680
+        case .f32LoadToAccAndSlot: return 681
+        case .f64LoadToAccAndSlot: return 682
+        case .i32Load8SToAccAndSlot: return 683
+        case .i32Load8UToAccAndSlot: return 684
+        case .i32Load16SToAccAndSlot: return 685
+        case .i32Load16UToAccAndSlot: return 686
+        case .i64Load8SToAccAndSlot: return 687
+        case .i64Load8UToAccAndSlot: return 688
+        case .i64Load16SToAccAndSlot: return 689
+        case .i64Load16UToAccAndSlot: return 690
+        case .i64Load32SToAccAndSlot: return 691
+        case .i64Load32UToAccAndSlot: return 692
+        case .copyStackAccToSlot: return 693
+        case .selectAcc: return 694
+        case .copyStack2: return 695
+        case .selectI32Eq: return 696
+        case .selectI32LtS: return 697
+        case .selectI32LtU: return 698
+        case .selectI32EqImm: return 699
+        case .selectI32LtSImm: return 700
+        case .selectI32LtUImm: return 701
+        case .selectI32GtSImm: return 702
+        case .selectI32GtUImm: return 703
+        case .selectI64Eq: return 704
+        case .selectI64LtS: return 705
+        case .selectI64LtU: return 706
+        case .selectI64EqImm: return 707
+        case .selectI64LtSImm: return 708
+        case .selectI64LtUImm: return 709
+        case .selectI64GtSImm: return 710
+        case .selectI64GtUImm: return 711
+        case .i32LoadWithCopy: return 712
+        case .i64LoadWithCopy: return 713
+        case .f32LoadWithCopy: return 714
+        case .f64LoadWithCopy: return 715
+        case .i32Load8SWithCopy: return 716
+        case .i32Load8UWithCopy: return 717
+        case .i32Load16SWithCopy: return 718
+        case .i32Load16UWithCopy: return 719
+        case .i64Load8SWithCopy: return 720
+        case .i64Load8UWithCopy: return 721
+        case .i64Load16SWithCopy: return 722
+        case .i64Load16UWithCopy: return 723
+        case .i64Load32SWithCopy: return 724
+        case .i64Load32UWithCopy: return 725
+        case .consumeFuel: return 726
+        case .outOfFuelTrap: return 727
+        case .callRef: return 728
+        case .returnCallRef: return 729
+        case .refAsNonNull: return 730
+        case .brIfNull: return 731
+        default: return 732  // .brIfNotNull
         }
     }
 }
@@ -5852,731 +5843,730 @@ extension Instruction {
         case 6: return .compilingCall(Instruction.CallOperand.load(from: &pc))
         case 7: return .internalCall(Instruction.CallOperand.load(from: &pc))
         case 8: return .callIndirect(Instruction.CallIndirectOperand.load(from: &pc))
-        case 9: return .resizeFrameHeader(Instruction.ResizeFrameHeaderOperand.load(from: &pc))
-        case 10: return .returnCall(Instruction.ReturnCallOperand.load(from: &pc))
-        case 11: return .returnCallIndirect(Instruction.ReturnCallIndirectOperand.load(from: &pc))
-        case 12: return .unreachable(NoOperand())
-        case 13: return .nop(NoOperand())
-        case 14: return .br(Instruction.BrOperand.load(from: &pc))
-        case 15: return .brIf(Instruction.BrIfOperand.load(from: &pc))
-        case 16: return .brIfNot(Instruction.BrIfOperand.load(from: &pc))
-        case 17: return .brTable(Instruction.BrTableOperand.load(from: &pc))
-        case 18: return ._return(NoOperand())
-        case 19: return .endOfExecution(NoOperand())
-        case 20: return .i32Load(Instruction.LoadOperand.load(from: &pc))
-        case 21: return .i64Load(Instruction.LoadOperand.load(from: &pc))
-        case 22: return .f32Load(Instruction.LoadOperand.load(from: &pc))
-        case 23: return .f64Load(Instruction.LoadOperand.load(from: &pc))
-        case 24: return .i32Load8S(Instruction.LoadOperand.load(from: &pc))
-        case 25: return .i32Load8U(Instruction.LoadOperand.load(from: &pc))
-        case 26: return .i32Load16S(Instruction.LoadOperand.load(from: &pc))
-        case 27: return .i32Load16U(Instruction.LoadOperand.load(from: &pc))
-        case 28: return .i64Load8S(Instruction.LoadOperand.load(from: &pc))
-        case 29: return .i64Load8U(Instruction.LoadOperand.load(from: &pc))
-        case 30: return .i64Load16S(Instruction.LoadOperand.load(from: &pc))
-        case 31: return .i64Load16U(Instruction.LoadOperand.load(from: &pc))
-        case 32: return .i64Load32S(Instruction.LoadOperand.load(from: &pc))
-        case 33: return .i64Load32U(Instruction.LoadOperand.load(from: &pc))
-        case 34: return .i32Store(Instruction.StoreOperand.load(from: &pc))
-        case 35: return .i64Store(Instruction.StoreOperand.load(from: &pc))
-        case 36: return .f32Store(Instruction.StoreOperand.load(from: &pc))
-        case 37: return .f64Store(Instruction.StoreOperand.load(from: &pc))
-        case 38: return .i32Store8(Instruction.StoreOperand.load(from: &pc))
-        case 39: return .i32Store16(Instruction.StoreOperand.load(from: &pc))
-        case 40: return .i64Store8(Instruction.StoreOperand.load(from: &pc))
-        case 41: return .i64Store16(Instruction.StoreOperand.load(from: &pc))
-        case 42: return .i64Store32(Instruction.StoreOperand.load(from: &pc))
-        case 43: return .memorySize(Instruction.MemorySizeOperand.load(from: &pc))
-        case 44: return .memoryGrow(Instruction.MemoryGrowOperand.load(from: &pc))
-        case 45: return .memoryInit(Instruction.MemoryInitOperand.load(from: &pc))
-        case 46: return .memoryDataDrop(Instruction.MemoryDataDropOperand.load(from: &pc))
-        case 47: return .memoryCopy(Instruction.MemoryCopyOperand.load(from: &pc))
-        case 48: return .memoryFill(Instruction.MemoryFillOperand.load(from: &pc))
-        case 49: return .v128Const(Instruction.V128ConstOperand.load(from: &pc))
-        case 50: return .i8x16Shuffle(Instruction.I8x16ShuffleOperand.load(from: &pc))
-        case 51: return .simd(Instruction.SimdOperand.load(from: &pc))
-        case 52: return .const32(Instruction.Const32Operand.load(from: &pc))
-        case 53: return .const64(Instruction.Const64Operand.load(from: &pc))
-        case 54: return .i32Add(Instruction.BinaryOperand.load(from: &pc))
-        case 55: return .i64Add(Instruction.BinaryOperand.load(from: &pc))
-        case 56: return .i32Sub(Instruction.BinaryOperand.load(from: &pc))
-        case 57: return .i64Sub(Instruction.BinaryOperand.load(from: &pc))
-        case 58: return .i32Mul(Instruction.BinaryOperand.load(from: &pc))
-        case 59: return .i64Mul(Instruction.BinaryOperand.load(from: &pc))
-        case 60: return .i32And(Instruction.BinaryOperand.load(from: &pc))
-        case 61: return .i64And(Instruction.BinaryOperand.load(from: &pc))
-        case 62: return .i32Or(Instruction.BinaryOperand.load(from: &pc))
-        case 63: return .i64Or(Instruction.BinaryOperand.load(from: &pc))
-        case 64: return .i32Xor(Instruction.BinaryOperand.load(from: &pc))
-        case 65: return .i64Xor(Instruction.BinaryOperand.load(from: &pc))
-        case 66: return .i32Shl(Instruction.BinaryOperand.load(from: &pc))
-        case 67: return .i64Shl(Instruction.BinaryOperand.load(from: &pc))
-        case 68: return .i32ShrS(Instruction.BinaryOperand.load(from: &pc))
-        case 69: return .i64ShrS(Instruction.BinaryOperand.load(from: &pc))
-        case 70: return .i32ShrU(Instruction.BinaryOperand.load(from: &pc))
-        case 71: return .i64ShrU(Instruction.BinaryOperand.load(from: &pc))
-        case 72: return .i32Rotl(Instruction.BinaryOperand.load(from: &pc))
-        case 73: return .i64Rotl(Instruction.BinaryOperand.load(from: &pc))
-        case 74: return .i32Rotr(Instruction.BinaryOperand.load(from: &pc))
-        case 75: return .i64Rotr(Instruction.BinaryOperand.load(from: &pc))
-        case 76: return .i32DivS(Instruction.BinaryOperand.load(from: &pc))
-        case 77: return .i64DivS(Instruction.BinaryOperand.load(from: &pc))
-        case 78: return .i32DivU(Instruction.BinaryOperand.load(from: &pc))
-        case 79: return .i64DivU(Instruction.BinaryOperand.load(from: &pc))
-        case 80: return .i32RemS(Instruction.BinaryOperand.load(from: &pc))
-        case 81: return .i64RemS(Instruction.BinaryOperand.load(from: &pc))
-        case 82: return .i32RemU(Instruction.BinaryOperand.load(from: &pc))
-        case 83: return .i64RemU(Instruction.BinaryOperand.load(from: &pc))
-        case 84: return .i32Eq(Instruction.BinaryOperand.load(from: &pc))
-        case 85: return .i64Eq(Instruction.BinaryOperand.load(from: &pc))
-        case 86: return .i32Ne(Instruction.BinaryOperand.load(from: &pc))
-        case 87: return .i64Ne(Instruction.BinaryOperand.load(from: &pc))
-        case 88: return .i32LtS(Instruction.BinaryOperand.load(from: &pc))
-        case 89: return .i64LtS(Instruction.BinaryOperand.load(from: &pc))
-        case 90: return .i32LtU(Instruction.BinaryOperand.load(from: &pc))
-        case 91: return .i64LtU(Instruction.BinaryOperand.load(from: &pc))
-        case 92: return .i32GtS(Instruction.BinaryOperand.load(from: &pc))
-        case 93: return .i64GtS(Instruction.BinaryOperand.load(from: &pc))
-        case 94: return .i32GtU(Instruction.BinaryOperand.load(from: &pc))
-        case 95: return .i64GtU(Instruction.BinaryOperand.load(from: &pc))
-        case 96: return .i32LeS(Instruction.BinaryOperand.load(from: &pc))
-        case 97: return .i64LeS(Instruction.BinaryOperand.load(from: &pc))
-        case 98: return .i32LeU(Instruction.BinaryOperand.load(from: &pc))
-        case 99: return .i64LeU(Instruction.BinaryOperand.load(from: &pc))
-        case 100: return .i32GeS(Instruction.BinaryOperand.load(from: &pc))
-        case 101: return .i64GeS(Instruction.BinaryOperand.load(from: &pc))
-        case 102: return .i32GeU(Instruction.BinaryOperand.load(from: &pc))
-        case 103: return .i64GeU(Instruction.BinaryOperand.load(from: &pc))
-        case 104: return .i32Clz(Instruction.UnaryOperand.load(from: &pc))
-        case 105: return .i64Clz(Instruction.UnaryOperand.load(from: &pc))
-        case 106: return .i32Ctz(Instruction.UnaryOperand.load(from: &pc))
-        case 107: return .i64Ctz(Instruction.UnaryOperand.load(from: &pc))
-        case 108: return .i32Popcnt(Instruction.UnaryOperand.load(from: &pc))
-        case 109: return .i64Popcnt(Instruction.UnaryOperand.load(from: &pc))
-        case 110: return .i32Eqz(Instruction.UnaryOperand.load(from: &pc))
-        case 111: return .i64Eqz(Instruction.UnaryOperand.load(from: &pc))
-        case 112: return .i32WrapI64(Instruction.UnaryOperand.load(from: &pc))
-        case 113: return .i64ExtendI32S(Instruction.UnaryOperand.load(from: &pc))
-        case 114: return .i64ExtendI32U(Instruction.UnaryOperand.load(from: &pc))
-        case 115: return .i32Extend8S(Instruction.UnaryOperand.load(from: &pc))
-        case 116: return .i64Extend8S(Instruction.UnaryOperand.load(from: &pc))
-        case 117: return .i32Extend16S(Instruction.UnaryOperand.load(from: &pc))
-        case 118: return .i64Extend16S(Instruction.UnaryOperand.load(from: &pc))
-        case 119: return .i64Extend32S(Instruction.UnaryOperand.load(from: &pc))
-        case 120: return .i32TruncF32S(Instruction.UnaryOperand.load(from: &pc))
-        case 121: return .i32TruncF32U(Instruction.UnaryOperand.load(from: &pc))
-        case 122: return .i32TruncSatF32S(Instruction.UnaryOperand.load(from: &pc))
-        case 123: return .i32TruncSatF32U(Instruction.UnaryOperand.load(from: &pc))
-        case 124: return .i32TruncF64S(Instruction.UnaryOperand.load(from: &pc))
-        case 125: return .i32TruncF64U(Instruction.UnaryOperand.load(from: &pc))
-        case 126: return .i32TruncSatF64S(Instruction.UnaryOperand.load(from: &pc))
-        case 127: return .i32TruncSatF64U(Instruction.UnaryOperand.load(from: &pc))
-        case 128: return .i64TruncF32S(Instruction.UnaryOperand.load(from: &pc))
-        case 129: return .i64TruncF32U(Instruction.UnaryOperand.load(from: &pc))
-        case 130: return .i64TruncSatF32S(Instruction.UnaryOperand.load(from: &pc))
-        case 131: return .i64TruncSatF32U(Instruction.UnaryOperand.load(from: &pc))
-        case 132: return .i64TruncF64S(Instruction.UnaryOperand.load(from: &pc))
-        case 133: return .i64TruncF64U(Instruction.UnaryOperand.load(from: &pc))
-        case 134: return .i64TruncSatF64S(Instruction.UnaryOperand.load(from: &pc))
-        case 135: return .i64TruncSatF64U(Instruction.UnaryOperand.load(from: &pc))
-        case 136: return .f32ConvertI32S(Instruction.UnaryOperand.load(from: &pc))
-        case 137: return .f32ConvertI32U(Instruction.UnaryOperand.load(from: &pc))
-        case 138: return .f32ConvertI64S(Instruction.UnaryOperand.load(from: &pc))
-        case 139: return .f32ConvertI64U(Instruction.UnaryOperand.load(from: &pc))
-        case 140: return .f64ConvertI32S(Instruction.UnaryOperand.load(from: &pc))
-        case 141: return .f64ConvertI32U(Instruction.UnaryOperand.load(from: &pc))
-        case 142: return .f64ConvertI64S(Instruction.UnaryOperand.load(from: &pc))
-        case 143: return .f64ConvertI64U(Instruction.UnaryOperand.load(from: &pc))
-        case 144: return .f32ReinterpretI32(Instruction.UnaryOperand.load(from: &pc))
-        case 145: return .f64ReinterpretI64(Instruction.UnaryOperand.load(from: &pc))
-        case 146: return .i32ReinterpretF32(Instruction.UnaryOperand.load(from: &pc))
-        case 147: return .i64ReinterpretF64(Instruction.UnaryOperand.load(from: &pc))
-        case 148: return .f32Add(Instruction.BinaryOperand.load(from: &pc))
-        case 149: return .f64Add(Instruction.BinaryOperand.load(from: &pc))
-        case 150: return .f32Sub(Instruction.BinaryOperand.load(from: &pc))
-        case 151: return .f64Sub(Instruction.BinaryOperand.load(from: &pc))
-        case 152: return .f32Mul(Instruction.BinaryOperand.load(from: &pc))
-        case 153: return .f64Mul(Instruction.BinaryOperand.load(from: &pc))
-        case 154: return .f32Div(Instruction.BinaryOperand.load(from: &pc))
-        case 155: return .f64Div(Instruction.BinaryOperand.load(from: &pc))
-        case 156: return .f32Min(Instruction.BinaryOperand.load(from: &pc))
-        case 157: return .f64Min(Instruction.BinaryOperand.load(from: &pc))
-        case 158: return .f32Max(Instruction.BinaryOperand.load(from: &pc))
-        case 159: return .f64Max(Instruction.BinaryOperand.load(from: &pc))
-        case 160: return .f32CopySign(Instruction.BinaryOperand.load(from: &pc))
-        case 161: return .f64CopySign(Instruction.BinaryOperand.load(from: &pc))
-        case 162: return .f32Eq(Instruction.BinaryOperand.load(from: &pc))
-        case 163: return .f64Eq(Instruction.BinaryOperand.load(from: &pc))
-        case 164: return .f32Ne(Instruction.BinaryOperand.load(from: &pc))
-        case 165: return .f64Ne(Instruction.BinaryOperand.load(from: &pc))
-        case 166: return .f32Lt(Instruction.BinaryOperand.load(from: &pc))
-        case 167: return .f64Lt(Instruction.BinaryOperand.load(from: &pc))
-        case 168: return .f32Gt(Instruction.BinaryOperand.load(from: &pc))
-        case 169: return .f64Gt(Instruction.BinaryOperand.load(from: &pc))
-        case 170: return .f32Le(Instruction.BinaryOperand.load(from: &pc))
-        case 171: return .f64Le(Instruction.BinaryOperand.load(from: &pc))
-        case 172: return .f32Ge(Instruction.BinaryOperand.load(from: &pc))
-        case 173: return .f64Ge(Instruction.BinaryOperand.load(from: &pc))
-        case 174: return .f32Abs(Instruction.UnaryOperand.load(from: &pc))
-        case 175: return .f64Abs(Instruction.UnaryOperand.load(from: &pc))
-        case 176: return .f32Neg(Instruction.UnaryOperand.load(from: &pc))
-        case 177: return .f64Neg(Instruction.UnaryOperand.load(from: &pc))
-        case 178: return .f32Ceil(Instruction.UnaryOperand.load(from: &pc))
-        case 179: return .f64Ceil(Instruction.UnaryOperand.load(from: &pc))
-        case 180: return .f32Floor(Instruction.UnaryOperand.load(from: &pc))
-        case 181: return .f64Floor(Instruction.UnaryOperand.load(from: &pc))
-        case 182: return .f32Trunc(Instruction.UnaryOperand.load(from: &pc))
-        case 183: return .f64Trunc(Instruction.UnaryOperand.load(from: &pc))
-        case 184: return .f32Nearest(Instruction.UnaryOperand.load(from: &pc))
-        case 185: return .f64Nearest(Instruction.UnaryOperand.load(from: &pc))
-        case 186: return .f32Sqrt(Instruction.UnaryOperand.load(from: &pc))
-        case 187: return .f64Sqrt(Instruction.UnaryOperand.load(from: &pc))
-        case 188: return .f64PromoteF32(Instruction.UnaryOperand.load(from: &pc))
-        case 189: return .f32DemoteF64(Instruction.UnaryOperand.load(from: &pc))
-        case 190: return .select(Instruction.SelectOperand.load(from: &pc))
-        case 191: return .refNull(Instruction.RefNullOperand.load(from: &pc))
-        case 192: return .refIsNull(Instruction.RefIsNullOperand.load(from: &pc))
-        case 193: return .refFunc(Instruction.RefFuncOperand.load(from: &pc))
-        case 194: return .tableGet(Instruction.TableGetOperand.load(from: &pc))
-        case 195: return .tableSet(Instruction.TableSetOperand.load(from: &pc))
-        case 196: return .tableSize(Instruction.TableSizeOperand.load(from: &pc))
-        case 197: return .tableGrow(Instruction.TableGrowOperand.load(from: &pc))
-        case 198: return .tableFill(Instruction.TableFillOperand.load(from: &pc))
-        case 199: return .tableCopy(Instruction.TableCopyOperand.load(from: &pc))
-        case 200: return .tableInit(Instruction.TableInitOperand.load(from: &pc))
-        case 201: return .tableElementDrop(Instruction.TableElementDropOperand.load(from: &pc))
-        case 202: return .onEnter(Instruction.OnEnterOperand.load(from: &pc))
-        case 203: return .onExit(Instruction.OnExitOperand.load(from: &pc))
-        case 204: return .breakpoint(NoOperand())
-        case 205: return .i32AtomicLoad(Instruction.LoadOperand.load(from: &pc))
-        case 206: return .i64AtomicLoad(Instruction.LoadOperand.load(from: &pc))
-        case 207: return .i32AtomicLoad8U(Instruction.LoadOperand.load(from: &pc))
-        case 208: return .i32AtomicLoad16U(Instruction.LoadOperand.load(from: &pc))
-        case 209: return .i64AtomicLoad8U(Instruction.LoadOperand.load(from: &pc))
-        case 210: return .i64AtomicLoad16U(Instruction.LoadOperand.load(from: &pc))
-        case 211: return .i64AtomicLoad32U(Instruction.LoadOperand.load(from: &pc))
-        case 212: return .i32AtomicStore(Instruction.StoreOperand.load(from: &pc))
-        case 213: return .i64AtomicStore(Instruction.StoreOperand.load(from: &pc))
-        case 214: return .i32AtomicStore8(Instruction.StoreOperand.load(from: &pc))
-        case 215: return .i32AtomicStore16(Instruction.StoreOperand.load(from: &pc))
-        case 216: return .i64AtomicStore8(Instruction.StoreOperand.load(from: &pc))
-        case 217: return .i64AtomicStore16(Instruction.StoreOperand.load(from: &pc))
-        case 218: return .i64AtomicStore32(Instruction.StoreOperand.load(from: &pc))
-        case 219: return .i32AtomicRmwAdd(Instruction.RmwOperand.load(from: &pc))
-        case 220: return .i64AtomicRmwAdd(Instruction.RmwOperand.load(from: &pc))
-        case 221: return .i32AtomicRmwSub(Instruction.RmwOperand.load(from: &pc))
-        case 222: return .i64AtomicRmwSub(Instruction.RmwOperand.load(from: &pc))
-        case 223: return .i32AtomicRmwAnd(Instruction.RmwOperand.load(from: &pc))
-        case 224: return .i64AtomicRmwAnd(Instruction.RmwOperand.load(from: &pc))
-        case 225: return .i32AtomicRmwOr(Instruction.RmwOperand.load(from: &pc))
-        case 226: return .i64AtomicRmwOr(Instruction.RmwOperand.load(from: &pc))
-        case 227: return .i32AtomicRmwXor(Instruction.RmwOperand.load(from: &pc))
-        case 228: return .i64AtomicRmwXor(Instruction.RmwOperand.load(from: &pc))
-        case 229: return .i32AtomicRmwXchg(Instruction.RmwOperand.load(from: &pc))
-        case 230: return .i64AtomicRmwXchg(Instruction.RmwOperand.load(from: &pc))
-        case 231: return .i32AtomicRmw8AddU(Instruction.RmwOperand.load(from: &pc))
-        case 232: return .i64AtomicRmw8AddU(Instruction.RmwOperand.load(from: &pc))
-        case 233: return .i32AtomicRmw8SubU(Instruction.RmwOperand.load(from: &pc))
-        case 234: return .i64AtomicRmw8SubU(Instruction.RmwOperand.load(from: &pc))
-        case 235: return .i32AtomicRmw8AndU(Instruction.RmwOperand.load(from: &pc))
-        case 236: return .i64AtomicRmw8AndU(Instruction.RmwOperand.load(from: &pc))
-        case 237: return .i32AtomicRmw8OrU(Instruction.RmwOperand.load(from: &pc))
-        case 238: return .i64AtomicRmw8OrU(Instruction.RmwOperand.load(from: &pc))
-        case 239: return .i32AtomicRmw8XorU(Instruction.RmwOperand.load(from: &pc))
-        case 240: return .i64AtomicRmw8XorU(Instruction.RmwOperand.load(from: &pc))
-        case 241: return .i32AtomicRmw8XchgU(Instruction.RmwOperand.load(from: &pc))
-        case 242: return .i64AtomicRmw8XchgU(Instruction.RmwOperand.load(from: &pc))
-        case 243: return .i32AtomicRmw16AddU(Instruction.RmwOperand.load(from: &pc))
-        case 244: return .i64AtomicRmw16AddU(Instruction.RmwOperand.load(from: &pc))
-        case 245: return .i32AtomicRmw16SubU(Instruction.RmwOperand.load(from: &pc))
-        case 246: return .i64AtomicRmw16SubU(Instruction.RmwOperand.load(from: &pc))
-        case 247: return .i32AtomicRmw16AndU(Instruction.RmwOperand.load(from: &pc))
-        case 248: return .i64AtomicRmw16AndU(Instruction.RmwOperand.load(from: &pc))
-        case 249: return .i32AtomicRmw16OrU(Instruction.RmwOperand.load(from: &pc))
-        case 250: return .i64AtomicRmw16OrU(Instruction.RmwOperand.load(from: &pc))
-        case 251: return .i32AtomicRmw16XorU(Instruction.RmwOperand.load(from: &pc))
-        case 252: return .i64AtomicRmw16XorU(Instruction.RmwOperand.load(from: &pc))
-        case 253: return .i32AtomicRmw16XchgU(Instruction.RmwOperand.load(from: &pc))
-        case 254: return .i64AtomicRmw16XchgU(Instruction.RmwOperand.load(from: &pc))
-        case 255: return .i64AtomicRmw32AddU(Instruction.RmwOperand.load(from: &pc))
-        case 256: return .i64AtomicRmw32SubU(Instruction.RmwOperand.load(from: &pc))
-        case 257: return .i64AtomicRmw32AndU(Instruction.RmwOperand.load(from: &pc))
-        case 258: return .i64AtomicRmw32OrU(Instruction.RmwOperand.load(from: &pc))
-        case 259: return .i64AtomicRmw32XorU(Instruction.RmwOperand.load(from: &pc))
-        case 260: return .i64AtomicRmw32XchgU(Instruction.RmwOperand.load(from: &pc))
-        case 261: return .i32AtomicRmwCmpxchg(Instruction.CmpxchgOperand.load(from: &pc))
-        case 262: return .i64AtomicRmwCmpxchg(Instruction.CmpxchgOperand.load(from: &pc))
-        case 263: return .i32AtomicRmw8CmpxchgU(Instruction.CmpxchgOperand.load(from: &pc))
-        case 264: return .i32AtomicRmw16CmpxchgU(Instruction.CmpxchgOperand.load(from: &pc))
-        case 265: return .i64AtomicRmw8CmpxchgU(Instruction.CmpxchgOperand.load(from: &pc))
-        case 266: return .i64AtomicRmw16CmpxchgU(Instruction.CmpxchgOperand.load(from: &pc))
-        case 267: return .i64AtomicRmw32CmpxchgU(Instruction.CmpxchgOperand.load(from: &pc))
-        case 268: return .memoryAtomicWait32(Instruction.AtomicWaitOperand.load(from: &pc))
-        case 269: return .memoryAtomicWait64(Instruction.AtomicWaitOperand.load(from: &pc))
-        case 270: return .memoryAtomicNotify(Instruction.AtomicNotifyOperand.load(from: &pc))
-        case 271: return .atomicFence(NoOperand())
-        case 272: return .throwTag(Instruction.ThrowTagOperand.load(from: &pc))
-        case 273: return .throwRef(Instruction.ThrowRefOperand.load(from: &pc))
-        case 274: return .catchHandlers(Instruction.CatchHandlersOperand.load(from: &pc))
-        case 275: return .catchHandlersEnd(Instruction.CatchHandlersEndOperand.load(from: &pc))
-        case 276: return .brIfI32Eq(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 277: return .brIfI32Ne(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 278: return .brIfI32LtS(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 279: return .brIfI32LtU(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 280: return .brIfI32GtS(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 281: return .brIfI32GtU(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 282: return .brIfI32LeS(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 283: return .brIfI32LeU(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 284: return .brIfI32GeS(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 285: return .brIfI32GeU(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 286: return .brIfI64Eq(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 287: return .brIfI64Ne(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 288: return .brIfI64LtS(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 289: return .brIfI64LtU(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 290: return .brIfI64GtS(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 291: return .brIfI64GtU(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 292: return .brIfI64LeS(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 293: return .brIfI64LeU(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 294: return .brIfI64GeS(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 295: return .brIfI64GeU(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 296: return .returnCrossInstance(NoOperand())
-        case 297: return .memoryOutOfBoundsTrap(NoOperand())
-        case 298: return .unalignedAtomicTrap(NoOperand())
-        case 299: return .brIfF32Eq(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 300: return .brIfF32Ne(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 301: return .brIfF32Lt(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 302: return .brIfF32Le(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 303: return .brIfNotF32Lt(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 304: return .brIfNotF32Le(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 305: return .brIfF64Eq(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 306: return .brIfF64Ne(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 307: return .brIfF64Lt(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 308: return .brIfF64Le(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 309: return .brIfNotF64Lt(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 310: return .brIfNotF64Le(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 311: return .f32AddAdd(Instruction.BinBinOperand.load(from: &pc))
-        case 312: return .f32AddSub(Instruction.BinBinOperand.load(from: &pc))
-        case 313: return .f32AddMul(Instruction.BinBinOperand.load(from: &pc))
-        case 314: return .f32SubAdd(Instruction.BinBinOperand.load(from: &pc))
-        case 315: return .f32SubSub(Instruction.BinBinOperand.load(from: &pc))
-        case 316: return .f32SubMul(Instruction.BinBinOperand.load(from: &pc))
-        case 317: return .f32MulAdd(Instruction.BinBinOperand.load(from: &pc))
-        case 318: return .f32MulSub(Instruction.BinBinOperand.load(from: &pc))
-        case 319: return .f32MulMul(Instruction.BinBinOperand.load(from: &pc))
-        case 320: return .f64AddAdd(Instruction.BinBinOperand.load(from: &pc))
-        case 321: return .f64AddSub(Instruction.BinBinOperand.load(from: &pc))
-        case 322: return .f64AddMul(Instruction.BinBinOperand.load(from: &pc))
-        case 323: return .f64SubAdd(Instruction.BinBinOperand.load(from: &pc))
-        case 324: return .f64SubSub(Instruction.BinBinOperand.load(from: &pc))
-        case 325: return .f64SubMul(Instruction.BinBinOperand.load(from: &pc))
-        case 326: return .f64MulAdd(Instruction.BinBinOperand.load(from: &pc))
-        case 327: return .f64MulSub(Instruction.BinBinOperand.load(from: &pc))
-        case 328: return .f64MulMul(Instruction.BinBinOperand.load(from: &pc))
-        case 329: return .brIfI32And(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 330: return .brIfNotI32And(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 331: return .brIfI64And(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 332: return .brIfNotI64And(Instruction.BrIfCmpOperand.load(from: &pc))
-        case 333: return .i32ShlAdd(Instruction.BinBinOperand.load(from: &pc))
-        case 334: return .i32MulAdd(Instruction.BinBinOperand.load(from: &pc))
-        case 335: return .i32AddAdd(Instruction.BinBinOperand.load(from: &pc))
-        case 336: return .i32AndAdd(Instruction.BinBinOperand.load(from: &pc))
-        case 337: return .i32ShrUAnd(Instruction.BinBinOperand.load(from: &pc))
-        case 338: return .i32OrAnd(Instruction.BinBinOperand.load(from: &pc))
-        case 339: return .i32ShrUAdd(Instruction.BinBinOperand.load(from: &pc))
-        case 340: return .i32SubAnd(Instruction.BinBinOperand.load(from: &pc))
-        case 341: return .i32ShlOr(Instruction.BinBinOperand.load(from: &pc))
-        case 342: return .i32AddAnd(Instruction.BinBinOperand.load(from: &pc))
-        case 343: return .i32ShrUOr(Instruction.BinBinOperand.load(from: &pc))
-        case 344: return .i32XorShrU(Instruction.BinBinOperand.load(from: &pc))
-        case 345: return .i32AddSub(Instruction.BinBinOperand.load(from: &pc))
-        case 346: return .i32XorShl(Instruction.BinBinOperand.load(from: &pc))
-        case 347: return .i32SubAdd(Instruction.BinBinOperand.load(from: &pc))
-        case 348: return .i32AndShl(Instruction.BinBinOperand.load(from: &pc))
-        case 349: return .i64XorRotl(Instruction.BinBinOperand.load(from: &pc))
-        case 350: return .i64MulAdd(Instruction.BinBinOperand.load(from: &pc))
-        case 351: return .i64ShlAnd(Instruction.BinBinOperand.load(from: &pc))
-        case 352: return .i64AndMul(Instruction.BinBinOperand.load(from: &pc))
-        case 353: return .i64ShlOr(Instruction.BinBinOperand.load(from: &pc))
-        case 354: return .i64XorAnd(Instruction.BinBinOperand.load(from: &pc))
-        case 355: return .i64MulXor(Instruction.BinBinOperand.load(from: &pc))
-        case 356: return .i64AndXor(Instruction.BinBinOperand.load(from: &pc))
-        case 357: return .i64RotlXor(Instruction.BinBinOperand.load(from: &pc))
-        case 358: return .i64SubAnd(Instruction.BinBinOperand.load(from: &pc))
-        case 359: return .i64XorXor(Instruction.BinBinOperand.load(from: &pc))
-        case 360: return .i64OrOr(Instruction.BinBinOperand.load(from: &pc))
-        case 361: return .i64ShrUAnd(Instruction.BinBinOperand.load(from: &pc))
-        case 362: return .i64AndAnd(Instruction.BinBinOperand.load(from: &pc))
-        case 363: return .i64XorMul(Instruction.BinBinOperand.load(from: &pc))
-        case 364: return .i64XorShrU(Instruction.BinBinOperand.load(from: &pc))
-        case 365: return .i32MulSubRev(Instruction.BinBinOperand.load(from: &pc))
-        case 366: return .i32AddToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 367: return .i32SubToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 368: return .i32MulToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 369: return .i32AndToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 370: return .i32OrToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 371: return .i32XorToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 372: return .i32ShlToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 373: return .i32ShrSToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 374: return .i32ShrUToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 375: return .i32RotlToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 376: return .i32RotrToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 377: return .i64AddToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 378: return .i64SubToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 379: return .i64MulToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 380: return .i64AndToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 381: return .i64OrToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 382: return .i64XorToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 383: return .i64ShlToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 384: return .i64ShrSToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 385: return .i64ShrUToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 386: return .i64RotlToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 387: return .i64RotrToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 388: return .i32AddFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 389: return .i32SubFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 390: return .i32MulFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 391: return .i32AndFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 392: return .i32OrFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 393: return .i32XorFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 394: return .i32ShlFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 395: return .i32ShrSFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 396: return .i32ShrUFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 397: return .i32RotlFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 398: return .i32RotrFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 399: return .i64AddFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 400: return .i64SubFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 401: return .i64MulFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 402: return .i64AndFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 403: return .i64OrFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 404: return .i64XorFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 405: return .i64ShlFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 406: return .i64ShrSFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 407: return .i64ShrUFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 408: return .i64RotlFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 409: return .i64RotrFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 410: return .i32AddInAcc(Instruction.AccOperand.load(from: &pc))
-        case 411: return .i32SubInAcc(Instruction.AccOperand.load(from: &pc))
-        case 412: return .i32MulInAcc(Instruction.AccOperand.load(from: &pc))
-        case 413: return .i32AndInAcc(Instruction.AccOperand.load(from: &pc))
-        case 414: return .i32OrInAcc(Instruction.AccOperand.load(from: &pc))
-        case 415: return .i32XorInAcc(Instruction.AccOperand.load(from: &pc))
-        case 416: return .i32ShlInAcc(Instruction.AccOperand.load(from: &pc))
-        case 417: return .i32ShrSInAcc(Instruction.AccOperand.load(from: &pc))
-        case 418: return .i32ShrUInAcc(Instruction.AccOperand.load(from: &pc))
-        case 419: return .i32RotlInAcc(Instruction.AccOperand.load(from: &pc))
-        case 420: return .i32RotrInAcc(Instruction.AccOperand.load(from: &pc))
-        case 421: return .i64AddInAcc(Instruction.AccOperand.load(from: &pc))
-        case 422: return .i64SubInAcc(Instruction.AccOperand.load(from: &pc))
-        case 423: return .i64MulInAcc(Instruction.AccOperand.load(from: &pc))
-        case 424: return .i64AndInAcc(Instruction.AccOperand.load(from: &pc))
-        case 425: return .i64OrInAcc(Instruction.AccOperand.load(from: &pc))
-        case 426: return .i64XorInAcc(Instruction.AccOperand.load(from: &pc))
-        case 427: return .i64ShlInAcc(Instruction.AccOperand.load(from: &pc))
-        case 428: return .i64ShrSInAcc(Instruction.AccOperand.load(from: &pc))
-        case 429: return .i64ShrUInAcc(Instruction.AccOperand.load(from: &pc))
-        case 430: return .i64RotlInAcc(Instruction.AccOperand.load(from: &pc))
-        case 431: return .i64RotrInAcc(Instruction.AccOperand.load(from: &pc))
-        case 432: return .brIfI32EqAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 433: return .brIfI32NeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 434: return .brIfI32LtSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 435: return .brIfI32LtUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 436: return .brIfI32GtSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 437: return .brIfI32GtUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 438: return .brIfI32LeSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 439: return .brIfI32LeUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 440: return .brIfI32GeSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 441: return .brIfI32GeUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 442: return .brIfI64EqAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 443: return .brIfI64NeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 444: return .brIfI64LtSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 445: return .brIfI64LtUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 446: return .brIfI64GtSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 447: return .brIfI64GtUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 448: return .brIfI64LeSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 449: return .brIfI64LeUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 450: return .brIfI64GeSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 451: return .brIfI64GeUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 452: return .brIfAcc(Instruction.BrIfAccOperand.load(from: &pc))
-        case 453: return .brIfNotAcc(Instruction.BrIfAccOperand.load(from: &pc))
-        case 454: return .globalGetToAcc(Instruction.GlobalOperand.load(from: &pc))
-        case 455: return .i32LoadToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 456: return .i64LoadToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 457: return .f32LoadToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 458: return .f64LoadToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 459: return .i32Load8SToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 460: return .i32Load8UToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 461: return .i32Load16SToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 462: return .i32Load16UToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 463: return .i64Load8SToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 464: return .i64Load8UToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 465: return .i64Load16SToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 466: return .i64Load16UToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 467: return .i64Load32SToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 468: return .i64Load32UToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 469: return .i32LoadFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
-        case 470: return .i64LoadFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
-        case 471: return .f32LoadFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
-        case 472: return .f64LoadFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
-        case 473: return .i32Load8SFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
-        case 474: return .i32Load8UFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
-        case 475: return .i32Load16SFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
-        case 476: return .i32Load16UFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
-        case 477: return .i64Load8SFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
-        case 478: return .i64Load8UFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
-        case 479: return .i64Load16SFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
-        case 480: return .i64Load16UFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
-        case 481: return .i64Load32SFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
-        case 482: return .i64Load32UFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
-        case 483: return .i32LoadInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
-        case 484: return .i64LoadInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
-        case 485: return .f32LoadInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
-        case 486: return .f64LoadInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
-        case 487: return .i32Load8SInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
-        case 488: return .i32Load8UInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
-        case 489: return .i32Load16SInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
-        case 490: return .i32Load16UInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
-        case 491: return .i64Load8SInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
-        case 492: return .i64Load8UInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
-        case 493: return .i64Load16SInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
-        case 494: return .i64Load16UInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
-        case 495: return .i64Load32SInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
-        case 496: return .i64Load32UInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
-        case 497: return .i32StoreFromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 498: return .i64StoreFromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 499: return .f32StoreFromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 500: return .f64StoreFromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 501: return .i32Store8FromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 502: return .i32Store16FromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 503: return .i64Store8FromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 504: return .i64Store16FromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 505: return .i64Store32FromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 506: return .i32StoreAddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
-        case 507: return .i64StoreAddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
-        case 508: return .f32StoreAddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
-        case 509: return .f64StoreAddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
-        case 510: return .i32Store8AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
-        case 511: return .i32Store16AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
-        case 512: return .i64Store8AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
-        case 513: return .i64Store16AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
-        case 514: return .i64Store32AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
-        case 515: return .f64AddToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 516: return .f64AddFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 517: return .f64AddInAcc(Instruction.AccOperand.load(from: &pc))
-        case 518: return .f64SubToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 519: return .f64SubFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 520: return .f64SubInAcc(Instruction.AccOperand.load(from: &pc))
-        case 521: return .f64SubFromAccRev(Instruction.AccUnaryOperand.load(from: &pc))
-        case 522: return .f64SubInAccRev(Instruction.AccOperand.load(from: &pc))
-        case 523: return .f64MulToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 524: return .f64MulFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 525: return .f64MulInAcc(Instruction.AccOperand.load(from: &pc))
-        case 526: return .f64DivToAcc(Instruction.AccBinaryOperand.load(from: &pc))
-        case 527: return .f64DivFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
-        case 528: return .f64DivInAcc(Instruction.AccOperand.load(from: &pc))
-        case 529: return .f64DivFromAccRev(Instruction.AccUnaryOperand.load(from: &pc))
-        case 530: return .f64DivInAccRev(Instruction.AccOperand.load(from: &pc))
-        case 531: return .f64AddAddToAcc(Instruction.AccBinBinOperand.load(from: &pc))
-        case 532: return .f64AddSubToAcc(Instruction.AccBinBinOperand.load(from: &pc))
-        case 533: return .f64AddMulToAcc(Instruction.AccBinBinOperand.load(from: &pc))
-        case 534: return .f64SubAddToAcc(Instruction.AccBinBinOperand.load(from: &pc))
-        case 535: return .f64SubSubToAcc(Instruction.AccBinBinOperand.load(from: &pc))
-        case 536: return .f64SubMulToAcc(Instruction.AccBinBinOperand.load(from: &pc))
-        case 537: return .f64MulAddToAcc(Instruction.AccBinBinOperand.load(from: &pc))
-        case 538: return .f64MulSubToAcc(Instruction.AccBinBinOperand.load(from: &pc))
-        case 539: return .f64MulMulToAcc(Instruction.AccBinBinOperand.load(from: &pc))
-        case 540: return .brIfF64EqAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 541: return .brIfF64NeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 542: return .brIfF64LtAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 543: return .brIfF64LeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 544: return .brIfF64GtAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 545: return .brIfF64GeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 546: return .brIfNotF64LtAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 547: return .brIfNotF64LeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 548: return .brIfNotF64GtAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 549: return .brIfNotF64GeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
-        case 550: return .f64SqrtToAcc(Instruction.AccOperand.load(from: &pc))
-        case 551: return .f64LoadToFAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 552: return .f64LoadFromAccToFAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
-        case 553: return .f64StoreFromFAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
-        case 554: return .i32AddImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 555: return .i32MulImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 556: return .i32AndImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 557: return .i32OrImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 558: return .i32XorImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 559: return .i32ShlImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 560: return .i32ShrSImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 561: return .i32ShrUImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 562: return .i32RotlImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 563: return .i32RotrImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 564: return .i64AddImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 565: return .i64MulImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 566: return .i64AndImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 567: return .i64OrImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 568: return .i64XorImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 569: return .i64ShlImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 570: return .i64ShrSImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 571: return .i64ShrUImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 572: return .i64RotlImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 573: return .i64RotrImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 574: return .i32EqImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 575: return .i32NeImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 576: return .i32LtSImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 577: return .i32LtUImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 578: return .i32GtSImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 579: return .i32GtUImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 580: return .i32LeSImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 581: return .i32LeUImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 582: return .i32GeSImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 583: return .i32GeUImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 584: return .i64EqImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 585: return .i64NeImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 586: return .i64LtSImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 587: return .i64LtUImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 588: return .i64GtSImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 589: return .i64GtUImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 590: return .i64LeSImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 591: return .i64LeUImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 592: return .i64GeSImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 593: return .i64GeUImm(Instruction.BinaryImmOperand.load(from: &pc))
-        case 594: return .brIfI32EqImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 595: return .brIfI32NeImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 596: return .brIfI32LtSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 597: return .brIfI32LtUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 598: return .brIfI32GtSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 599: return .brIfI32GtUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 600: return .brIfI32LeSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 601: return .brIfI32LeUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 602: return .brIfI32GeSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 603: return .brIfI32GeUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 604: return .brIfI64EqImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 605: return .brIfI64NeImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 606: return .brIfI64LtSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 607: return .brIfI64LtUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 608: return .brIfI64GtSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 609: return .brIfI64GtUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 610: return .brIfI64LeSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 611: return .brIfI64LeUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 612: return .brIfI64GeSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 613: return .brIfI64GeUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 614: return .brIfI32AndImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 615: return .brIfNotI32AndImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 616: return .brIfI64AndImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 617: return .brIfNotI64AndImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
-        case 618: return .i32AddImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 619: return .i32MulImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 620: return .i32AndImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 621: return .i32OrImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 622: return .i32XorImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 623: return .i32ShlImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 624: return .i32ShrSImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 625: return .i32ShrUImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 626: return .i32RotlImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 627: return .i32RotrImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 628: return .i64AddImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 629: return .i64MulImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 630: return .i64AndImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 631: return .i64OrImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 632: return .i64XorImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 633: return .i64ShlImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 634: return .i64ShrSImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 635: return .i64ShrUImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 636: return .i64RotlImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 637: return .i64RotrImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
-        case 638: return .i32AddToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 639: return .i32SubToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 640: return .i32MulToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 641: return .i32AndToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 642: return .i32OrToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 643: return .i32XorToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 644: return .i32ShlToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 645: return .i32ShrSToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 646: return .i32ShrUToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 647: return .i32RotlToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 648: return .i32RotrToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 649: return .i64AddToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 650: return .i64SubToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 651: return .i64MulToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 652: return .i64AndToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 653: return .i64OrToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 654: return .i64XorToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 655: return .i64ShlToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 656: return .i64ShrSToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 657: return .i64ShrUToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 658: return .i64RotlToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 659: return .i64RotrToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
-        case 660: return .i32AddImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 661: return .i32MulImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 662: return .i32AndImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 663: return .i32OrImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 664: return .i32XorImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 665: return .i32ShlImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 666: return .i32ShrSImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 667: return .i32ShrUImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 668: return .i32RotlImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 669: return .i32RotrImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 670: return .i64AddImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 671: return .i64MulImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 672: return .i64AndImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 673: return .i64OrImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 674: return .i64XorImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 675: return .i64ShlImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 676: return .i64ShrSImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 677: return .i64ShrUImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 678: return .i64RotlImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 679: return .i64RotrImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
-        case 680: return .i32LoadToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
-        case 681: return .i64LoadToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
-        case 682: return .f32LoadToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
-        case 683: return .f64LoadToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
-        case 684: return .i32Load8SToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
-        case 685: return .i32Load8UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
-        case 686: return .i32Load16SToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
-        case 687: return .i32Load16UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
-        case 688: return .i64Load8SToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
-        case 689: return .i64Load8UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
-        case 690: return .i64Load16SToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
-        case 691: return .i64Load16UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
-        case 692: return .i64Load32SToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
-        case 693: return .i64Load32UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
-        case 694: return .copyStackAccToSlot(Instruction.CopyStackAccToSlotOperand.load(from: &pc))
-        case 695: return .selectAcc(Instruction.SelectAccOperand.load(from: &pc))
-        case 696: return .copyStack2(Instruction.CopyStack2Operand.load(from: &pc))
-        case 697: return .selectI32Eq(Instruction.SelectCmpOperand.load(from: &pc))
-        case 698: return .selectI32LtS(Instruction.SelectCmpOperand.load(from: &pc))
-        case 699: return .selectI32LtU(Instruction.SelectCmpOperand.load(from: &pc))
-        case 700: return .selectI32EqImm(Instruction.SelectCmpImmOperand.load(from: &pc))
-        case 701: return .selectI32LtSImm(Instruction.SelectCmpImmOperand.load(from: &pc))
-        case 702: return .selectI32LtUImm(Instruction.SelectCmpImmOperand.load(from: &pc))
-        case 703: return .selectI32GtSImm(Instruction.SelectCmpImmOperand.load(from: &pc))
-        case 704: return .selectI32GtUImm(Instruction.SelectCmpImmOperand.load(from: &pc))
-        case 705: return .selectI64Eq(Instruction.SelectCmpOperand.load(from: &pc))
-        case 706: return .selectI64LtS(Instruction.SelectCmpOperand.load(from: &pc))
-        case 707: return .selectI64LtU(Instruction.SelectCmpOperand.load(from: &pc))
-        case 708: return .selectI64EqImm(Instruction.SelectCmpImmOperand.load(from: &pc))
-        case 709: return .selectI64LtSImm(Instruction.SelectCmpImmOperand.load(from: &pc))
-        case 710: return .selectI64LtUImm(Instruction.SelectCmpImmOperand.load(from: &pc))
-        case 711: return .selectI64GtSImm(Instruction.SelectCmpImmOperand.load(from: &pc))
-        case 712: return .selectI64GtUImm(Instruction.SelectCmpImmOperand.load(from: &pc))
-        case 713: return .i32LoadWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
-        case 714: return .i64LoadWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
-        case 715: return .f32LoadWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
-        case 716: return .f64LoadWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
-        case 717: return .i32Load8SWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
-        case 718: return .i32Load8UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
-        case 719: return .i32Load16SWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
-        case 720: return .i32Load16UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
-        case 721: return .i64Load8SWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
-        case 722: return .i64Load8UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
-        case 723: return .i64Load16SWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
-        case 724: return .i64Load16UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
-        case 725: return .i64Load32SWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
-        case 726: return .i64Load32UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
-        case 727: return .consumeFuel(Instruction.ConsumeFuelOperand.load(from: &pc))
-        case 728: return .outOfFuelTrap(NoOperand())
-        case 729: return .callRef(Instruction.CallRefOperand.load(from: &pc))
-        case 730: return .returnCallRef(Instruction.ReturnCallRefOperand.load(from: &pc))
-        case 731: return .refAsNonNull(Instruction.RefAsNonNullOperand.load(from: &pc))
-        case 732: return .brIfNull(Instruction.BrIfOperand.load(from: &pc))
-        case 733: return .brIfNotNull(Instruction.BrIfOperand.load(from: &pc))
+        case 9: return .returnCall(Instruction.ReturnCallOperand.load(from: &pc))
+        case 10: return .returnCallIndirect(Instruction.ReturnCallIndirectOperand.load(from: &pc))
+        case 11: return .unreachable(NoOperand())
+        case 12: return .nop(NoOperand())
+        case 13: return .br(Instruction.BrOperand.load(from: &pc))
+        case 14: return .brIf(Instruction.BrIfOperand.load(from: &pc))
+        case 15: return .brIfNot(Instruction.BrIfOperand.load(from: &pc))
+        case 16: return .brTable(Instruction.BrTableOperand.load(from: &pc))
+        case 17: return ._return(NoOperand())
+        case 18: return .endOfExecution(NoOperand())
+        case 19: return .i32Load(Instruction.LoadOperand.load(from: &pc))
+        case 20: return .i64Load(Instruction.LoadOperand.load(from: &pc))
+        case 21: return .f32Load(Instruction.LoadOperand.load(from: &pc))
+        case 22: return .f64Load(Instruction.LoadOperand.load(from: &pc))
+        case 23: return .i32Load8S(Instruction.LoadOperand.load(from: &pc))
+        case 24: return .i32Load8U(Instruction.LoadOperand.load(from: &pc))
+        case 25: return .i32Load16S(Instruction.LoadOperand.load(from: &pc))
+        case 26: return .i32Load16U(Instruction.LoadOperand.load(from: &pc))
+        case 27: return .i64Load8S(Instruction.LoadOperand.load(from: &pc))
+        case 28: return .i64Load8U(Instruction.LoadOperand.load(from: &pc))
+        case 29: return .i64Load16S(Instruction.LoadOperand.load(from: &pc))
+        case 30: return .i64Load16U(Instruction.LoadOperand.load(from: &pc))
+        case 31: return .i64Load32S(Instruction.LoadOperand.load(from: &pc))
+        case 32: return .i64Load32U(Instruction.LoadOperand.load(from: &pc))
+        case 33: return .i32Store(Instruction.StoreOperand.load(from: &pc))
+        case 34: return .i64Store(Instruction.StoreOperand.load(from: &pc))
+        case 35: return .f32Store(Instruction.StoreOperand.load(from: &pc))
+        case 36: return .f64Store(Instruction.StoreOperand.load(from: &pc))
+        case 37: return .i32Store8(Instruction.StoreOperand.load(from: &pc))
+        case 38: return .i32Store16(Instruction.StoreOperand.load(from: &pc))
+        case 39: return .i64Store8(Instruction.StoreOperand.load(from: &pc))
+        case 40: return .i64Store16(Instruction.StoreOperand.load(from: &pc))
+        case 41: return .i64Store32(Instruction.StoreOperand.load(from: &pc))
+        case 42: return .memorySize(Instruction.MemorySizeOperand.load(from: &pc))
+        case 43: return .memoryGrow(Instruction.MemoryGrowOperand.load(from: &pc))
+        case 44: return .memoryInit(Instruction.MemoryInitOperand.load(from: &pc))
+        case 45: return .memoryDataDrop(Instruction.MemoryDataDropOperand.load(from: &pc))
+        case 46: return .memoryCopy(Instruction.MemoryCopyOperand.load(from: &pc))
+        case 47: return .memoryFill(Instruction.MemoryFillOperand.load(from: &pc))
+        case 48: return .v128Const(Instruction.V128ConstOperand.load(from: &pc))
+        case 49: return .i8x16Shuffle(Instruction.I8x16ShuffleOperand.load(from: &pc))
+        case 50: return .simd(Instruction.SimdOperand.load(from: &pc))
+        case 51: return .const32(Instruction.Const32Operand.load(from: &pc))
+        case 52: return .const64(Instruction.Const64Operand.load(from: &pc))
+        case 53: return .i32Add(Instruction.BinaryOperand.load(from: &pc))
+        case 54: return .i64Add(Instruction.BinaryOperand.load(from: &pc))
+        case 55: return .i32Sub(Instruction.BinaryOperand.load(from: &pc))
+        case 56: return .i64Sub(Instruction.BinaryOperand.load(from: &pc))
+        case 57: return .i32Mul(Instruction.BinaryOperand.load(from: &pc))
+        case 58: return .i64Mul(Instruction.BinaryOperand.load(from: &pc))
+        case 59: return .i32And(Instruction.BinaryOperand.load(from: &pc))
+        case 60: return .i64And(Instruction.BinaryOperand.load(from: &pc))
+        case 61: return .i32Or(Instruction.BinaryOperand.load(from: &pc))
+        case 62: return .i64Or(Instruction.BinaryOperand.load(from: &pc))
+        case 63: return .i32Xor(Instruction.BinaryOperand.load(from: &pc))
+        case 64: return .i64Xor(Instruction.BinaryOperand.load(from: &pc))
+        case 65: return .i32Shl(Instruction.BinaryOperand.load(from: &pc))
+        case 66: return .i64Shl(Instruction.BinaryOperand.load(from: &pc))
+        case 67: return .i32ShrS(Instruction.BinaryOperand.load(from: &pc))
+        case 68: return .i64ShrS(Instruction.BinaryOperand.load(from: &pc))
+        case 69: return .i32ShrU(Instruction.BinaryOperand.load(from: &pc))
+        case 70: return .i64ShrU(Instruction.BinaryOperand.load(from: &pc))
+        case 71: return .i32Rotl(Instruction.BinaryOperand.load(from: &pc))
+        case 72: return .i64Rotl(Instruction.BinaryOperand.load(from: &pc))
+        case 73: return .i32Rotr(Instruction.BinaryOperand.load(from: &pc))
+        case 74: return .i64Rotr(Instruction.BinaryOperand.load(from: &pc))
+        case 75: return .i32DivS(Instruction.BinaryOperand.load(from: &pc))
+        case 76: return .i64DivS(Instruction.BinaryOperand.load(from: &pc))
+        case 77: return .i32DivU(Instruction.BinaryOperand.load(from: &pc))
+        case 78: return .i64DivU(Instruction.BinaryOperand.load(from: &pc))
+        case 79: return .i32RemS(Instruction.BinaryOperand.load(from: &pc))
+        case 80: return .i64RemS(Instruction.BinaryOperand.load(from: &pc))
+        case 81: return .i32RemU(Instruction.BinaryOperand.load(from: &pc))
+        case 82: return .i64RemU(Instruction.BinaryOperand.load(from: &pc))
+        case 83: return .i32Eq(Instruction.BinaryOperand.load(from: &pc))
+        case 84: return .i64Eq(Instruction.BinaryOperand.load(from: &pc))
+        case 85: return .i32Ne(Instruction.BinaryOperand.load(from: &pc))
+        case 86: return .i64Ne(Instruction.BinaryOperand.load(from: &pc))
+        case 87: return .i32LtS(Instruction.BinaryOperand.load(from: &pc))
+        case 88: return .i64LtS(Instruction.BinaryOperand.load(from: &pc))
+        case 89: return .i32LtU(Instruction.BinaryOperand.load(from: &pc))
+        case 90: return .i64LtU(Instruction.BinaryOperand.load(from: &pc))
+        case 91: return .i32GtS(Instruction.BinaryOperand.load(from: &pc))
+        case 92: return .i64GtS(Instruction.BinaryOperand.load(from: &pc))
+        case 93: return .i32GtU(Instruction.BinaryOperand.load(from: &pc))
+        case 94: return .i64GtU(Instruction.BinaryOperand.load(from: &pc))
+        case 95: return .i32LeS(Instruction.BinaryOperand.load(from: &pc))
+        case 96: return .i64LeS(Instruction.BinaryOperand.load(from: &pc))
+        case 97: return .i32LeU(Instruction.BinaryOperand.load(from: &pc))
+        case 98: return .i64LeU(Instruction.BinaryOperand.load(from: &pc))
+        case 99: return .i32GeS(Instruction.BinaryOperand.load(from: &pc))
+        case 100: return .i64GeS(Instruction.BinaryOperand.load(from: &pc))
+        case 101: return .i32GeU(Instruction.BinaryOperand.load(from: &pc))
+        case 102: return .i64GeU(Instruction.BinaryOperand.load(from: &pc))
+        case 103: return .i32Clz(Instruction.UnaryOperand.load(from: &pc))
+        case 104: return .i64Clz(Instruction.UnaryOperand.load(from: &pc))
+        case 105: return .i32Ctz(Instruction.UnaryOperand.load(from: &pc))
+        case 106: return .i64Ctz(Instruction.UnaryOperand.load(from: &pc))
+        case 107: return .i32Popcnt(Instruction.UnaryOperand.load(from: &pc))
+        case 108: return .i64Popcnt(Instruction.UnaryOperand.load(from: &pc))
+        case 109: return .i32Eqz(Instruction.UnaryOperand.load(from: &pc))
+        case 110: return .i64Eqz(Instruction.UnaryOperand.load(from: &pc))
+        case 111: return .i32WrapI64(Instruction.UnaryOperand.load(from: &pc))
+        case 112: return .i64ExtendI32S(Instruction.UnaryOperand.load(from: &pc))
+        case 113: return .i64ExtendI32U(Instruction.UnaryOperand.load(from: &pc))
+        case 114: return .i32Extend8S(Instruction.UnaryOperand.load(from: &pc))
+        case 115: return .i64Extend8S(Instruction.UnaryOperand.load(from: &pc))
+        case 116: return .i32Extend16S(Instruction.UnaryOperand.load(from: &pc))
+        case 117: return .i64Extend16S(Instruction.UnaryOperand.load(from: &pc))
+        case 118: return .i64Extend32S(Instruction.UnaryOperand.load(from: &pc))
+        case 119: return .i32TruncF32S(Instruction.UnaryOperand.load(from: &pc))
+        case 120: return .i32TruncF32U(Instruction.UnaryOperand.load(from: &pc))
+        case 121: return .i32TruncSatF32S(Instruction.UnaryOperand.load(from: &pc))
+        case 122: return .i32TruncSatF32U(Instruction.UnaryOperand.load(from: &pc))
+        case 123: return .i32TruncF64S(Instruction.UnaryOperand.load(from: &pc))
+        case 124: return .i32TruncF64U(Instruction.UnaryOperand.load(from: &pc))
+        case 125: return .i32TruncSatF64S(Instruction.UnaryOperand.load(from: &pc))
+        case 126: return .i32TruncSatF64U(Instruction.UnaryOperand.load(from: &pc))
+        case 127: return .i64TruncF32S(Instruction.UnaryOperand.load(from: &pc))
+        case 128: return .i64TruncF32U(Instruction.UnaryOperand.load(from: &pc))
+        case 129: return .i64TruncSatF32S(Instruction.UnaryOperand.load(from: &pc))
+        case 130: return .i64TruncSatF32U(Instruction.UnaryOperand.load(from: &pc))
+        case 131: return .i64TruncF64S(Instruction.UnaryOperand.load(from: &pc))
+        case 132: return .i64TruncF64U(Instruction.UnaryOperand.load(from: &pc))
+        case 133: return .i64TruncSatF64S(Instruction.UnaryOperand.load(from: &pc))
+        case 134: return .i64TruncSatF64U(Instruction.UnaryOperand.load(from: &pc))
+        case 135: return .f32ConvertI32S(Instruction.UnaryOperand.load(from: &pc))
+        case 136: return .f32ConvertI32U(Instruction.UnaryOperand.load(from: &pc))
+        case 137: return .f32ConvertI64S(Instruction.UnaryOperand.load(from: &pc))
+        case 138: return .f32ConvertI64U(Instruction.UnaryOperand.load(from: &pc))
+        case 139: return .f64ConvertI32S(Instruction.UnaryOperand.load(from: &pc))
+        case 140: return .f64ConvertI32U(Instruction.UnaryOperand.load(from: &pc))
+        case 141: return .f64ConvertI64S(Instruction.UnaryOperand.load(from: &pc))
+        case 142: return .f64ConvertI64U(Instruction.UnaryOperand.load(from: &pc))
+        case 143: return .f32ReinterpretI32(Instruction.UnaryOperand.load(from: &pc))
+        case 144: return .f64ReinterpretI64(Instruction.UnaryOperand.load(from: &pc))
+        case 145: return .i32ReinterpretF32(Instruction.UnaryOperand.load(from: &pc))
+        case 146: return .i64ReinterpretF64(Instruction.UnaryOperand.load(from: &pc))
+        case 147: return .f32Add(Instruction.BinaryOperand.load(from: &pc))
+        case 148: return .f64Add(Instruction.BinaryOperand.load(from: &pc))
+        case 149: return .f32Sub(Instruction.BinaryOperand.load(from: &pc))
+        case 150: return .f64Sub(Instruction.BinaryOperand.load(from: &pc))
+        case 151: return .f32Mul(Instruction.BinaryOperand.load(from: &pc))
+        case 152: return .f64Mul(Instruction.BinaryOperand.load(from: &pc))
+        case 153: return .f32Div(Instruction.BinaryOperand.load(from: &pc))
+        case 154: return .f64Div(Instruction.BinaryOperand.load(from: &pc))
+        case 155: return .f32Min(Instruction.BinaryOperand.load(from: &pc))
+        case 156: return .f64Min(Instruction.BinaryOperand.load(from: &pc))
+        case 157: return .f32Max(Instruction.BinaryOperand.load(from: &pc))
+        case 158: return .f64Max(Instruction.BinaryOperand.load(from: &pc))
+        case 159: return .f32CopySign(Instruction.BinaryOperand.load(from: &pc))
+        case 160: return .f64CopySign(Instruction.BinaryOperand.load(from: &pc))
+        case 161: return .f32Eq(Instruction.BinaryOperand.load(from: &pc))
+        case 162: return .f64Eq(Instruction.BinaryOperand.load(from: &pc))
+        case 163: return .f32Ne(Instruction.BinaryOperand.load(from: &pc))
+        case 164: return .f64Ne(Instruction.BinaryOperand.load(from: &pc))
+        case 165: return .f32Lt(Instruction.BinaryOperand.load(from: &pc))
+        case 166: return .f64Lt(Instruction.BinaryOperand.load(from: &pc))
+        case 167: return .f32Gt(Instruction.BinaryOperand.load(from: &pc))
+        case 168: return .f64Gt(Instruction.BinaryOperand.load(from: &pc))
+        case 169: return .f32Le(Instruction.BinaryOperand.load(from: &pc))
+        case 170: return .f64Le(Instruction.BinaryOperand.load(from: &pc))
+        case 171: return .f32Ge(Instruction.BinaryOperand.load(from: &pc))
+        case 172: return .f64Ge(Instruction.BinaryOperand.load(from: &pc))
+        case 173: return .f32Abs(Instruction.UnaryOperand.load(from: &pc))
+        case 174: return .f64Abs(Instruction.UnaryOperand.load(from: &pc))
+        case 175: return .f32Neg(Instruction.UnaryOperand.load(from: &pc))
+        case 176: return .f64Neg(Instruction.UnaryOperand.load(from: &pc))
+        case 177: return .f32Ceil(Instruction.UnaryOperand.load(from: &pc))
+        case 178: return .f64Ceil(Instruction.UnaryOperand.load(from: &pc))
+        case 179: return .f32Floor(Instruction.UnaryOperand.load(from: &pc))
+        case 180: return .f64Floor(Instruction.UnaryOperand.load(from: &pc))
+        case 181: return .f32Trunc(Instruction.UnaryOperand.load(from: &pc))
+        case 182: return .f64Trunc(Instruction.UnaryOperand.load(from: &pc))
+        case 183: return .f32Nearest(Instruction.UnaryOperand.load(from: &pc))
+        case 184: return .f64Nearest(Instruction.UnaryOperand.load(from: &pc))
+        case 185: return .f32Sqrt(Instruction.UnaryOperand.load(from: &pc))
+        case 186: return .f64Sqrt(Instruction.UnaryOperand.load(from: &pc))
+        case 187: return .f64PromoteF32(Instruction.UnaryOperand.load(from: &pc))
+        case 188: return .f32DemoteF64(Instruction.UnaryOperand.load(from: &pc))
+        case 189: return .select(Instruction.SelectOperand.load(from: &pc))
+        case 190: return .refNull(Instruction.RefNullOperand.load(from: &pc))
+        case 191: return .refIsNull(Instruction.RefIsNullOperand.load(from: &pc))
+        case 192: return .refFunc(Instruction.RefFuncOperand.load(from: &pc))
+        case 193: return .tableGet(Instruction.TableGetOperand.load(from: &pc))
+        case 194: return .tableSet(Instruction.TableSetOperand.load(from: &pc))
+        case 195: return .tableSize(Instruction.TableSizeOperand.load(from: &pc))
+        case 196: return .tableGrow(Instruction.TableGrowOperand.load(from: &pc))
+        case 197: return .tableFill(Instruction.TableFillOperand.load(from: &pc))
+        case 198: return .tableCopy(Instruction.TableCopyOperand.load(from: &pc))
+        case 199: return .tableInit(Instruction.TableInitOperand.load(from: &pc))
+        case 200: return .tableElementDrop(Instruction.TableElementDropOperand.load(from: &pc))
+        case 201: return .onEnter(Instruction.OnEnterOperand.load(from: &pc))
+        case 202: return .onExit(Instruction.OnExitOperand.load(from: &pc))
+        case 203: return .breakpoint(NoOperand())
+        case 204: return .i32AtomicLoad(Instruction.LoadOperand.load(from: &pc))
+        case 205: return .i64AtomicLoad(Instruction.LoadOperand.load(from: &pc))
+        case 206: return .i32AtomicLoad8U(Instruction.LoadOperand.load(from: &pc))
+        case 207: return .i32AtomicLoad16U(Instruction.LoadOperand.load(from: &pc))
+        case 208: return .i64AtomicLoad8U(Instruction.LoadOperand.load(from: &pc))
+        case 209: return .i64AtomicLoad16U(Instruction.LoadOperand.load(from: &pc))
+        case 210: return .i64AtomicLoad32U(Instruction.LoadOperand.load(from: &pc))
+        case 211: return .i32AtomicStore(Instruction.StoreOperand.load(from: &pc))
+        case 212: return .i64AtomicStore(Instruction.StoreOperand.load(from: &pc))
+        case 213: return .i32AtomicStore8(Instruction.StoreOperand.load(from: &pc))
+        case 214: return .i32AtomicStore16(Instruction.StoreOperand.load(from: &pc))
+        case 215: return .i64AtomicStore8(Instruction.StoreOperand.load(from: &pc))
+        case 216: return .i64AtomicStore16(Instruction.StoreOperand.load(from: &pc))
+        case 217: return .i64AtomicStore32(Instruction.StoreOperand.load(from: &pc))
+        case 218: return .i32AtomicRmwAdd(Instruction.RmwOperand.load(from: &pc))
+        case 219: return .i64AtomicRmwAdd(Instruction.RmwOperand.load(from: &pc))
+        case 220: return .i32AtomicRmwSub(Instruction.RmwOperand.load(from: &pc))
+        case 221: return .i64AtomicRmwSub(Instruction.RmwOperand.load(from: &pc))
+        case 222: return .i32AtomicRmwAnd(Instruction.RmwOperand.load(from: &pc))
+        case 223: return .i64AtomicRmwAnd(Instruction.RmwOperand.load(from: &pc))
+        case 224: return .i32AtomicRmwOr(Instruction.RmwOperand.load(from: &pc))
+        case 225: return .i64AtomicRmwOr(Instruction.RmwOperand.load(from: &pc))
+        case 226: return .i32AtomicRmwXor(Instruction.RmwOperand.load(from: &pc))
+        case 227: return .i64AtomicRmwXor(Instruction.RmwOperand.load(from: &pc))
+        case 228: return .i32AtomicRmwXchg(Instruction.RmwOperand.load(from: &pc))
+        case 229: return .i64AtomicRmwXchg(Instruction.RmwOperand.load(from: &pc))
+        case 230: return .i32AtomicRmw8AddU(Instruction.RmwOperand.load(from: &pc))
+        case 231: return .i64AtomicRmw8AddU(Instruction.RmwOperand.load(from: &pc))
+        case 232: return .i32AtomicRmw8SubU(Instruction.RmwOperand.load(from: &pc))
+        case 233: return .i64AtomicRmw8SubU(Instruction.RmwOperand.load(from: &pc))
+        case 234: return .i32AtomicRmw8AndU(Instruction.RmwOperand.load(from: &pc))
+        case 235: return .i64AtomicRmw8AndU(Instruction.RmwOperand.load(from: &pc))
+        case 236: return .i32AtomicRmw8OrU(Instruction.RmwOperand.load(from: &pc))
+        case 237: return .i64AtomicRmw8OrU(Instruction.RmwOperand.load(from: &pc))
+        case 238: return .i32AtomicRmw8XorU(Instruction.RmwOperand.load(from: &pc))
+        case 239: return .i64AtomicRmw8XorU(Instruction.RmwOperand.load(from: &pc))
+        case 240: return .i32AtomicRmw8XchgU(Instruction.RmwOperand.load(from: &pc))
+        case 241: return .i64AtomicRmw8XchgU(Instruction.RmwOperand.load(from: &pc))
+        case 242: return .i32AtomicRmw16AddU(Instruction.RmwOperand.load(from: &pc))
+        case 243: return .i64AtomicRmw16AddU(Instruction.RmwOperand.load(from: &pc))
+        case 244: return .i32AtomicRmw16SubU(Instruction.RmwOperand.load(from: &pc))
+        case 245: return .i64AtomicRmw16SubU(Instruction.RmwOperand.load(from: &pc))
+        case 246: return .i32AtomicRmw16AndU(Instruction.RmwOperand.load(from: &pc))
+        case 247: return .i64AtomicRmw16AndU(Instruction.RmwOperand.load(from: &pc))
+        case 248: return .i32AtomicRmw16OrU(Instruction.RmwOperand.load(from: &pc))
+        case 249: return .i64AtomicRmw16OrU(Instruction.RmwOperand.load(from: &pc))
+        case 250: return .i32AtomicRmw16XorU(Instruction.RmwOperand.load(from: &pc))
+        case 251: return .i64AtomicRmw16XorU(Instruction.RmwOperand.load(from: &pc))
+        case 252: return .i32AtomicRmw16XchgU(Instruction.RmwOperand.load(from: &pc))
+        case 253: return .i64AtomicRmw16XchgU(Instruction.RmwOperand.load(from: &pc))
+        case 254: return .i64AtomicRmw32AddU(Instruction.RmwOperand.load(from: &pc))
+        case 255: return .i64AtomicRmw32SubU(Instruction.RmwOperand.load(from: &pc))
+        case 256: return .i64AtomicRmw32AndU(Instruction.RmwOperand.load(from: &pc))
+        case 257: return .i64AtomicRmw32OrU(Instruction.RmwOperand.load(from: &pc))
+        case 258: return .i64AtomicRmw32XorU(Instruction.RmwOperand.load(from: &pc))
+        case 259: return .i64AtomicRmw32XchgU(Instruction.RmwOperand.load(from: &pc))
+        case 260: return .i32AtomicRmwCmpxchg(Instruction.CmpxchgOperand.load(from: &pc))
+        case 261: return .i64AtomicRmwCmpxchg(Instruction.CmpxchgOperand.load(from: &pc))
+        case 262: return .i32AtomicRmw8CmpxchgU(Instruction.CmpxchgOperand.load(from: &pc))
+        case 263: return .i32AtomicRmw16CmpxchgU(Instruction.CmpxchgOperand.load(from: &pc))
+        case 264: return .i64AtomicRmw8CmpxchgU(Instruction.CmpxchgOperand.load(from: &pc))
+        case 265: return .i64AtomicRmw16CmpxchgU(Instruction.CmpxchgOperand.load(from: &pc))
+        case 266: return .i64AtomicRmw32CmpxchgU(Instruction.CmpxchgOperand.load(from: &pc))
+        case 267: return .memoryAtomicWait32(Instruction.AtomicWaitOperand.load(from: &pc))
+        case 268: return .memoryAtomicWait64(Instruction.AtomicWaitOperand.load(from: &pc))
+        case 269: return .memoryAtomicNotify(Instruction.AtomicNotifyOperand.load(from: &pc))
+        case 270: return .atomicFence(NoOperand())
+        case 271: return .throwTag(Instruction.ThrowTagOperand.load(from: &pc))
+        case 272: return .throwRef(Instruction.ThrowRefOperand.load(from: &pc))
+        case 273: return .catchHandlers(Instruction.CatchHandlersOperand.load(from: &pc))
+        case 274: return .catchHandlersEnd(Instruction.CatchHandlersEndOperand.load(from: &pc))
+        case 275: return .brIfI32Eq(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 276: return .brIfI32Ne(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 277: return .brIfI32LtS(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 278: return .brIfI32LtU(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 279: return .brIfI32GtS(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 280: return .brIfI32GtU(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 281: return .brIfI32LeS(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 282: return .brIfI32LeU(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 283: return .brIfI32GeS(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 284: return .brIfI32GeU(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 285: return .brIfI64Eq(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 286: return .brIfI64Ne(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 287: return .brIfI64LtS(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 288: return .brIfI64LtU(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 289: return .brIfI64GtS(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 290: return .brIfI64GtU(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 291: return .brIfI64LeS(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 292: return .brIfI64LeU(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 293: return .brIfI64GeS(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 294: return .brIfI64GeU(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 295: return .returnCrossInstance(NoOperand())
+        case 296: return .memoryOutOfBoundsTrap(NoOperand())
+        case 297: return .unalignedAtomicTrap(NoOperand())
+        case 298: return .brIfF32Eq(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 299: return .brIfF32Ne(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 300: return .brIfF32Lt(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 301: return .brIfF32Le(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 302: return .brIfNotF32Lt(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 303: return .brIfNotF32Le(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 304: return .brIfF64Eq(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 305: return .brIfF64Ne(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 306: return .brIfF64Lt(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 307: return .brIfF64Le(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 308: return .brIfNotF64Lt(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 309: return .brIfNotF64Le(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 310: return .f32AddAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 311: return .f32AddSub(Instruction.BinBinOperand.load(from: &pc))
+        case 312: return .f32AddMul(Instruction.BinBinOperand.load(from: &pc))
+        case 313: return .f32SubAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 314: return .f32SubSub(Instruction.BinBinOperand.load(from: &pc))
+        case 315: return .f32SubMul(Instruction.BinBinOperand.load(from: &pc))
+        case 316: return .f32MulAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 317: return .f32MulSub(Instruction.BinBinOperand.load(from: &pc))
+        case 318: return .f32MulMul(Instruction.BinBinOperand.load(from: &pc))
+        case 319: return .f64AddAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 320: return .f64AddSub(Instruction.BinBinOperand.load(from: &pc))
+        case 321: return .f64AddMul(Instruction.BinBinOperand.load(from: &pc))
+        case 322: return .f64SubAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 323: return .f64SubSub(Instruction.BinBinOperand.load(from: &pc))
+        case 324: return .f64SubMul(Instruction.BinBinOperand.load(from: &pc))
+        case 325: return .f64MulAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 326: return .f64MulSub(Instruction.BinBinOperand.load(from: &pc))
+        case 327: return .f64MulMul(Instruction.BinBinOperand.load(from: &pc))
+        case 328: return .brIfI32And(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 329: return .brIfNotI32And(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 330: return .brIfI64And(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 331: return .brIfNotI64And(Instruction.BrIfCmpOperand.load(from: &pc))
+        case 332: return .i32ShlAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 333: return .i32MulAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 334: return .i32AddAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 335: return .i32AndAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 336: return .i32ShrUAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 337: return .i32OrAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 338: return .i32ShrUAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 339: return .i32SubAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 340: return .i32ShlOr(Instruction.BinBinOperand.load(from: &pc))
+        case 341: return .i32AddAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 342: return .i32ShrUOr(Instruction.BinBinOperand.load(from: &pc))
+        case 343: return .i32XorShrU(Instruction.BinBinOperand.load(from: &pc))
+        case 344: return .i32AddSub(Instruction.BinBinOperand.load(from: &pc))
+        case 345: return .i32XorShl(Instruction.BinBinOperand.load(from: &pc))
+        case 346: return .i32SubAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 347: return .i32AndShl(Instruction.BinBinOperand.load(from: &pc))
+        case 348: return .i64XorRotl(Instruction.BinBinOperand.load(from: &pc))
+        case 349: return .i64MulAdd(Instruction.BinBinOperand.load(from: &pc))
+        case 350: return .i64ShlAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 351: return .i64AndMul(Instruction.BinBinOperand.load(from: &pc))
+        case 352: return .i64ShlOr(Instruction.BinBinOperand.load(from: &pc))
+        case 353: return .i64XorAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 354: return .i64MulXor(Instruction.BinBinOperand.load(from: &pc))
+        case 355: return .i64AndXor(Instruction.BinBinOperand.load(from: &pc))
+        case 356: return .i64RotlXor(Instruction.BinBinOperand.load(from: &pc))
+        case 357: return .i64SubAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 358: return .i64XorXor(Instruction.BinBinOperand.load(from: &pc))
+        case 359: return .i64OrOr(Instruction.BinBinOperand.load(from: &pc))
+        case 360: return .i64ShrUAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 361: return .i64AndAnd(Instruction.BinBinOperand.load(from: &pc))
+        case 362: return .i64XorMul(Instruction.BinBinOperand.load(from: &pc))
+        case 363: return .i64XorShrU(Instruction.BinBinOperand.load(from: &pc))
+        case 364: return .i32MulSubRev(Instruction.BinBinOperand.load(from: &pc))
+        case 365: return .i32AddToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 366: return .i32SubToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 367: return .i32MulToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 368: return .i32AndToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 369: return .i32OrToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 370: return .i32XorToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 371: return .i32ShlToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 372: return .i32ShrSToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 373: return .i32ShrUToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 374: return .i32RotlToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 375: return .i32RotrToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 376: return .i64AddToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 377: return .i64SubToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 378: return .i64MulToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 379: return .i64AndToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 380: return .i64OrToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 381: return .i64XorToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 382: return .i64ShlToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 383: return .i64ShrSToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 384: return .i64ShrUToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 385: return .i64RotlToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 386: return .i64RotrToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 387: return .i32AddFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 388: return .i32SubFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 389: return .i32MulFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 390: return .i32AndFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 391: return .i32OrFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 392: return .i32XorFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 393: return .i32ShlFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 394: return .i32ShrSFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 395: return .i32ShrUFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 396: return .i32RotlFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 397: return .i32RotrFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 398: return .i64AddFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 399: return .i64SubFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 400: return .i64MulFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 401: return .i64AndFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 402: return .i64OrFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 403: return .i64XorFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 404: return .i64ShlFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 405: return .i64ShrSFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 406: return .i64ShrUFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 407: return .i64RotlFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 408: return .i64RotrFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 409: return .i32AddInAcc(Instruction.AccOperand.load(from: &pc))
+        case 410: return .i32SubInAcc(Instruction.AccOperand.load(from: &pc))
+        case 411: return .i32MulInAcc(Instruction.AccOperand.load(from: &pc))
+        case 412: return .i32AndInAcc(Instruction.AccOperand.load(from: &pc))
+        case 413: return .i32OrInAcc(Instruction.AccOperand.load(from: &pc))
+        case 414: return .i32XorInAcc(Instruction.AccOperand.load(from: &pc))
+        case 415: return .i32ShlInAcc(Instruction.AccOperand.load(from: &pc))
+        case 416: return .i32ShrSInAcc(Instruction.AccOperand.load(from: &pc))
+        case 417: return .i32ShrUInAcc(Instruction.AccOperand.load(from: &pc))
+        case 418: return .i32RotlInAcc(Instruction.AccOperand.load(from: &pc))
+        case 419: return .i32RotrInAcc(Instruction.AccOperand.load(from: &pc))
+        case 420: return .i64AddInAcc(Instruction.AccOperand.load(from: &pc))
+        case 421: return .i64SubInAcc(Instruction.AccOperand.load(from: &pc))
+        case 422: return .i64MulInAcc(Instruction.AccOperand.load(from: &pc))
+        case 423: return .i64AndInAcc(Instruction.AccOperand.load(from: &pc))
+        case 424: return .i64OrInAcc(Instruction.AccOperand.load(from: &pc))
+        case 425: return .i64XorInAcc(Instruction.AccOperand.load(from: &pc))
+        case 426: return .i64ShlInAcc(Instruction.AccOperand.load(from: &pc))
+        case 427: return .i64ShrSInAcc(Instruction.AccOperand.load(from: &pc))
+        case 428: return .i64ShrUInAcc(Instruction.AccOperand.load(from: &pc))
+        case 429: return .i64RotlInAcc(Instruction.AccOperand.load(from: &pc))
+        case 430: return .i64RotrInAcc(Instruction.AccOperand.load(from: &pc))
+        case 431: return .brIfI32EqAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 432: return .brIfI32NeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 433: return .brIfI32LtSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 434: return .brIfI32LtUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 435: return .brIfI32GtSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 436: return .brIfI32GtUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 437: return .brIfI32LeSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 438: return .brIfI32LeUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 439: return .brIfI32GeSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 440: return .brIfI32GeUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 441: return .brIfI64EqAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 442: return .brIfI64NeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 443: return .brIfI64LtSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 444: return .brIfI64LtUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 445: return .brIfI64GtSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 446: return .brIfI64GtUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 447: return .brIfI64LeSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 448: return .brIfI64LeUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 449: return .brIfI64GeSAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 450: return .brIfI64GeUAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 451: return .brIfAcc(Instruction.BrIfAccOperand.load(from: &pc))
+        case 452: return .brIfNotAcc(Instruction.BrIfAccOperand.load(from: &pc))
+        case 453: return .globalGetToAcc(Instruction.GlobalOperand.load(from: &pc))
+        case 454: return .i32LoadToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 455: return .i64LoadToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 456: return .f32LoadToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 457: return .f64LoadToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 458: return .i32Load8SToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 459: return .i32Load8UToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 460: return .i32Load16SToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 461: return .i32Load16UToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 462: return .i64Load8SToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 463: return .i64Load8UToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 464: return .i64Load16SToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 465: return .i64Load16UToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 466: return .i64Load32SToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 467: return .i64Load32UToAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 468: return .i32LoadFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 469: return .i64LoadFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 470: return .f32LoadFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 471: return .f64LoadFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 472: return .i32Load8SFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 473: return .i32Load8UFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 474: return .i32Load16SFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 475: return .i32Load16UFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 476: return .i64Load8SFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 477: return .i64Load8UFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 478: return .i64Load16SFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 479: return .i64Load16UFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 480: return .i64Load32SFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 481: return .i64Load32UFromAcc(Instruction.AccMemoryResultOperand.load(from: &pc))
+        case 482: return .i32LoadInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 483: return .i64LoadInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 484: return .f32LoadInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 485: return .f64LoadInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 486: return .i32Load8SInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 487: return .i32Load8UInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 488: return .i32Load16SInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 489: return .i32Load16UInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 490: return .i64Load8SInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 491: return .i64Load8UInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 492: return .i64Load16SInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 493: return .i64Load16UInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 494: return .i64Load32SInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 495: return .i64Load32UInAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 496: return .i32StoreFromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 497: return .i64StoreFromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 498: return .f32StoreFromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 499: return .f64StoreFromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 500: return .i32Store8FromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 501: return .i32Store16FromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 502: return .i64Store8FromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 503: return .i64Store16FromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 504: return .i64Store32FromAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 505: return .i32StoreAddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 506: return .i64StoreAddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 507: return .f32StoreAddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 508: return .f64StoreAddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 509: return .i32Store8AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 510: return .i32Store16AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 511: return .i64Store8AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 512: return .i64Store16AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 513: return .i64Store32AddrFromAcc(Instruction.AccMemoryValueOperand.load(from: &pc))
+        case 514: return .f64AddToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 515: return .f64AddFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 516: return .f64AddInAcc(Instruction.AccOperand.load(from: &pc))
+        case 517: return .f64SubToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 518: return .f64SubFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 519: return .f64SubInAcc(Instruction.AccOperand.load(from: &pc))
+        case 520: return .f64SubFromAccRev(Instruction.AccUnaryOperand.load(from: &pc))
+        case 521: return .f64SubInAccRev(Instruction.AccOperand.load(from: &pc))
+        case 522: return .f64MulToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 523: return .f64MulFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 524: return .f64MulInAcc(Instruction.AccOperand.load(from: &pc))
+        case 525: return .f64DivToAcc(Instruction.AccBinaryOperand.load(from: &pc))
+        case 526: return .f64DivFromAcc(Instruction.AccUnaryOperand.load(from: &pc))
+        case 527: return .f64DivInAcc(Instruction.AccOperand.load(from: &pc))
+        case 528: return .f64DivFromAccRev(Instruction.AccUnaryOperand.load(from: &pc))
+        case 529: return .f64DivInAccRev(Instruction.AccOperand.load(from: &pc))
+        case 530: return .f64AddAddToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 531: return .f64AddSubToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 532: return .f64AddMulToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 533: return .f64SubAddToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 534: return .f64SubSubToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 535: return .f64SubMulToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 536: return .f64MulAddToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 537: return .f64MulSubToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 538: return .f64MulMulToAcc(Instruction.AccBinBinOperand.load(from: &pc))
+        case 539: return .brIfF64EqAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 540: return .brIfF64NeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 541: return .brIfF64LtAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 542: return .brIfF64LeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 543: return .brIfF64GtAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 544: return .brIfF64GeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 545: return .brIfNotF64LtAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 546: return .brIfNotF64LeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 547: return .brIfNotF64GtAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 548: return .brIfNotF64GeAcc(Instruction.BrIfAccCmpOperand.load(from: &pc))
+        case 549: return .f64SqrtToAcc(Instruction.AccOperand.load(from: &pc))
+        case 550: return .f64LoadToFAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 551: return .f64LoadFromAccToFAcc(Instruction.AccMemoryOffsetOperand.load(from: &pc))
+        case 552: return .f64StoreFromFAcc(Instruction.AccMemoryPointerOperand.load(from: &pc))
+        case 553: return .i32AddImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 554: return .i32MulImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 555: return .i32AndImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 556: return .i32OrImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 557: return .i32XorImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 558: return .i32ShlImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 559: return .i32ShrSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 560: return .i32ShrUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 561: return .i32RotlImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 562: return .i32RotrImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 563: return .i64AddImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 564: return .i64MulImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 565: return .i64AndImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 566: return .i64OrImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 567: return .i64XorImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 568: return .i64ShlImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 569: return .i64ShrSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 570: return .i64ShrUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 571: return .i64RotlImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 572: return .i64RotrImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 573: return .i32EqImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 574: return .i32NeImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 575: return .i32LtSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 576: return .i32LtUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 577: return .i32GtSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 578: return .i32GtUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 579: return .i32LeSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 580: return .i32LeUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 581: return .i32GeSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 582: return .i32GeUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 583: return .i64EqImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 584: return .i64NeImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 585: return .i64LtSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 586: return .i64LtUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 587: return .i64GtSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 588: return .i64GtUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 589: return .i64LeSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 590: return .i64LeUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 591: return .i64GeSImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 592: return .i64GeUImm(Instruction.BinaryImmOperand.load(from: &pc))
+        case 593: return .brIfI32EqImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 594: return .brIfI32NeImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 595: return .brIfI32LtSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 596: return .brIfI32LtUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 597: return .brIfI32GtSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 598: return .brIfI32GtUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 599: return .brIfI32LeSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 600: return .brIfI32LeUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 601: return .brIfI32GeSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 602: return .brIfI32GeUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 603: return .brIfI64EqImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 604: return .brIfI64NeImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 605: return .brIfI64LtSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 606: return .brIfI64LtUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 607: return .brIfI64GtSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 608: return .brIfI64GtUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 609: return .brIfI64LeSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 610: return .brIfI64LeUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 611: return .brIfI64GeSImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 612: return .brIfI64GeUImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 613: return .brIfI32AndImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 614: return .brIfNotI32AndImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 615: return .brIfI64AndImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 616: return .brIfNotI64AndImm(Instruction.BrIfCmpImmOperand.load(from: &pc))
+        case 617: return .i32AddImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 618: return .i32MulImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 619: return .i32AndImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 620: return .i32OrImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 621: return .i32XorImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 622: return .i32ShlImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 623: return .i32ShrSImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 624: return .i32ShrUImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 625: return .i32RotlImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 626: return .i32RotrImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 627: return .i64AddImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 628: return .i64MulImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 629: return .i64AndImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 630: return .i64OrImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 631: return .i64XorImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 632: return .i64ShlImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 633: return .i64ShrSImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 634: return .i64ShrUImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 635: return .i64RotlImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 636: return .i64RotrImmToAcc(Instruction.AccBinaryImmOperand.load(from: &pc))
+        case 637: return .i32AddToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 638: return .i32SubToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 639: return .i32MulToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 640: return .i32AndToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 641: return .i32OrToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 642: return .i32XorToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 643: return .i32ShlToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 644: return .i32ShrSToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 645: return .i32ShrUToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 646: return .i32RotlToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 647: return .i32RotrToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 648: return .i64AddToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 649: return .i64SubToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 650: return .i64MulToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 651: return .i64AndToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 652: return .i64OrToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 653: return .i64XorToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 654: return .i64ShlToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 655: return .i64ShrSToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 656: return .i64ShrUToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 657: return .i64RotlToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 658: return .i64RotrToAccAndSlot(Instruction.BinaryOperand.load(from: &pc))
+        case 659: return .i32AddImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 660: return .i32MulImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 661: return .i32AndImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 662: return .i32OrImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 663: return .i32XorImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 664: return .i32ShlImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 665: return .i32ShrSImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 666: return .i32ShrUImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 667: return .i32RotlImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 668: return .i32RotrImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 669: return .i64AddImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 670: return .i64MulImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 671: return .i64AndImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 672: return .i64OrImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 673: return .i64XorImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 674: return .i64ShlImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 675: return .i64ShrSImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 676: return .i64ShrUImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 677: return .i64RotlImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 678: return .i64RotrImmToAccAndSlot(Instruction.BinaryImmOperand.load(from: &pc))
+        case 679: return .i32LoadToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 680: return .i64LoadToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 681: return .f32LoadToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 682: return .f64LoadToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 683: return .i32Load8SToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 684: return .i32Load8UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 685: return .i32Load16SToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 686: return .i32Load16UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 687: return .i64Load8SToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 688: return .i64Load8UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 689: return .i64Load16SToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 690: return .i64Load16UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 691: return .i64Load32SToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 692: return .i64Load32UToAccAndSlot(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 693: return .copyStackAccToSlot(Instruction.CopyStackAccToSlotOperand.load(from: &pc))
+        case 694: return .selectAcc(Instruction.SelectAccOperand.load(from: &pc))
+        case 695: return .copyStack2(Instruction.CopyStack2Operand.load(from: &pc))
+        case 696: return .selectI32Eq(Instruction.SelectCmpOperand.load(from: &pc))
+        case 697: return .selectI32LtS(Instruction.SelectCmpOperand.load(from: &pc))
+        case 698: return .selectI32LtU(Instruction.SelectCmpOperand.load(from: &pc))
+        case 699: return .selectI32EqImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 700: return .selectI32LtSImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 701: return .selectI32LtUImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 702: return .selectI32GtSImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 703: return .selectI32GtUImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 704: return .selectI64Eq(Instruction.SelectCmpOperand.load(from: &pc))
+        case 705: return .selectI64LtS(Instruction.SelectCmpOperand.load(from: &pc))
+        case 706: return .selectI64LtU(Instruction.SelectCmpOperand.load(from: &pc))
+        case 707: return .selectI64EqImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 708: return .selectI64LtSImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 709: return .selectI64LtUImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 710: return .selectI64GtSImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 711: return .selectI64GtUImm(Instruction.SelectCmpImmOperand.load(from: &pc))
+        case 712: return .i32LoadWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 713: return .i64LoadWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 714: return .f32LoadWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 715: return .f64LoadWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 716: return .i32Load8SWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 717: return .i32Load8UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 718: return .i32Load16SWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 719: return .i32Load16UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 720: return .i64Load8SWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 721: return .i64Load8UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 722: return .i64Load16SWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 723: return .i64Load16UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 724: return .i64Load32SWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 725: return .i64Load32UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
+        case 726: return .consumeFuel(Instruction.ConsumeFuelOperand.load(from: &pc))
+        case 727: return .outOfFuelTrap(NoOperand())
+        case 728: return .callRef(Instruction.CallRefOperand.load(from: &pc))
+        case 729: return .returnCallRef(Instruction.ReturnCallRefOperand.load(from: &pc))
+        case 730: return .refAsNonNull(Instruction.RefAsNonNullOperand.load(from: &pc))
+        case 731: return .brIfNull(Instruction.BrIfOperand.load(from: &pc))
+        case 732: return .brIfNotNull(Instruction.BrIfOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -6600,731 +6590,730 @@ extension Instruction {
         case 6: return "compilingCall"
         case 7: return "internalCall"
         case 8: return "callIndirect"
-        case 9: return "resizeFrameHeader"
-        case 10: return "returnCall"
-        case 11: return "returnCallIndirect"
-        case 12: return "unreachable"
-        case 13: return "nop"
-        case 14: return "br"
-        case 15: return "brIf"
-        case 16: return "brIfNot"
-        case 17: return "brTable"
-        case 18: return "_return"
-        case 19: return "endOfExecution"
-        case 20: return "i32Load"
-        case 21: return "i64Load"
-        case 22: return "f32Load"
-        case 23: return "f64Load"
-        case 24: return "i32Load8S"
-        case 25: return "i32Load8U"
-        case 26: return "i32Load16S"
-        case 27: return "i32Load16U"
-        case 28: return "i64Load8S"
-        case 29: return "i64Load8U"
-        case 30: return "i64Load16S"
-        case 31: return "i64Load16U"
-        case 32: return "i64Load32S"
-        case 33: return "i64Load32U"
-        case 34: return "i32Store"
-        case 35: return "i64Store"
-        case 36: return "f32Store"
-        case 37: return "f64Store"
-        case 38: return "i32Store8"
-        case 39: return "i32Store16"
-        case 40: return "i64Store8"
-        case 41: return "i64Store16"
-        case 42: return "i64Store32"
-        case 43: return "memorySize"
-        case 44: return "memoryGrow"
-        case 45: return "memoryInit"
-        case 46: return "memoryDataDrop"
-        case 47: return "memoryCopy"
-        case 48: return "memoryFill"
-        case 49: return "v128Const"
-        case 50: return "i8x16Shuffle"
-        case 51: return "simd"
-        case 52: return "const32"
-        case 53: return "const64"
-        case 54: return "i32Add"
-        case 55: return "i64Add"
-        case 56: return "i32Sub"
-        case 57: return "i64Sub"
-        case 58: return "i32Mul"
-        case 59: return "i64Mul"
-        case 60: return "i32And"
-        case 61: return "i64And"
-        case 62: return "i32Or"
-        case 63: return "i64Or"
-        case 64: return "i32Xor"
-        case 65: return "i64Xor"
-        case 66: return "i32Shl"
-        case 67: return "i64Shl"
-        case 68: return "i32ShrS"
-        case 69: return "i64ShrS"
-        case 70: return "i32ShrU"
-        case 71: return "i64ShrU"
-        case 72: return "i32Rotl"
-        case 73: return "i64Rotl"
-        case 74: return "i32Rotr"
-        case 75: return "i64Rotr"
-        case 76: return "i32DivS"
-        case 77: return "i64DivS"
-        case 78: return "i32DivU"
-        case 79: return "i64DivU"
-        case 80: return "i32RemS"
-        case 81: return "i64RemS"
-        case 82: return "i32RemU"
-        case 83: return "i64RemU"
-        case 84: return "i32Eq"
-        case 85: return "i64Eq"
-        case 86: return "i32Ne"
-        case 87: return "i64Ne"
-        case 88: return "i32LtS"
-        case 89: return "i64LtS"
-        case 90: return "i32LtU"
-        case 91: return "i64LtU"
-        case 92: return "i32GtS"
-        case 93: return "i64GtS"
-        case 94: return "i32GtU"
-        case 95: return "i64GtU"
-        case 96: return "i32LeS"
-        case 97: return "i64LeS"
-        case 98: return "i32LeU"
-        case 99: return "i64LeU"
-        case 100: return "i32GeS"
-        case 101: return "i64GeS"
-        case 102: return "i32GeU"
-        case 103: return "i64GeU"
-        case 104: return "i32Clz"
-        case 105: return "i64Clz"
-        case 106: return "i32Ctz"
-        case 107: return "i64Ctz"
-        case 108: return "i32Popcnt"
-        case 109: return "i64Popcnt"
-        case 110: return "i32Eqz"
-        case 111: return "i64Eqz"
-        case 112: return "i32WrapI64"
-        case 113: return "i64ExtendI32S"
-        case 114: return "i64ExtendI32U"
-        case 115: return "i32Extend8S"
-        case 116: return "i64Extend8S"
-        case 117: return "i32Extend16S"
-        case 118: return "i64Extend16S"
-        case 119: return "i64Extend32S"
-        case 120: return "i32TruncF32S"
-        case 121: return "i32TruncF32U"
-        case 122: return "i32TruncSatF32S"
-        case 123: return "i32TruncSatF32U"
-        case 124: return "i32TruncF64S"
-        case 125: return "i32TruncF64U"
-        case 126: return "i32TruncSatF64S"
-        case 127: return "i32TruncSatF64U"
-        case 128: return "i64TruncF32S"
-        case 129: return "i64TruncF32U"
-        case 130: return "i64TruncSatF32S"
-        case 131: return "i64TruncSatF32U"
-        case 132: return "i64TruncF64S"
-        case 133: return "i64TruncF64U"
-        case 134: return "i64TruncSatF64S"
-        case 135: return "i64TruncSatF64U"
-        case 136: return "f32ConvertI32S"
-        case 137: return "f32ConvertI32U"
-        case 138: return "f32ConvertI64S"
-        case 139: return "f32ConvertI64U"
-        case 140: return "f64ConvertI32S"
-        case 141: return "f64ConvertI32U"
-        case 142: return "f64ConvertI64S"
-        case 143: return "f64ConvertI64U"
-        case 144: return "f32ReinterpretI32"
-        case 145: return "f64ReinterpretI64"
-        case 146: return "i32ReinterpretF32"
-        case 147: return "i64ReinterpretF64"
-        case 148: return "f32Add"
-        case 149: return "f64Add"
-        case 150: return "f32Sub"
-        case 151: return "f64Sub"
-        case 152: return "f32Mul"
-        case 153: return "f64Mul"
-        case 154: return "f32Div"
-        case 155: return "f64Div"
-        case 156: return "f32Min"
-        case 157: return "f64Min"
-        case 158: return "f32Max"
-        case 159: return "f64Max"
-        case 160: return "f32CopySign"
-        case 161: return "f64CopySign"
-        case 162: return "f32Eq"
-        case 163: return "f64Eq"
-        case 164: return "f32Ne"
-        case 165: return "f64Ne"
-        case 166: return "f32Lt"
-        case 167: return "f64Lt"
-        case 168: return "f32Gt"
-        case 169: return "f64Gt"
-        case 170: return "f32Le"
-        case 171: return "f64Le"
-        case 172: return "f32Ge"
-        case 173: return "f64Ge"
-        case 174: return "f32Abs"
-        case 175: return "f64Abs"
-        case 176: return "f32Neg"
-        case 177: return "f64Neg"
-        case 178: return "f32Ceil"
-        case 179: return "f64Ceil"
-        case 180: return "f32Floor"
-        case 181: return "f64Floor"
-        case 182: return "f32Trunc"
-        case 183: return "f64Trunc"
-        case 184: return "f32Nearest"
-        case 185: return "f64Nearest"
-        case 186: return "f32Sqrt"
-        case 187: return "f64Sqrt"
-        case 188: return "f64PromoteF32"
-        case 189: return "f32DemoteF64"
-        case 190: return "select"
-        case 191: return "refNull"
-        case 192: return "refIsNull"
-        case 193: return "refFunc"
-        case 194: return "tableGet"
-        case 195: return "tableSet"
-        case 196: return "tableSize"
-        case 197: return "tableGrow"
-        case 198: return "tableFill"
-        case 199: return "tableCopy"
-        case 200: return "tableInit"
-        case 201: return "tableElementDrop"
-        case 202: return "onEnter"
-        case 203: return "onExit"
-        case 204: return "breakpoint"
-        case 205: return "i32AtomicLoad"
-        case 206: return "i64AtomicLoad"
-        case 207: return "i32AtomicLoad8U"
-        case 208: return "i32AtomicLoad16U"
-        case 209: return "i64AtomicLoad8U"
-        case 210: return "i64AtomicLoad16U"
-        case 211: return "i64AtomicLoad32U"
-        case 212: return "i32AtomicStore"
-        case 213: return "i64AtomicStore"
-        case 214: return "i32AtomicStore8"
-        case 215: return "i32AtomicStore16"
-        case 216: return "i64AtomicStore8"
-        case 217: return "i64AtomicStore16"
-        case 218: return "i64AtomicStore32"
-        case 219: return "i32AtomicRmwAdd"
-        case 220: return "i64AtomicRmwAdd"
-        case 221: return "i32AtomicRmwSub"
-        case 222: return "i64AtomicRmwSub"
-        case 223: return "i32AtomicRmwAnd"
-        case 224: return "i64AtomicRmwAnd"
-        case 225: return "i32AtomicRmwOr"
-        case 226: return "i64AtomicRmwOr"
-        case 227: return "i32AtomicRmwXor"
-        case 228: return "i64AtomicRmwXor"
-        case 229: return "i32AtomicRmwXchg"
-        case 230: return "i64AtomicRmwXchg"
-        case 231: return "i32AtomicRmw8AddU"
-        case 232: return "i64AtomicRmw8AddU"
-        case 233: return "i32AtomicRmw8SubU"
-        case 234: return "i64AtomicRmw8SubU"
-        case 235: return "i32AtomicRmw8AndU"
-        case 236: return "i64AtomicRmw8AndU"
-        case 237: return "i32AtomicRmw8OrU"
-        case 238: return "i64AtomicRmw8OrU"
-        case 239: return "i32AtomicRmw8XorU"
-        case 240: return "i64AtomicRmw8XorU"
-        case 241: return "i32AtomicRmw8XchgU"
-        case 242: return "i64AtomicRmw8XchgU"
-        case 243: return "i32AtomicRmw16AddU"
-        case 244: return "i64AtomicRmw16AddU"
-        case 245: return "i32AtomicRmw16SubU"
-        case 246: return "i64AtomicRmw16SubU"
-        case 247: return "i32AtomicRmw16AndU"
-        case 248: return "i64AtomicRmw16AndU"
-        case 249: return "i32AtomicRmw16OrU"
-        case 250: return "i64AtomicRmw16OrU"
-        case 251: return "i32AtomicRmw16XorU"
-        case 252: return "i64AtomicRmw16XorU"
-        case 253: return "i32AtomicRmw16XchgU"
-        case 254: return "i64AtomicRmw16XchgU"
-        case 255: return "i64AtomicRmw32AddU"
-        case 256: return "i64AtomicRmw32SubU"
-        case 257: return "i64AtomicRmw32AndU"
-        case 258: return "i64AtomicRmw32OrU"
-        case 259: return "i64AtomicRmw32XorU"
-        case 260: return "i64AtomicRmw32XchgU"
-        case 261: return "i32AtomicRmwCmpxchg"
-        case 262: return "i64AtomicRmwCmpxchg"
-        case 263: return "i32AtomicRmw8CmpxchgU"
-        case 264: return "i32AtomicRmw16CmpxchgU"
-        case 265: return "i64AtomicRmw8CmpxchgU"
-        case 266: return "i64AtomicRmw16CmpxchgU"
-        case 267: return "i64AtomicRmw32CmpxchgU"
-        case 268: return "memoryAtomicWait32"
-        case 269: return "memoryAtomicWait64"
-        case 270: return "memoryAtomicNotify"
-        case 271: return "atomicFence"
-        case 272: return "throwTag"
-        case 273: return "throwRef"
-        case 274: return "catchHandlers"
-        case 275: return "catchHandlersEnd"
-        case 276: return "brIfI32Eq"
-        case 277: return "brIfI32Ne"
-        case 278: return "brIfI32LtS"
-        case 279: return "brIfI32LtU"
-        case 280: return "brIfI32GtS"
-        case 281: return "brIfI32GtU"
-        case 282: return "brIfI32LeS"
-        case 283: return "brIfI32LeU"
-        case 284: return "brIfI32GeS"
-        case 285: return "brIfI32GeU"
-        case 286: return "brIfI64Eq"
-        case 287: return "brIfI64Ne"
-        case 288: return "brIfI64LtS"
-        case 289: return "brIfI64LtU"
-        case 290: return "brIfI64GtS"
-        case 291: return "brIfI64GtU"
-        case 292: return "brIfI64LeS"
-        case 293: return "brIfI64LeU"
-        case 294: return "brIfI64GeS"
-        case 295: return "brIfI64GeU"
-        case 296: return "returnCrossInstance"
-        case 297: return "memoryOutOfBoundsTrap"
-        case 298: return "unalignedAtomicTrap"
-        case 299: return "brIfF32Eq"
-        case 300: return "brIfF32Ne"
-        case 301: return "brIfF32Lt"
-        case 302: return "brIfF32Le"
-        case 303: return "brIfNotF32Lt"
-        case 304: return "brIfNotF32Le"
-        case 305: return "brIfF64Eq"
-        case 306: return "brIfF64Ne"
-        case 307: return "brIfF64Lt"
-        case 308: return "brIfF64Le"
-        case 309: return "brIfNotF64Lt"
-        case 310: return "brIfNotF64Le"
-        case 311: return "f32AddAdd"
-        case 312: return "f32AddSub"
-        case 313: return "f32AddMul"
-        case 314: return "f32SubAdd"
-        case 315: return "f32SubSub"
-        case 316: return "f32SubMul"
-        case 317: return "f32MulAdd"
-        case 318: return "f32MulSub"
-        case 319: return "f32MulMul"
-        case 320: return "f64AddAdd"
-        case 321: return "f64AddSub"
-        case 322: return "f64AddMul"
-        case 323: return "f64SubAdd"
-        case 324: return "f64SubSub"
-        case 325: return "f64SubMul"
-        case 326: return "f64MulAdd"
-        case 327: return "f64MulSub"
-        case 328: return "f64MulMul"
-        case 329: return "brIfI32And"
-        case 330: return "brIfNotI32And"
-        case 331: return "brIfI64And"
-        case 332: return "brIfNotI64And"
-        case 333: return "i32ShlAdd"
-        case 334: return "i32MulAdd"
-        case 335: return "i32AddAdd"
-        case 336: return "i32AndAdd"
-        case 337: return "i32ShrUAnd"
-        case 338: return "i32OrAnd"
-        case 339: return "i32ShrUAdd"
-        case 340: return "i32SubAnd"
-        case 341: return "i32ShlOr"
-        case 342: return "i32AddAnd"
-        case 343: return "i32ShrUOr"
-        case 344: return "i32XorShrU"
-        case 345: return "i32AddSub"
-        case 346: return "i32XorShl"
-        case 347: return "i32SubAdd"
-        case 348: return "i32AndShl"
-        case 349: return "i64XorRotl"
-        case 350: return "i64MulAdd"
-        case 351: return "i64ShlAnd"
-        case 352: return "i64AndMul"
-        case 353: return "i64ShlOr"
-        case 354: return "i64XorAnd"
-        case 355: return "i64MulXor"
-        case 356: return "i64AndXor"
-        case 357: return "i64RotlXor"
-        case 358: return "i64SubAnd"
-        case 359: return "i64XorXor"
-        case 360: return "i64OrOr"
-        case 361: return "i64ShrUAnd"
-        case 362: return "i64AndAnd"
-        case 363: return "i64XorMul"
-        case 364: return "i64XorShrU"
-        case 365: return "i32MulSubRev"
-        case 366: return "i32AddToAcc"
-        case 367: return "i32SubToAcc"
-        case 368: return "i32MulToAcc"
-        case 369: return "i32AndToAcc"
-        case 370: return "i32OrToAcc"
-        case 371: return "i32XorToAcc"
-        case 372: return "i32ShlToAcc"
-        case 373: return "i32ShrSToAcc"
-        case 374: return "i32ShrUToAcc"
-        case 375: return "i32RotlToAcc"
-        case 376: return "i32RotrToAcc"
-        case 377: return "i64AddToAcc"
-        case 378: return "i64SubToAcc"
-        case 379: return "i64MulToAcc"
-        case 380: return "i64AndToAcc"
-        case 381: return "i64OrToAcc"
-        case 382: return "i64XorToAcc"
-        case 383: return "i64ShlToAcc"
-        case 384: return "i64ShrSToAcc"
-        case 385: return "i64ShrUToAcc"
-        case 386: return "i64RotlToAcc"
-        case 387: return "i64RotrToAcc"
-        case 388: return "i32AddFromAcc"
-        case 389: return "i32SubFromAcc"
-        case 390: return "i32MulFromAcc"
-        case 391: return "i32AndFromAcc"
-        case 392: return "i32OrFromAcc"
-        case 393: return "i32XorFromAcc"
-        case 394: return "i32ShlFromAcc"
-        case 395: return "i32ShrSFromAcc"
-        case 396: return "i32ShrUFromAcc"
-        case 397: return "i32RotlFromAcc"
-        case 398: return "i32RotrFromAcc"
-        case 399: return "i64AddFromAcc"
-        case 400: return "i64SubFromAcc"
-        case 401: return "i64MulFromAcc"
-        case 402: return "i64AndFromAcc"
-        case 403: return "i64OrFromAcc"
-        case 404: return "i64XorFromAcc"
-        case 405: return "i64ShlFromAcc"
-        case 406: return "i64ShrSFromAcc"
-        case 407: return "i64ShrUFromAcc"
-        case 408: return "i64RotlFromAcc"
-        case 409: return "i64RotrFromAcc"
-        case 410: return "i32AddInAcc"
-        case 411: return "i32SubInAcc"
-        case 412: return "i32MulInAcc"
-        case 413: return "i32AndInAcc"
-        case 414: return "i32OrInAcc"
-        case 415: return "i32XorInAcc"
-        case 416: return "i32ShlInAcc"
-        case 417: return "i32ShrSInAcc"
-        case 418: return "i32ShrUInAcc"
-        case 419: return "i32RotlInAcc"
-        case 420: return "i32RotrInAcc"
-        case 421: return "i64AddInAcc"
-        case 422: return "i64SubInAcc"
-        case 423: return "i64MulInAcc"
-        case 424: return "i64AndInAcc"
-        case 425: return "i64OrInAcc"
-        case 426: return "i64XorInAcc"
-        case 427: return "i64ShlInAcc"
-        case 428: return "i64ShrSInAcc"
-        case 429: return "i64ShrUInAcc"
-        case 430: return "i64RotlInAcc"
-        case 431: return "i64RotrInAcc"
-        case 432: return "brIfI32EqAcc"
-        case 433: return "brIfI32NeAcc"
-        case 434: return "brIfI32LtSAcc"
-        case 435: return "brIfI32LtUAcc"
-        case 436: return "brIfI32GtSAcc"
-        case 437: return "brIfI32GtUAcc"
-        case 438: return "brIfI32LeSAcc"
-        case 439: return "brIfI32LeUAcc"
-        case 440: return "brIfI32GeSAcc"
-        case 441: return "brIfI32GeUAcc"
-        case 442: return "brIfI64EqAcc"
-        case 443: return "brIfI64NeAcc"
-        case 444: return "brIfI64LtSAcc"
-        case 445: return "brIfI64LtUAcc"
-        case 446: return "brIfI64GtSAcc"
-        case 447: return "brIfI64GtUAcc"
-        case 448: return "brIfI64LeSAcc"
-        case 449: return "brIfI64LeUAcc"
-        case 450: return "brIfI64GeSAcc"
-        case 451: return "brIfI64GeUAcc"
-        case 452: return "brIfAcc"
-        case 453: return "brIfNotAcc"
-        case 454: return "globalGetToAcc"
-        case 455: return "i32LoadToAcc"
-        case 456: return "i64LoadToAcc"
-        case 457: return "f32LoadToAcc"
-        case 458: return "f64LoadToAcc"
-        case 459: return "i32Load8SToAcc"
-        case 460: return "i32Load8UToAcc"
-        case 461: return "i32Load16SToAcc"
-        case 462: return "i32Load16UToAcc"
-        case 463: return "i64Load8SToAcc"
-        case 464: return "i64Load8UToAcc"
-        case 465: return "i64Load16SToAcc"
-        case 466: return "i64Load16UToAcc"
-        case 467: return "i64Load32SToAcc"
-        case 468: return "i64Load32UToAcc"
-        case 469: return "i32LoadFromAcc"
-        case 470: return "i64LoadFromAcc"
-        case 471: return "f32LoadFromAcc"
-        case 472: return "f64LoadFromAcc"
-        case 473: return "i32Load8SFromAcc"
-        case 474: return "i32Load8UFromAcc"
-        case 475: return "i32Load16SFromAcc"
-        case 476: return "i32Load16UFromAcc"
-        case 477: return "i64Load8SFromAcc"
-        case 478: return "i64Load8UFromAcc"
-        case 479: return "i64Load16SFromAcc"
-        case 480: return "i64Load16UFromAcc"
-        case 481: return "i64Load32SFromAcc"
-        case 482: return "i64Load32UFromAcc"
-        case 483: return "i32LoadInAcc"
-        case 484: return "i64LoadInAcc"
-        case 485: return "f32LoadInAcc"
-        case 486: return "f64LoadInAcc"
-        case 487: return "i32Load8SInAcc"
-        case 488: return "i32Load8UInAcc"
-        case 489: return "i32Load16SInAcc"
-        case 490: return "i32Load16UInAcc"
-        case 491: return "i64Load8SInAcc"
-        case 492: return "i64Load8UInAcc"
-        case 493: return "i64Load16SInAcc"
-        case 494: return "i64Load16UInAcc"
-        case 495: return "i64Load32SInAcc"
-        case 496: return "i64Load32UInAcc"
-        case 497: return "i32StoreFromAcc"
-        case 498: return "i64StoreFromAcc"
-        case 499: return "f32StoreFromAcc"
-        case 500: return "f64StoreFromAcc"
-        case 501: return "i32Store8FromAcc"
-        case 502: return "i32Store16FromAcc"
-        case 503: return "i64Store8FromAcc"
-        case 504: return "i64Store16FromAcc"
-        case 505: return "i64Store32FromAcc"
-        case 506: return "i32StoreAddrFromAcc"
-        case 507: return "i64StoreAddrFromAcc"
-        case 508: return "f32StoreAddrFromAcc"
-        case 509: return "f64StoreAddrFromAcc"
-        case 510: return "i32Store8AddrFromAcc"
-        case 511: return "i32Store16AddrFromAcc"
-        case 512: return "i64Store8AddrFromAcc"
-        case 513: return "i64Store16AddrFromAcc"
-        case 514: return "i64Store32AddrFromAcc"
-        case 515: return "f64AddToAcc"
-        case 516: return "f64AddFromAcc"
-        case 517: return "f64AddInAcc"
-        case 518: return "f64SubToAcc"
-        case 519: return "f64SubFromAcc"
-        case 520: return "f64SubInAcc"
-        case 521: return "f64SubFromAccRev"
-        case 522: return "f64SubInAccRev"
-        case 523: return "f64MulToAcc"
-        case 524: return "f64MulFromAcc"
-        case 525: return "f64MulInAcc"
-        case 526: return "f64DivToAcc"
-        case 527: return "f64DivFromAcc"
-        case 528: return "f64DivInAcc"
-        case 529: return "f64DivFromAccRev"
-        case 530: return "f64DivInAccRev"
-        case 531: return "f64AddAddToAcc"
-        case 532: return "f64AddSubToAcc"
-        case 533: return "f64AddMulToAcc"
-        case 534: return "f64SubAddToAcc"
-        case 535: return "f64SubSubToAcc"
-        case 536: return "f64SubMulToAcc"
-        case 537: return "f64MulAddToAcc"
-        case 538: return "f64MulSubToAcc"
-        case 539: return "f64MulMulToAcc"
-        case 540: return "brIfF64EqAcc"
-        case 541: return "brIfF64NeAcc"
-        case 542: return "brIfF64LtAcc"
-        case 543: return "brIfF64LeAcc"
-        case 544: return "brIfF64GtAcc"
-        case 545: return "brIfF64GeAcc"
-        case 546: return "brIfNotF64LtAcc"
-        case 547: return "brIfNotF64LeAcc"
-        case 548: return "brIfNotF64GtAcc"
-        case 549: return "brIfNotF64GeAcc"
-        case 550: return "f64SqrtToAcc"
-        case 551: return "f64LoadToFAcc"
-        case 552: return "f64LoadFromAccToFAcc"
-        case 553: return "f64StoreFromFAcc"
-        case 554: return "i32AddImm"
-        case 555: return "i32MulImm"
-        case 556: return "i32AndImm"
-        case 557: return "i32OrImm"
-        case 558: return "i32XorImm"
-        case 559: return "i32ShlImm"
-        case 560: return "i32ShrSImm"
-        case 561: return "i32ShrUImm"
-        case 562: return "i32RotlImm"
-        case 563: return "i32RotrImm"
-        case 564: return "i64AddImm"
-        case 565: return "i64MulImm"
-        case 566: return "i64AndImm"
-        case 567: return "i64OrImm"
-        case 568: return "i64XorImm"
-        case 569: return "i64ShlImm"
-        case 570: return "i64ShrSImm"
-        case 571: return "i64ShrUImm"
-        case 572: return "i64RotlImm"
-        case 573: return "i64RotrImm"
-        case 574: return "i32EqImm"
-        case 575: return "i32NeImm"
-        case 576: return "i32LtSImm"
-        case 577: return "i32LtUImm"
-        case 578: return "i32GtSImm"
-        case 579: return "i32GtUImm"
-        case 580: return "i32LeSImm"
-        case 581: return "i32LeUImm"
-        case 582: return "i32GeSImm"
-        case 583: return "i32GeUImm"
-        case 584: return "i64EqImm"
-        case 585: return "i64NeImm"
-        case 586: return "i64LtSImm"
-        case 587: return "i64LtUImm"
-        case 588: return "i64GtSImm"
-        case 589: return "i64GtUImm"
-        case 590: return "i64LeSImm"
-        case 591: return "i64LeUImm"
-        case 592: return "i64GeSImm"
-        case 593: return "i64GeUImm"
-        case 594: return "brIfI32EqImm"
-        case 595: return "brIfI32NeImm"
-        case 596: return "brIfI32LtSImm"
-        case 597: return "brIfI32LtUImm"
-        case 598: return "brIfI32GtSImm"
-        case 599: return "brIfI32GtUImm"
-        case 600: return "brIfI32LeSImm"
-        case 601: return "brIfI32LeUImm"
-        case 602: return "brIfI32GeSImm"
-        case 603: return "brIfI32GeUImm"
-        case 604: return "brIfI64EqImm"
-        case 605: return "brIfI64NeImm"
-        case 606: return "brIfI64LtSImm"
-        case 607: return "brIfI64LtUImm"
-        case 608: return "brIfI64GtSImm"
-        case 609: return "brIfI64GtUImm"
-        case 610: return "brIfI64LeSImm"
-        case 611: return "brIfI64LeUImm"
-        case 612: return "brIfI64GeSImm"
-        case 613: return "brIfI64GeUImm"
-        case 614: return "brIfI32AndImm"
-        case 615: return "brIfNotI32AndImm"
-        case 616: return "brIfI64AndImm"
-        case 617: return "brIfNotI64AndImm"
-        case 618: return "i32AddImmToAcc"
-        case 619: return "i32MulImmToAcc"
-        case 620: return "i32AndImmToAcc"
-        case 621: return "i32OrImmToAcc"
-        case 622: return "i32XorImmToAcc"
-        case 623: return "i32ShlImmToAcc"
-        case 624: return "i32ShrSImmToAcc"
-        case 625: return "i32ShrUImmToAcc"
-        case 626: return "i32RotlImmToAcc"
-        case 627: return "i32RotrImmToAcc"
-        case 628: return "i64AddImmToAcc"
-        case 629: return "i64MulImmToAcc"
-        case 630: return "i64AndImmToAcc"
-        case 631: return "i64OrImmToAcc"
-        case 632: return "i64XorImmToAcc"
-        case 633: return "i64ShlImmToAcc"
-        case 634: return "i64ShrSImmToAcc"
-        case 635: return "i64ShrUImmToAcc"
-        case 636: return "i64RotlImmToAcc"
-        case 637: return "i64RotrImmToAcc"
-        case 638: return "i32AddToAccAndSlot"
-        case 639: return "i32SubToAccAndSlot"
-        case 640: return "i32MulToAccAndSlot"
-        case 641: return "i32AndToAccAndSlot"
-        case 642: return "i32OrToAccAndSlot"
-        case 643: return "i32XorToAccAndSlot"
-        case 644: return "i32ShlToAccAndSlot"
-        case 645: return "i32ShrSToAccAndSlot"
-        case 646: return "i32ShrUToAccAndSlot"
-        case 647: return "i32RotlToAccAndSlot"
-        case 648: return "i32RotrToAccAndSlot"
-        case 649: return "i64AddToAccAndSlot"
-        case 650: return "i64SubToAccAndSlot"
-        case 651: return "i64MulToAccAndSlot"
-        case 652: return "i64AndToAccAndSlot"
-        case 653: return "i64OrToAccAndSlot"
-        case 654: return "i64XorToAccAndSlot"
-        case 655: return "i64ShlToAccAndSlot"
-        case 656: return "i64ShrSToAccAndSlot"
-        case 657: return "i64ShrUToAccAndSlot"
-        case 658: return "i64RotlToAccAndSlot"
-        case 659: return "i64RotrToAccAndSlot"
-        case 660: return "i32AddImmToAccAndSlot"
-        case 661: return "i32MulImmToAccAndSlot"
-        case 662: return "i32AndImmToAccAndSlot"
-        case 663: return "i32OrImmToAccAndSlot"
-        case 664: return "i32XorImmToAccAndSlot"
-        case 665: return "i32ShlImmToAccAndSlot"
-        case 666: return "i32ShrSImmToAccAndSlot"
-        case 667: return "i32ShrUImmToAccAndSlot"
-        case 668: return "i32RotlImmToAccAndSlot"
-        case 669: return "i32RotrImmToAccAndSlot"
-        case 670: return "i64AddImmToAccAndSlot"
-        case 671: return "i64MulImmToAccAndSlot"
-        case 672: return "i64AndImmToAccAndSlot"
-        case 673: return "i64OrImmToAccAndSlot"
-        case 674: return "i64XorImmToAccAndSlot"
-        case 675: return "i64ShlImmToAccAndSlot"
-        case 676: return "i64ShrSImmToAccAndSlot"
-        case 677: return "i64ShrUImmToAccAndSlot"
-        case 678: return "i64RotlImmToAccAndSlot"
-        case 679: return "i64RotrImmToAccAndSlot"
-        case 680: return "i32LoadToAccAndSlot"
-        case 681: return "i64LoadToAccAndSlot"
-        case 682: return "f32LoadToAccAndSlot"
-        case 683: return "f64LoadToAccAndSlot"
-        case 684: return "i32Load8SToAccAndSlot"
-        case 685: return "i32Load8UToAccAndSlot"
-        case 686: return "i32Load16SToAccAndSlot"
-        case 687: return "i32Load16UToAccAndSlot"
-        case 688: return "i64Load8SToAccAndSlot"
-        case 689: return "i64Load8UToAccAndSlot"
-        case 690: return "i64Load16SToAccAndSlot"
-        case 691: return "i64Load16UToAccAndSlot"
-        case 692: return "i64Load32SToAccAndSlot"
-        case 693: return "i64Load32UToAccAndSlot"
-        case 694: return "copyStackAccToSlot"
-        case 695: return "selectAcc"
-        case 696: return "copyStack2"
-        case 697: return "selectI32Eq"
-        case 698: return "selectI32LtS"
-        case 699: return "selectI32LtU"
-        case 700: return "selectI32EqImm"
-        case 701: return "selectI32LtSImm"
-        case 702: return "selectI32LtUImm"
-        case 703: return "selectI32GtSImm"
-        case 704: return "selectI32GtUImm"
-        case 705: return "selectI64Eq"
-        case 706: return "selectI64LtS"
-        case 707: return "selectI64LtU"
-        case 708: return "selectI64EqImm"
-        case 709: return "selectI64LtSImm"
-        case 710: return "selectI64LtUImm"
-        case 711: return "selectI64GtSImm"
-        case 712: return "selectI64GtUImm"
-        case 713: return "i32LoadWithCopy"
-        case 714: return "i64LoadWithCopy"
-        case 715: return "f32LoadWithCopy"
-        case 716: return "f64LoadWithCopy"
-        case 717: return "i32Load8SWithCopy"
-        case 718: return "i32Load8UWithCopy"
-        case 719: return "i32Load16SWithCopy"
-        case 720: return "i32Load16UWithCopy"
-        case 721: return "i64Load8SWithCopy"
-        case 722: return "i64Load8UWithCopy"
-        case 723: return "i64Load16SWithCopy"
-        case 724: return "i64Load16UWithCopy"
-        case 725: return "i64Load32SWithCopy"
-        case 726: return "i64Load32UWithCopy"
-        case 727: return "consumeFuel"
-        case 728: return "outOfFuelTrap"
-        case 729: return "callRef"
-        case 730: return "returnCallRef"
-        case 731: return "refAsNonNull"
-        case 732: return "brIfNull"
-        case 733: return "brIfNotNull"
+        case 9: return "returnCall"
+        case 10: return "returnCallIndirect"
+        case 11: return "unreachable"
+        case 12: return "nop"
+        case 13: return "br"
+        case 14: return "brIf"
+        case 15: return "brIfNot"
+        case 16: return "brTable"
+        case 17: return "_return"
+        case 18: return "endOfExecution"
+        case 19: return "i32Load"
+        case 20: return "i64Load"
+        case 21: return "f32Load"
+        case 22: return "f64Load"
+        case 23: return "i32Load8S"
+        case 24: return "i32Load8U"
+        case 25: return "i32Load16S"
+        case 26: return "i32Load16U"
+        case 27: return "i64Load8S"
+        case 28: return "i64Load8U"
+        case 29: return "i64Load16S"
+        case 30: return "i64Load16U"
+        case 31: return "i64Load32S"
+        case 32: return "i64Load32U"
+        case 33: return "i32Store"
+        case 34: return "i64Store"
+        case 35: return "f32Store"
+        case 36: return "f64Store"
+        case 37: return "i32Store8"
+        case 38: return "i32Store16"
+        case 39: return "i64Store8"
+        case 40: return "i64Store16"
+        case 41: return "i64Store32"
+        case 42: return "memorySize"
+        case 43: return "memoryGrow"
+        case 44: return "memoryInit"
+        case 45: return "memoryDataDrop"
+        case 46: return "memoryCopy"
+        case 47: return "memoryFill"
+        case 48: return "v128Const"
+        case 49: return "i8x16Shuffle"
+        case 50: return "simd"
+        case 51: return "const32"
+        case 52: return "const64"
+        case 53: return "i32Add"
+        case 54: return "i64Add"
+        case 55: return "i32Sub"
+        case 56: return "i64Sub"
+        case 57: return "i32Mul"
+        case 58: return "i64Mul"
+        case 59: return "i32And"
+        case 60: return "i64And"
+        case 61: return "i32Or"
+        case 62: return "i64Or"
+        case 63: return "i32Xor"
+        case 64: return "i64Xor"
+        case 65: return "i32Shl"
+        case 66: return "i64Shl"
+        case 67: return "i32ShrS"
+        case 68: return "i64ShrS"
+        case 69: return "i32ShrU"
+        case 70: return "i64ShrU"
+        case 71: return "i32Rotl"
+        case 72: return "i64Rotl"
+        case 73: return "i32Rotr"
+        case 74: return "i64Rotr"
+        case 75: return "i32DivS"
+        case 76: return "i64DivS"
+        case 77: return "i32DivU"
+        case 78: return "i64DivU"
+        case 79: return "i32RemS"
+        case 80: return "i64RemS"
+        case 81: return "i32RemU"
+        case 82: return "i64RemU"
+        case 83: return "i32Eq"
+        case 84: return "i64Eq"
+        case 85: return "i32Ne"
+        case 86: return "i64Ne"
+        case 87: return "i32LtS"
+        case 88: return "i64LtS"
+        case 89: return "i32LtU"
+        case 90: return "i64LtU"
+        case 91: return "i32GtS"
+        case 92: return "i64GtS"
+        case 93: return "i32GtU"
+        case 94: return "i64GtU"
+        case 95: return "i32LeS"
+        case 96: return "i64LeS"
+        case 97: return "i32LeU"
+        case 98: return "i64LeU"
+        case 99: return "i32GeS"
+        case 100: return "i64GeS"
+        case 101: return "i32GeU"
+        case 102: return "i64GeU"
+        case 103: return "i32Clz"
+        case 104: return "i64Clz"
+        case 105: return "i32Ctz"
+        case 106: return "i64Ctz"
+        case 107: return "i32Popcnt"
+        case 108: return "i64Popcnt"
+        case 109: return "i32Eqz"
+        case 110: return "i64Eqz"
+        case 111: return "i32WrapI64"
+        case 112: return "i64ExtendI32S"
+        case 113: return "i64ExtendI32U"
+        case 114: return "i32Extend8S"
+        case 115: return "i64Extend8S"
+        case 116: return "i32Extend16S"
+        case 117: return "i64Extend16S"
+        case 118: return "i64Extend32S"
+        case 119: return "i32TruncF32S"
+        case 120: return "i32TruncF32U"
+        case 121: return "i32TruncSatF32S"
+        case 122: return "i32TruncSatF32U"
+        case 123: return "i32TruncF64S"
+        case 124: return "i32TruncF64U"
+        case 125: return "i32TruncSatF64S"
+        case 126: return "i32TruncSatF64U"
+        case 127: return "i64TruncF32S"
+        case 128: return "i64TruncF32U"
+        case 129: return "i64TruncSatF32S"
+        case 130: return "i64TruncSatF32U"
+        case 131: return "i64TruncF64S"
+        case 132: return "i64TruncF64U"
+        case 133: return "i64TruncSatF64S"
+        case 134: return "i64TruncSatF64U"
+        case 135: return "f32ConvertI32S"
+        case 136: return "f32ConvertI32U"
+        case 137: return "f32ConvertI64S"
+        case 138: return "f32ConvertI64U"
+        case 139: return "f64ConvertI32S"
+        case 140: return "f64ConvertI32U"
+        case 141: return "f64ConvertI64S"
+        case 142: return "f64ConvertI64U"
+        case 143: return "f32ReinterpretI32"
+        case 144: return "f64ReinterpretI64"
+        case 145: return "i32ReinterpretF32"
+        case 146: return "i64ReinterpretF64"
+        case 147: return "f32Add"
+        case 148: return "f64Add"
+        case 149: return "f32Sub"
+        case 150: return "f64Sub"
+        case 151: return "f32Mul"
+        case 152: return "f64Mul"
+        case 153: return "f32Div"
+        case 154: return "f64Div"
+        case 155: return "f32Min"
+        case 156: return "f64Min"
+        case 157: return "f32Max"
+        case 158: return "f64Max"
+        case 159: return "f32CopySign"
+        case 160: return "f64CopySign"
+        case 161: return "f32Eq"
+        case 162: return "f64Eq"
+        case 163: return "f32Ne"
+        case 164: return "f64Ne"
+        case 165: return "f32Lt"
+        case 166: return "f64Lt"
+        case 167: return "f32Gt"
+        case 168: return "f64Gt"
+        case 169: return "f32Le"
+        case 170: return "f64Le"
+        case 171: return "f32Ge"
+        case 172: return "f64Ge"
+        case 173: return "f32Abs"
+        case 174: return "f64Abs"
+        case 175: return "f32Neg"
+        case 176: return "f64Neg"
+        case 177: return "f32Ceil"
+        case 178: return "f64Ceil"
+        case 179: return "f32Floor"
+        case 180: return "f64Floor"
+        case 181: return "f32Trunc"
+        case 182: return "f64Trunc"
+        case 183: return "f32Nearest"
+        case 184: return "f64Nearest"
+        case 185: return "f32Sqrt"
+        case 186: return "f64Sqrt"
+        case 187: return "f64PromoteF32"
+        case 188: return "f32DemoteF64"
+        case 189: return "select"
+        case 190: return "refNull"
+        case 191: return "refIsNull"
+        case 192: return "refFunc"
+        case 193: return "tableGet"
+        case 194: return "tableSet"
+        case 195: return "tableSize"
+        case 196: return "tableGrow"
+        case 197: return "tableFill"
+        case 198: return "tableCopy"
+        case 199: return "tableInit"
+        case 200: return "tableElementDrop"
+        case 201: return "onEnter"
+        case 202: return "onExit"
+        case 203: return "breakpoint"
+        case 204: return "i32AtomicLoad"
+        case 205: return "i64AtomicLoad"
+        case 206: return "i32AtomicLoad8U"
+        case 207: return "i32AtomicLoad16U"
+        case 208: return "i64AtomicLoad8U"
+        case 209: return "i64AtomicLoad16U"
+        case 210: return "i64AtomicLoad32U"
+        case 211: return "i32AtomicStore"
+        case 212: return "i64AtomicStore"
+        case 213: return "i32AtomicStore8"
+        case 214: return "i32AtomicStore16"
+        case 215: return "i64AtomicStore8"
+        case 216: return "i64AtomicStore16"
+        case 217: return "i64AtomicStore32"
+        case 218: return "i32AtomicRmwAdd"
+        case 219: return "i64AtomicRmwAdd"
+        case 220: return "i32AtomicRmwSub"
+        case 221: return "i64AtomicRmwSub"
+        case 222: return "i32AtomicRmwAnd"
+        case 223: return "i64AtomicRmwAnd"
+        case 224: return "i32AtomicRmwOr"
+        case 225: return "i64AtomicRmwOr"
+        case 226: return "i32AtomicRmwXor"
+        case 227: return "i64AtomicRmwXor"
+        case 228: return "i32AtomicRmwXchg"
+        case 229: return "i64AtomicRmwXchg"
+        case 230: return "i32AtomicRmw8AddU"
+        case 231: return "i64AtomicRmw8AddU"
+        case 232: return "i32AtomicRmw8SubU"
+        case 233: return "i64AtomicRmw8SubU"
+        case 234: return "i32AtomicRmw8AndU"
+        case 235: return "i64AtomicRmw8AndU"
+        case 236: return "i32AtomicRmw8OrU"
+        case 237: return "i64AtomicRmw8OrU"
+        case 238: return "i32AtomicRmw8XorU"
+        case 239: return "i64AtomicRmw8XorU"
+        case 240: return "i32AtomicRmw8XchgU"
+        case 241: return "i64AtomicRmw8XchgU"
+        case 242: return "i32AtomicRmw16AddU"
+        case 243: return "i64AtomicRmw16AddU"
+        case 244: return "i32AtomicRmw16SubU"
+        case 245: return "i64AtomicRmw16SubU"
+        case 246: return "i32AtomicRmw16AndU"
+        case 247: return "i64AtomicRmw16AndU"
+        case 248: return "i32AtomicRmw16OrU"
+        case 249: return "i64AtomicRmw16OrU"
+        case 250: return "i32AtomicRmw16XorU"
+        case 251: return "i64AtomicRmw16XorU"
+        case 252: return "i32AtomicRmw16XchgU"
+        case 253: return "i64AtomicRmw16XchgU"
+        case 254: return "i64AtomicRmw32AddU"
+        case 255: return "i64AtomicRmw32SubU"
+        case 256: return "i64AtomicRmw32AndU"
+        case 257: return "i64AtomicRmw32OrU"
+        case 258: return "i64AtomicRmw32XorU"
+        case 259: return "i64AtomicRmw32XchgU"
+        case 260: return "i32AtomicRmwCmpxchg"
+        case 261: return "i64AtomicRmwCmpxchg"
+        case 262: return "i32AtomicRmw8CmpxchgU"
+        case 263: return "i32AtomicRmw16CmpxchgU"
+        case 264: return "i64AtomicRmw8CmpxchgU"
+        case 265: return "i64AtomicRmw16CmpxchgU"
+        case 266: return "i64AtomicRmw32CmpxchgU"
+        case 267: return "memoryAtomicWait32"
+        case 268: return "memoryAtomicWait64"
+        case 269: return "memoryAtomicNotify"
+        case 270: return "atomicFence"
+        case 271: return "throwTag"
+        case 272: return "throwRef"
+        case 273: return "catchHandlers"
+        case 274: return "catchHandlersEnd"
+        case 275: return "brIfI32Eq"
+        case 276: return "brIfI32Ne"
+        case 277: return "brIfI32LtS"
+        case 278: return "brIfI32LtU"
+        case 279: return "brIfI32GtS"
+        case 280: return "brIfI32GtU"
+        case 281: return "brIfI32LeS"
+        case 282: return "brIfI32LeU"
+        case 283: return "brIfI32GeS"
+        case 284: return "brIfI32GeU"
+        case 285: return "brIfI64Eq"
+        case 286: return "brIfI64Ne"
+        case 287: return "brIfI64LtS"
+        case 288: return "brIfI64LtU"
+        case 289: return "brIfI64GtS"
+        case 290: return "brIfI64GtU"
+        case 291: return "brIfI64LeS"
+        case 292: return "brIfI64LeU"
+        case 293: return "brIfI64GeS"
+        case 294: return "brIfI64GeU"
+        case 295: return "returnCrossInstance"
+        case 296: return "memoryOutOfBoundsTrap"
+        case 297: return "unalignedAtomicTrap"
+        case 298: return "brIfF32Eq"
+        case 299: return "brIfF32Ne"
+        case 300: return "brIfF32Lt"
+        case 301: return "brIfF32Le"
+        case 302: return "brIfNotF32Lt"
+        case 303: return "brIfNotF32Le"
+        case 304: return "brIfF64Eq"
+        case 305: return "brIfF64Ne"
+        case 306: return "brIfF64Lt"
+        case 307: return "brIfF64Le"
+        case 308: return "brIfNotF64Lt"
+        case 309: return "brIfNotF64Le"
+        case 310: return "f32AddAdd"
+        case 311: return "f32AddSub"
+        case 312: return "f32AddMul"
+        case 313: return "f32SubAdd"
+        case 314: return "f32SubSub"
+        case 315: return "f32SubMul"
+        case 316: return "f32MulAdd"
+        case 317: return "f32MulSub"
+        case 318: return "f32MulMul"
+        case 319: return "f64AddAdd"
+        case 320: return "f64AddSub"
+        case 321: return "f64AddMul"
+        case 322: return "f64SubAdd"
+        case 323: return "f64SubSub"
+        case 324: return "f64SubMul"
+        case 325: return "f64MulAdd"
+        case 326: return "f64MulSub"
+        case 327: return "f64MulMul"
+        case 328: return "brIfI32And"
+        case 329: return "brIfNotI32And"
+        case 330: return "brIfI64And"
+        case 331: return "brIfNotI64And"
+        case 332: return "i32ShlAdd"
+        case 333: return "i32MulAdd"
+        case 334: return "i32AddAdd"
+        case 335: return "i32AndAdd"
+        case 336: return "i32ShrUAnd"
+        case 337: return "i32OrAnd"
+        case 338: return "i32ShrUAdd"
+        case 339: return "i32SubAnd"
+        case 340: return "i32ShlOr"
+        case 341: return "i32AddAnd"
+        case 342: return "i32ShrUOr"
+        case 343: return "i32XorShrU"
+        case 344: return "i32AddSub"
+        case 345: return "i32XorShl"
+        case 346: return "i32SubAdd"
+        case 347: return "i32AndShl"
+        case 348: return "i64XorRotl"
+        case 349: return "i64MulAdd"
+        case 350: return "i64ShlAnd"
+        case 351: return "i64AndMul"
+        case 352: return "i64ShlOr"
+        case 353: return "i64XorAnd"
+        case 354: return "i64MulXor"
+        case 355: return "i64AndXor"
+        case 356: return "i64RotlXor"
+        case 357: return "i64SubAnd"
+        case 358: return "i64XorXor"
+        case 359: return "i64OrOr"
+        case 360: return "i64ShrUAnd"
+        case 361: return "i64AndAnd"
+        case 362: return "i64XorMul"
+        case 363: return "i64XorShrU"
+        case 364: return "i32MulSubRev"
+        case 365: return "i32AddToAcc"
+        case 366: return "i32SubToAcc"
+        case 367: return "i32MulToAcc"
+        case 368: return "i32AndToAcc"
+        case 369: return "i32OrToAcc"
+        case 370: return "i32XorToAcc"
+        case 371: return "i32ShlToAcc"
+        case 372: return "i32ShrSToAcc"
+        case 373: return "i32ShrUToAcc"
+        case 374: return "i32RotlToAcc"
+        case 375: return "i32RotrToAcc"
+        case 376: return "i64AddToAcc"
+        case 377: return "i64SubToAcc"
+        case 378: return "i64MulToAcc"
+        case 379: return "i64AndToAcc"
+        case 380: return "i64OrToAcc"
+        case 381: return "i64XorToAcc"
+        case 382: return "i64ShlToAcc"
+        case 383: return "i64ShrSToAcc"
+        case 384: return "i64ShrUToAcc"
+        case 385: return "i64RotlToAcc"
+        case 386: return "i64RotrToAcc"
+        case 387: return "i32AddFromAcc"
+        case 388: return "i32SubFromAcc"
+        case 389: return "i32MulFromAcc"
+        case 390: return "i32AndFromAcc"
+        case 391: return "i32OrFromAcc"
+        case 392: return "i32XorFromAcc"
+        case 393: return "i32ShlFromAcc"
+        case 394: return "i32ShrSFromAcc"
+        case 395: return "i32ShrUFromAcc"
+        case 396: return "i32RotlFromAcc"
+        case 397: return "i32RotrFromAcc"
+        case 398: return "i64AddFromAcc"
+        case 399: return "i64SubFromAcc"
+        case 400: return "i64MulFromAcc"
+        case 401: return "i64AndFromAcc"
+        case 402: return "i64OrFromAcc"
+        case 403: return "i64XorFromAcc"
+        case 404: return "i64ShlFromAcc"
+        case 405: return "i64ShrSFromAcc"
+        case 406: return "i64ShrUFromAcc"
+        case 407: return "i64RotlFromAcc"
+        case 408: return "i64RotrFromAcc"
+        case 409: return "i32AddInAcc"
+        case 410: return "i32SubInAcc"
+        case 411: return "i32MulInAcc"
+        case 412: return "i32AndInAcc"
+        case 413: return "i32OrInAcc"
+        case 414: return "i32XorInAcc"
+        case 415: return "i32ShlInAcc"
+        case 416: return "i32ShrSInAcc"
+        case 417: return "i32ShrUInAcc"
+        case 418: return "i32RotlInAcc"
+        case 419: return "i32RotrInAcc"
+        case 420: return "i64AddInAcc"
+        case 421: return "i64SubInAcc"
+        case 422: return "i64MulInAcc"
+        case 423: return "i64AndInAcc"
+        case 424: return "i64OrInAcc"
+        case 425: return "i64XorInAcc"
+        case 426: return "i64ShlInAcc"
+        case 427: return "i64ShrSInAcc"
+        case 428: return "i64ShrUInAcc"
+        case 429: return "i64RotlInAcc"
+        case 430: return "i64RotrInAcc"
+        case 431: return "brIfI32EqAcc"
+        case 432: return "brIfI32NeAcc"
+        case 433: return "brIfI32LtSAcc"
+        case 434: return "brIfI32LtUAcc"
+        case 435: return "brIfI32GtSAcc"
+        case 436: return "brIfI32GtUAcc"
+        case 437: return "brIfI32LeSAcc"
+        case 438: return "brIfI32LeUAcc"
+        case 439: return "brIfI32GeSAcc"
+        case 440: return "brIfI32GeUAcc"
+        case 441: return "brIfI64EqAcc"
+        case 442: return "brIfI64NeAcc"
+        case 443: return "brIfI64LtSAcc"
+        case 444: return "brIfI64LtUAcc"
+        case 445: return "brIfI64GtSAcc"
+        case 446: return "brIfI64GtUAcc"
+        case 447: return "brIfI64LeSAcc"
+        case 448: return "brIfI64LeUAcc"
+        case 449: return "brIfI64GeSAcc"
+        case 450: return "brIfI64GeUAcc"
+        case 451: return "brIfAcc"
+        case 452: return "brIfNotAcc"
+        case 453: return "globalGetToAcc"
+        case 454: return "i32LoadToAcc"
+        case 455: return "i64LoadToAcc"
+        case 456: return "f32LoadToAcc"
+        case 457: return "f64LoadToAcc"
+        case 458: return "i32Load8SToAcc"
+        case 459: return "i32Load8UToAcc"
+        case 460: return "i32Load16SToAcc"
+        case 461: return "i32Load16UToAcc"
+        case 462: return "i64Load8SToAcc"
+        case 463: return "i64Load8UToAcc"
+        case 464: return "i64Load16SToAcc"
+        case 465: return "i64Load16UToAcc"
+        case 466: return "i64Load32SToAcc"
+        case 467: return "i64Load32UToAcc"
+        case 468: return "i32LoadFromAcc"
+        case 469: return "i64LoadFromAcc"
+        case 470: return "f32LoadFromAcc"
+        case 471: return "f64LoadFromAcc"
+        case 472: return "i32Load8SFromAcc"
+        case 473: return "i32Load8UFromAcc"
+        case 474: return "i32Load16SFromAcc"
+        case 475: return "i32Load16UFromAcc"
+        case 476: return "i64Load8SFromAcc"
+        case 477: return "i64Load8UFromAcc"
+        case 478: return "i64Load16SFromAcc"
+        case 479: return "i64Load16UFromAcc"
+        case 480: return "i64Load32SFromAcc"
+        case 481: return "i64Load32UFromAcc"
+        case 482: return "i32LoadInAcc"
+        case 483: return "i64LoadInAcc"
+        case 484: return "f32LoadInAcc"
+        case 485: return "f64LoadInAcc"
+        case 486: return "i32Load8SInAcc"
+        case 487: return "i32Load8UInAcc"
+        case 488: return "i32Load16SInAcc"
+        case 489: return "i32Load16UInAcc"
+        case 490: return "i64Load8SInAcc"
+        case 491: return "i64Load8UInAcc"
+        case 492: return "i64Load16SInAcc"
+        case 493: return "i64Load16UInAcc"
+        case 494: return "i64Load32SInAcc"
+        case 495: return "i64Load32UInAcc"
+        case 496: return "i32StoreFromAcc"
+        case 497: return "i64StoreFromAcc"
+        case 498: return "f32StoreFromAcc"
+        case 499: return "f64StoreFromAcc"
+        case 500: return "i32Store8FromAcc"
+        case 501: return "i32Store16FromAcc"
+        case 502: return "i64Store8FromAcc"
+        case 503: return "i64Store16FromAcc"
+        case 504: return "i64Store32FromAcc"
+        case 505: return "i32StoreAddrFromAcc"
+        case 506: return "i64StoreAddrFromAcc"
+        case 507: return "f32StoreAddrFromAcc"
+        case 508: return "f64StoreAddrFromAcc"
+        case 509: return "i32Store8AddrFromAcc"
+        case 510: return "i32Store16AddrFromAcc"
+        case 511: return "i64Store8AddrFromAcc"
+        case 512: return "i64Store16AddrFromAcc"
+        case 513: return "i64Store32AddrFromAcc"
+        case 514: return "f64AddToAcc"
+        case 515: return "f64AddFromAcc"
+        case 516: return "f64AddInAcc"
+        case 517: return "f64SubToAcc"
+        case 518: return "f64SubFromAcc"
+        case 519: return "f64SubInAcc"
+        case 520: return "f64SubFromAccRev"
+        case 521: return "f64SubInAccRev"
+        case 522: return "f64MulToAcc"
+        case 523: return "f64MulFromAcc"
+        case 524: return "f64MulInAcc"
+        case 525: return "f64DivToAcc"
+        case 526: return "f64DivFromAcc"
+        case 527: return "f64DivInAcc"
+        case 528: return "f64DivFromAccRev"
+        case 529: return "f64DivInAccRev"
+        case 530: return "f64AddAddToAcc"
+        case 531: return "f64AddSubToAcc"
+        case 532: return "f64AddMulToAcc"
+        case 533: return "f64SubAddToAcc"
+        case 534: return "f64SubSubToAcc"
+        case 535: return "f64SubMulToAcc"
+        case 536: return "f64MulAddToAcc"
+        case 537: return "f64MulSubToAcc"
+        case 538: return "f64MulMulToAcc"
+        case 539: return "brIfF64EqAcc"
+        case 540: return "brIfF64NeAcc"
+        case 541: return "brIfF64LtAcc"
+        case 542: return "brIfF64LeAcc"
+        case 543: return "brIfF64GtAcc"
+        case 544: return "brIfF64GeAcc"
+        case 545: return "brIfNotF64LtAcc"
+        case 546: return "brIfNotF64LeAcc"
+        case 547: return "brIfNotF64GtAcc"
+        case 548: return "brIfNotF64GeAcc"
+        case 549: return "f64SqrtToAcc"
+        case 550: return "f64LoadToFAcc"
+        case 551: return "f64LoadFromAccToFAcc"
+        case 552: return "f64StoreFromFAcc"
+        case 553: return "i32AddImm"
+        case 554: return "i32MulImm"
+        case 555: return "i32AndImm"
+        case 556: return "i32OrImm"
+        case 557: return "i32XorImm"
+        case 558: return "i32ShlImm"
+        case 559: return "i32ShrSImm"
+        case 560: return "i32ShrUImm"
+        case 561: return "i32RotlImm"
+        case 562: return "i32RotrImm"
+        case 563: return "i64AddImm"
+        case 564: return "i64MulImm"
+        case 565: return "i64AndImm"
+        case 566: return "i64OrImm"
+        case 567: return "i64XorImm"
+        case 568: return "i64ShlImm"
+        case 569: return "i64ShrSImm"
+        case 570: return "i64ShrUImm"
+        case 571: return "i64RotlImm"
+        case 572: return "i64RotrImm"
+        case 573: return "i32EqImm"
+        case 574: return "i32NeImm"
+        case 575: return "i32LtSImm"
+        case 576: return "i32LtUImm"
+        case 577: return "i32GtSImm"
+        case 578: return "i32GtUImm"
+        case 579: return "i32LeSImm"
+        case 580: return "i32LeUImm"
+        case 581: return "i32GeSImm"
+        case 582: return "i32GeUImm"
+        case 583: return "i64EqImm"
+        case 584: return "i64NeImm"
+        case 585: return "i64LtSImm"
+        case 586: return "i64LtUImm"
+        case 587: return "i64GtSImm"
+        case 588: return "i64GtUImm"
+        case 589: return "i64LeSImm"
+        case 590: return "i64LeUImm"
+        case 591: return "i64GeSImm"
+        case 592: return "i64GeUImm"
+        case 593: return "brIfI32EqImm"
+        case 594: return "brIfI32NeImm"
+        case 595: return "brIfI32LtSImm"
+        case 596: return "brIfI32LtUImm"
+        case 597: return "brIfI32GtSImm"
+        case 598: return "brIfI32GtUImm"
+        case 599: return "brIfI32LeSImm"
+        case 600: return "brIfI32LeUImm"
+        case 601: return "brIfI32GeSImm"
+        case 602: return "brIfI32GeUImm"
+        case 603: return "brIfI64EqImm"
+        case 604: return "brIfI64NeImm"
+        case 605: return "brIfI64LtSImm"
+        case 606: return "brIfI64LtUImm"
+        case 607: return "brIfI64GtSImm"
+        case 608: return "brIfI64GtUImm"
+        case 609: return "brIfI64LeSImm"
+        case 610: return "brIfI64LeUImm"
+        case 611: return "brIfI64GeSImm"
+        case 612: return "brIfI64GeUImm"
+        case 613: return "brIfI32AndImm"
+        case 614: return "brIfNotI32AndImm"
+        case 615: return "brIfI64AndImm"
+        case 616: return "brIfNotI64AndImm"
+        case 617: return "i32AddImmToAcc"
+        case 618: return "i32MulImmToAcc"
+        case 619: return "i32AndImmToAcc"
+        case 620: return "i32OrImmToAcc"
+        case 621: return "i32XorImmToAcc"
+        case 622: return "i32ShlImmToAcc"
+        case 623: return "i32ShrSImmToAcc"
+        case 624: return "i32ShrUImmToAcc"
+        case 625: return "i32RotlImmToAcc"
+        case 626: return "i32RotrImmToAcc"
+        case 627: return "i64AddImmToAcc"
+        case 628: return "i64MulImmToAcc"
+        case 629: return "i64AndImmToAcc"
+        case 630: return "i64OrImmToAcc"
+        case 631: return "i64XorImmToAcc"
+        case 632: return "i64ShlImmToAcc"
+        case 633: return "i64ShrSImmToAcc"
+        case 634: return "i64ShrUImmToAcc"
+        case 635: return "i64RotlImmToAcc"
+        case 636: return "i64RotrImmToAcc"
+        case 637: return "i32AddToAccAndSlot"
+        case 638: return "i32SubToAccAndSlot"
+        case 639: return "i32MulToAccAndSlot"
+        case 640: return "i32AndToAccAndSlot"
+        case 641: return "i32OrToAccAndSlot"
+        case 642: return "i32XorToAccAndSlot"
+        case 643: return "i32ShlToAccAndSlot"
+        case 644: return "i32ShrSToAccAndSlot"
+        case 645: return "i32ShrUToAccAndSlot"
+        case 646: return "i32RotlToAccAndSlot"
+        case 647: return "i32RotrToAccAndSlot"
+        case 648: return "i64AddToAccAndSlot"
+        case 649: return "i64SubToAccAndSlot"
+        case 650: return "i64MulToAccAndSlot"
+        case 651: return "i64AndToAccAndSlot"
+        case 652: return "i64OrToAccAndSlot"
+        case 653: return "i64XorToAccAndSlot"
+        case 654: return "i64ShlToAccAndSlot"
+        case 655: return "i64ShrSToAccAndSlot"
+        case 656: return "i64ShrUToAccAndSlot"
+        case 657: return "i64RotlToAccAndSlot"
+        case 658: return "i64RotrToAccAndSlot"
+        case 659: return "i32AddImmToAccAndSlot"
+        case 660: return "i32MulImmToAccAndSlot"
+        case 661: return "i32AndImmToAccAndSlot"
+        case 662: return "i32OrImmToAccAndSlot"
+        case 663: return "i32XorImmToAccAndSlot"
+        case 664: return "i32ShlImmToAccAndSlot"
+        case 665: return "i32ShrSImmToAccAndSlot"
+        case 666: return "i32ShrUImmToAccAndSlot"
+        case 667: return "i32RotlImmToAccAndSlot"
+        case 668: return "i32RotrImmToAccAndSlot"
+        case 669: return "i64AddImmToAccAndSlot"
+        case 670: return "i64MulImmToAccAndSlot"
+        case 671: return "i64AndImmToAccAndSlot"
+        case 672: return "i64OrImmToAccAndSlot"
+        case 673: return "i64XorImmToAccAndSlot"
+        case 674: return "i64ShlImmToAccAndSlot"
+        case 675: return "i64ShrSImmToAccAndSlot"
+        case 676: return "i64ShrUImmToAccAndSlot"
+        case 677: return "i64RotlImmToAccAndSlot"
+        case 678: return "i64RotrImmToAccAndSlot"
+        case 679: return "i32LoadToAccAndSlot"
+        case 680: return "i64LoadToAccAndSlot"
+        case 681: return "f32LoadToAccAndSlot"
+        case 682: return "f64LoadToAccAndSlot"
+        case 683: return "i32Load8SToAccAndSlot"
+        case 684: return "i32Load8UToAccAndSlot"
+        case 685: return "i32Load16SToAccAndSlot"
+        case 686: return "i32Load16UToAccAndSlot"
+        case 687: return "i64Load8SToAccAndSlot"
+        case 688: return "i64Load8UToAccAndSlot"
+        case 689: return "i64Load16SToAccAndSlot"
+        case 690: return "i64Load16UToAccAndSlot"
+        case 691: return "i64Load32SToAccAndSlot"
+        case 692: return "i64Load32UToAccAndSlot"
+        case 693: return "copyStackAccToSlot"
+        case 694: return "selectAcc"
+        case 695: return "copyStack2"
+        case 696: return "selectI32Eq"
+        case 697: return "selectI32LtS"
+        case 698: return "selectI32LtU"
+        case 699: return "selectI32EqImm"
+        case 700: return "selectI32LtSImm"
+        case 701: return "selectI32LtUImm"
+        case 702: return "selectI32GtSImm"
+        case 703: return "selectI32GtUImm"
+        case 704: return "selectI64Eq"
+        case 705: return "selectI64LtS"
+        case 706: return "selectI64LtU"
+        case 707: return "selectI64EqImm"
+        case 708: return "selectI64LtSImm"
+        case 709: return "selectI64LtUImm"
+        case 710: return "selectI64GtSImm"
+        case 711: return "selectI64GtUImm"
+        case 712: return "i32LoadWithCopy"
+        case 713: return "i64LoadWithCopy"
+        case 714: return "f32LoadWithCopy"
+        case 715: return "f64LoadWithCopy"
+        case 716: return "i32Load8SWithCopy"
+        case 717: return "i32Load8UWithCopy"
+        case 718: return "i32Load16SWithCopy"
+        case 719: return "i32Load16UWithCopy"
+        case 720: return "i64Load8SWithCopy"
+        case 721: return "i64Load8UWithCopy"
+        case 722: return "i64Load16SWithCopy"
+        case 723: return "i64Load16UWithCopy"
+        case 724: return "i64Load32SWithCopy"
+        case 725: return "i64Load32UWithCopy"
+        case 726: return "consumeFuel"
+        case 727: return "outOfFuelTrap"
+        case 728: return "callRef"
+        case 729: return "returnCallRef"
+        case 730: return "refAsNonNull"
+        case 731: return "brIfNull"
+        case 732: return "brIfNotNull"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
@@ -7468,117 +7457,117 @@ extension Instruction {
         case 6: return predictor.predictNext_compilingCall(operandPc: operandPc, sp: sp)
         case 7: return predictor.predictNext_internalCall(operandPc: operandPc, sp: sp)
         case 8: return predictor.predictNext_callIndirect(operandPc: operandPc, sp: sp)
-        case 10: return predictor.predictNext_returnCall(operandPc: operandPc, sp: sp)
-        case 11: return predictor.predictNext_returnCallIndirect(operandPc: operandPc, sp: sp)
-        case 12: return predictor.predictNext_unreachable(operandPc: operandPc, sp: sp)
-        case 14: return predictor.predictNext_br(operandPc: operandPc, sp: sp)
-        case 15: return predictor.predictNext_brIf(operandPc: operandPc, sp: sp)
-        case 16: return predictor.predictNext_brIfNot(operandPc: operandPc, sp: sp)
-        case 17: return predictor.predictNext_brTable(operandPc: operandPc, sp: sp)
-        case 18: return predictor.predictNext__return(operandPc: operandPc, sp: sp)
-        case 19: return predictor.predictNext_endOfExecution(operandPc: operandPc, sp: sp)
-        case 204: return predictor.predictNext_breakpoint(operandPc: operandPc, sp: sp)
-        case 272: return predictor.predictNext_throwTag(operandPc: operandPc, sp: sp)
-        case 273: return predictor.predictNext_throwRef(operandPc: operandPc, sp: sp)
-        case 274: return predictor.predictNext_catchHandlers(operandPc: operandPc, sp: sp)
-        case 276: return predictor.predictNext_brIfI32Eq(operandPc: operandPc, sp: sp)
-        case 277: return predictor.predictNext_brIfI32Ne(operandPc: operandPc, sp: sp)
-        case 278: return predictor.predictNext_brIfI32LtS(operandPc: operandPc, sp: sp)
-        case 279: return predictor.predictNext_brIfI32LtU(operandPc: operandPc, sp: sp)
-        case 280: return predictor.predictNext_brIfI32GtS(operandPc: operandPc, sp: sp)
-        case 281: return predictor.predictNext_brIfI32GtU(operandPc: operandPc, sp: sp)
-        case 282: return predictor.predictNext_brIfI32LeS(operandPc: operandPc, sp: sp)
-        case 283: return predictor.predictNext_brIfI32LeU(operandPc: operandPc, sp: sp)
-        case 284: return predictor.predictNext_brIfI32GeS(operandPc: operandPc, sp: sp)
-        case 285: return predictor.predictNext_brIfI32GeU(operandPc: operandPc, sp: sp)
-        case 286: return predictor.predictNext_brIfI64Eq(operandPc: operandPc, sp: sp)
-        case 287: return predictor.predictNext_brIfI64Ne(operandPc: operandPc, sp: sp)
-        case 288: return predictor.predictNext_brIfI64LtS(operandPc: operandPc, sp: sp)
-        case 289: return predictor.predictNext_brIfI64LtU(operandPc: operandPc, sp: sp)
-        case 290: return predictor.predictNext_brIfI64GtS(operandPc: operandPc, sp: sp)
-        case 291: return predictor.predictNext_brIfI64GtU(operandPc: operandPc, sp: sp)
-        case 292: return predictor.predictNext_brIfI64LeS(operandPc: operandPc, sp: sp)
-        case 293: return predictor.predictNext_brIfI64LeU(operandPc: operandPc, sp: sp)
-        case 294: return predictor.predictNext_brIfI64GeS(operandPc: operandPc, sp: sp)
-        case 295: return predictor.predictNext_brIfI64GeU(operandPc: operandPc, sp: sp)
-        case 296: return predictor.predictNext_returnCrossInstance(operandPc: operandPc, sp: sp)
-        case 299: return predictor.predictNext_brIfF32Eq(operandPc: operandPc, sp: sp)
-        case 300: return predictor.predictNext_brIfF32Ne(operandPc: operandPc, sp: sp)
-        case 301: return predictor.predictNext_brIfF32Lt(operandPc: operandPc, sp: sp)
-        case 302: return predictor.predictNext_brIfF32Le(operandPc: operandPc, sp: sp)
-        case 303: return predictor.predictNext_brIfNotF32Lt(operandPc: operandPc, sp: sp)
-        case 304: return predictor.predictNext_brIfNotF32Le(operandPc: operandPc, sp: sp)
-        case 305: return predictor.predictNext_brIfF64Eq(operandPc: operandPc, sp: sp)
-        case 306: return predictor.predictNext_brIfF64Ne(operandPc: operandPc, sp: sp)
-        case 307: return predictor.predictNext_brIfF64Lt(operandPc: operandPc, sp: sp)
-        case 308: return predictor.predictNext_brIfF64Le(operandPc: operandPc, sp: sp)
-        case 309: return predictor.predictNext_brIfNotF64Lt(operandPc: operandPc, sp: sp)
-        case 310: return predictor.predictNext_brIfNotF64Le(operandPc: operandPc, sp: sp)
-        case 329: return predictor.predictNext_brIfI32And(operandPc: operandPc, sp: sp)
-        case 330: return predictor.predictNext_brIfNotI32And(operandPc: operandPc, sp: sp)
-        case 331: return predictor.predictNext_brIfI64And(operandPc: operandPc, sp: sp)
-        case 332: return predictor.predictNext_brIfNotI64And(operandPc: operandPc, sp: sp)
-        case 432: return predictor.predictNext_brIfI32EqAcc(operandPc: operandPc, sp: sp)
-        case 433: return predictor.predictNext_brIfI32NeAcc(operandPc: operandPc, sp: sp)
-        case 434: return predictor.predictNext_brIfI32LtSAcc(operandPc: operandPc, sp: sp)
-        case 435: return predictor.predictNext_brIfI32LtUAcc(operandPc: operandPc, sp: sp)
-        case 436: return predictor.predictNext_brIfI32GtSAcc(operandPc: operandPc, sp: sp)
-        case 437: return predictor.predictNext_brIfI32GtUAcc(operandPc: operandPc, sp: sp)
-        case 438: return predictor.predictNext_brIfI32LeSAcc(operandPc: operandPc, sp: sp)
-        case 439: return predictor.predictNext_brIfI32LeUAcc(operandPc: operandPc, sp: sp)
-        case 440: return predictor.predictNext_brIfI32GeSAcc(operandPc: operandPc, sp: sp)
-        case 441: return predictor.predictNext_brIfI32GeUAcc(operandPc: operandPc, sp: sp)
-        case 442: return predictor.predictNext_brIfI64EqAcc(operandPc: operandPc, sp: sp)
-        case 443: return predictor.predictNext_brIfI64NeAcc(operandPc: operandPc, sp: sp)
-        case 444: return predictor.predictNext_brIfI64LtSAcc(operandPc: operandPc, sp: sp)
-        case 445: return predictor.predictNext_brIfI64LtUAcc(operandPc: operandPc, sp: sp)
-        case 446: return predictor.predictNext_brIfI64GtSAcc(operandPc: operandPc, sp: sp)
-        case 447: return predictor.predictNext_brIfI64GtUAcc(operandPc: operandPc, sp: sp)
-        case 448: return predictor.predictNext_brIfI64LeSAcc(operandPc: operandPc, sp: sp)
-        case 449: return predictor.predictNext_brIfI64LeUAcc(operandPc: operandPc, sp: sp)
-        case 450: return predictor.predictNext_brIfI64GeSAcc(operandPc: operandPc, sp: sp)
-        case 451: return predictor.predictNext_brIfI64GeUAcc(operandPc: operandPc, sp: sp)
-        case 452: return predictor.predictNext_brIfAcc(operandPc: operandPc, sp: sp)
-        case 453: return predictor.predictNext_brIfNotAcc(operandPc: operandPc, sp: sp)
-        case 540: return predictor.predictNext_brIfF64EqAcc(operandPc: operandPc, sp: sp)
-        case 541: return predictor.predictNext_brIfF64NeAcc(operandPc: operandPc, sp: sp)
-        case 542: return predictor.predictNext_brIfF64LtAcc(operandPc: operandPc, sp: sp)
-        case 543: return predictor.predictNext_brIfF64LeAcc(operandPc: operandPc, sp: sp)
-        case 544: return predictor.predictNext_brIfF64GtAcc(operandPc: operandPc, sp: sp)
-        case 545: return predictor.predictNext_brIfF64GeAcc(operandPc: operandPc, sp: sp)
-        case 546: return predictor.predictNext_brIfNotF64LtAcc(operandPc: operandPc, sp: sp)
-        case 547: return predictor.predictNext_brIfNotF64LeAcc(operandPc: operandPc, sp: sp)
-        case 548: return predictor.predictNext_brIfNotF64GtAcc(operandPc: operandPc, sp: sp)
-        case 549: return predictor.predictNext_brIfNotF64GeAcc(operandPc: operandPc, sp: sp)
-        case 594: return predictor.predictNext_brIfI32EqImm(operandPc: operandPc, sp: sp)
-        case 595: return predictor.predictNext_brIfI32NeImm(operandPc: operandPc, sp: sp)
-        case 596: return predictor.predictNext_brIfI32LtSImm(operandPc: operandPc, sp: sp)
-        case 597: return predictor.predictNext_brIfI32LtUImm(operandPc: operandPc, sp: sp)
-        case 598: return predictor.predictNext_brIfI32GtSImm(operandPc: operandPc, sp: sp)
-        case 599: return predictor.predictNext_brIfI32GtUImm(operandPc: operandPc, sp: sp)
-        case 600: return predictor.predictNext_brIfI32LeSImm(operandPc: operandPc, sp: sp)
-        case 601: return predictor.predictNext_brIfI32LeUImm(operandPc: operandPc, sp: sp)
-        case 602: return predictor.predictNext_brIfI32GeSImm(operandPc: operandPc, sp: sp)
-        case 603: return predictor.predictNext_brIfI32GeUImm(operandPc: operandPc, sp: sp)
-        case 604: return predictor.predictNext_brIfI64EqImm(operandPc: operandPc, sp: sp)
-        case 605: return predictor.predictNext_brIfI64NeImm(operandPc: operandPc, sp: sp)
-        case 606: return predictor.predictNext_brIfI64LtSImm(operandPc: operandPc, sp: sp)
-        case 607: return predictor.predictNext_brIfI64LtUImm(operandPc: operandPc, sp: sp)
-        case 608: return predictor.predictNext_brIfI64GtSImm(operandPc: operandPc, sp: sp)
-        case 609: return predictor.predictNext_brIfI64GtUImm(operandPc: operandPc, sp: sp)
-        case 610: return predictor.predictNext_brIfI64LeSImm(operandPc: operandPc, sp: sp)
-        case 611: return predictor.predictNext_brIfI64LeUImm(operandPc: operandPc, sp: sp)
-        case 612: return predictor.predictNext_brIfI64GeSImm(operandPc: operandPc, sp: sp)
-        case 613: return predictor.predictNext_brIfI64GeUImm(operandPc: operandPc, sp: sp)
-        case 614: return predictor.predictNext_brIfI32AndImm(operandPc: operandPc, sp: sp)
-        case 615: return predictor.predictNext_brIfNotI32AndImm(operandPc: operandPc, sp: sp)
-        case 616: return predictor.predictNext_brIfI64AndImm(operandPc: operandPc, sp: sp)
-        case 617: return predictor.predictNext_brIfNotI64AndImm(operandPc: operandPc, sp: sp)
-        case 728: return predictor.predictNext_outOfFuelTrap(operandPc: operandPc, sp: sp)
-        case 729: return predictor.predictNext_callRef(operandPc: operandPc, sp: sp)
-        case 730: return predictor.predictNext_returnCallRef(operandPc: operandPc, sp: sp)
-        case 732: return predictor.predictNext_brIfNull(operandPc: operandPc, sp: sp)
-        case 733: return predictor.predictNext_brIfNotNull(operandPc: operandPc, sp: sp)
+        case 9: return predictor.predictNext_returnCall(operandPc: operandPc, sp: sp)
+        case 10: return predictor.predictNext_returnCallIndirect(operandPc: operandPc, sp: sp)
+        case 11: return predictor.predictNext_unreachable(operandPc: operandPc, sp: sp)
+        case 13: return predictor.predictNext_br(operandPc: operandPc, sp: sp)
+        case 14: return predictor.predictNext_brIf(operandPc: operandPc, sp: sp)
+        case 15: return predictor.predictNext_brIfNot(operandPc: operandPc, sp: sp)
+        case 16: return predictor.predictNext_brTable(operandPc: operandPc, sp: sp)
+        case 17: return predictor.predictNext__return(operandPc: operandPc, sp: sp)
+        case 18: return predictor.predictNext_endOfExecution(operandPc: operandPc, sp: sp)
+        case 203: return predictor.predictNext_breakpoint(operandPc: operandPc, sp: sp)
+        case 271: return predictor.predictNext_throwTag(operandPc: operandPc, sp: sp)
+        case 272: return predictor.predictNext_throwRef(operandPc: operandPc, sp: sp)
+        case 273: return predictor.predictNext_catchHandlers(operandPc: operandPc, sp: sp)
+        case 275: return predictor.predictNext_brIfI32Eq(operandPc: operandPc, sp: sp)
+        case 276: return predictor.predictNext_brIfI32Ne(operandPc: operandPc, sp: sp)
+        case 277: return predictor.predictNext_brIfI32LtS(operandPc: operandPc, sp: sp)
+        case 278: return predictor.predictNext_brIfI32LtU(operandPc: operandPc, sp: sp)
+        case 279: return predictor.predictNext_brIfI32GtS(operandPc: operandPc, sp: sp)
+        case 280: return predictor.predictNext_brIfI32GtU(operandPc: operandPc, sp: sp)
+        case 281: return predictor.predictNext_brIfI32LeS(operandPc: operandPc, sp: sp)
+        case 282: return predictor.predictNext_brIfI32LeU(operandPc: operandPc, sp: sp)
+        case 283: return predictor.predictNext_brIfI32GeS(operandPc: operandPc, sp: sp)
+        case 284: return predictor.predictNext_brIfI32GeU(operandPc: operandPc, sp: sp)
+        case 285: return predictor.predictNext_brIfI64Eq(operandPc: operandPc, sp: sp)
+        case 286: return predictor.predictNext_brIfI64Ne(operandPc: operandPc, sp: sp)
+        case 287: return predictor.predictNext_brIfI64LtS(operandPc: operandPc, sp: sp)
+        case 288: return predictor.predictNext_brIfI64LtU(operandPc: operandPc, sp: sp)
+        case 289: return predictor.predictNext_brIfI64GtS(operandPc: operandPc, sp: sp)
+        case 290: return predictor.predictNext_brIfI64GtU(operandPc: operandPc, sp: sp)
+        case 291: return predictor.predictNext_brIfI64LeS(operandPc: operandPc, sp: sp)
+        case 292: return predictor.predictNext_brIfI64LeU(operandPc: operandPc, sp: sp)
+        case 293: return predictor.predictNext_brIfI64GeS(operandPc: operandPc, sp: sp)
+        case 294: return predictor.predictNext_brIfI64GeU(operandPc: operandPc, sp: sp)
+        case 295: return predictor.predictNext_returnCrossInstance(operandPc: operandPc, sp: sp)
+        case 298: return predictor.predictNext_brIfF32Eq(operandPc: operandPc, sp: sp)
+        case 299: return predictor.predictNext_brIfF32Ne(operandPc: operandPc, sp: sp)
+        case 300: return predictor.predictNext_brIfF32Lt(operandPc: operandPc, sp: sp)
+        case 301: return predictor.predictNext_brIfF32Le(operandPc: operandPc, sp: sp)
+        case 302: return predictor.predictNext_brIfNotF32Lt(operandPc: operandPc, sp: sp)
+        case 303: return predictor.predictNext_brIfNotF32Le(operandPc: operandPc, sp: sp)
+        case 304: return predictor.predictNext_brIfF64Eq(operandPc: operandPc, sp: sp)
+        case 305: return predictor.predictNext_brIfF64Ne(operandPc: operandPc, sp: sp)
+        case 306: return predictor.predictNext_brIfF64Lt(operandPc: operandPc, sp: sp)
+        case 307: return predictor.predictNext_brIfF64Le(operandPc: operandPc, sp: sp)
+        case 308: return predictor.predictNext_brIfNotF64Lt(operandPc: operandPc, sp: sp)
+        case 309: return predictor.predictNext_brIfNotF64Le(operandPc: operandPc, sp: sp)
+        case 328: return predictor.predictNext_brIfI32And(operandPc: operandPc, sp: sp)
+        case 329: return predictor.predictNext_brIfNotI32And(operandPc: operandPc, sp: sp)
+        case 330: return predictor.predictNext_brIfI64And(operandPc: operandPc, sp: sp)
+        case 331: return predictor.predictNext_brIfNotI64And(operandPc: operandPc, sp: sp)
+        case 431: return predictor.predictNext_brIfI32EqAcc(operandPc: operandPc, sp: sp)
+        case 432: return predictor.predictNext_brIfI32NeAcc(operandPc: operandPc, sp: sp)
+        case 433: return predictor.predictNext_brIfI32LtSAcc(operandPc: operandPc, sp: sp)
+        case 434: return predictor.predictNext_brIfI32LtUAcc(operandPc: operandPc, sp: sp)
+        case 435: return predictor.predictNext_brIfI32GtSAcc(operandPc: operandPc, sp: sp)
+        case 436: return predictor.predictNext_brIfI32GtUAcc(operandPc: operandPc, sp: sp)
+        case 437: return predictor.predictNext_brIfI32LeSAcc(operandPc: operandPc, sp: sp)
+        case 438: return predictor.predictNext_brIfI32LeUAcc(operandPc: operandPc, sp: sp)
+        case 439: return predictor.predictNext_brIfI32GeSAcc(operandPc: operandPc, sp: sp)
+        case 440: return predictor.predictNext_brIfI32GeUAcc(operandPc: operandPc, sp: sp)
+        case 441: return predictor.predictNext_brIfI64EqAcc(operandPc: operandPc, sp: sp)
+        case 442: return predictor.predictNext_brIfI64NeAcc(operandPc: operandPc, sp: sp)
+        case 443: return predictor.predictNext_brIfI64LtSAcc(operandPc: operandPc, sp: sp)
+        case 444: return predictor.predictNext_brIfI64LtUAcc(operandPc: operandPc, sp: sp)
+        case 445: return predictor.predictNext_brIfI64GtSAcc(operandPc: operandPc, sp: sp)
+        case 446: return predictor.predictNext_brIfI64GtUAcc(operandPc: operandPc, sp: sp)
+        case 447: return predictor.predictNext_brIfI64LeSAcc(operandPc: operandPc, sp: sp)
+        case 448: return predictor.predictNext_brIfI64LeUAcc(operandPc: operandPc, sp: sp)
+        case 449: return predictor.predictNext_brIfI64GeSAcc(operandPc: operandPc, sp: sp)
+        case 450: return predictor.predictNext_brIfI64GeUAcc(operandPc: operandPc, sp: sp)
+        case 451: return predictor.predictNext_brIfAcc(operandPc: operandPc, sp: sp)
+        case 452: return predictor.predictNext_brIfNotAcc(operandPc: operandPc, sp: sp)
+        case 539: return predictor.predictNext_brIfF64EqAcc(operandPc: operandPc, sp: sp)
+        case 540: return predictor.predictNext_brIfF64NeAcc(operandPc: operandPc, sp: sp)
+        case 541: return predictor.predictNext_brIfF64LtAcc(operandPc: operandPc, sp: sp)
+        case 542: return predictor.predictNext_brIfF64LeAcc(operandPc: operandPc, sp: sp)
+        case 543: return predictor.predictNext_brIfF64GtAcc(operandPc: operandPc, sp: sp)
+        case 544: return predictor.predictNext_brIfF64GeAcc(operandPc: operandPc, sp: sp)
+        case 545: return predictor.predictNext_brIfNotF64LtAcc(operandPc: operandPc, sp: sp)
+        case 546: return predictor.predictNext_brIfNotF64LeAcc(operandPc: operandPc, sp: sp)
+        case 547: return predictor.predictNext_brIfNotF64GtAcc(operandPc: operandPc, sp: sp)
+        case 548: return predictor.predictNext_brIfNotF64GeAcc(operandPc: operandPc, sp: sp)
+        case 593: return predictor.predictNext_brIfI32EqImm(operandPc: operandPc, sp: sp)
+        case 594: return predictor.predictNext_brIfI32NeImm(operandPc: operandPc, sp: sp)
+        case 595: return predictor.predictNext_brIfI32LtSImm(operandPc: operandPc, sp: sp)
+        case 596: return predictor.predictNext_brIfI32LtUImm(operandPc: operandPc, sp: sp)
+        case 597: return predictor.predictNext_brIfI32GtSImm(operandPc: operandPc, sp: sp)
+        case 598: return predictor.predictNext_brIfI32GtUImm(operandPc: operandPc, sp: sp)
+        case 599: return predictor.predictNext_brIfI32LeSImm(operandPc: operandPc, sp: sp)
+        case 600: return predictor.predictNext_brIfI32LeUImm(operandPc: operandPc, sp: sp)
+        case 601: return predictor.predictNext_brIfI32GeSImm(operandPc: operandPc, sp: sp)
+        case 602: return predictor.predictNext_brIfI32GeUImm(operandPc: operandPc, sp: sp)
+        case 603: return predictor.predictNext_brIfI64EqImm(operandPc: operandPc, sp: sp)
+        case 604: return predictor.predictNext_brIfI64NeImm(operandPc: operandPc, sp: sp)
+        case 605: return predictor.predictNext_brIfI64LtSImm(operandPc: operandPc, sp: sp)
+        case 606: return predictor.predictNext_brIfI64LtUImm(operandPc: operandPc, sp: sp)
+        case 607: return predictor.predictNext_brIfI64GtSImm(operandPc: operandPc, sp: sp)
+        case 608: return predictor.predictNext_brIfI64GtUImm(operandPc: operandPc, sp: sp)
+        case 609: return predictor.predictNext_brIfI64LeSImm(operandPc: operandPc, sp: sp)
+        case 610: return predictor.predictNext_brIfI64LeUImm(operandPc: operandPc, sp: sp)
+        case 611: return predictor.predictNext_brIfI64GeSImm(operandPc: operandPc, sp: sp)
+        case 612: return predictor.predictNext_brIfI64GeUImm(operandPc: operandPc, sp: sp)
+        case 613: return predictor.predictNext_brIfI32AndImm(operandPc: operandPc, sp: sp)
+        case 614: return predictor.predictNext_brIfNotI32AndImm(operandPc: operandPc, sp: sp)
+        case 615: return predictor.predictNext_brIfI64AndImm(operandPc: operandPc, sp: sp)
+        case 616: return predictor.predictNext_brIfNotI64AndImm(operandPc: operandPc, sp: sp)
+        case 727: return predictor.predictNext_outOfFuelTrap(operandPc: operandPc, sp: sp)
+        case 728: return predictor.predictNext_callRef(operandPc: operandPc, sp: sp)
+        case 729: return predictor.predictNext_returnCallRef(operandPc: operandPc, sp: sp)
+        case 731: return predictor.predictNext_brIfNull(operandPc: operandPc, sp: sp)
+        case 732: return predictor.predictNext_brIfNotNull(operandPc: operandPc, sp: sp)
         default: return nil
         }
     }
@@ -7592,27 +7581,27 @@ extension Instruction {
     ) -> [CodeSlot: OpcodeID] {
         var map = [CodeSlot: OpcodeID]()
             do {
-                let inst = Instruction.call(.init(rawCallee: UInt64(0), spAddend: VReg.zero))
+                let inst = Instruction.call(.init(rawCallee: UInt64(0), arguments: VReg.zero, spAddend: LVReg.zero))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.compilingCall(.init(rawCallee: UInt64(0), spAddend: VReg.zero))
+                let inst = Instruction.compilingCall(.init(rawCallee: UInt64(0), arguments: VReg.zero, spAddend: LVReg.zero))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.internalCall(.init(rawCallee: UInt64(0), spAddend: VReg.zero))
+                let inst = Instruction.internalCall(.init(rawCallee: UInt64(0), arguments: VReg.zero, spAddend: LVReg.zero))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.callIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg.zero, spAddend: VReg.zero))
+                let inst = Instruction.callIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg.zero, arguments: VReg.zero))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.returnCall(.init(rawCallee: UInt64(0)))
+                let inst = Instruction.returnCall(.init(rawCallee: UInt64(0), arguments: VReg.zero, frameBase: LVReg.zero))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.returnCallIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg.zero))
+                let inst = Instruction.returnCallIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg.zero, arguments: VReg.zero, frameBase: LVReg.zero))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
@@ -8036,11 +8025,11 @@ extension Instruction {
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.callRef(.init(callee: VReg.zero, spAddend: VReg.zero))
+                let inst = Instruction.callRef(.init(callee: VReg.zero, arguments: VReg.zero))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {
-                let inst = Instruction.returnCallRef(.init(callee: VReg.zero))
+                let inst = Instruction.returnCallRef(.init(callee: VReg.zero, arguments: VReg.zero, frameBase: LVReg.zero))
                 map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
             }
             do {

@@ -56,6 +56,38 @@ struct ExecutionTests {
         #expect(results == [.i32(42)])
     }
 
+    /// A tail call to a host function moves the arguments over the caller's
+    /// saved slots, and the host function's results have to reach the caller's
+    /// caller.
+    @Test
+    func tailCallHostFunction() throws {
+        let module = try parseWasm(
+            bytes: wat2wasm(
+                """
+                (module
+                    (import "env" "sum5" (func $sum5 (param i64 i64 i64 i64 i64) (result i64)))
+                    (func $tail (result i64)
+                        (return_call $sum5
+                            (i64.const 1) (i64.const 20) (i64.const 300) (i64.const 4000) (i64.const 50000)))
+                    (func (export "_start") (param i64) (result i64)
+                        (i64.add (call $tail) (local.get 0)))
+                )
+                """
+            )
+        )
+        let engine = Engine()
+        let store = Store(engine: engine)
+        var imports = Imports()
+        imports.define(
+            module: "env", name: "sum5",
+            Function(store: store, parameters: Array(repeating: .i64, count: 5), results: [.i64]) { _, args in
+                [.i64(args.reduce(0) { $0 + $1.i64 })]
+            })
+        let instance = try module.instantiate(store: store, imports: imports)
+        let _start = try #require(instance.exports[function: "_start"])
+        #expect(try _start([.i64(600000)]) == [.i64(654321)])
+    }
+
     func expectTrap(_ wat: String, assertTrap: (Trap) throws -> Void) throws {
         let module = try parseWasm(
             bytes: wat2wasm(wat, options: EncodeOptions(nameSection: true))

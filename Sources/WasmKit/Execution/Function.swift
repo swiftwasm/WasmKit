@@ -333,6 +333,8 @@ struct WasmFunctionEntity {
     let instance: InternalInstance
     let index: FunctionIndex
     let numberOfNonParameterLocalSlots: Int
+    /// The size of the function body in bytes, which sizes its constant pool.
+    let codeSize: Int
     var code: CodeBody
 
     init(index: FunctionIndex, type: InternedFuncType, code: InternalUncompiledCode, instance: InternalInstance) {
@@ -340,6 +342,7 @@ struct WasmFunctionEntity {
         self.instance = instance
         self.code = .uncompiled(code)
         self.numberOfNonParameterLocalSlots = code.locals.reduce(into: 0) { $0 += $1.stackSlotCount }
+        self.codeSize = code.expression.count
         self.index = index
     }
 
@@ -405,22 +408,52 @@ typealias InternalUncompiledCode = EntityHandle<Code>
 /// A compiled instruction sequence.
 struct InstructionSequence {
     let instructions: UnsafeMutableBufferPointer<CodeSlot>
-    /// The maximum height of the value stack during execution of this function.
-    /// This height does not count the locals.
+    /// The maximum height of the value stack, which starts at `sp`.
     let maxStackHeight: Int
 
-    /// The image a new frame's local and constant area starts out as: one zero
-    /// slot per non-parameter local slot, followed by the constant pool.
+    /// The image the constants and the locals of a new frame start out as: the
+    /// constants that were given a slot, then the default value of each
+    /// non-parameter local slot. It ends right below the saved slots.
     ///
-    /// The two halves are kept in one buffer so entering a function is a single
-    /// contiguous copy instead of a `memset` of the locals plus a `memcpy` of the
-    /// pool. See ``FrameHeaderLayout`` for how these land on the stack.
-    let frameInit: UnsafeBufferPointer<UntypedValue>
+    /// The image is kept in one buffer so entering a function is a single
+    /// contiguous copy. It is addressed the way the frame is: it occupies the
+    /// bytes `frameInitOffset ..< -24` from ``frameInitAnchor``, just as it
+    /// does from the new frame's `sp`, so a call copies it with the same
+    /// offsets from both and computes no address.
+    let frameInitAnchor: UnsafeRawPointer
+    /// The byte offset of the start of the image from ``frameInitAnchor``, and
+    /// from `sp`. Never above the saved slots, `-24`.
+    let frameInitOffset: Int
 
-    init(instructions: UnsafeMutableBufferPointer<CodeSlot>, maxStackHeight: Int, frameInit: UnsafeBufferPointer<UntypedValue>) {
+    /// The frame-initialization image as a buffer.
+    var frameInit: UnsafeBufferPointer<UntypedValue> {
+        let savedSlotsOffset = -StackLayout.numberOfSavingSlots * MemoryLayout<UntypedValue>.stride
+        return UnsafeBufferPointer(
+            start: (frameInitAnchor + frameInitOffset).assumingMemoryBound(to: UntypedValue.self),
+            count: (savedSlotsOffset - frameInitOffset) / MemoryLayout<UntypedValue>.stride
+        )
+    }
+
+    /// The number of slots from the start of the parameter area to `sp`. See
+    /// ``StackLayout/entryOffset``.
+    let entryOffset: Int
+
+    /// The number of slots the parameters take.
+    let parameterSlotCount: Int
+
+    init(
+        instructions: UnsafeMutableBufferPointer<CodeSlot>,
+        maxStackHeight: Int,
+        frameInit: (anchor: UnsafeRawPointer, offset: Int),
+        entryOffset: Int,
+        parameterSlotCount: Int
+    ) {
         self.instructions = instructions
         self.maxStackHeight = maxStackHeight
-        self.frameInit = frameInit
+        self.frameInitAnchor = frameInit.anchor
+        self.frameInitOffset = frameInit.offset
+        self.entryOffset = entryOffset
+        self.parameterSlotCount = parameterSlotCount
     }
 
     var baseAddress: UnsafeMutablePointer<CodeSlot> {
@@ -447,5 +480,6 @@ extension EntityHandle<WasmFunctionEntity> {
     var instance: InternalInstance { withValue { $0.instance } }
     var index: FunctionIndex { withValue { $0.index } }
     var numberOfNonParameterLocalSlots: Int { withValue { $0.numberOfNonParameterLocalSlots } }
+    var codeSize: Int { withValue { $0.codeSize } }
     var code: CodeBody { withValue { $0.code } }
 }

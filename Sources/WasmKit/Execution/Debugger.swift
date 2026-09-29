@@ -93,14 +93,14 @@
         private let headSlotToOpcodeID: [CodeSlot: OpcodeID]
 
         private static let callFamilyOpcodes: Set<OpcodeID> = [
-            Instruction.call(.init(rawCallee: UInt64(0), spAddend: VReg.zero)).opcodeID,
-            Instruction.compilingCall(.init(rawCallee: UInt64(0), spAddend: VReg.zero)).opcodeID,
-            Instruction.internalCall(.init(rawCallee: UInt64(0), spAddend: VReg.zero)).opcodeID,
-            Instruction.callIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg.zero, spAddend: VReg.zero)).opcodeID,
-            Instruction.returnCall(.init(rawCallee: UInt64(0))).opcodeID,
-            Instruction.returnCallIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg.zero)).opcodeID,
-            Instruction.callRef(.init(callee: VReg.zero, spAddend: VReg.zero)).opcodeID,
-            Instruction.returnCallRef(.init(callee: VReg.zero)).opcodeID,
+            Instruction.call(.init(rawCallee: UInt64(0), arguments: VReg.zero, spAddend: LVReg.zero)).opcodeID,
+            Instruction.compilingCall(.init(rawCallee: UInt64(0), arguments: VReg.zero, spAddend: LVReg.zero)).opcodeID,
+            Instruction.internalCall(.init(rawCallee: UInt64(0), arguments: VReg.zero, spAddend: LVReg.zero)).opcodeID,
+            Instruction.callIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg.zero, arguments: VReg.zero)).opcodeID,
+            Instruction.returnCall(.init(rawCallee: UInt64(0), arguments: VReg.zero, frameBase: LVReg.zero)).opcodeID,
+            Instruction.returnCallIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg.zero, arguments: VReg.zero, frameBase: LVReg.zero)).opcodeID,
+            Instruction.callRef(.init(callee: VReg.zero, arguments: VReg.zero)).opcodeID,
+            Instruction.returnCallRef(.init(callee: VReg.zero, arguments: VReg.zero, frameBase: LVReg.zero)).opcodeID,
         ]
 
         /// Initializes a new debugger state instance.
@@ -464,13 +464,10 @@
                     throw Debugger.Error.stackLocalIndexOOB(localIndex)
                 }
 
-                if localIndex < functionType.parameters.count {
-                    let localIndex = Int(localIndex) - 4
-                    return frame.sp[localIndex].storage
-                } else {
-                    let localIndex = Int(localIndex) - functionType.parameters.count
-                    return frame.sp[localIndex].storage
+                let stackLayout = try wasm.withValue { code in
+                    try StackLayout(type: functionType, locals: code.locals, codeSize: code.expression.count)
                 }
+                return frame.sp[stackLayout.localSlotIndex(LocalIndex(localIndex))].storage
             }
 
             throw Error.stackFrameIndexOOB(frameIndex)
