@@ -28,7 +28,7 @@ To use WasmKit in your package, add it as a [Swift Package Manager](https://www.
 Run the following commands in the same directory as your `Package.swift` manifest to add the dependency:
 
 ```
-swift package add-dependency https://github.com/swiftwasm/WasmKit --up-to-next-minor-from 0.4.0
+swift package add-dependency https://github.com/swiftwasm/WasmKit --up-to-next-minor-from 0.4.1
 swift package add-target-dependency WasmKit <your-package-target-name> --package WasmKit
 ```
 
@@ -37,7 +37,7 @@ You can also add the following snippet manually instead to your `Package.swift` 
 ```swift
 dependencies: [
     // ...other dependencies
-    .package(url: "https://github.com/swiftwasm/WasmKit.git", .upToNextMinor(from: "0.4.0")),
+    .package(url: "https://github.com/swiftwasm/WasmKit.git", .upToNextMinor(from: "0.4.1")),
 ],
 // ...other package configuration
 targets: [
@@ -102,7 +102,7 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | [Reference Types](https://github.com/WebAssembly/reference-types) | ✅ Implemented | [0.0.2] |
 | [Sign-extension Operators](https://github.com/WebAssembly/sign-extension-ops) | ✅ Implemented | [0.0.2] |
 | [Tail Call](https://github.com/WebAssembly/tail-call) | ✅ Implemented | [0.1.4] |
-| [Typed Function References](https://github.com/WebAssembly/function-references) | ✅ Implemented | `main` branch |
+| [Typed Function References](https://github.com/WebAssembly/function-references) | ✅ Implemented | [0.4.1] |
 | [Branch Hinting](https://github.com/WebAssembly/branch-hinting) | ❌ Not implemented | |
 | [Custom Annotation Syntax in the Text Format](https://github.com/WebAssembly/annotations) | ❌ Not implemented | |
 | [Extended Constant Expressions](https://github.com/WebAssembly/extended-const) | ✅ Implemented | [0.4.0] |
@@ -114,6 +114,7 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 [0.1.4]: https://github.com/swiftwasm/WasmKit/releases/tag/0.1.4
 [0.3.0]: https://github.com/swiftwasm/WasmKit/releases/tag/0.3.0
 [0.4.0]: https://github.com/swiftwasm/WasmKit/releases/tag/0.4.0
+[0.4.1]: https://github.com/swiftwasm/WasmKit/releases/tag/0.4.1
 
 #### Phase 4 - Standardize the Feature (WG)
 
