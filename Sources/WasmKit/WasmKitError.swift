@@ -105,6 +105,10 @@ extension WasmKitError.Message {
         Self("alignment 2**\(memarg.align) is out of limit \(naturalAlignment)")
     }
 
+    static func memArgOffsetOutOfRange(offset: UInt64) -> Self {
+        Self("offset out of range: \(offset) does not fit a 32-bit memory")
+    }
+
     static var globalSetConstant: Self {
         Self("cannot set a constant global")
     }
