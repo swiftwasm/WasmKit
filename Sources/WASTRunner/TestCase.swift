@@ -103,6 +103,9 @@ class WASTRunContext {
     let rootPath: String
     private var namedModuleInstances: [String: Instance] = [:]
     var currentInstance: Instance?
+    /// Modules from `(module definition ...)`, instantiated later by `(module instance ...)`.
+    var namedModuleDefinitions: [String: Module] = [:]
+    var lastModuleDefinition: Module?
     var importsSpace = Imports()
     /// Why the current module was skipped, if it was; the directives that use it are skipped too.
     var skippedCurrentModule: String?
@@ -173,11 +176,16 @@ extension TestCase {
                 handler(self, location, .failed("\(failure.error)"))
                 continue
             }
-            if case .module = directive {
+            switch directive {
+            case .module(let module) where !module.isDefinition:
                 // A new current module replaces a skipped one.
                 context.skippedCurrentModule = nil
+            case .moduleInstance:
+                context.skippedCurrentModule = nil
+            default: break
             }
             if let reason = context.skipReason(for: directive) {
+                context.skip(parsed, reason: reason)
                 handler(self, location, .skipped(reason))
                 continue
             }
@@ -196,17 +204,23 @@ extension WASTRunContext {
     /// Records a skipped directive, so that the directives that use a skipped module are
     /// skipped as well.
     func skip(_ directive: Swift.Result<WASTDirective, WASTDirectiveError>, reason: String) {
-        let moduleId: String??
+        let moduleId: String?
+        let isDefinition: Bool
         switch directive {
-        case .success(.module(let module)): moduleId = .some(module.id)
-        case .success: moduleId = nil
-        case .failure(let failure): moduleId = failure.module.map { $0.id }
+        case .success(.module(let module)): (moduleId, isDefinition) = (module.id, module.isDefinition)
+        case .success(.moduleInstance(let instance, _)): (moduleId, isDefinition) = (instance, false)
+        case .failure(let failure):
+            guard let module = failure.module else { return }
+            (moduleId, isDefinition) = (module.id, module.isDefinition)
+        case .success: return
         }
-        guard let moduleId else { return }
-        currentInstance = nil
-        skippedCurrentModule = reason
         if let moduleId {
             skippedNamedModules[moduleId] = reason
+        }
+        // A definition is not instantiated, so it leaves the current module alone.
+        if !isDefinition {
+            currentInstance = nil
+            skippedCurrentModule = reason
         }
     }
 
@@ -223,6 +237,8 @@ extension WASTRunContext {
             }
         }
         switch directive {
+        case .moduleInstance(_, let module):
+            return module.flatMap { skippedNamedModules[$0] }
         case .invoke(let invoke): return reason(forModule: invoke.module)
         case .register(_, let moduleId): return reason(forModule: moduleId)
         case .assertReturn(let execute, _), .assertTrap(let execute, _), .assertException(let execute),
@@ -285,12 +301,33 @@ extension WASTRunContext {
                 return .failed("module could not be parsed: \(error)")
             }
 
+            if moduleDirective.isDefinition {
+                lastModuleDefinition = module
+                if let id = moduleDirective.id {
+                    namedModuleDefinitions[id] = module
+                }
+                return .passed
+            }
+
             do {
                 currentInstance = try instantiate(module: module, name: moduleDirective.id)
             } catch {
                 return .failed("module could not be instantiated: \(error)")
             }
 
+            return .passed
+
+        case .moduleInstance(let instanceId, let moduleId):
+            currentInstance = nil
+            let definition = moduleId.map { namedModuleDefinitions[$0] } ?? lastModuleDefinition
+            guard let definition else {
+                return .failed("module definition \(moduleId ?? "") not found")
+            }
+            do {
+                currentInstance = try instantiate(module: definition, name: instanceId)
+            } catch {
+                return .failed("module could not be instantiated: \(error)")
+            }
             return .passed
 
         case .register(let name, let moduleId):

@@ -89,6 +89,8 @@ enum Spectest {
     struct Command: Decodable {
         enum CommandType: String, Decodable {
             case module
+            /// `(module instance ...)`, which instantiates an earlier module definition.
+            case instance
             case action
             case register
             case assertReturn = "assert_return"

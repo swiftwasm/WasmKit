@@ -190,8 +190,8 @@ public struct WAST {
             do {
                 _ = try parser.parser.expect(.leftParen)
                 if try parser.parser.takeKeyword("module") {
-                    _ = try parser.parser.takeKeyword("definition")
-                    module = WASTDirectiveError.Module(id: try parser.parser.takeId()?.value)
+                    let isDefinition = try parser.parser.takeKeyword("definition")
+                    module = WASTDirectiveError.Module(id: try parser.parser.takeId()?.value, isDefinition: isDefinition)
                 }
                 try parser.parser.skipParenBlock()
             } catch {
@@ -221,6 +221,8 @@ public struct WASTDirectiveError: Error {
     public struct Module: Sendable {
         /// The name of the module specified in $id form
         public let id: String?
+        /// Whether this is a `(module definition ...)`, which is not instantiated.
+        public let isDefinition: Bool
     }
 
     public let error: WatParserError

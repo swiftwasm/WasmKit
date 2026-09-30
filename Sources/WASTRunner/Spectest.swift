@@ -29,7 +29,6 @@ package struct SpectestDiscovery {
 /// What WasmKit cannot run yet at the top level of the spec testsuite, by file name.
 package enum UnsupportedSpectests {
     private static let garbageCollection = "needs garbage collection"
-    private static let moduleDefinitions = "needs `module definition` and `module instance`"
     private static let limits = "needs limits checked against their address type"
     private static let definedGlobalsInConstExpr = "needs constant expressions to read globals defined in the module"
     private static let memargOffsets = "needs a memarg offset checked against a 32-bit memory"
@@ -148,21 +147,7 @@ package enum UnsupportedSpectests {
         ],
 
         // Not implemented yet by WasmKit itself.
-        "instance.wast": [
-            3: moduleDefinitions,  // Defines `$M`, which the directives below instantiate
-            10: moduleDefinitions,  // Instantiates `$M`
-            11: moduleDefinitions,  // Instantiates `$M`
-            12: moduleDefinitions,  // Registers the instance from line 10
-            13: moduleDefinitions,  // Registers the instance from line 11
-            15: moduleDefinitions,  // Imports from the instances made on lines 10 and 11
-            62: moduleDefinitions,  // Imports from the instance made on line 10
-            109: moduleDefinitions,  // Defines `$N`, which the directives below instantiate
-            125: moduleDefinitions,  // Instantiates `$N`
-            126: moduleDefinitions,  // Registers the instance from line 125
-            128: moduleDefinitions,  // Imports from the instance made on line 125
-        ],
         "memory.wast": [
-            8: moduleDefinitions,  // A memory of 65536 pages, defined but not instantiated
             77: limits,  // `(memory 0x1_0000_0000)`, which must fail validation rather than parsing
             81: limits,  // An i32 minimum and maximum beyond u32, which must fail validation rather than parsing
             85: limits,  // An i32 maximum beyond u32, which must fail validation rather than parsing
@@ -171,15 +156,10 @@ package enum UnsupportedSpectests {
             98: limits,  // An imported i32 memory with a maximum beyond u32, which must be invalid
         ],
         "memory64.wast": [
-            8: moduleDefinitions,  // A memory of 2^48 pages, defined but not instantiated
-            57: limits,  // A memory64 maximum of more than 2^48 pages, which must be invalid
-        ],
-        "table.wast": [
-            9: moduleDefinitions  // A table of 2^32 - 1 elements, defined but not instantiated
+            57: limits  // A memory64 maximum of more than 2^48 pages, which must be invalid
         ],
         "table64.wast": [
             8: limits,  // A table64 maximum beyond 2^32 - 1
-            9: moduleDefinitions,  // A table of 2^64 - 1 elements, defined but not instantiated
             10: limits,  // A table64 maximum of 2^64 - 1
         ],
         "data.wast": [
