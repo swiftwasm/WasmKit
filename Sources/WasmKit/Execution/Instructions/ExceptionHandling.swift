@@ -37,8 +37,11 @@ extension Execution {
     ///
     /// `pc` points past the `catchHandlers` instruction at this point.
     /// The `pcOffset` in each `CatchTableEntry` is relative to this `pc`.
+    ///
+    /// Clauses are pushed last to first so that `handleException`, which searches
+    /// from the top, tries them in source order as the spec requires.
     mutating func catchHandlers(sp: Sp, pc: Pc, immediate: Instruction.CatchHandlersOperand) -> (Pc, CodeSlot) {
-        for i in 0..<Int(immediate.count) {
+        for i in (0..<Int(immediate.count)).reversed() {
             let entry = immediate.baseAddress[i]
             let targetPC = pc.advanced(by: Int(entry.pcOffset))
             let handler = ExceptionHandler(

@@ -261,8 +261,9 @@ extension Instruction.BrTableOperand {
 ///    *enclosing* scope (the `try_table`'s own label is not yet in scope), so clauses are
 ///    processed before pushing the `try_table` control frame.
 /// 3. **Execute**: The `catchHandlers` instruction registers entries as `ExceptionHandler`
-///    values on a handler stack. On `throw`, `handleException` walks the stack top-down to
-///    find a matching handler (by tag identity, or `catch_all`), unwinds `sp`, writes the
+///    values on a handler stack, last clause first. On `throw`, `handleException` walks the
+///    stack top-down, so each `try_table`'s clauses are tried in source order, to find a
+///    matching handler (by tag identity, or `catch_all`), unwinds `sp`, writes the
 ///    exception payload into the target registers, and jumps to the handler `pc`.
 ///    `catchHandlersEnd` pops handlers when control exits the `try_table` normally or via branch.
 struct CatchTableEntry {
