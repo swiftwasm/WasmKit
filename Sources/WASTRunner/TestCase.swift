@@ -104,6 +104,10 @@ class WASTRunContext {
     private var namedModuleInstances: [String: Instance] = [:]
     var currentInstance: Instance?
     var importsSpace = Imports()
+    /// Why the current module was skipped, if it was; the directives that use it are skipped too.
+    var skippedCurrentModule: String?
+    /// Why each named module was skipped.
+    var skippedNamedModules: [String: String] = [:]
 
     init(store: Store, rootPath: String) {
         self.store = store
@@ -119,7 +123,12 @@ class WASTRunContext {
 }
 
 extension TestCase {
-    func run(spectestModule: Module, configuration: EngineConfiguration, handler: @escaping (TestCase, Location, Result) -> Void) throws {
+    /// - Parameter skip: Why each directive to skip is skipped, keyed by the line it starts on.
+    ///   Skipping a module also skips the directives that use it.
+    func run(
+        spectestModule: Module, configuration: EngineConfiguration, skip: [Int: String] = [:],
+        handler: @escaping (TestCase, Location, Result) -> Void
+    ) throws {
         guard let data = FileManager.default.contents(atPath: path) else {
             assertionFailure("failed to load \(path)")
             return
@@ -145,27 +154,85 @@ extension TestCase {
         {
             context.importsSpace.define(module: "spectest", name: "shared_memory", sharedMemory)
         }
-        do {
-            while let (directive, location) = try content.nextDirective() {
-                do {
-                    if let result = try context.run(directive: directive) {
-                        handler(self, location, result)
-                    }
-                } catch let error {
-                    handler(self, location, .failed("\(error)"))
-                }
+        while let (parsed, location) = content.nextDirectiveResult() {
+            // Computing a line scans the script up to it, so only do so when there is a skip.
+            if !skip.isEmpty, let reason = skip[location.computeLineAndColumn().line] {
+                context.skip(parsed, reason: reason)
+                handler(self, location, .skipped(reason))
+                continue
             }
-        } catch let parseError {
-            if let location = parseError.location {
-                handler(self, location, .failed(parseError.message))
-            } else {
-                throw parseError
+            let directive: WASTDirective
+            switch parsed {
+            case .success(let parsed):
+                directive = parsed
+            case .failure(let failure):
+                if failure.module != nil {
+                    context.currentInstance = nil
+                    context.skippedCurrentModule = nil
+                }
+                handler(self, location, .failed("\(failure.error)"))
+                continue
+            }
+            if case .module = directive {
+                // A new current module replaces a skipped one.
+                context.skippedCurrentModule = nil
+            }
+            if let reason = context.skipReason(for: directive) {
+                handler(self, location, .skipped(reason))
+                continue
+            }
+            do {
+                if let result = try context.run(directive: directive) {
+                    handler(self, location, result)
+                }
+            } catch let error {
+                handler(self, location, .failed("\(error)"))
             }
         }
     }
 }
 
 extension WASTRunContext {
+    /// Records a skipped directive, so that the directives that use a skipped module are
+    /// skipped as well.
+    func skip(_ directive: Swift.Result<WASTDirective, WASTDirectiveError>, reason: String) {
+        let moduleId: String??
+        switch directive {
+        case .success(.module(let module)): moduleId = .some(module.id)
+        case .success: moduleId = nil
+        case .failure(let failure): moduleId = failure.module.map { $0.id }
+        }
+        guard let moduleId else { return }
+        currentInstance = nil
+        skippedCurrentModule = reason
+        if let moduleId {
+            skippedNamedModules[moduleId] = reason
+        }
+    }
+
+    /// Why `directive` is skipped because it uses a skipped module, if it does.
+    func skipReason(for directive: WASTDirective) -> String? {
+        func reason(forModule name: String?) -> String? {
+            name.map { skippedNamedModules[$0] } ?? skippedCurrentModule
+        }
+        func reason(for execute: WASTExecute) -> String? {
+            switch execute {
+            case .invoke(let invoke): return reason(forModule: invoke.module)
+            case .get(let module, _): return reason(forModule: module)
+            default: return nil
+            }
+        }
+        switch directive {
+        case .invoke(let invoke): return reason(forModule: invoke.module)
+        case .register(_, let moduleId): return reason(forModule: moduleId)
+        case .assertReturn(let execute, _), .assertTrap(let execute, _), .assertException(let execute),
+            .assertFuel(let execute, _), .assertOutOfFuel(let execute, _):
+            return reason(for: execute)
+        case .assertExhaustion(let call, _): return reason(forModule: call.module)
+        default: return nil
+        }
+    }
+
     func instantiate(module: Module, name: String? = nil) throws -> Instance {
         let instance = try module.instantiate(store: store, imports: importsSpace)
         if let name {
