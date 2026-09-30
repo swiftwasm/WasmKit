@@ -658,12 +658,7 @@ struct WatParser {
     }
 
     mutating func tableType(isMemory64: Bool) throws(WatParserError) -> UnresolvedType<TableType> {
-        let limits: Limits
-        if isMemory64 {
-            limits = try limit64()
-        } else {
-            limits = try limit32()
-        }
+        let limits = try limits(isMemory64: isMemory64)
         let elementType = try refType()
         return elementType.map { TableType(elementType: $0, limits: limits) }
     }
@@ -673,12 +668,7 @@ struct WatParser {
     }
 
     mutating func memoryType(isMemory64: Bool) throws(WatParserError) -> MemoryType {
-        let limits: Limits
-        if isMemory64 {
-            limits = try limit64()
-        } else {
-            limits = try limit32()
-        }
+        let limits = try limits(isMemory64: isMemory64)
         let shared = try parser.takeKeyword("shared")
         return Limits(min: limits.min, max: limits.max, isMemory64: limits.isMemory64, shared: shared)
     }
@@ -698,16 +688,12 @@ struct WatParser {
         return valueType.map { GlobalType(mutability: mutability, valueType: $0) }
     }
 
-    mutating func limit32() throws(WatParserError) -> Limits {
-        let min = try parser.expectUnsignedInt(UInt32.self)
-        let max: UInt32? = try parser.takeUnsignedInt(UInt32.self)
-        return Limits(min: UInt64(min), max: max.map(UInt64.init), isMemory64: false)
-    }
-
-    mutating func limit64() throws(WatParserError) -> Limits {
+    /// Limits are u64 in the text format whatever the address type, so an out-of-range
+    /// i32 limit is left for validation to reject.
+    mutating func limits(isMemory64: Bool) throws(WatParserError) -> Limits {
         let min = try parser.expectUnsignedInt(UInt64.self)
         let max: UInt64? = try parser.takeUnsignedInt(UInt64.self)
-        return Limits(min: min, max: max, isMemory64: true)
+        return Limits(min: min, max: max, isMemory64: isMemory64)
     }
 
     /// functype ::= '(' 'func' t1*:vec(param) t2*:vec(result) ')' => [t1*] -> [t2*]

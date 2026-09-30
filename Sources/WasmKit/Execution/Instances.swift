@@ -340,7 +340,7 @@ struct TableEntity: ~Copyable {
     var limits: Limits { tableType.limits }
 
     static func maxSize(isMemory64: Bool) -> UInt64 {
-        return UInt64(UInt32.max)
+        return isMemory64 ? UInt64.max : UInt64(UInt32.max)
     }
 
     /// The raw slot value for a reference, where `0` is always null.
@@ -584,10 +584,11 @@ struct MemoryEntity: ~Copyable {
     static let pageSize = 64 * 1024
 
     static func maxPageCount(isMemory64: Bool) -> UInt64 {
-        // Shift in the UInt64 domain: `1 << 32` would be evaluated as `Int`,
-        // which is 32 bits wide on targets like riscv32, wrapping to zero and
-        // rejecting every guest that declares a memory.
-        isMemory64 ? UInt64.max : (UInt64(1) << 32) / UInt64(pageSize)
+        // The pages that fit in the 32- or 64-bit address space. Shift in the
+        // UInt64 domain: `1 << 32` would be evaluated as `Int`, which is 32 bits
+        // wide on targets like riscv32, wrapping to zero and rejecting every guest
+        // that declares a memory.
+        (UInt64(1) << (isMemory64 ? 48 : 16))
     }
 
     private struct MallocStorage {
