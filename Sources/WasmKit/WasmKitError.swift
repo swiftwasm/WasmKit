@@ -284,6 +284,10 @@ extension WasmKitError.Message {
         Self("constant expression must produce exactly one value, but produced \(count)")
     }
 
+    static func mutableGlobalInConstExpression(index: UInt32) -> Self {
+        Self("constant expression required: global \(index) is mutable")
+    }
+
     static func illegalConstExpressionInstruction(_ constInst: WasmParser.Instruction) -> Self {
         Self("illegal const expression instruction")
     }

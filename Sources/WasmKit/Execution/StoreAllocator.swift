@@ -423,15 +423,17 @@ extension StoreAllocator {
         )
 
         var functionRefs: Set<InternalFunction> = []
-        let constEvalContext = ConstEvaluationContext(
+        // Table initializers can only read imported globals, a global initializer can also read
+        // the globals defined before it, and element segments can read every global. Both
+        // contexts gain each global as it is allocated.
+        var constEvalContext = ConstEvaluationContext(
             functions: functions,
-            globals: importedGlobals.map { $0.value },
+            globals: importedGlobals,
             onFunctionReferenced: { function in
                 functionRefs.insert(function)
             }
         )
-        // Constant expressions can only read imported globals.
-        let constTypeContext = ConstExpressionTypeContext(
+        var constTypeContext = ConstExpressionTypeContext(
             canonicalizer: canonicalizer, functions: functions, globalTypes: importedGlobalTypes
         )
 
@@ -472,7 +474,10 @@ extension StoreAllocator {
                 let initialValue = try global.initializer.evaluate(
                     context: constEvalContext, expectedType: globalType.valueType
                 )
-                return try allocate(globalType: globalType, initialValue: initialValue)
+                let allocated = try allocate(globalType: globalType, initialValue: initialValue)
+                constEvalContext.globals.append(allocated)
+                constTypeContext.globalTypes.append(globalType)
+                return allocated
             }
         )
 

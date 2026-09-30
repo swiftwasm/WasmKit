@@ -7,12 +7,13 @@ protocol ConstEvaluationContextProtocol {
 
 struct ConstEvaluationContext: ConstEvaluationContextProtocol {
     let functions: ImmutableArray<InternalFunction>
-    var globals: [Value]
+    /// The globals a constant expression may read, which depends on where it appears.
+    var globals: [InternalGlobal]
     let onFunctionReferenced: ((InternalFunction) -> Void)?
 
     init(
         functions: ImmutableArray<InternalFunction>,
-        globals: [Value],
+        globals: [InternalGlobal],
         onFunctionReferenced: ((InternalFunction) -> Void)? = nil
     ) {
         self.functions = functions
@@ -20,12 +21,9 @@ struct ConstEvaluationContext: ConstEvaluationContextProtocol {
         self.onFunctionReferenced = onFunctionReferenced
     }
 
-    init(instance: InternalInstance, moduleImports: ModuleImports) {
-        // Constant expressions can only reference imported globals
-        let externalGlobals = instance.globals
-            .prefix(moduleImports.numberOfGlobals)
-            .map { $0.value }
-        self.init(functions: instance.functions, globals: Array(externalGlobals))
+    /// A context for element and data segment offsets, which may read every global.
+    init(instance: InternalInstance) {
+        self.init(functions: instance.functions, globals: Array(instance.globals))
     }
 
     func functionRef(_ index: FunctionIndex) throws -> Reference {
@@ -37,7 +35,11 @@ struct ConstEvaluationContext: ConstEvaluationContextProtocol {
         guard index < globals.count else {
             throw GlobalEntity.createOutOfBoundsError(index: Int(index), count: globals.count)
         }
-        return self.globals[Int(index)]
+        let global = self.globals[Int(index)]
+        guard global.globalType.mutability == .constant else {
+            throw WasmKitError(message: .mutableGlobalInConstExpression(index: index))
+        }
+        return global.value
     }
 }
 
@@ -162,7 +164,7 @@ struct ConstExpressionTypeContext {
     let canonicalizer: TypeCanonicalizer
     let functions: ImmutableArray<InternalFunction>
     /// The types of the globals a constant expression may read.
-    let globalTypes: [GlobalType]
+    var globalTypes: [GlobalType]
 }
 
 extension ConstExpression {

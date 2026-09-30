@@ -29,7 +29,6 @@ package struct SpectestDiscovery {
 /// What WasmKit cannot run yet at the top level of the spec testsuite, by file name.
 package enum UnsupportedSpectests {
     private static let garbageCollection = "needs garbage collection"
-    private static let definedGlobalsInConstExpr = "needs constant expressions to read globals defined in the module"
     private static let memargOffsets = "needs a memarg offset checked against a 32-bit memory"
     private static let quotedIdentifiers = "needs quoted identifiers"
 
@@ -146,19 +145,6 @@ package enum UnsupportedSpectests {
         ],
 
         // Not implemented yet by WasmKit itself.
-        "data.wast": [
-            89: definedGlobalsInConstExpr,  // A data segment offset read from a defined global
-            90: definedGlobalsInConstExpr,  // A data segment offset read from a defined global, by name
-        ],
-        "elem.wast": [
-            178: definedGlobalsInConstExpr,  // An element segment offset read from a defined global
-            182: definedGlobalsInConstExpr,  // An element segment offset read from a defined global, by name
-        ],
-        "global.wast": [
-            373: definedGlobalsInConstExpr,  // A global initialized from a defined global
-            374: definedGlobalsInConstExpr,  // A global initialized from a defined global, by name
-            634: definedGlobalsInConstExpr,  // Globals, segment offsets and table entries read from defined globals
-        ],
         "load64.wast": [
             571: memargOffsets  // An i32 load from a 32-bit memory beside a memory64, with `offset=4294967296`, which must be invalid
         ],
