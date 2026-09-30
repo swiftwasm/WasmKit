@@ -396,6 +396,11 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
             // This path should not be reached when parsing folded "if" instruction.
             // It should be separately handled in foldedInstruction().
             try checkRepeatedLabelConsistency()
+            // An empty `else` means the same as none. Leave it out, as the folded form does
+            // and as wast2json does, so both encode the same bytes.
+            if try parser.peekKeyword() == "end" {
+                return { _ in }
+            }
             return { visitor in
                 return try visitor.visitElse()
             }
