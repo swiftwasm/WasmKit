@@ -1,5 +1,6 @@
 ;; A try_table's catch clauses are tried in source order and the first match
-;; wins.
+;; wins. Once one clause catches, the try_table is gone, so its other clauses
+;; must not catch later exceptions either.
 
 (module
   (tag $t)
@@ -48,9 +49,21 @@
         (return (i32.const 0)))
       (return (i32.const 1)))
     (i32.const 2))
+
+  ;; After `catch $t` fires, the `catch_all` of the same try_table is out of
+  ;; scope, so the second throw must escape the function.
+  (func (export "sibling-clauses-removed")
+    (block $all
+      (block $h
+        (try_table (catch $t $h) (catch_all $all)
+          (throw $t))
+        (unreachable))
+      (throw $u))
+    (unreachable))
 )
 
 (assert_return (invoke "catch-before-catch-all") (i32.const 1))
 (assert_return (invoke "catch-ref-before-catch-all-ref") (i32.const 1))
 (assert_return (invoke "duplicated-catches") (i32.const 1))
 (assert_return (invoke "skip-non-matching") (i32.const 1))
+(assert_exception (invoke "sibling-clauses-removed"))

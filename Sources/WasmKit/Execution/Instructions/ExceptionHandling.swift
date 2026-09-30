@@ -49,7 +49,8 @@ extension Execution {
                 isRef: entry.isRef != 0,
                 sp: sp,
                 targetPC: targetPC,
-                payloadRegBase: entry.payloadRegBase
+                payloadRegBase: entry.payloadRegBase,
+                siblingsBelow: Int(immediate.count) - 1 - i
             )
             exceptionHandlers.append(handler)
         }
@@ -84,6 +85,9 @@ extension Execution {
             }
 
             guard isMatch else { continue }
+
+            // The rest of this handler's try_table is exited along with it.
+            exceptionHandlers.removeLast(handler.siblingsBelow)
 
             // Unwind call stack to the handler's frame
             sp = handler.sp
