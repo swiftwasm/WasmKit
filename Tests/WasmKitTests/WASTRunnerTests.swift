@@ -65,6 +65,25 @@ import WasmKit
         }
     }
 
+    @Test func skippingADefinitionSkipsItsInstances() throws {
+        let script = """
+            (module (func (export "a") (result i32) (i32.const 1)))
+            (module definition $M (func (export "m") (result i32) (no.such.instruction)))
+            (assert_return (invoke "a") (i32.const 1))
+            (module instance $I $M)
+            (assert_return (invoke $I "m") (i32.const 2))
+            """
+        try withScript(script) { script in
+            let outcome = try SpectestRunner(configuration: EngineConfiguration())
+                .evaluate(test: script, reporter: NullSpectestProgressReporter(), skip: [2: "unsupported"])
+
+            // The assertion on line 3 still runs against the module on line 1.
+            #expect(outcome.passed == 2)
+            #expect(outcome.skipped == 3)
+            #expect(outcome.failures.isEmpty)
+        }
+    }
+
     /// Keeps the script out of `ExtraSuite`, which `SpectestTests` scans and would fail on it.
     private func withScript(_ text: String, _ body: (TestCase) throws -> Void) throws {
         let url = FileManager.default.temporaryDirectory

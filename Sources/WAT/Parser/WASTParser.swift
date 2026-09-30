@@ -230,6 +230,11 @@ public enum WASTExpectValue {
 /// A directive in a WAST script.
 public enum WASTDirective {
     case module(ModuleDirective)
+    /// Instantiate a module defined by `(module definition ...)`.
+    ///
+    /// Example: `(module instance $I $M)` instantiates the definition `$M` and names the
+    /// instance `$I`. Without a module name, the most recent definition is instantiated.
+    case moduleInstance(instance: String?, module: String?)
     case assertInvalid(module: ModuleDirective, message: String)
     case assertMalformed(module: ModuleDirective, message: String)
     case assertReturn(execute: WASTExecute, results: [WASTExpectValue])
@@ -262,6 +267,15 @@ public enum WASTDirective {
         let keyword = try wastParser.parser.peekKeyword()
         switch keyword {
         case "module":
+            var lookahead = wastParser.parser
+            try lookahead.consume()
+            if try lookahead.takeKeyword("instance") {
+                wastParser.parser = lookahead
+                let instance = try wastParser.parser.takeId()
+                let module = try wastParser.parser.takeId()
+                try wastParser.parser.expect(.rightParen)
+                return .moduleInstance(instance: instance?.value, module: module?.value)
+            }
             return .module(try ModuleDirective.parse(wastParser: &wastParser))
         case "assert_invalid":
             try wastParser.parser.consume()
@@ -350,13 +364,24 @@ public struct ModuleDirective {
     public let id: String?
     /// The location of the module in the source
     public let location: Location
+    /// Whether this is a `(module definition ...)`, which is validated but not instantiated
+    /// until a `(module instance ...)` directive names it.
+    public let isDefinition: Bool
+
+    init(source: ModuleSource, id: String?, location: Location, isDefinition: Bool = false) {
+        self.source = source
+        self.id = id
+        self.location = location
+        self.isDefinition = isDefinition
+    }
 
     static func parse(wastParser: inout WASTParser) throws(WatParserError) -> ModuleDirective {
         let location = wastParser.parser.lexer.location()
         try wastParser.parser.expectKeyword("module")
+        let isDefinition = try wastParser.parser.takeKeyword("definition")
         let id = try wastParser.parser.takeId()
         let source = try ModuleSource.parse(wastParser: &wastParser)
-        return ModuleDirective(source: source, id: id?.value, location: location)
+        return ModuleDirective(source: source, id: id?.value, location: location, isDefinition: isDefinition)
     }
 }
 
