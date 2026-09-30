@@ -89,13 +89,15 @@ package struct SpectestRunner {
     package struct Outcome {
         package var passed = 0
         package var failed = 0
+        package var skipped = 0
         package var failures: [(Location, reason: String)] = []
     }
 
     /// A failing assertion lands in ``Outcome/failures``; only a script that cannot be parsed throws.
-    package func evaluate(test: TestCase, reporter: SpectestProgressReporter) throws -> Outcome {
+    /// - Parameter skip: Why each directive to skip is skipped, keyed by the line it starts on.
+    package func evaluate(test: TestCase, reporter: SpectestProgressReporter, skip: [Int: String] = [:]) throws -> Outcome {
         var outcome = Outcome()
-        try test.run(spectestModule: hostModule, configuration: configuration) { test, location, result in
+        try test.run(spectestModule: hostModule, configuration: configuration, skip: skip) { test, location, result in
             switch result {
             case .failed(let reason):
                 reporter.log("\(result.banner) \(reason)", path: test.path, location: location, verbose: false)
@@ -103,6 +105,7 @@ package struct SpectestRunner {
                 outcome.failures.append((location, reason))
             case .skipped(let reason):
                 reporter.log("\(result.banner) \(reason)", path: test.path, location: location, verbose: true)
+                outcome.skipped += 1
             case .passed:
                 reporter.log(result.banner, path: test.path, location: location, verbose: true)
                 outcome.passed += 1
