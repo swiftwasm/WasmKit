@@ -26,6 +26,9 @@ struct EncoderTests {
             // wast2json writes no value type for a relaxed-SIMD `either` result.
             "i16x8_relaxed_q15mulr_s.wast", "i8x16_relaxed_swizzle.wast", "relaxed_dot_product.wast",
             "relaxed_laneselect.wast", "relaxed_madd_nmadd.wast", "relaxed_min_max.wast",
+            // Written before Wasm 3.0 made text-format limits u64; the top-level memory.wast
+            // expects an out-of-range limit to fail validation instead.
+            "proposals/threads/memory.wast",
         ]
 
     // MARK: - Supporting Types

@@ -29,7 +29,6 @@ package struct SpectestDiscovery {
 /// What WasmKit cannot run yet at the top level of the spec testsuite, by file name.
 package enum UnsupportedSpectests {
     private static let garbageCollection = "needs garbage collection"
-    private static let limits = "needs limits checked against their address type"
     private static let definedGlobalsInConstExpr = "needs constant expressions to read globals defined in the module"
     private static let memargOffsets = "needs a memarg offset checked against a 32-bit memory"
     private static let quotedIdentifiers = "needs quoted identifiers"
@@ -147,21 +146,6 @@ package enum UnsupportedSpectests {
         ],
 
         // Not implemented yet by WasmKit itself.
-        "memory.wast": [
-            77: limits,  // `(memory 0x1_0000_0000)`, which must fail validation rather than parsing
-            81: limits,  // An i32 minimum and maximum beyond u32, which must fail validation rather than parsing
-            85: limits,  // An i32 maximum beyond u32, which must fail validation rather than parsing
-            90: limits,  // An imported i32 memory with a minimum beyond u32, which must be invalid
-            94: limits,  // An imported i32 memory with a minimum and maximum beyond u32, which must be invalid
-            98: limits,  // An imported i32 memory with a maximum beyond u32, which must be invalid
-        ],
-        "memory64.wast": [
-            57: limits  // A memory64 maximum of more than 2^48 pages, which must be invalid
-        ],
-        "table64.wast": [
-            8: limits,  // A table64 maximum beyond 2^32 - 1
-            10: limits,  // A table64 maximum of 2^64 - 1
-        ],
         "data.wast": [
             89: definedGlobalsInConstExpr,  // A data segment offset read from a defined global
             90: definedGlobalsInConstExpr,  // A data segment offset read from a defined global, by name

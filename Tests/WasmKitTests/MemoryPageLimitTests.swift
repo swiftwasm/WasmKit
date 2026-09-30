@@ -14,8 +14,9 @@ import Testing
         #expect(MemoryEntity.maxPageCount(isMemory64: false) == 65536)
     }
 
-    @Test func aSixtyFourBitMemoryIsUnbounded() {
-        #expect(MemoryEntity.maxPageCount(isMemory64: true) == UInt64.max)
+    /// A 64-bit wasm memory addresses 2^64 bytes, which is 2^48 pages.
+    @Test func aSixtyFourBitMemoryAllowsTheFullPageRange() {
+        #expect(MemoryEntity.maxPageCount(isMemory64: true) == UInt64(1) << 48)
     }
 
     /// A memory64 minimum can name far more pages than `Int` can hold bytes for.
