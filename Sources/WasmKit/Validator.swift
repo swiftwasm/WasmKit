@@ -8,6 +8,11 @@ struct InstructionValidator {
         if memarg.align > naturalAlignment {
             throw WasmKitError(message: .invalidMemArgAlignment(memarg: memarg, naturalAlignment: naturalAlignment))
         }
+        // With memory64 enabled the parser reads every offset as u64, so a 32-bit memory's
+        // offset range is checked here.
+        if memarg.offset > UInt32.max, try !context.isMemory64(memoryIndex: memarg.memory) {
+            throw WasmKitError(message: .memArgOffsetOutOfRange(offset: memarg.offset))
+        }
     }
 
     func validateGlobalSet(_ type: GlobalType) throws(WasmKitError) {

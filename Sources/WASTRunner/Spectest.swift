@@ -29,7 +29,6 @@ package struct SpectestDiscovery {
 /// What WasmKit cannot run yet at the top level of the spec testsuite, by file name.
 package enum UnsupportedSpectests {
     private static let garbageCollection = "needs garbage collection"
-    private static let memargOffsets = "needs a memarg offset checked against a 32-bit memory"
     private static let quotedIdentifiers = "needs quoted identifiers"
 
     /// Files with nothing WasmKit can run.
@@ -145,12 +144,6 @@ package enum UnsupportedSpectests {
         ],
 
         // Not implemented yet by WasmKit itself.
-        "load64.wast": [
-            571: memargOffsets  // An i32 load from a 32-bit memory beside a memory64, with `offset=4294967296`, which must be invalid
-        ],
-        "align.wast": [
-            1004: memargOffsets  // An i32 memory with `offset=0xFFFF_FFFF_FFFF_FFFF`, which must be invalid
-        ],
         "id.wast": [
             1: quotedIdentifiers,  // Quoted identifiers such as `$"fh"`
             26: quotedIdentifiers,  // An empty identifier, `$`, which must be malformed
