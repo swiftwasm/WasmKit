@@ -29,6 +29,8 @@ struct EncoderTests {
             // Written before Wasm 3.0 made text-format limits u64; the top-level memory.wast
             // expects an out-of-range limit to fail validation instead.
             "proposals/threads/memory.wast",
+            // wast2json drops an empty flat `else`; the encoder keeps it.
+            "id.wast",
         ]
 
     // MARK: - Supporting Types

@@ -29,7 +29,6 @@ package struct SpectestDiscovery {
 /// What WasmKit cannot run yet at the top level of the spec testsuite, by file name.
 package enum UnsupportedSpectests {
     private static let garbageCollection = "needs garbage collection"
-    private static let quotedIdentifiers = "needs quoted identifiers"
 
     /// Files with nothing WasmKit can run.
     package static let files: [String] =
@@ -141,16 +140,6 @@ package enum UnsupportedSpectests {
             197: garbageCollection,  // A recursion group
             204: garbageCollection,  // A recursion group, in a module that must be invalid
             216: garbageCollection,  // A recursion group, in a module that must be invalid
-        ],
-
-        // Not implemented yet by WasmKit itself.
-        "id.wast": [
-            1: quotedIdentifiers,  // Quoted identifiers such as `$"fh"`
-            26: quotedIdentifiers,  // An empty identifier, `$`, which must be malformed
-            27: quotedIdentifiers,  // An empty quoted identifier, which must be malformed
-            29: quotedIdentifiers,  // A raw newline in a quoted identifier, which must be malformed
-            30: quotedIdentifiers,  // A raw tab in a quoted identifier, which must be malformed
-            31: quotedIdentifiers,  // A quoted identifier of invalid UTF-8, which must be malformed
         ],
     ]
 

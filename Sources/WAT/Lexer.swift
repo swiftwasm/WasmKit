@@ -443,6 +443,9 @@ struct Lexer {
                 case let other:
                     throw cursor.createError("Invalid escape sequence: \(other)")
                 }
+            } else if char.value < 0x20 || char.value == 0x7F {
+                // Control characters must be written as escapes.
+                throw cursor.createError("malformed string: unescaped control character")
             } else {
                 append(char)
             }

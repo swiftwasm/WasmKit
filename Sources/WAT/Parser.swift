@@ -351,7 +351,29 @@ internal struct Parser {
     mutating func takeId() throws(WatParserError) -> Name? {
         guard let token = try peek(.id) else { return nil }
         try consume()
-        return Name(value: token.text(from: lexer), location: token.location(in: lexer))
+        let location = token.location(in: lexer)
+        let text = token.text(from: lexer)
+        guard text.utf8.count > 1 else {
+            throw WatParserError("empty identifier", location: location)
+        }
+        return Name(value: try Self.canonicalId(text, location: location), location: location)
+    }
+
+    /// Spells a quoted identifier such as `$"a\62"` as `$ab`, the same id written without quotes.
+    private static func canonicalId(_ text: String, location: Location) throws(WatParserError) -> String {
+        guard text.utf8.dropFirst().first == UInt8(ascii: "\"") else { return text }
+        var lexer = Lexer(input: String(text.dropFirst()))
+        guard let token = try lexer.lex(), case .string(let bytes) = token.kind else {
+            throw WatParserError("malformed identifier", location: location)
+        }
+        guard !bytes.isEmpty else {
+            throw WatParserError("empty identifier", location: location)
+        }
+        let decoded = bytes.withUnsafeBufferPointer { String._tryFromUTF8($0) }
+        guard let decoded else {
+            throw WatParserError("malformed UTF-8 encoding", location: location)
+        }
+        return "$" + decoded
     }
 
     mutating func skipParenBlock() throws(WatParserError) {
