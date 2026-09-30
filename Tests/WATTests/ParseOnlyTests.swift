@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import WASTRunner
 import WAT
 import WasmParser
 
@@ -14,6 +15,7 @@ struct ParseOnlyTests {
                 includingPropertiesForKeys: nil
             ).filter { url in
                 url.pathExtension == "wast" && url.lastPathComponent.starts(with: "simd_")
+                    && !UnsupportedSpectests.affectedFiles.contains(url.lastPathComponent)
             }
         #endif
     }

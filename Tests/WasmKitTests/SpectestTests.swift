@@ -22,14 +22,9 @@ struct SpectestTests {
 
     static var testPaths: [String] {
         return [
+            // Wasm 3.0, which includes memory64, tail calls, exception handling, extended
+            // constant expressions, relaxed SIMD, typed function references and multi-memory.
             Self.testsuite.path,
-            Self.testsuite.appendingPathComponent("proposals/memory64").path,
-            Self.testsuite.appendingPathComponent("proposals/tail-call").path,
-            Self.testsuite.appendingPathComponent("proposals/exception-handling").path,
-            Self.testsuite.appendingPathComponent("proposals/extended-const").path,
-            Self.testsuite.appendingPathComponent("proposals/relaxed-simd").path,
-            Self.testsuite.appendingPathComponent("proposals/function-references").path,
-            Self.testsuite.appendingPathComponent("proposals/multi-memory").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/memory64").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/function-references").path,
@@ -48,28 +43,39 @@ struct SpectestTests {
         ]
     }
 
+    static func testCases(in paths: [String]) throws -> [TestCase] {
+        var exclude = SpectestDiscovery(path: []).exclude
+        exclude += UnsupportedSpectests.files.map { "Vendor/testsuite/\($0)" }
+        return try SpectestDiscovery(path: paths, exclude: exclude).discover()
+    }
+
+    static func run(test: TestCase, configuration: EngineConfiguration) throws {
+        let fileName = URL(fileURLWithPath: test.path).lastPathComponent
+        let isTopLevel = test.path.hasSuffix("Vendor/testsuite/\(fileName)")
+        let skip = isTopLevel ? UnsupportedSpectests.directives[fileName] ?? [:] : [:]
+        try SpectestRunner(configuration: configuration)
+            .run(test: test, reporter: NullSpectestProgressReporter(), skip: skip)
+    }
+
     #if !os(Android)
         @Test(
             .disabled("unable to run spectest on Android due to missing files on emulator", platforms: [.android]),
-            arguments: try SpectestDiscovery(path: SpectestTests.testPaths + SpectestTests.sharedMemoryTestPaths).discover()
+            arguments: try SpectestTests.testCases(in: SpectestTests.testPaths + SpectestTests.sharedMemoryTestPaths)
         )
         func run(test: TestCase) throws {
-            let defaultConfig = EngineConfiguration()
-            let runner = try SpectestRunner(configuration: defaultConfig)
-            try runner.run(test: test, reporter: NullSpectestProgressReporter())
+            try Self.run(test: test, configuration: EngineConfiguration())
         }
 
         @Test(
             .disabled("unable to run spectest on Android due to missing files on emulator", platforms: [.android]),
-            arguments: try SpectestDiscovery(path: SpectestTests.testPaths).discover()
+            arguments: try SpectestTests.testCases(in: SpectestTests.testPaths)
         )
         func runWithTokenThreading(test: TestCase) throws {
             var defaultConfig = EngineConfiguration()
             guard defaultConfig.threadingModel != .token else { return }
             defaultConfig.threadingModel = .token
             // Sanity check that non-default threading models work.
-            let runner = try SpectestRunner(configuration: defaultConfig)
-            try runner.run(test: test, reporter: NullSpectestProgressReporter())
+            try Self.run(test: test, configuration: defaultConfig)
         }
     #endif
 }

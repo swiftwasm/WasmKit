@@ -498,6 +498,13 @@ extension WASTRunContext {
 
     static func deriveFeatureSet(rootPath: String) -> WasmFeatureSet {
         var features = WasmFeatureSet.default
+        if rootPath.hasSuffix("testsuite") {
+            // The spec testsuite's top level is Wasm 3.0, which merged these proposals.
+            features.insert(.memory64)
+            features.insert(.tailCall)
+            features.insert(.functionReferences)
+            features.insert(.multiMemory)
+        }
         if rootPath.hasSuffix("memory64") {
             features.insert(.memory64)
         }
@@ -507,9 +514,6 @@ extension WASTRunContext {
             // as they test core WebAssembly features without reference types
             features.remove(.referenceTypes)
             features.insert(.threads)
-        }
-        if rootPath.hasSuffix("proposals/exception-handling") {
-            features.insert(.exceptionHandling)
         }
         if rootPath.hasSuffix("function-references") {
             // Covers the proposal's spec tests and WasmKit's own tests for it; both

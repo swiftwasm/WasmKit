@@ -146,6 +146,7 @@ let package = Package(
                     condition: .when(traits: ["ComponentModel"])
                 ),
                 "WAT",
+                "WASTRunner",
             ],
             swiftSettings: swiftSettings
         ),
