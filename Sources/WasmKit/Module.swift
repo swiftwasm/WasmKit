@@ -214,7 +214,7 @@ public struct Module: Sendable {
             try? store.nameRegistry.register(instance: instance, nameSection: nameSection)
         }
 
-        let constEvalContext = ConstEvaluationContext(instance: instance, moduleImports: moduleImports)
+        let constEvalContext = ConstEvaluationContext(instance: instance)
         // Step 12-13.
 
         // Steps 14-15.

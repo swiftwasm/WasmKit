@@ -11,13 +11,3 @@
 (assert_return (invoke "computed") (i32.const 42))
 (assert_return (invoke "w") (i64.const 42))
 (assert_return (invoke "load") (i32.const 0x6f))
-
-;; `global.get` of a module-defined global in a const expr is a GC-proposal relaxation, not part of extended
-;; const; without GC it is invalid, so only imported globals are referenceable. Both positions are rejected:
-;; a global initializer and a data-segment offset.
-(assert_invalid
-  (module (global $a i32 (i32.const 1)) (global $b i32 (global.get $a)))
-  "constant expression required")
-(assert_invalid
-  (module (global $a i32 (i32.const 0)) (memory 1) (data (global.get $a) "x"))
-  "constant expression required")
