@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import WASTRunner
 import WasmParser
 
 @testable import WAT
@@ -15,13 +16,17 @@ struct EncoderTests {
         "--enable-threads"
     ]
 
-    /// Features enabled only for the files in the given directories. With
-    /// function references enabled, wast2json writes element segments as
-    /// expressions rather than function indices, so the encoder's output would
-    /// no longer match elsewhere.
-    private static let wast2jsonDirectoryFeatures: [String: [String]] = [
-        "function-references": ["--enable-function-references"]
-    ]
+    /// Files whose output wast2json cannot produce or encodes differently, on top of the
+    /// proposals WasmKit does not implement.
+    private static let excludedFiles: [String] =
+        UnsupportedSpectests.affectedFiles + [
+            // wast2json 1.0.42 cannot parse these: an `exnref` result, and a global read
+            // from a table initializer.
+            "try_table.wast", "elem.wast",
+            // wast2json writes no value type for a relaxed-SIMD `either` result.
+            "i16x8_relaxed_q15mulr_s.wast", "i8x16_relaxed_swizzle.wast", "relaxed_dot_product.wast",
+            "relaxed_laneselect.wast", "relaxed_madd_nmadd.wast", "relaxed_min_max.wast",
+        ]
 
     // MARK: - Supporting Types
 
@@ -314,7 +319,7 @@ struct EncoderTests {
 
     #if !(os(iOS) || os(watchOS) || os(tvOS) || os(visionOS))
         @Test(
-            arguments: Spectest.wastFiles(include: [], exclude: [])
+            arguments: Spectest.wastFiles(include: [], exclude: Self.excludedFiles)
         )
         func spectest(wastFile: URL) throws {
             guard let wast2json = TestSupport.lookupExecutable("wast2json") else {
@@ -369,7 +374,11 @@ struct EncoderTests {
         private func runWast2Json(wast2json: URL, wastFile: URL, json: URL) throws {
             var arguments = [wastFile.path]
             arguments.append(contentsOf: Self.wast2jsonFeatures)
-            arguments.append(contentsOf: Self.wast2jsonDirectoryFeatures[wastFile.deletingLastPathComponent().lastPathComponent] ?? [])
+            // With function references enabled, wast2json writes element segments as
+            // expressions rather than function indices, so only the files that need it get it.
+            if Spectest.usesFunctionReferences(wastFile) {
+                arguments.append("--enable-function-references")
+            }
             arguments.append(contentsOf: ["-o", json.path])
 
             let process = try Process.run(wast2json, arguments: arguments)

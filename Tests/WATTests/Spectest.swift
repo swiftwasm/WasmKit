@@ -16,17 +16,30 @@ enum Spectest {
         testsuitePath.appendingPathComponent(file)
     }
 
+    /// Files at the top level of the testsuite that use typed function references. wast2json
+    /// needs its flag for them, and the flag changes how it encodes element segments, so only
+    /// these files get it.
+    static let functionReferencesFiles: Set<String> = [
+        "br_if.wast", "br_on_non_null.wast", "br_on_null.wast", "br_table.wast", "call_ref.wast",
+        "linking.wast", "local_init.wast", "local_tee.wast", "ref.wast", "ref_as_non_null.wast",
+        "ref_is_null.wast", "return_call.wast", "return_call_indirect.wast", "return_call_ref.wast",
+        "select.wast", "table-sub.wast", "table.wast", "unreached-invalid.wast", "unreached-valid.wast",
+    ]
+
+    static func usesFunctionReferences(_ wast: URL) -> Bool {
+        let directory = wast.deletingLastPathComponent()
+        return directory.lastPathComponent == "function-references"
+            || (directory.path == testsuitePath.path && functionReferencesFiles.contains(wast.lastPathComponent))
+    }
+
+    /// - Parameter exclude: File names, or path suffixes such as `proposals/threads/memory.wast`.
     static func wastFiles(include: [String] = [], exclude: [String] = ["annotations.wast"]) -> [URL] {
         #if os(Android)
             return []
         #else
             return [
                 testsuitePath,
-                testsuitePath.appendingPathComponent("proposals/memory64"),
-                testsuitePath.appendingPathComponent("proposals/tail-call"),
                 testsuitePath.appendingPathComponent("proposals/threads"),
-                testsuitePath.appendingPathComponent("proposals/function-references"),
-                testsuitePath.appendingPathComponent("proposals/multi-memory"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/function-references"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/multi-memory"),
@@ -42,7 +55,7 @@ enum Spectest {
                 if !include.isEmpty {
                     guard include.contains(filePath.lastPathComponent) else { return nil }
                 } else {
-                    guard !exclude.contains(filePath.lastPathComponent) else { return nil }
+                    guard !exclude.contains(where: { filePath.path.hasSuffix("/" + $0) }) else { return nil }
                 }
                 return filePath
             }
@@ -51,13 +64,16 @@ enum Spectest {
 
     static func deriveFeatureSet(wast: URL) -> WasmFeatureSet {
         var features = WasmFeatureSet.default
-        if wast.deletingLastPathComponent().path.hasSuffix("proposals/memory64") {
+        if wast.deletingLastPathComponent().path == testsuitePath.path {
+            // The spec testsuite's top level is Wasm 3.0, which merged these proposals.
             features.insert(.memory64)
+            features.insert(.tailCall)
+            features.insert(.multiMemory)
         }
         if wast.deletingLastPathComponent().path.hasSuffix("proposals/threads") {
             features.insert(.threads)
         }
-        if wast.deletingLastPathComponent().lastPathComponent == "function-references" {
+        if usesFunctionReferences(wast) {
             features.insert(.functionReferences)
         }
         if wast.deletingLastPathComponent().lastPathComponent == "multi-memory" {
