@@ -165,9 +165,40 @@ public func parseWAT(_ input: String, features: WasmFeatureSet = .default) throw
 /// A WAST script representation.
 public struct WAST {
     var parser: WASTParser
+    /// Set once a directive could not even be skipped over, which leaves nothing to resume from.
+    private var isExhausted = false
 
     init(_ input: String, features: WasmFeatureSet) {
         self.parser = WASTParser(input, features: features)
+    }
+
+    /// Parses the next directive, stepping past one that fails to parse instead of ending the
+    /// script, so that the directives after an unsupported one still run.
+    ///
+    /// - Returns: The directive, or why it failed to parse, and the location where it starts;
+    ///   `nil` if there are no more directives to parse.
+    public mutating func nextDirectiveResult() -> (directive: Result<WASTDirective, WASTDirectiveError>, location: Location)? {
+        guard !isExhausted else { return nil }
+        let start = parser.parser
+        let location = (try? parser.parser.peek()?.location(in: parser.parser.lexer)) ?? parser.parser.lexer.location()
+        do {
+            guard let directive = try parser.nextDirective() else { return nil }
+            return (.success(directive), location)
+        } catch {
+            parser.parser = start
+            var module: WASTDirectiveError.Module?
+            do {
+                _ = try parser.parser.expect(.leftParen)
+                if try parser.parser.takeKeyword("module") {
+                    _ = try parser.parser.takeKeyword("definition")
+                    module = WASTDirectiveError.Module(id: try parser.parser.takeId()?.value)
+                }
+                try parser.parser.skipParenBlock()
+            } catch {
+                isExhausted = true
+            }
+            return (.failure(WASTDirectiveError(error: error, module: module)), location)
+        }
     }
 
     /// Parses the next directive in the WAST script.
@@ -182,6 +213,19 @@ public struct WAST {
             return nil
         }
     }
+}
+
+/// A WAST directive that failed to parse.
+public struct WASTDirectiveError: Error {
+    /// A module directive, which the directives after it may use.
+    public struct Module: Sendable {
+        /// The name of the module specified in $id form
+        public let id: String?
+    }
+
+    public let error: WatParserError
+    /// Set if the directive is a `(module ...)`.
+    public let module: Module?
 }
 
 /// Parses a WebAssembly script test format (WAST) string into a `WAST` instance.
