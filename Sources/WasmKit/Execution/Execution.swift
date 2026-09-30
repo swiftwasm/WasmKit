@@ -33,6 +33,9 @@ struct Execution: ~Copyable {
         let targetPC: Pc
         /// The register offset where payload values should be written (relative to `sp`).
         let payloadRegBase: VReg
+        /// The number of handlers from the same `try_table` directly below this one,
+        /// which go out of scope together with it when it catches.
+        let siblingsBelow: Int
     }
 
     #if WasmDebuggingSupport
