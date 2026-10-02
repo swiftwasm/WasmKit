@@ -173,7 +173,7 @@ struct EncoderTests {
                 )
 
                 // Encode and compare module bytes
-                let moduleBytes = try encodeModule(watModule: watModule)
+                let moduleBytes = try TestSupport.encode(watModule.source)
                 try Self.compareModuleBytes(
                     expected: expectedBytes,
                     actual: moduleBytes,
@@ -303,19 +303,6 @@ struct EncoderTests {
             \(Self.dumpWastFileContext(wastFile: wast, location: watModule.location))
             --- End of context ---
             """)
-    }
-
-    // MARK: - Module Encoding
-
-    private func encodeModule(watModule: ModuleDirective) throws -> [UInt8] {
-        switch watModule.source {
-        case .text(var watModule):
-            return try encode(module: &watModule, options: .default)
-        case .binary(let bytes):
-            return bytes
-        case .quote(let watText):
-            return try wat2wasm(String(decoding: watText, as: UTF8.self))
-        }
     }
 
     // MARK: - Test Cases

@@ -10,6 +10,15 @@ extension AbstractHeapType: CustomStringConvertible {
         case .funcRef: return "func"
         case .externRef: return "extern"
         case .exnRef: return "exn"
+        case .any: return "any"
+        case .eq: return "eq"
+        case .i31: return "i31"
+        case .structRef: return "struct"
+        case .arrayRef: return "array"
+        case .noneRef: return "none"
+        case .noExtern: return "noextern"
+        case .noFunc: return "nofunc"
+        case .noExn: return "noexn"
         }
     }
 }
@@ -30,6 +39,15 @@ extension ReferenceType: CustomStringConvertible {
             case .abstract(.funcRef): return "funcref"
             case .abstract(.externRef): return "externref"
             case .abstract(.exnRef): return "exnref"
+            case .abstract(.any): return "anyref"
+            case .abstract(.eq): return "eqref"
+            case .abstract(.i31): return "i31ref"
+            case .abstract(.structRef): return "structref"
+            case .abstract(.arrayRef): return "arrayref"
+            case .abstract(.noneRef): return "nullref"
+            case .abstract(.noExtern): return "nullexternref"
+            case .abstract(.noFunc): return "nullfuncref"
+            case .abstract(.noExn): return "nullexnref"
             case .concrete: break
             }
         }

@@ -169,6 +169,11 @@ extension WasmParserError.Message {
     }
 
     @usableFromInline
+    static func malformedCompositeType(_ byte: UInt8) -> Self {
+        Self("Malformed composite type: \(byte)")
+    }
+
+    @usableFromInline
     static let sectionOutOfOrder = Self("Sections in the module are out of order")
 
     @usableFromInline
