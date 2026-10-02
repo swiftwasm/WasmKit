@@ -616,6 +616,7 @@ extension WasmFeatureSet.Feature {
         case .exceptionHandling: "exception-handling"
         case .functionReferences: "function-references"
         case .multiMemory: "multi-memory"
+        case .gc: "gc"
         }
     }
 }

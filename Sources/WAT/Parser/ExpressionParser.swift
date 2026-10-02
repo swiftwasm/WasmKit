@@ -502,11 +502,29 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
             return .externRef
         } else if try parser.takeKeyword("exn") {
             return .exnRef
+        } else if try parser.takeKeyword("any") {
+            return .abstract(.any)
+        } else if try parser.takeKeyword("eq") {
+            return .abstract(.eq)
+        } else if try parser.takeKeyword("i31") {
+            return .abstract(.i31)
+        } else if try parser.takeKeyword("struct") {
+            return .abstract(.structRef)
+        } else if try parser.takeKeyword("array") {
+            return .abstract(.arrayRef)
+        } else if try parser.takeKeyword("none") {
+            return .abstract(.noneRef)
+        } else if try parser.takeKeyword("noextern") {
+            return .abstract(.noExtern)
+        } else if try parser.takeKeyword("nofunc") {
+            return .abstract(.noFunc)
+        } else if try parser.takeKeyword("noexn") {
+            return .abstract(.noExn)
         } else if let id = try parser.takeIndexOrId() {
             let (_, index) = try wat.types.resolve(use: id)
             return .concrete(typeIndex: UInt32(index))
         }
-        throw WatParserError("expected \"func\", \"extern\", \"exn\" or type index", location: parser.lexer.location())
+        throw WatParserError("expected heap type", location: parser.lexer.location())
     }
 
     /// Parses an optional memory index or name, then the memarg's `offset=` and `align=`.

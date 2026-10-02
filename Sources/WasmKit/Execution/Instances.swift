@@ -369,6 +369,9 @@ struct TableEntity: ~Copyable {
             return .exception(raw == 0 ? nil : raw &- 1)
         case .abstract(.funcRef), .concrete:
             return .function(raw == 0 ? nil : raw)
+        case .abstract(.any), .abstract(.eq), .abstract(.i31), .abstract(.structRef), .abstract(.arrayRef),
+            .abstract(.noneRef), .abstract(.noExtern), .abstract(.noFunc), .abstract(.noExn):
+            preconditionFailure("Internal consistency error: GC reference type \(type) passed validation")
         }
     }
 
@@ -560,6 +563,7 @@ public struct Table: Equatable {
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
     public init(store: Store, type: TableType) throws {
+        try type.elementType.heapType.checkImplemented()
         self.init(
             handle: try store.allocator.allocate(tableType: type, resourceLimiter: store.resourceLimiter),
             allocator: store.allocator
@@ -1221,6 +1225,7 @@ public struct Global: Equatable {
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
     public init(store: Store, type: GlobalType, value: Value) throws {
+        try type.valueType.checkImplemented()
         let handle = try store.allocator.allocate(globalType: type, initialValue: value)
         self.init(handle: handle, allocator: store.allocator)
     }

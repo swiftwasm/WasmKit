@@ -106,15 +106,21 @@ extension NameMapping where Decl: ImportableModuleFieldDecl {
 
 typealias TypesNameMapping = NameMapping<TypesMap.NamedResolvedType>
 
-/// A map of unique function types indexed by their name or type signature
+/// The types of a module, indexed by name and, for implicit type uses, by function signature.
 struct TypesMap {
     struct NamedResolvedType: NamedFieldDecl {
         let id: Name?
+        /// The function type, or an empty placeholder for a struct or array type.
         let type: WatParser.FunctionType
+        /// The definition written in a `type` or `rec` field, or `nil` for an implicit function type.
+        var declared: WatParser.ResolvedSubType? = nil
+        var fieldNames: [String: Int] { declared?.fieldNames ?? [:] }
     }
     private(set) var nameMapping = NameMapping<NamedResolvedType>()
     /// Tracks the earliest index for each function type
     private var indices: [FunctionType: Int] = [:]
+    /// Index ranges of the `type` and `rec` fields, in declaration order.
+    private(set) var explicitGroups: [(range: Range<Int>, isRec: Bool)] = []
 
     /// Adds a new function type to the mapping
     @discardableResult
@@ -127,6 +133,40 @@ struct TypesMap {
             let newIndex = nameMapping.count - 1
             indices[decl.type.signature] = newIndex
             return newIndex
+        }
+    }
+
+    /// Adds the types of one `type` or `rec` field, in order. Every such type gets its own index.
+    mutating func addExplicitGroup(
+        _ members: [(id: Name?, sub: WatParser.ResolvedSubType)], isRec: Bool
+    ) throws(WatParserError) {
+        let start = nameMapping.count
+        for member in members {
+            try addExplicit(id: member.id, sub: member.sub, isRec: isRec)
+        }
+        explicitGroups.append((start..<nameMapping.count, isRec))
+    }
+
+    private mutating func addExplicit(id: Name?, sub: WatParser.ResolvedSubType, isRec: Bool) throws(WatParserError) {
+        let funcType: WatParser.FunctionType
+        switch sub.body {
+        case .function(let signature):
+            funcType = WatParser.FunctionType(signature: signature, parameterNames: sub.parameterNames)
+        case .structType, .arrayType:
+            funcType = WatParser.FunctionType(signature: FunctionType(parameters: [], results: []), parameterNames: [])
+        }
+        let index = try nameMapping.add(NamedResolvedType(id: id, type: funcType, declared: sub))
+        // As in wasm-tools, an implicit type use may reuse an explicit type outside `rec`, final or not,
+        // and never a `rec` member.
+        if !isRec, case .function(let signature) = sub.body, indices[signature] == nil {
+            indices[signature] = index
+        }
+    }
+
+    private func checkFunctionType(at index: Int, location: Location?) throws(WatParserError) {
+        guard index < nameMapping.count, let declared = nameMapping[index].declared else { return }
+        guard case .function = declared.body else {
+            throw WatParserError("type index \(index) is not a function type", location: location)
         }
     }
 
@@ -197,7 +237,9 @@ struct TypesMap {
     mutating func resolveIndex(use: WatParser.TypeUse) throws(WatParserError) -> Int {
         switch (use.index, use.inline) {
         case (let indexOrId?, _):
-            return try nameMapping.resolveIndex(use: indexOrId)
+            let index = try nameMapping.resolveIndex(use: indexOrId)
+            try checkFunctionType(at: index, location: indexOrId.location)
+            return index
         case (nil, let inline):
             let inline = try inline?.resolve(nameMapping).signature ?? WasmTypes.FunctionType(parameters: [], results: [])
             return try addAnonymousSignature(inline)
@@ -212,6 +254,7 @@ struct TypesMap {
 
     private func resolveAndCheck(use indexOrId: Parser.IndexOrId, inline: WatParser.FunctionType?) throws(WatParserError) -> (type: WatParser.FunctionType, index: Int) {
         let (found, index) = try resolve(use: indexOrId)
+        try checkFunctionType(at: index, location: indexOrId.location)
         if let inline {
             // If both index and inline type, then they must match
             guard found.signature == inline.signature else {

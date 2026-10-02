@@ -139,9 +139,7 @@ extension ReferenceType: WasmEncodable {
     package func encode(to encoder: inout Encoder) {
         switch (isNullable, heapType) {
         // Use short form when available
-        case (true, .externRef): encoder.output.append(0x6F)
-        case (true, .funcRef): encoder.output.append(0x70)
-        case (true, .exnRef): encoder.output.append(0x69)
+        case (true, .abstract(let abstract)): encoder.output.append(abstract.rawValue)
         default:
             encoder.output.append(isNullable ? 0x63 : 0x64)
             encoder.encode(heapType)
@@ -152,9 +150,7 @@ extension ReferenceType: WasmEncodable {
 extension HeapType: WasmEncodable {
     package func encode(to encoder: inout Encoder) {
         switch self {
-        case .abstract(.externRef): encoder.output.append(0x6F)
-        case .abstract(.funcRef): encoder.output.append(0x70)
-        case .abstract(.exnRef): encoder.output.append(0x69)
+        case .abstract(let abstract): encoder.output.append(abstract.rawValue)
         case .concrete(let typeIndex):
             // Note that the typeIndex is decoded as s33,
             // so we need to encode it as signed.
@@ -174,6 +170,52 @@ extension FunctionType: WasmEncodable {
         for result in results {
             result.encode(to: &encoder)
         }
+    }
+}
+
+extension StorageType: WasmEncodable {
+    package func encode(to encoder: inout Encoder) {
+        switch self {
+        case .value(let valueType): encoder.encode(valueType)
+        case .packed(.i8): encoder.output.append(0x78)
+        case .packed(.i16): encoder.output.append(0x77)
+        }
+    }
+}
+
+extension FieldType: WasmEncodable {
+    package func encode(to encoder: inout Encoder) {
+        encoder.encode(storage)
+        encoder.output.append(isMutable ? 0x01 : 0x00)
+    }
+}
+
+extension CompositeType: WasmEncodable {
+    package func encode(to encoder: inout Encoder) {
+        switch self {
+        case .function(let functionType):
+            encoder.encode(functionType)
+        case .structType(let structType):
+            encoder.output.append(0x5F)
+            encoder.encodeVector(structType.fields)
+        case .arrayType(let arrayType):
+            encoder.output.append(0x5E)
+            encoder.encode(arrayType.element)
+        }
+    }
+}
+
+extension SubType: WasmEncodable {
+    package func encode(to encoder: inout Encoder) {
+        if isFinal, supertypes.isEmpty {
+            encoder.encode(body)
+            return
+        }
+        encoder.output.append(isFinal ? 0x4F : 0x50)
+        encoder.encodeVector(supertypes) { index, encoder in
+            encoder.writeUnsignedLEB128(index)
+        }
+        encoder.encode(body)
     }
 }
 
@@ -697,9 +739,31 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     try resolveTagTypes(upTo: functions.count)
 
     // Section 1: Type section
-    if !module.types.isEmpty {
+    if !module.types.isEmpty || !module.types.explicitGroups.isEmpty {
         encoder.section(id: 0x01) { encoder in
-            encoder.encodeVector(module.types, transform: { $0.type.signature })
+            let types = module.types
+            func subType(at index: Int) -> SubType {
+                if let declared = types[index].declared {
+                    return SubType(isFinal: declared.isFinal, supertypes: declared.supertypes, body: declared.body)
+                }
+                return SubType(isFinal: true, supertypes: [], body: .function(types[index].type.signature))
+            }
+            var groups: [(range: Range<Int>, isRec: Bool)] = []
+            var covered = 0
+            for group in types.explicitGroups {
+                groups += (covered..<group.range.lowerBound).map { ($0..<$0 + 1, false) }
+                groups.append(group)
+                covered = group.range.upperBound
+            }
+            groups += (covered..<types.count).map { ($0..<$0 + 1, false) }
+            encoder.encodeVector(groups) { group, encoder in
+                if group.isRec {
+                    encoder.output.append(0x4E)
+                    encoder.encodeVector(group.range.map(subType(at:)))
+                } else {
+                    encoder.encode(subType(at: group.range.lowerBound))
+                }
+            }
         }
     }
 
@@ -923,11 +987,15 @@ private func encodeNameSection(
         guard let name = decl.id else { return nil }
         return (i, name.value)
     }
+    let fieldNames = module.types.enumerated().compactMap { i, decl -> (Int, [(Int, String)])? in
+        guard !decl.fieldNames.isEmpty else { return nil }
+        return (i, decl.fieldNames.map { ($0.value, $0.key) }.sorted { $0.0 < $1.0 })
+    }
 
     let hasAnyNames =
         hasModuleName || !functionNames.isEmpty || !localNames.isEmpty
         || !labelNames.isEmpty || !typeNames.isEmpty || !tableNames.isEmpty || !memoryNames.isEmpty
-        || !globalNames.isEmpty || !elemNames.isEmpty || !dataNames.isEmpty
+        || !globalNames.isEmpty || !elemNames.isEmpty || !dataNames.isEmpty || !fieldNames.isEmpty
 
     guard hasAnyNames else { return }
 
@@ -985,6 +1053,19 @@ private func encodeNameSection(
         }
         if !dataNames.isEmpty {
             encodeNameMapSubsection(id: 9, entries: dataNames, encoder: &encoder)
+        }
+        if !fieldNames.isEmpty {
+            encoder.section(id: 10) { encoder in
+                encoder.encodeVector(fieldNames) { entry, encoder in
+                    let (typeIndex, names) = entry
+                    encoder.writeUnsignedLEB128(UInt(typeIndex))
+                    encoder.encodeVector(names) { field, encoder in
+                        let (fieldIndex, name) = field
+                        encoder.writeUnsignedLEB128(UInt(fieldIndex))
+                        encoder.encode(String(name.dropFirst()))
+                    }
+                }
+            }
         }
     }
 }

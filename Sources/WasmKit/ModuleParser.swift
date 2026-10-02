@@ -40,16 +40,19 @@ func parseModule<Source: ByteStreamSource>(parser: consuming WasmParser.Parser<S
         case .customSection(let customSection):
             customSections.append(customSection)
         case .typeSection(let typeSection):
-            types = typeSection
+            types = try typeSection.implementedFunctionTypes()
         case .importSection(let importSection):
+            try importSection.checkImplemented()
             imports = importSection
         case .functionSection(let types):
             typeIndices = types
         case .tableSection(let tableSection):
+            try tableSection.checkImplemented()
             tables = tableSection
         case .memorySection(let memorySection):
             memories = memorySection.map { $0.type }
         case .globalSection(let globalSection):
+            try globalSection.checkImplemented()
             globals = globalSection
         case .tagSection(let tagSection):
             tags = tagSection
@@ -58,10 +61,13 @@ func parseModule<Source: ByteStreamSource>(parser: consuming WasmParser.Parser<S
         case .startSection(let functionIndex):
             start = functionIndex
         case .elementSection(let elementSection):
+            try elementSection.checkImplemented()
             elements = elementSection
         case .codeSection(let codeSection):
+            try codeSection.checkImplemented()
             codes = codeSection
         case .dataSection(let dataSection):
+            try dataSection.checkImplemented()
             data = dataSection
         case .dataCount(let count):
             dataCount = count
