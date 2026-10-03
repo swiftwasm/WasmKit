@@ -39,7 +39,7 @@ struct WASTParser {
         guard let keyword = try parser.peekKeyword() else { return false }
         switch keyword {
         case "data", "elem", "tag", "export", "func",
-            "type", "global", "import", "memory",
+            "type", "rec", "global", "import", "memory",
             "start", "table":
             return true
         default:

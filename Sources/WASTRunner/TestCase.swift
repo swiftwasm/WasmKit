@@ -516,6 +516,9 @@ extension WASTRunContext {
                 case .abstract(.exnRef): return .ref(.exception(nil))
                 case .concrete:
                     throw SpectestError("concrete ref.null is not supported yet")
+                case .abstract(.any), .abstract(.eq), .abstract(.i31), .abstract(.structRef), .abstract(.arrayRef),
+                    .abstract(.noneRef), .abstract(.noExtern), .abstract(.noFunc), .abstract(.noExn):
+                    throw SpectestError("ref.null \(heapType) is not supported yet")
                 }
             case .refExtern(let value): return .ref(.extern(Int(value)))
             case .refFunc(let value): return .ref(.function(Int(value)))

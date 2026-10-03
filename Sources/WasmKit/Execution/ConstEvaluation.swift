@@ -72,6 +72,9 @@ extension ConstExpression {
                 case .abstract(.externRef): stack.append(.ref(.extern(nil)))
                 case .abstract(.funcRef), .concrete: stack.append(.ref(.function(nil)))
                 case .abstract(.exnRef): stack.append(.ref(.exception(nil)))
+                case .abstract(.any), .abstract(.eq), .abstract(.i31), .abstract(.structRef), .abstract(.arrayRef),
+                    .abstract(.noneRef), .abstract(.noExtern), .abstract(.noFunc), .abstract(.noExn):
+                    throw WasmKitError(message: .illegalConstExpressionInstruction(constInst))
                 }
             case .refFunc(let functionIndex):
                 stack.append(.ref(try context.functionRef(functionIndex)))

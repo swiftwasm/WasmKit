@@ -310,14 +310,16 @@ package func wast2json(
 ) throws -> (json: WAST2JSONOutput, wasmFiles: [String: [UInt8]]) {
     let inputPath = "/input/\(wastFileName)"
     let outputDir = "/output"
+    let jsonPath = "\(outputDir)/output.json"
 
     let context = try WasmToolsContext()
     try context.addInputFile(WasmToolsInputFile(guestPath: inputPath, content: wastContent))
     try context.memoryFS.ensureDirectory(at: outputDir)
 
+    // A large JSON on stdout deadlocks runWasmTools.
     let result = try runWasmTools(
         wasmToolsPath: wasmToolsPath,
-        args: ["json-from-wast", inputPath, "--wasm-dir", outputDir],
+        args: ["json-from-wast", inputPath, "--output", jsonPath, "--wasm-dir", outputDir],
         context: context,
         outputPaths: []
     )
@@ -326,7 +328,7 @@ package func wast2json(
         throw WasmToolsError.executionFailed(exitCode: result.exitCode, stderr: result.stderrString)
     }
 
-    let jsonOutput = try JSONDecoder().decode(WAST2JSONOutput.self, from: Data(result.stdout))
+    let jsonOutput = try JSONDecoder().decode(WAST2JSONOutput.self, from: Data(context.getFile(at: jsonPath)))
 
     var wasmFiles: [String: [UInt8]] = [:]
     for command in jsonOutput.commands {

@@ -328,19 +328,26 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
     var typesMap = TypesMap()
 
     do {
-        var unresolvedTypesMapping = NameMapping<WatParser.FunctionTypeDecl>()
+        var unresolvedTypesMapping = NameMapping<WatParser.SubTypeDecl>()
+        var groups: [(range: Range<Int>, isRec: Bool)] = []
         // 1. Collect module type decls and resolve symbolic references inside
         // their definitions.
         var watParser = WatParser(parser: initialParser)
         while let decl = try watParser.next() {
-            guard case .type(let decl) = decl.kind else { continue }
-            try unresolvedTypesMapping.add(decl)
+            guard case .type(let decls, let isRec) = decl.kind else { continue }
+            let start = unresolvedTypesMapping.count
+            for decl in decls {
+                try unresolvedTypesMapping.add(decl)
+            }
+            groups.append((start..<unresolvedTypesMapping.count, isRec))
         }
-        for decl in unresolvedTypesMapping {
-            try typesMap.add(
-                TypesMap.NamedResolvedType(
-                    id: decl.id, type: decl.type.resolve(unresolvedTypesMapping)
-                ))
+        for group in groups {
+            var members: [(id: Name?, sub: WatParser.ResolvedSubType)] = []
+            for index in group.range {
+                let decl = unresolvedTypesMapping[index]
+                members.append((decl.id, try decl.sub.resolve(unresolvedTypesMapping)))
+            }
+            try typesMap.addExplicitGroup(members, isRec: group.isRec)
         }
     }
 

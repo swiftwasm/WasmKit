@@ -25,27 +25,13 @@ struct ParseOnlyTests {
         while let (directive, _) = try wast.nextDirective() {
             switch directive {
             case .module(let module):
-                try parseModuleSource(module.source, features: features)
+                try parseWasmBytes(TestSupport.encode(module.source, features: features), features: features)
             case .assertUnlinkable(let wat, _):
-                let bytes = try wat.encode(options: .default)
-                try parseWasmBytes(bytes, features: features)
+                try parseWasmBytes(TestSupport.encode(.text(wat), features: features), features: features)
             default:
                 break
             }
         }
-    }
-
-    private func parseModuleSource(_ moduleSource: ModuleSource, features: WasmFeatureSet) throws {
-        let bytes: [UInt8]
-        switch moduleSource {
-        case .binary(let b):
-            bytes = b
-        case .quote(let text):
-            bytes = try wat2wasm(String(decoding: text, as: UTF8.self), features: features)
-        case .text(let wat):
-            bytes = try wat.encode(options: .default)
-        }
-        try parseWasmBytes(bytes, features: features)
     }
 
     private func parseWasmBytes(_ bytes: [UInt8], features: WasmFeatureSet) throws {

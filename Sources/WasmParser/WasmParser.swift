@@ -164,6 +164,8 @@ public struct WasmFeatureSet: OptionSet, Sendable {
         case functionReferences
         /// The WebAssembly multi-memory proposal
         case multiMemory
+        /// The WebAssembly garbage collection proposal
+        case gc
 
         /// The bit this proposal occupies in a feature set. The values are part
         /// of the stored representation, so they must stay stable.
@@ -178,6 +180,7 @@ public struct WasmFeatureSet: OptionSet, Sendable {
             case .exceptionHandling: 5
             case .functionReferences: 6
             case .multiMemory: 7
+            case .gc: 8
             }
         }
     }
@@ -212,6 +215,9 @@ public struct WasmFeatureSet: OptionSet, Sendable {
     /// The WebAssembly multi-memory proposal
     @_alwaysEmitIntoClient
     public static var multiMemory: WasmFeatureSet { WasmFeatureSet(.multiMemory) }
+    /// The WebAssembly garbage collection proposal
+    @_alwaysEmitIntoClient
+    public static var gc: WasmFeatureSet { WasmFeatureSet(.gc) }
 
     /// The default feature set
     public static let `default`: WasmFeatureSet = [.referenceTypes, .exceptionHandling]
@@ -359,17 +365,32 @@ extension ByteStream {
     mutating func parseReferenceType(byte: UInt8, features: WasmFeatureSet) throws(WasmParserError) -> ReferenceType? {
         switch byte {
         case 0x63:
-            let heapType = try parseHeapType()
-            // Without typed function references, `0x63` only spells out a
+            let heapType = try parseHeapType(features: features)
+            // Without typed function references or GC, `0x63` only spells out a
             // nullable abstract type such as `funcref`.
-            if case .concrete = heapType, !features.contains(.functionReferences) { return nil }
+            if case .concrete = heapType, !features.contains(.functionReferences), !features.contains(.gc) { return nil }
             return ReferenceType(isNullable: true, heapType: heapType)
         case 0x64:
-            guard features.contains(.functionReferences) else { return nil }
-            return try ReferenceType(isNullable: false, heapType: parseHeapType())
+            if features.contains(.functionReferences) {
+                return try ReferenceType(isNullable: false, heapType: parseHeapType(features: features))
+            }
+            guard features.contains(.gc) else { return nil }
+            let heapType = try parseHeapType(features: features)
+            switch heapType {
+            // As in wasm-tools, a non-nullable func or extern needs typed function references even with GC.
+            case .abstract(.funcRef), .abstract(.externRef): return nil
+            case .abstract(.exnRef) where !features.contains(.exceptionHandling): return nil
+            default: return ReferenceType(isNullable: false, heapType: heapType)
+            }
         case 0x69:
             guard features.contains(.exceptionHandling) else { return nil }
             return .exnRef
+        case 0x74:
+            guard features.contains(.exceptionHandling) else { return nil }
+            return ReferenceType(isNullable: true, heapType: .abstract(.noExn))
+        case 0x6A...0x6E, 0x71...0x73:
+            guard features.contains(.gc), let heapType = AbstractHeapType(rawValue: byte) else { return nil }
+            return ReferenceType(isNullable: true, heapType: .abstract(heapType))
         case 0x6F: return .externRef
         case 0x70: return .funcRef
         default: return nil  // invalid discriminator
@@ -379,7 +400,7 @@ extension ByteStream {
     /// > Note:
     /// <https://webassembly.github.io/function-references/core/binary/types.html#heap-types>
     @usableFromInline
-    mutating func parseHeapType() throws(WasmParserError) -> HeapType {
+    mutating func parseHeapType(features: WasmFeatureSet) throws(WasmParserError) -> HeapType {
         let b = try peek()
         switch b {
         case 0x69:
@@ -391,13 +412,21 @@ extension ByteStream {
         case 0x70:
             _ = try consumeAny()
             return .funcRef
-        default:
-            let rawIndex = try parseVarSigned33()
-            guard let index = TypeIndex(exactly: rawIndex) else {
-                throw makeError(.invalidFunctionType(rawIndex))
+        case 0x74 where features.contains(.exceptionHandling),
+            .some(0x6A...0x6E) where features.contains(.gc),
+            .some(0x71...0x73) where features.contains(.gc):
+            if let b, let heapType = AbstractHeapType(rawValue: b) {
+                _ = try consumeAny()
+                return .abstract(heapType)
             }
-            return .concrete(typeIndex: index)
+        default:
+            break
         }
+        let rawIndex = try parseVarSigned33()
+        guard let index = TypeIndex(exactly: rawIndex) else {
+            throw makeError(.invalidFunctionType(rawIndex))
+        }
+        return .concrete(typeIndex: index)
     }
 
     /// > Note:
@@ -414,10 +443,81 @@ extension ByteStream {
         guard opcode == 0x60 else {
             throw makeError(.malformedFunctionType(opcode))
         }
+        return try parseFunctionTypeBody(features: features)
+    }
 
+    @inlinable
+    mutating func parseFunctionTypeBody(features: WasmFeatureSet) throws(WasmParserError) -> FunctionType {
         let parameters = try parseVector { (s) throws(WasmParserError) in try s.parseValueType(features: features) }
         let results = try parseVector { (s) throws(WasmParserError) in try s.parseValueType(features: features) }
         return FunctionType(parameters: parameters, results: results)
+    }
+
+    /// > Note:
+    /// <https://webassembly.github.io/gc/core/binary/types.html#recursive-types>
+    @usableFromInline
+    mutating func parseRecursiveGroup(features: WasmFeatureSet) throws(WasmParserError) -> RecursiveGroup {
+        switch try peek() {
+        case 0x4E:
+            _ = try consumeAny()
+            let types = try parseVector { (s) throws(WasmParserError) in try s.parseSubType(features: features) }
+            return RecursiveGroup(types: types)
+        default:
+            return RecursiveGroup(types: [try parseSubType(features: features)])
+        }
+    }
+
+    @usableFromInline
+    mutating func parseSubType(features: WasmFeatureSet) throws(WasmParserError) -> SubType {
+        switch try peek() {
+        case 0x50, 0x4F:
+            let isFinal = try consumeAny() == 0x4F
+            let supertypes = try parseVector { (s) throws(WasmParserError) -> UInt32 in try s.parseUnsigned() }
+            return SubType(isFinal: isFinal, supertypes: supertypes, body: try parseCompositeType(features: features))
+        default:
+            return SubType(isFinal: true, supertypes: [], body: try parseCompositeType(features: features))
+        }
+    }
+
+    /// > Note:
+    /// <https://webassembly.github.io/gc/core/binary/types.html#composite-types>
+    @usableFromInline
+    mutating func parseCompositeType(features: WasmFeatureSet) throws(WasmParserError) -> CompositeType {
+        let opcode = try consumeAny()
+        guard opcode & 0b10000000 == 0 else {
+            throw makeError(.integerRepresentationTooLong)
+        }
+        switch opcode {
+        case 0x60:
+            return .function(try parseFunctionTypeBody(features: features))
+        case 0x5F:
+            let fields = try parseVector { (s) throws(WasmParserError) in try s.parseFieldType(features: features) }
+            return .structType(StructType(fields: fields))
+        case 0x5E:
+            return .arrayType(ArrayType(element: try parseFieldType(features: features)))
+        default:
+            throw makeError(.malformedCompositeType(opcode))
+        }
+    }
+
+    @usableFromInline
+    mutating func parseFieldType(features: WasmFeatureSet) throws(WasmParserError) -> FieldType {
+        let storage = try parseStorageType(features: features)
+        return FieldType(storage: storage, isMutable: try parseMutability() == .variable)
+    }
+
+    @usableFromInline
+    mutating func parseStorageType(features: WasmFeatureSet) throws(WasmParserError) -> StorageType {
+        switch try peek() {
+        case 0x78:
+            _ = try consumeAny()
+            return .packed(.i8)
+        case 0x77:
+            _ = try consumeAny()
+            return .packed(.i16)
+        default:
+            return .value(try parseValueType(features: features))
+        }
     }
 
     /// > Note:
@@ -559,7 +659,10 @@ extension Parser {
         case 0x40:
             _ = try stream.consumeAny()
             return .empty
-        case 0x7B...0x7F, 0x70, 0x6F, 0x69, 0x63, 0x64:
+        case 0x7B...0x7F, 0x70, 0x6F, 0x69, 0x63, 0x64,
+            0x6A...0x6E where features.contains(.gc),
+            0x71...0x73 where features.contains(.gc),
+            0x74 where features.contains(.exceptionHandling):
             return try .type(stream.parseValueType(features: features))
         default:
             let rawIndex = try stream.parseVarSigned33()
@@ -717,7 +820,7 @@ extension Parser: BinaryInstructionDecoder {
         return IEEE754.Float64(bitPattern: n)
     }
     @inlinable mutating func visitRefNull() throws(WasmParserError) -> WasmTypes.HeapType {
-        return try stream.parseHeapType()
+        return try stream.parseHeapType(features: features)
     }
     @inlinable mutating func visitBrOnNull() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
     @inlinable mutating func visitBrOnNonNull() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
@@ -884,9 +987,14 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#type-section>
     @inlinable
-    mutating func parseTypeSection() throws(WasmParserError) -> [FunctionType] {
+    mutating func parseTypeSection() throws(WasmParserError) -> [RecursiveGroup] {
         let features = self.features
-        return try parseVector { (s) throws(WasmParserError) in try s.parseFunctionType(features: features) }
+        guard features.contains(.gc) else {
+            return try parseVector { (s) throws(WasmParserError) in
+                RecursiveGroup(types: [SubType(isFinal: true, supertypes: [], body: .function(try s.parseFunctionType(features: features)))])
+            }
+        }
+        return try parseVector { (s) throws(WasmParserError) in try s.parseRecursiveGroup(features: features) }
     }
 
     /// > Note:
@@ -1140,7 +1248,7 @@ extension Parser {
 public enum ParsingPayload {
     case header(version: [UInt8])
     case customSection(CustomSection)
-    case typeSection([FunctionType])
+    case typeSection([RecursiveGroup])
     case importSection([Import])
     case functionSection([TypeIndex])
     case tableSection([Table])

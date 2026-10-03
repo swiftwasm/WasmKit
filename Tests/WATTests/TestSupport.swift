@@ -1,4 +1,7 @@
 import Foundation
+import WAT
+
+@testable import WasmParser
 
 enum TestSupport {
     struct Error: Swift.Error, CustomStringConvertible {
@@ -73,5 +76,48 @@ enum TestSupport {
             }
         }
         return nil
+    }
+
+    /// The id and content range of each section in `bytes` from offset `start`.
+    static func sections(in bytes: [UInt8], from start: Int = 8) throws -> [(id: UInt8, content: Range<Int>)] {
+        var stream = ByteStream(StaticByteStreamSource(bytes: bytes))
+        stream.currentIndex = start
+        var sections: [(id: UInt8, content: Range<Int>)] = []
+        while try !stream.hasReachedEnd() {
+            let id = try stream.consumeAny()
+            let length = Int(try decodeLEB128(stream: &stream) as UInt32)
+            sections.append((id, stream.currentIndex..<(stream.currentIndex + length)))
+            _ = try stream.consume(count: length)
+        }
+        return sections
+    }
+
+    /// The content of the first section with id `id` in `bytes`, read from offset `start`.
+    static func section(_ id: UInt8, in bytes: [UInt8], from start: Int = 8) throws -> [UInt8]? {
+        try sections(in: bytes, from: start).first { $0.id == id }.map { Array(bytes[$0.content]) }
+    }
+
+    /// The binary module that `source` describes. `features` applies to a quoted module.
+    static func encode(_ source: ModuleSource, features: WasmFeatureSet = .default) throws -> [UInt8] {
+        switch source {
+        case .text(let wat):
+            return try wat.encode()
+        case .quote(let text):
+            return try wat2wasm(String(decoding: text, as: UTF8.self), features: features)
+        case .binary(let bytes):
+            return bytes
+        }
+    }
+
+    /// The message of the error `body` throws, or nil if it throws none.
+    static func errorMessage(_ body: () throws -> Void) -> String? {
+        do {
+            try body()
+            return nil
+        } catch let error as WatParserError {
+            return error.message
+        } catch {
+            return "\(error)"
+        }
     }
 }

@@ -85,6 +85,22 @@ struct WatParser {
         let parameterNames: [Name?]
     }
 
+    /// A type definition with its names resolved.
+    struct ResolvedSubType {
+        let isFinal: Bool
+        let supertypes: [UInt32]
+        let body: CompositeType
+        /// Names of the parameters when `body` is a function type, otherwise empty.
+        let parameterNames: [Name?]
+        var fieldNames: [String: Int] = [:]
+    }
+
+    struct ResolvedComposite {
+        let composite: CompositeType
+        let parameterNames: [Name?]
+        var fieldNames: [String: Int] = [:]
+    }
+
     /// Represents a type use in a function signature.
     /// Note that a type use can have both an index and an inline type at the same time.
     /// In that case, we need to use the information to validate their consistency later.
@@ -150,9 +166,9 @@ struct WatParser {
         }
     }
 
-    struct FunctionTypeDecl: NamedFieldDecl {
+    struct SubTypeDecl: NamedFieldDecl {
         let id: Name?
-        let type: UnresolvedType<FunctionType>
+        let sub: UnresolvedType<ResolvedSubType>
     }
 
     struct TableDecl: NamedFieldDecl, ImportableModuleFieldDecl {
@@ -247,7 +263,8 @@ struct WatParser {
     }
 
     enum ModuleFieldKind {
-        case type(FunctionTypeDecl)
+        /// A `(type ...)` field has one member; a `(rec ...)` field has any number.
+        case type([SubTypeDecl], isRec: Bool)
         case function(FunctionDecl)
         case table(TableDecl)
         case memory(MemoryDecl)
@@ -270,8 +287,16 @@ struct WatParser {
         switch keyword {
         case "type":
             let id = try parser.takeId()
-            let functionType = try funcType()
-            kind = .type(FunctionTypeDecl(id: id, type: functionType))
+            kind = .type([try subTypeDecl(id: id)], isRec: false)
+            try parser.expect(.rightParen)
+        case "rec":
+            var decls: [SubTypeDecl] = []
+            while try parser.takeParenBlockStart("type") {
+                let id = try parser.takeId()
+                decls.append(try subTypeDecl(id: id))
+                try parser.expect(.rightParen)
+            }
+            kind = .type(decls, isRec: true)
             try parser.expect(.rightParen)
         case "import":
             let importNames = try importNames()
@@ -711,6 +736,105 @@ struct WatParser {
         }
     }
 
+    /// subtype ::= '(' 'sub' 'final'? typeidx* comptype ')' | comptype
+    mutating func subTypeDecl(id: Name?) throws(WatParserError) -> SubTypeDecl {
+        guard try parser.takeParenBlockStart("sub") else {
+            let sub = try compositeType().map {
+                ResolvedSubType(
+                    isFinal: true, supertypes: [], body: $0.composite,
+                    parameterNames: $0.parameterNames, fieldNames: $0.fieldNames)
+            }
+            return SubTypeDecl(id: id, sub: sub)
+        }
+        let isFinal = try parser.takeKeyword("final")
+        var supertypeUses: [Parser.IndexOrId] = []
+        while let use = try parser.takeIndexOrId() {
+            supertypeUses.append(use)
+        }
+        let composite = try compositeType()
+        try parser.expect(.rightParen)
+        let sub = UnresolvedType<ResolvedSubType> { (resolveIndex: UnresolvedType<ResolvedSubType>.IndexResolver) throws(WatParserError) in
+            let resolved = try composite.resolve(resolveIndex)
+            let supertypes = try supertypeUses.map { use throws(WatParserError) in try UInt32(resolveIndex(use)) }
+            return ResolvedSubType(
+                isFinal: isFinal, supertypes: supertypes, body: resolved.composite,
+                parameterNames: resolved.parameterNames, fieldNames: resolved.fieldNames)
+        }
+        return SubTypeDecl(id: id, sub: sub)
+    }
+
+    /// comptype ::= '(' 'func' ... ')' | '(' 'struct' ... ')' | '(' 'array' ... ')'
+    mutating func compositeType() throws(WatParserError) -> UnresolvedType<ResolvedComposite> {
+        switch try parser.peekKeywordAfterLeftParen() {
+        case "func":
+            return try funcType().map {
+                ResolvedComposite(composite: .function($0.signature), parameterNames: $0.parameterNames)
+            }
+        case "struct":
+            let (type, fieldNames) = try structType()
+            return type.map { ResolvedComposite(composite: $0, parameterNames: [], fieldNames: fieldNames) }
+        case "array":
+            return try arrayType().map { ResolvedComposite(composite: $0, parameterNames: []) }
+        default:
+            throw WatParserError("expected func, struct or array", location: parser.lexer.location())
+        }
+    }
+
+    /// structtype ::= '(' 'struct' field* ')'
+    /// field ::= '(' 'field' id fieldtype ')' | '(' 'field' fieldtype* ')'
+    mutating func structType() throws(WatParserError) -> (type: UnresolvedType<CompositeType>, fieldNames: [String: Int]) {
+        try parser.expect(.leftParen)
+        try parser.expectKeyword("struct")
+        var fields: [UnresolvedType<FieldType>] = []
+        var fieldNames: [String: Int] = [:]
+        while try parser.takeParenBlockStart("field") {
+            if let id = try parser.takeId() {
+                guard fieldNames[id.value] == nil else {
+                    throw WatParserError("duplicate field \(id.value)", location: id.location)
+                }
+                fieldNames[id.value] = fields.count
+                fields.append(try fieldType())
+            } else {
+                while try parser.peek(.rightParen) == nil {
+                    fields.append(try fieldType())
+                }
+            }
+            try parser.expect(.rightParen)
+        }
+        try parser.expect(.rightParen)
+        let type = UnresolvedType<CompositeType> { (resolveIndex: UnresolvedType<CompositeType>.IndexResolver) throws(WatParserError) in
+            let resolved = try fields.map { field throws(WatParserError) in try field.resolve(resolveIndex) }
+            return .structType(StructType(fields: resolved))
+        }
+        return (type, fieldNames)
+    }
+
+    /// arraytype ::= '(' 'array' fieldtype ')'
+    mutating func arrayType() throws(WatParserError) -> UnresolvedType<CompositeType> {
+        try parser.expect(.leftParen)
+        try parser.expectKeyword("array")
+        let element = try fieldType()
+        try parser.expect(.rightParen)
+        return element.map { .arrayType(ArrayType(element: $0)) }
+    }
+
+    /// fieldtype ::= storagetype | '(' 'mut' storagetype ')'
+    mutating func fieldType() throws(WatParserError) -> UnresolvedType<FieldType> {
+        let isMutable = try parser.takeParenBlockStart("mut")
+        let storage: UnresolvedType<StorageType>
+        if try parser.takeKeyword("i8") {
+            storage = UnresolvedType(.packed(.i8))
+        } else if try parser.takeKeyword("i16") {
+            storage = UnresolvedType(.packed(.i16))
+        } else {
+            storage = try valueType().map { .value($0) }
+        }
+        if isMutable {
+            try parser.expect(.rightParen)
+        }
+        return storage.map { FieldType(storage: $0, isMutable: isMutable) }
+    }
+
     mutating func optionalFunctionType(mayHaveName: Bool) throws(WatParserError) -> UnresolvedType<FunctionType>? {
         let (params, names) = try params(mayHaveName: mayHaveName)
         let results = try results()
@@ -778,6 +902,24 @@ struct WatParser {
             return UnresolvedType(.externRef)
         } else if try parser.takeKeyword("exnref") {
             return UnresolvedType(.exnRef)
+        } else if try parser.takeKeyword("anyref") {
+            return UnresolvedType(ReferenceType(isNullable: true, heapType: .abstract(.any)))
+        } else if try parser.takeKeyword("eqref") {
+            return UnresolvedType(ReferenceType(isNullable: true, heapType: .abstract(.eq)))
+        } else if try parser.takeKeyword("i31ref") {
+            return UnresolvedType(ReferenceType(isNullable: true, heapType: .abstract(.i31)))
+        } else if try parser.takeKeyword("structref") {
+            return UnresolvedType(ReferenceType(isNullable: true, heapType: .abstract(.structRef)))
+        } else if try parser.takeKeyword("arrayref") {
+            return UnresolvedType(ReferenceType(isNullable: true, heapType: .abstract(.arrayRef)))
+        } else if try parser.takeKeyword("nullref") {
+            return UnresolvedType(ReferenceType(isNullable: true, heapType: .abstract(.noneRef)))
+        } else if try parser.takeKeyword("nullfuncref") {
+            return UnresolvedType(ReferenceType(isNullable: true, heapType: .abstract(.noFunc)))
+        } else if try parser.takeKeyword("nullexternref") {
+            return UnresolvedType(ReferenceType(isNullable: true, heapType: .abstract(.noExtern)))
+        } else if try parser.takeKeyword("nullexnref") {
+            return UnresolvedType(ReferenceType(isNullable: true, heapType: .abstract(.noExn)))
         } else if try parser.takeParenBlockStart("ref") {
             let isNullable = try parser.takeKeyword("null")
             let heapType = try heapType()
@@ -798,6 +940,24 @@ struct WatParser {
             return UnresolvedType(.abstract(.externRef))
         } else if try parser.takeKeyword("exn") {
             return UnresolvedType(.abstract(.exnRef))
+        } else if try parser.takeKeyword("any") {
+            return UnresolvedType(.abstract(.any))
+        } else if try parser.takeKeyword("eq") {
+            return UnresolvedType(.abstract(.eq))
+        } else if try parser.takeKeyword("i31") {
+            return UnresolvedType(.abstract(.i31))
+        } else if try parser.takeKeyword("struct") {
+            return UnresolvedType(.abstract(.structRef))
+        } else if try parser.takeKeyword("array") {
+            return UnresolvedType(.abstract(.arrayRef))
+        } else if try parser.takeKeyword("none") {
+            return UnresolvedType(.abstract(.noneRef))
+        } else if try parser.takeKeyword("noextern") {
+            return UnresolvedType(.abstract(.noExtern))
+        } else if try parser.takeKeyword("nofunc") {
+            return UnresolvedType(.abstract(.noFunc))
+        } else if try parser.takeKeyword("noexn") {
+            return UnresolvedType(.abstract(.noExn))
         } else if let id = try parser.takeIndexOrId() {
             return UnresolvedType(make: { (resolveIndex: UnresolvedType<HeapType>.IndexResolver) throws(WatParserError) in
                 try .concrete(typeIndex: UInt32(resolveIndex(id)))
