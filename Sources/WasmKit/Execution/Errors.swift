@@ -14,6 +14,11 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     /// The symbols in the backtrace.
     public let symbols: [Symbol]
 
+    /// Where the trap was raised, in the innermost frame: the address is just past the head slot
+    /// of the raising instruction, or further into it. The addresses of ``symbols`` are the
+    /// frames' return addresses, in their callers, so none of them lies in the innermost frame.
+    var trapSite: Symbol? = nil
+
     /// Textual description of the backtrace.
     public var description: String {
         symbols.enumerated().map { (index, symbol) in

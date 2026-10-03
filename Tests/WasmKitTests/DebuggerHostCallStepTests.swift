@@ -8,8 +8,8 @@
 
     /// Calls an imported host function. The translator emits `call` (not
     /// `compilingCall`) for any callee outside the current instance, which
-    /// includes every host function, so stepping here exercises the predictor's
-    /// handling of a non-wasm callee.
+    /// includes every host function, so stepping here runs a `call` whose
+    /// callee is not Wasm.
     private let hostCallWAT = """
         (module
           (import "env" "host" (func $host (param i32) (result i32)))
@@ -25,8 +25,9 @@
         /// `HostFunctionEntity` as a `WasmFunctionEntity` reads unrelated memory:
         /// it either trips `assumeCompiled()`'s precondition or reads past the
         /// allocation, which AddressSanitizer reports as a heap-buffer-overflow.
-        @Test func steppingOverAHostCallDoesNotReadTheCalleeAsWasm() throws {
-            let store = Store(engine: Engine())
+        @Test(arguments: testedThreadingModels)
+        func steppingOverAHostCallDoesNotReadTheCalleeAsWasm(threadingModel: EngineConfiguration.ThreadingModel) throws {
+            let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let module = try parseWasm(bytes: try wat2wasm(hostCallWAT))
 
             var imports = Imports()
@@ -47,7 +48,7 @@
                 return
             }
 
-            // The step itself is what predicts past the host call.
+            // The step runs the host function inside `call`.
             try debugger.step()
         }
     }
