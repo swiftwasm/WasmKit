@@ -34,21 +34,6 @@ struct IntegrationTests {
         let path: URL
         let reason: String
     }
-    struct SuiteManifest: Codable {
-        let name: String
-    }
-
-    static var skipTests: [String: Set<String>] {
-        #if os(Windows)
-            return [
-                "WASI Rust tests": [
-                    "poll_oneoff_stdio",  // poll_oneoff on a descriptor is not supported
-                ],
-            ]
-        #else
-            return [:]
-        #endif
-    }
 
     /// The WASI version whose prebuilt tests we run. The suites also ship
     /// `wasm32-wasip3` components, which need the component model.
@@ -67,9 +52,6 @@ struct IntegrationTests {
     }
 
     static func discoverTestsFromSuite(path: URL) throws -> [URL] {
-        let manifestPath = path.appendingPathComponent("manifest.json")
-        let manifest = try JSONDecoder().decode(SuiteManifest.self, from: Data(contentsOf: manifestPath))
-
         // Clean up **/*.cleanup
         do {
             let enumerator = FileManager.default.enumerator(at: path, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])!
@@ -81,21 +63,7 @@ struct IntegrationTests {
         }
 
         let tests = try FileManager.default.contentsOfDirectory(at: path, includingPropertiesForKeys: nil, options: [])
-
-        // Suite names carry the WASI version, e.g. "WASI C tests [wasm32-wasip1]".
-        let suiteName = manifest.name.replacingOccurrences(of: " [\(wasiVersion)]", with: "")
-        let skipTests = Self.skipTests[suiteName] ?? []
-
-        var testCases = [URL]()
-        for test in tests {
-            guard test.pathExtension == "wasm" else { continue }
-            let testName = test.deletingPathExtension().lastPathComponent
-            if skipTests.contains(testName) {
-                continue
-            }
-            testCases.append(test)
-        }
-        return testCases.sorted { $0.path < $1.path }
+        return tests.filter { $0.pathExtension == "wasm" }.sorted { $0.path < $1.path }
     }
 
     /// A test specification, as described in `doc/specification.md` of
