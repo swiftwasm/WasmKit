@@ -22,9 +22,9 @@ struct CustomSectionDecl {
         case last
     }
 
-    /// Where this custom section should be placed in the binary.
+    /// Where this custom section should be placed in the binary. A section without one
+    /// goes `(after last)`.
     enum Placement: Equatable {
-        case unplaced
         case before(SectionKind)
         case after(SectionKind)
     }

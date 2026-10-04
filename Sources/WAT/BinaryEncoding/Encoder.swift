@@ -900,17 +900,12 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
         }
     }
 
-    // Unplaced custom sections go after all standard sections
-    for section in cs where section.placement == .unplaced {
-        encoder.encodeCustomSection(section)
-    }
-
     // (Optional) Name Section
     if options.nameSection {
         try encodeNameSection(module: &module, options: options, encoder: &encoder, functions: functions, functionLabelNames: functionLabelNames)
     }
 
-    // "last" placement goes after everything including the name section
+    // `(after last)` goes after everything, including the name section
     for section in cs where section.placement == .after(.last) {
         encoder.encodeCustomSection(section)
     }

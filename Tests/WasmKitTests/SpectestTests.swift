@@ -32,6 +32,7 @@ struct SpectestTests {
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/multi-memory").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/fuel").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/gc").path,
+            Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/annotations").path,
         ]
     }
 

@@ -189,6 +189,7 @@ enum Spectest {
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/multi-memory"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/multi-memory/threads"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/gc"),
+                rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/annotations"),
             ].flatMap {
                 try! FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
             }.compactMap { filePath in
