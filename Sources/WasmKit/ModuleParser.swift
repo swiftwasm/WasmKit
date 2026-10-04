@@ -19,7 +19,7 @@ public func parseWasm(bytes: ArraySlice<UInt8>, features: WasmFeatureSet = .defa
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
 func parseModule<Source: ByteStreamSource>(parser: consuming WasmParser.Parser<Source>, features: WasmFeatureSet = .default) throws(WasmKitError) -> Module {
-    var types: [FunctionType] = []
+    var types = TypeSection([])
     var typeIndices: [TypeIndex] = []
     var codes: [Code] = []
     var tables: [WasmParser.Table] = []
@@ -40,19 +40,16 @@ func parseModule<Source: ByteStreamSource>(parser: consuming WasmParser.Parser<S
         case .customSection(let customSection):
             customSections.append(customSection)
         case .typeSection(let typeSection):
-            types = try typeSection.implementedFunctionTypes()
+            types = TypeSection(typeSection)
         case .importSection(let importSection):
-            try importSection.checkImplemented()
             imports = importSection
         case .functionSection(let types):
             typeIndices = types
         case .tableSection(let tableSection):
-            try tableSection.checkImplemented()
             tables = tableSection
         case .memorySection(let memorySection):
             memories = memorySection.map { $0.type }
         case .globalSection(let globalSection):
-            try globalSection.checkImplemented()
             globals = globalSection
         case .tagSection(let tagSection):
             tags = tagSection
@@ -61,13 +58,10 @@ func parseModule<Source: ByteStreamSource>(parser: consuming WasmParser.Parser<S
         case .startSection(let functionIndex):
             start = functionIndex
         case .elementSection(let elementSection):
-            try elementSection.checkImplemented()
             elements = elementSection
         case .codeSection(let codeSection):
-            try codeSection.checkImplemented()
             codes = codeSection
         case .dataSection(let dataSection):
-            try dataSection.checkImplemented()
             data = dataSection
         case .dataCount(let count):
             dataCount = count
@@ -99,7 +93,7 @@ func parseModule<Source: ByteStreamSource>(parser: consuming WasmParser.Parser<S
     let functions = try codes.enumerated().map { index, code throws(WasmKitError) in
         // SAFETY: The number of typeIndices is guaranteed to be the same as the number of codes
         let funcTypeIndex = typeIndices[index]
-        let funcType = try Module.resolveType(funcTypeIndex, typeSection: types)
+        let funcType = try types.functionType(at: funcTypeIndex)
         return GuestFunction(
             type: funcType,
             code: code

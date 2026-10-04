@@ -34,7 +34,9 @@ package struct Explore: ParsableCommand {
         for importEntry in module.imports {
             switch importEntry.descriptor {
             case .function(let typeIndex):
-                let type = module.types[Int(typeIndex)]
+                guard let type = module.functionType(at: typeIndex) else {
+                    fatalError("Import \(importEntry) has no function type")
+                }
                 imports.define(
                     module: importEntry.module,
                     name: importEntry.name,
