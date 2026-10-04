@@ -544,7 +544,6 @@ extension WASTRunContext {
             features.insert(.tailCall)
             features.insert(.functionReferences)
             features.insert(.multiMemory)
-            features.insert(.gc)
         }
         if rootPath.hasSuffix("memory64") {
             features.insert(.memory64)

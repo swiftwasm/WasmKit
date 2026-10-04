@@ -77,9 +77,6 @@ extension InternalInstance {
         return self.types[Int(index)]
     }
     func resolveBlockType(_ blockType: BlockType) throws(WasmKitError) -> FunctionType {
-        if case .type(let valueType) = blockType {
-            try valueType.checkImplemented()
-        }
         if case .type(.ref(let referenceType)) = blockType, case .concrete = referenceType.heapType {
             return FunctionType(parameters: [], results: [.ref(try typeCanonicalizer.canonicalize(referenceType))])
         }
@@ -4247,7 +4244,6 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
     mutating func visitTypedSelect(type: WasmTypes.ValueType) throws(WasmKitError) -> Output {
-        try type.checkImplemented()
         let type = try module.typeCanonicalizer.canonicalize(type)
         // Captured before `popVRegOperand`, which resets the last emission.
         let fusable = iseqBuilder.fusableEmission
@@ -5122,7 +5118,6 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     mutating func visitF32Const(value: IEEE754.Float32) -> Output { visitConst(.f32, .f32(value.bitPattern)) }
     mutating func visitF64Const(value: IEEE754.Float64) -> Output { visitConst(.f64, .f64(value.bitPattern)) }
     mutating func visitRefNull(type: HeapType) throws(WasmKitError) {
-        try type.checkImplemented()
         // At run time, the null of a concrete (function) type is a null function reference.
         let abstractType: AbstractHeapType
         var type = type

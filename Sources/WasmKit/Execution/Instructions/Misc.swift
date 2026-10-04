@@ -57,7 +57,7 @@ extension Execution {
         case .exnRef:
             value = .ref(.exception(nil))
         case .any, .eq, .i31, .structRef, .arrayRef, .noneRef, .noExtern, .noFunc, .noExn:
-            preconditionFailure("Internal consistency error: ref.null of GC heap type \(immediate.type) passed validation")
+            preconditionFailure("ref.null of GC heap type \(immediate.type) is not supported yet")
         }
         sp[immediate.result] = UntypedValue(value)
     }

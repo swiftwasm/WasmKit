@@ -17,6 +17,10 @@
 ;; A function type with a `(ref null none)` parameter, in its long form.
 (assert_malformed (module binary "\00\61\73\6d\01\00\00\00\01\06\01\60\01\63\71\00") "malformed value type")
 
+;; A function type with a nullexnref parameter. `noexn` is part of exception
+;; handling, but WasmKit also needs GC for it, as it runs no bottom heap type yet.
+(assert_malformed (module binary "\00\61\73\6d\01\00\00\00\01\05\01\60\01\74\00") "malformed value type")
+
 ;; A function doing `ref.null any`.
 (assert_malformed
   (module binary

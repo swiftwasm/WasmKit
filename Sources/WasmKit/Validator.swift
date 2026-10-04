@@ -86,7 +86,6 @@ struct ModuleValidator {
     }
 
     func validate() throws(WasmKitError) {
-        try checkGCUnimplemented()
         if module.memoryTypes.count > 1 && !module.features.contains(.multiMemory) {
             throw WasmKitError(message: .multipleMemoriesNotPermitted)
         }
@@ -180,95 +179,6 @@ struct ModuleValidator {
         guard let max = limit.max else { return }
         if limit.min > max {
             throw WasmKitError(message: .sizeMinimumMustNotExceedMaximum)
-        }
-    }
-}
-
-// MARK: - GC refusal
-
-extension ModuleValidator {
-    /// Refuses a module that uses a GC type definition or heap type, which WasmKit decodes but cannot
-    /// execute yet. The translator refuses the ones inside function bodies.
-    func checkGCUnimplemented() throws(WasmKitError) {
-        for group in module.types.recursiveGroups {
-            guard group.types.count == 1, let type = group.types.first, type.isFinal, type.supertypes.isEmpty,
-                case .function(let functionType) = type.body
-            else {
-                throw WasmKitError("GC type definitions are not implemented yet")
-            }
-            try functionType.checkImplemented()
-        }
-        for entry in module.imports {
-            switch entry.descriptor {
-            case .table(let type): try type.elementType.heapType.checkImplemented()
-            case .global(let type): try type.valueType.checkImplemented()
-            case .function, .memory, .tag: break
-            }
-        }
-        for (type, initializer) in zip(module.internalTables, module.tableInitializers) {
-            try type.elementType.heapType.checkImplemented()
-            try initializer?.checkImplemented()
-        }
-        for global in module.globals {
-            try global.type.valueType.checkImplemented()
-            try global.initializer.checkImplemented()
-        }
-        for element in module.elements {
-            try element.type.heapType.checkImplemented()
-            for item in element.initializer {
-                try item.checkImplemented()
-            }
-            if case .active(_, let offset) = element.mode {
-                try offset.checkImplemented()
-            }
-        }
-        for function in module.functions {
-            for local in function.code.locals {
-                try local.checkImplemented()
-            }
-        }
-        for case .active(let segment) in module.data {
-            try segment.offset.checkImplemented()
-        }
-    }
-}
-
-extension HeapType {
-    func checkImplemented() throws(WasmKitError) {
-        switch self {
-        // `ModuleValidator` refuses every type definition except a function type.
-        case .concrete, .abstract(.funcRef), .abstract(.externRef), .abstract(.exnRef):
-            return
-        case .abstract(.any), .abstract(.eq), .abstract(.i31), .abstract(.structRef), .abstract(.arrayRef),
-            .abstract(.noneRef), .abstract(.noExtern), .abstract(.noFunc), .abstract(.noExn):
-            throw WasmKitError("heap type \(self) is not implemented yet")
-        }
-    }
-}
-
-extension ValueType {
-    func checkImplemented() throws(WasmKitError) {
-        if case .ref(let type) = self {
-            try type.heapType.checkImplemented()
-        }
-    }
-}
-
-extension FunctionType {
-    func checkImplemented() throws(WasmKitError) {
-        for type in parameters {
-            try type.checkImplemented()
-        }
-        for type in results {
-            try type.checkImplemented()
-        }
-    }
-}
-
-extension ConstExpression {
-    func checkImplemented() throws(WasmKitError) {
-        for case .refNull(let type) in self {
-            try type.checkImplemented()
         }
     }
 }
