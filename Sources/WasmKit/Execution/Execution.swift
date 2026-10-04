@@ -732,11 +732,16 @@ extension Execution {
                     opcode = try doExecute(opcode, sp: &sp, pc: &pc, md: &md, ms: &ms)
                 }
             } catch let exception as WasmKitException {
-                if handleException(exception, sp: &sp, pc: &pc, md: &md, ms: &ms) {
-                    opcode = pc.read(OpcodeID.self)
-                    continue
+                // Through copies: taking the address of `sp` or `pc` anywhere in this loop would keep
+                // them in memory, and every instruction would store and reload them.
+                var handlerSp = sp
+                var handlerPc = pc
+                guard handleException(exception, sp: &handlerSp, pc: &handlerPc, md: &md, ms: &ms) else {
+                    throw exception
                 }
-                throw exception
+                opcode = handlerPc.read(OpcodeID.self)
+                sp = handlerSp
+                pc = handlerPc
             } catch let trap as Trap {
                 throw trap.withBacktrace(Self.captureBacktrace(sp: sp, store: store.value))
             }
