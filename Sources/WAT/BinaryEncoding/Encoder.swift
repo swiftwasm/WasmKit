@@ -928,9 +928,14 @@ private func encodeNameMapSubsection(
     }
 }
 
-/// The name map entries for the declarations in `decls` that have a `$id`, without its `$`.
-private func nameMapEntries(_ decls: some Sequence<some NamedFieldDecl>) -> [(Int, String)] {
+/// The name map entries for the declarations in `decls` that have a name: the `@name`
+/// annotation if one is given, which takes precedence, or else the `$id` without its `$`.
+private func nameMapEntries<Decl: NamedFieldDecl>(
+    _ decls: some Sequence<Decl>,
+    nameAnnotation: (Decl) -> String? = { _ in nil }
+) -> [(Int, String)] {
     decls.enumerated().compactMap { i, decl -> (Int, String)? in
+        if let annotation = nameAnnotation(decl) { return (i, annotation) }
         guard let name = decl.id else { return nil }
         return (i, String(name.value.dropFirst()))
     }
@@ -946,7 +951,7 @@ private func encodeNameSection(
     functionLabelNames: [[(Int, String)]]
 ) throws(WatParserError) {
     let hasModuleName = module.id != nil
-    let functionNames = nameMapEntries(module.functionsMap)
+    let functionNames = nameMapEntries(module.functionsMap, nameAnnotation: { $0.nameAnnotation })
     var localNames: [(Int, [(Int, String)])] = []
     for (funcDefIndex, entry) in functions.enumerated() {
         let (locals, function) = entry
@@ -1011,7 +1016,7 @@ private func encodeNameSection(
     let globalNames = nameMapEntries(module.globals)
     let elemNames = nameMapEntries(module.elementsMap)
     let dataNames = nameMapEntries(module.data)
-    let tagNames = nameMapEntries(module.tagsMap)
+    let tagNames = nameMapEntries(module.tagsMap, nameAnnotation: { $0.nameAnnotation })
     let fieldNames = module.types.enumerated().compactMap { i, decl -> (Int, [(Int, String)])? in
         guard !decl.fieldNames.isEmpty else { return nil }
         return (i, decl.fieldNames.map { ($0.value, $0.key) }.sorted { $0.0 < $1.0 })
