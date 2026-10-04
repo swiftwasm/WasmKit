@@ -972,7 +972,8 @@ final class WASIImplementation: Sendable {
     /// Force the allocation of space in a file.
     func fd_allocate(fd: WASIAbi.Fd, offset: WASIAbi.FileSize, length: WASIAbi.FileSize) throws {
         try fdTable.withLock { table in
-            guard table[fd] != nil else {
+            // Only regular files can be allocated.
+            guard case .file = table[fd] else {
                 throw WASIAbi.Errno.EBADF
             }
         }

@@ -103,7 +103,6 @@ struct IntegrationTests {
         #else
             return [
                 "WASI Rust tests": [
-                    "dir_fd_op_failures",  // fd_allocate on a directory returns NOTSUP instead of BADF
                     "path_filestat",  // path_open drops the SYNC fdflag
                     "path_link",  // path_link is not implemented
                     "symlink_create",  // path_symlink accepts an absolute target
