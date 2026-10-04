@@ -291,7 +291,6 @@ struct EncoderTests {
         /// wasm-tools picks other element segment forms than wabt, whose choices WAT follows, so
         /// segments are compared decoded.
         case elements([ElementSegment])
-        case nameSubsection(id: UInt8, content: ArraySlice<UInt8>)
     }
 
     /// The parts of `bytes` that WAT and wasm-tools encode alike.
@@ -306,11 +305,6 @@ struct EncoderTests {
                         parts.append(.elements(elements))
                     }
                 }
-            case 0 where content.starts(with: [4] + Array("name".utf8)):
-                // WAT does not write tag (11) names yet.
-                for (id, subsection) in try sections(of: content.dropFirst(5)) where id != 11 {
-                    parts.append(.nameSubsection(id: id, content: subsection))
-                }
             default:
                 parts.append(.section(id: id, content: content))
             }
@@ -318,7 +312,7 @@ struct EncoderTests {
         return parts
     }
 
-    /// The id and content of each section, or name subsection, in `bytes`.
+    /// The id and content of each section in `bytes`.
     private static func sections(of bytes: ArraySlice<UInt8>) throws -> [(id: UInt8, content: ArraySlice<UInt8>)] {
         var sections: [(id: UInt8, content: ArraySlice<UInt8>)] = []
         var index = bytes.startIndex

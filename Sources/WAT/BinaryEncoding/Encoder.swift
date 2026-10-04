@@ -913,7 +913,7 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     return encoder.output
 }
 
-/// Helper to encode a name map subsection (index → name pairs with "$" prefix stripped)
+/// Helper to encode a name map subsection (index → name pairs, names without a "$" prefix)
 private func encodeNameMapSubsection(
     id: UInt8,
     entries: some Collection<(Int, String)>,
@@ -923,9 +923,16 @@ private func encodeNameMapSubsection(
         encoder.encodeVector(Array(entries)) { entry, encoder in
             let (index, name) = entry
             encoder.writeUnsignedLEB128(UInt(index))
-            // Drop initial "$"
-            encoder.encode(String(name.dropFirst()))
+            encoder.encode(name)
         }
+    }
+}
+
+/// The name map entries for the declarations in `decls` that have a `$id`, without its `$`.
+private func nameMapEntries(_ decls: some Sequence<some NamedFieldDecl>) -> [(Int, String)] {
+    decls.enumerated().compactMap { i, decl -> (Int, String)? in
+        guard let name = decl.id else { return nil }
+        return (i, String(name.value.dropFirst()))
     }
 }
 
@@ -939,10 +946,7 @@ private func encodeNameSection(
     functionLabelNames: [[(Int, String)]]
 ) throws(WatParserError) {
     let hasModuleName = module.id != nil
-    let functionNames = module.functionsMap.enumerated().compactMap { i, decl -> (Int, String)? in
-        guard let name = decl.id else { return nil }
-        return (i, name.value)
-    }
+    let functionNames = nameMapEntries(module.functionsMap)
     var localNames: [(Int, [(Int, String)])] = []
     for (funcDefIndex, entry) in functions.enumerated() {
         let (locals, function) = entry
@@ -1001,30 +1005,13 @@ private func encodeNameSection(
         guard !names.isEmpty else { return nil }
         return (importFuncCount + funcDefIndex, names)
     }
-    let typeNames = module.types.enumerated().compactMap { i, decl -> (Int, String)? in
-        guard let name = decl.id else { return nil }
-        return (i, name.value)
-    }
-    let tableNames = module.tablesMap.enumerated().compactMap { i, decl -> (Int, String)? in
-        guard let name = decl.id else { return nil }
-        return (i, name.value)
-    }
-    let memoryNames = module.memories.enumerated().compactMap { i, decl -> (Int, String)? in
-        guard let name = decl.id else { return nil }
-        return (i, name.value)
-    }
-    let globalNames = module.globals.enumerated().compactMap { i, decl -> (Int, String)? in
-        guard let name = decl.id else { return nil }
-        return (i, name.value)
-    }
-    let elemNames = module.elementsMap.enumerated().compactMap { i, decl -> (Int, String)? in
-        guard let name = decl.id else { return nil }
-        return (i, name.value)
-    }
-    let dataNames = module.data.enumerated().compactMap { i, decl -> (Int, String)? in
-        guard let name = decl.id else { return nil }
-        return (i, name.value)
-    }
+    let typeNames = nameMapEntries(module.types)
+    let tableNames = nameMapEntries(module.tablesMap)
+    let memoryNames = nameMapEntries(module.memories)
+    let globalNames = nameMapEntries(module.globals)
+    let elemNames = nameMapEntries(module.elementsMap)
+    let dataNames = nameMapEntries(module.data)
+    let tagNames = nameMapEntries(module.tagsMap)
     let fieldNames = module.types.enumerated().compactMap { i, decl -> (Int, [(Int, String)])? in
         guard !decl.fieldNames.isEmpty else { return nil }
         return (i, decl.fieldNames.map { ($0.value, $0.key) }.sorted { $0.0 < $1.0 })
@@ -1034,6 +1021,7 @@ private func encodeNameSection(
         hasModuleName || !functionNames.isEmpty || !localNames.isEmpty
         || !labelNames.isEmpty || !typeNames.isEmpty || !tableNames.isEmpty || !memoryNames.isEmpty
         || !globalNames.isEmpty || !elemNames.isEmpty || !dataNames.isEmpty || !fieldNames.isEmpty
+        || !tagNames.isEmpty
 
     guard hasAnyNames else { return }
 
@@ -1104,6 +1092,9 @@ private func encodeNameSection(
                     }
                 }
             }
+        }
+        if !tagNames.isEmpty {
+            encodeNameMapSubsection(id: 11, entries: tagNames, encoder: &encoder)
         }
     }
 }
