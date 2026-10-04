@@ -37,13 +37,21 @@ struct TypeCanonicalizer {
     /// Canonicalizes a module's type section.
     ///
     /// Throws "unknown type" if a type refers to itself or to a later type.
-    init(typeSection: [FunctionType], interner: Interner<FunctionType>) throws(WasmKitError) {
+    init(typeSection: TypeSection, interner: Interner<FunctionType>) throws(WasmKitError) {
         var typeIDs: [InternedFuncType] = []
         typeIDs.reserveCapacity(typeSection.count)
-        for type in typeSection {
-            // Only the types defined so far are visible to this one.
-            let canonical = try TypeCanonicalizer(typeIDs: typeIDs).canonicalize(type)
-            typeIDs.append(interner.intern(canonical))
+        // A function type is canonical by its signature alone. GC compares types by the recursive
+        // group they are defined in, with their finality and supertypes, so struct and array types,
+        // and function types that use those, will be canonicalized per group here.
+        for group in typeSection.recursiveGroups {
+            for type in group.types {
+                guard case .function(let functionType) = type.body else {
+                    throw WasmKitError("GC type definitions are not supported yet")
+                }
+                // Only the types defined so far are visible to this one.
+                let canonical = try TypeCanonicalizer(typeIDs: typeIDs).canonicalize(functionType)
+                typeIDs.append(interner.intern(canonical))
+            }
         }
         self.typeIDs = typeIDs
     }
