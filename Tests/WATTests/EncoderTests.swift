@@ -31,6 +31,8 @@ struct EncoderTests {
         // Written before Wasm 3.0 made text-format limits u64; the top-level memory.wast
         // expects an out-of-range limit to fail validation instead.
         "proposals/threads/memory.wast",
+        // Neither wast2json nor wasm-tools accepts a `datacount` placement.
+        "annotations/custom_datacount.wast",
     ]
 
     /// Files with GC types or annotations, which wast2json 1.0.42 cannot parse, so they are
@@ -460,7 +462,7 @@ struct EncoderTests {
         }
 
         private static func usesWasmTools(_ wastFile: URL) -> Bool {
-            wastFile.deletingLastPathComponent().lastPathComponent == "gc"
+            ["gc", "annotations"].contains(wastFile.deletingLastPathComponent().lastPathComponent)
                 || (Spectest.isTopLevel(wastFile) && wasmToolsFiles.contains(wastFile.lastPathComponent))
         }
 

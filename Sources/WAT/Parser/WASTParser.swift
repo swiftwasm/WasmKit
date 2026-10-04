@@ -375,18 +375,6 @@ public struct ModuleDirective {
         self.isDefinition = isDefinition
     }
 
-    /// The effective module name from either `@name` annotation or `$id`.
-    /// `@name` from the WAT source takes precedence over `$id`.
-    var moduleName: ModuleName? {
-        if case .text(let wat) = source, let watId = wat.id {
-            return watId
-        }
-        if let id {
-            return .identifier(id)
-        }
-        return nil
-    }
-
     static func parse(wastParser: inout WASTParser) throws(WatParserError) -> ModuleDirective {
         let location = wastParser.parser.lexer.location()
         try wastParser.parser.expectKeyword("module")

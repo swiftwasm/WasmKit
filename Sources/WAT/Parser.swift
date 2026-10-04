@@ -394,7 +394,7 @@ internal struct Parser {
         }
 
         // Optional placement directive: (before|after sectionKind)
-        var placement: CustomSectionDecl.Placement = .unplaced
+        var placement: CustomSectionDecl.Placement = .after(.last)
         if try subParser.peek(.leftParen) != nil {
             try subParser.consume()
             let kw = try subParser.expectKeyword()
