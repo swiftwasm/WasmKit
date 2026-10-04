@@ -9,6 +9,12 @@ add_wasmkit_library(WasmKit
   Validator.swift
   TypeCanonicalization.swift
   TypeMatching.swift
+  TypeRegistry.swift
+  GC/GCHeap.swift
+  GC/StackMaps.swift
+  GC/Collector.swift
+  GC/Rooting.swift
+  GC/HostAPI.swift
   WasmKitError.swift
   ResourceLimiter.swift
   Execution/SharedMemory.swift
@@ -18,6 +24,7 @@ add_wasmkit_library(WasmKit
   Component/CanonicalOptions.swift
   Component/ComponentTypes.swift
   Execution/DebuggerInstructionMapping.swift
+  Execution/Instructions/GC.swift
   Execution/Instructions/Control.swift
   Execution/Instructions/ControlAccumulator.swift
   Execution/Instructions/ControlAccumulatorFloat.swift

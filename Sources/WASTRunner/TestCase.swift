@@ -141,6 +141,10 @@ extension TestCase {
         let features = WASTRunContext.deriveFeatureSet(rootPath: rootPath)
         configuration.features = features
         configuration.fuelMetering = WASTRunContext.deriveFuelMetering(rootPath: rootPath)
+        if rootPath.hasSuffix("gc") {
+            // Small enough that WasmKit's own GC tests run out of memory unless garbage is collected.
+            configuration.maxGCHeapSize = 16 << 20
+        }
 
         let engine = Engine(configuration: configuration)
         let store = Store(engine: engine)
@@ -418,7 +422,7 @@ extension WASTRunContext {
             }
         case .assertReturn(let execute, let expected):
             let actual = try wastExecute(execute: execute)
-            guard actual.isTestEquivalent(to: expected) else {
+            guard actual.isTestEquivalent(to: expected, kindOf: store.kind(of:)) else {
                 return .failed("invoke result mismatch: expected: \(expected), actual: \(actual)")
             }
             return .passed
@@ -502,7 +506,8 @@ extension WASTRunContext {
         guard let function = instance.exportedFunction(name: call.name) else {
             throw SpectestError("function \(call.name) not exported")
         }
-        let args = try call.args.map { arg -> Value in
+        let parameters = function.type.parameters
+        let args = try call.args.enumerated().map { index, arg -> Value in
             switch arg {
             case .i32(let value): return .i32(value)
             case .i64(let value): return .i64(value)
@@ -511,17 +516,22 @@ extension WASTRunContext {
             case .v128(let value): return .v128(value)
             case .refNull(let heapType):
                 switch heapType {
-                case .abstract(.funcRef): return .ref(.function(nil))
-                case .abstract(.externRef): return .ref(.extern(nil))
-                case .abstract(.exnRef): return .ref(.exception(nil))
-                case .concrete:
-                    throw SpectestError("concrete ref.null is not supported yet")
+                case .abstract(.funcRef), .abstract(.noFunc): return .ref(.function(nil))
+                case .abstract(.externRef), .abstract(.noExtern): return .ref(.extern(nil))
+                case .abstract(.exnRef), .abstract(.noExn): return .ref(.exception(nil))
                 case .abstract(.any), .abstract(.eq), .abstract(.i31), .abstract(.structRef), .abstract(.arrayRef),
-                    .abstract(.noneRef), .abstract(.noExtern), .abstract(.noFunc), .abstract(.noExn):
-                    throw SpectestError("ref.null \(heapType) is not supported yet")
+                    .abstract(.noneRef):
+                    return .ref(.any(nil))
+                case .concrete:
+                    // The index is the module's, so take the null the parameter's type expects.
+                    guard index < parameters.count, case .ref(let parameterType) = parameters[index] else {
+                        throw SpectestError("ref.null of a concrete type for a non-reference parameter")
+                    }
+                    return .ref(parameterType.nullReference)
                 }
             case .refExtern(let value): return .ref(.extern(Int(value)))
             case .refFunc(let value): return .ref(.function(Int(value)))
+            case .refHost(let value): return .ref(.any(AnyRef(internalizing: Int(value))))
             }
         }
         return try function.invoke(args)
@@ -544,6 +554,7 @@ extension WASTRunContext {
             features.insert(.tailCall)
             features.insert(.functionReferences)
             features.insert(.multiMemory)
+            features.insert(.gc)
         }
         if rootPath.hasSuffix("memory64") {
             features.insert(.memory64)
@@ -597,7 +608,9 @@ extension WASTRunContext {
 }
 
 extension Value {
-    func isTestEquivalent(to value: WASTExpectValue) -> Bool {
+    /// - Parameter kindOf: The abstract heap type of an internal reference: `i31`,
+    ///   `struct`, `array`, or `nil` for an internalized host value.
+    func isTestEquivalent(to value: WASTExpectValue, kindOf: (AnyRef) -> AbstractHeapType?) -> Bool {
         switch (self, value) {
         case (.i32(let lhs), .i32(let rhs)):
             return lhs == rhs
@@ -667,17 +680,36 @@ extension Value {
             return rhs.map { lhs == $0 } ?? true
         case (.ref(.function(let lhs?)), .refFunc(let rhs)):
             return rhs.map { lhs == $0 } ?? true
-        case (.ref(.extern(nil)), .refNull(.abstract(.externRef))),
-            (.ref(.function(nil)), .refNull(.abstract(.funcRef))),
+        case (.ref(.externalized), .refExtern(nil)):
+            return true
+        case (.ref(.extern(nil)), .refNull(.abstract(.externRef))), (.ref(.extern(nil)), .refNull(.abstract(.noExtern))),
+            (.ref(.function(nil)), .refNull(.abstract(.funcRef))), (.ref(.function(nil)), .refNull(.abstract(.noFunc))),
             (.ref(.function(nil)), .refNull(.concrete)),
-            (.ref(.exception(nil)), .refNull(.abstract(.exnRef))),
+            (.ref(.exception(nil)), .refNull(.abstract(.exnRef))), (.ref(.exception(nil)), .refNull(.abstract(.noExn))),
+            (.ref(.any(nil)), .refNull(.abstract(.any))), (.ref(.any(nil)), .refNull(.abstract(.eq))),
+            (.ref(.any(nil)), .refNull(.abstract(.i31))), (.ref(.any(nil)), .refNull(.abstract(.structRef))),
+            (.ref(.any(nil)), .refNull(.abstract(.arrayRef))), (.ref(.any(nil)), .refNull(.abstract(.noneRef))),
+            (.ref(.any(nil)), .refNull(.concrete)),
             (.ref(.extern(nil)), .refNull(nil)),
             (.ref(.function(nil)), .refNull(nil)),
-            (.ref(.exception(nil)), .refNull(nil)):
+            (.ref(.exception(nil)), .refNull(nil)),
+            (.ref(.any(nil)), .refNull(nil)):
             return true
+        case (.ref(.any(.some)), .refAny):
+            return true
+        case (.ref(.any(let reference?)), .refI31):
+            return kindOf(reference) == .i31
+        case (.ref(.any(let reference?)), .refStruct):
+            return kindOf(reference) == .structRef
+        case (.ref(.any(let reference?)), .refArray):
+            return kindOf(reference) == .arrayRef
+        case (.ref(.any(let reference?)), .refEq):
+            return kindOf(reference) != nil
+        case (.ref(.any(let reference?)), .refHost(let value)):
+            return reference.internalizedValue == Int(value)
         case (_, .either(let candidates)):
             // Relaxed-SIMD non-determinism: match if the actual equals any candidate.
-            return candidates.contains { self.isTestEquivalent(to: $0) }
+            return candidates.contains { self.isTestEquivalent(to: $0, kindOf: kindOf) }
         default:
             return false
         }
@@ -685,13 +717,13 @@ extension Value {
 }
 
 extension Array where Element == Value {
-    func isTestEquivalent(to arrayOfValues: [WASTExpectValue]) -> Bool {
+    func isTestEquivalent(to arrayOfValues: [WASTExpectValue], kindOf: (AnyRef) -> AbstractHeapType?) -> Bool {
         guard count == arrayOfValues.count else {
             return false
         }
 
         for (i, value) in enumerated() {
-            if !value.isTestEquivalent(to: arrayOfValues[i]) {
+            if !value.isTestEquivalent(to: arrayOfValues[i], kindOf: kindOf) {
                 return false
             }
         }

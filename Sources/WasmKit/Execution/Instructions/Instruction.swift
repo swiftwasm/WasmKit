@@ -2391,6 +2391,50 @@ enum Instruction {
     case brIfNull(Instruction.BrIfOperand)
     /// Conditional pc-relative branch if the condition is not a null reference
     case brIfNotNull(Instruction.BrIfOperand)
+    /// WebAssembly Core Instruction `ref.i31`
+    case refI31(Instruction.RefI31Operand)
+    /// WebAssembly Core Instruction `i31.get_s`
+    case i31GetS(Instruction.I31GetSOperand)
+    /// WebAssembly Core Instruction `i31.get_u`
+    case i31GetU(Instruction.I31GetUOperand)
+    /// WebAssembly Core Instruction `ref.eq`
+    case refEq(Instruction.RefEqOperand)
+    /// WebAssembly Core Instruction `struct.new`. The field values are consecutive from `operands`.
+    case structNew(Instruction.StructNewOperand)
+    /// WebAssembly Core Instruction `struct.new_default`
+    case structNewDefault(Instruction.StructNewDefaultOperand)
+    /// WebAssembly Core Instruction `struct.get`, `struct.get_s` or `struct.get_u`. See `GCFieldAccess`.
+    case structGet(Instruction.StructGetOperand)
+    /// WebAssembly Core Instruction `struct.set`. See `GCFieldAccess`.
+    case structSet(Instruction.StructSetOperand)
+    /// WebAssembly Core Instruction `array.new`. The operands are the value then the length.
+    case arrayNew(Instruction.ArrayNewOperand)
+    /// WebAssembly Core Instruction `array.new_default`
+    case arrayNewDefault(Instruction.ArrayNewDefaultOperand)
+    /// WebAssembly Core Instruction `array.new_fixed`. The elements are consecutive from `operands`.
+    case arrayNewFixed(Instruction.ArrayNewFixedOperand)
+    /// WebAssembly Core Instruction `array.new_data`. The operands are the offset then the length.
+    case arrayNewData(Instruction.ArrayNewDataOperand)
+    /// WebAssembly Core Instruction `array.new_elem`. The operands are the offset then the length.
+    case arrayNewElem(Instruction.ArrayNewElemOperand)
+    /// WebAssembly Core Instruction `array.get`, `array.get_s` or `array.get_u`. The operands are the array then the index.
+    case arrayGet(Instruction.ArrayGetOperand)
+    /// WebAssembly Core Instruction `array.set`. The operands are the array, the index, then the value.
+    case arraySet(Instruction.ArraySetOperand)
+    /// WebAssembly Core Instruction `array.len`
+    case arrayLen(Instruction.ArrayLenOperand)
+    /// WebAssembly Core Instruction `array.fill`. The operands are the array, the offset, the value, then the length.
+    case arrayFill(Instruction.ArrayFillOperand)
+    /// WebAssembly Core Instruction `array.copy`. The operands are the destination array and offset, the source array and offset, then the length.
+    case arrayCopy(Instruction.ArrayCopyOperand)
+    /// WebAssembly Core Instruction `array.init_data`. The operands are the array, the destination offset, the source offset, then the length.
+    case arrayInitData(Instruction.ArrayInitDataOperand)
+    /// WebAssembly Core Instruction `ref.test`. See `CastTarget`.
+    case refTest(Instruction.RefTestOperand)
+    /// WebAssembly Core Instruction `ref.cast`. See `CastTarget`.
+    case refCast(Instruction.RefCastOperand)
+    /// WebAssembly Core Instruction `array.init_elem`. The operands are the array, the destination offset, the source offset, then the length.
+    case arrayInitElem(Instruction.ArrayInitElemOperand)
     /// Point the current memory registers at the given memory of the current instance.
     /// 
     /// Emitted around an instruction that accesses a memory other than 0 (multi-memory);
@@ -3636,6 +3680,330 @@ extension Instruction {
         }
     }
 
+    struct RefI31Operand: InstructionImmediate {
+        var value: LVReg
+        var result: LVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let value = LVReg(storage: Int32(truncatingIfNeeded: word0))
+                let result = LVReg(storage: Int32(truncatingIfNeeded: word0 >> 32))
+                return Self(value: value, result: result)
+            #else
+                let (value, result) = pc.read((LVReg, LVReg).self)
+                return Self(value: value, result: result)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.value, $0.result) as (LVReg, LVReg), to: CodeSlot.self) }
+        }
+    }
+
+    struct I31GetSOperand: InstructionImmediate {
+        var value: LVReg
+        var result: LVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (value, result) = pc.read((LVReg, LVReg).self)
+            return Self(value: value, result: result)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.value, $0.result) as (LVReg, LVReg), to: CodeSlot.self) }
+        }
+    }
+
+    struct I31GetUOperand: InstructionImmediate {
+        var value: LVReg
+        var result: LVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (value, result) = pc.read((LVReg, LVReg).self)
+            return Self(value: value, result: result)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.value, $0.result) as (LVReg, LVReg), to: CodeSlot.self) }
+        }
+    }
+
+    struct RefEqOperand: InstructionImmediate {
+        var lhs: VReg
+        var rhs: VReg
+        var result: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let lhs = VReg(byteOffset: Int16(truncatingIfNeeded: word0))
+                let rhs = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 16))
+                let result = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 32))
+                return Self(lhs: lhs, rhs: rhs, result: result)
+            #else
+                let (lhs, rhs, result, _, _) = pc.read((VReg, VReg, VReg, UInt8, UInt8).self)
+                return Self(lhs: lhs, rhs: rhs, result: result)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.lhs, $0.rhs, $0.result, 0, 0) as (VReg, VReg, VReg, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct StructNewOperand: InstructionImmediate {
+        var typeID: UInt32
+        var operands: VReg
+        var result: VReg
+        var safepoint: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (typeID, operands, result) = pc.read((UInt32, VReg, VReg).self)
+            let (safepoint, _, _, _, _) = pc.read((UInt32, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(typeID: typeID, operands: operands, result: result, safepoint: safepoint)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.typeID, $0.operands, $0.result) as (UInt32, VReg, VReg), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.safepoint, 0, 0, 0, 0) as (UInt32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct StructNewDefaultOperand: InstructionImmediate {
+        var typeID: UInt32
+        var result: VReg
+        var safepoint: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (typeID, result, _, _) = pc.read((UInt32, VReg, UInt8, UInt8).self)
+            let (safepoint, _, _, _, _) = pc.read((UInt32, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(typeID: typeID, result: result, safepoint: safepoint)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.typeID, $0.result, 0, 0) as (UInt32, VReg, UInt8, UInt8), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.safepoint, 0, 0, 0, 0) as (UInt32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct StructGetOperand: InstructionImmediate {
+        var object: VReg
+        var result: VReg
+        var field: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (object, result, field) = pc.read((VReg, VReg, UInt32).self)
+            return Self(object: object, result: result, field: field)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.object, $0.result, $0.field) as (VReg, VReg, UInt32), to: CodeSlot.self) }
+        }
+    }
+
+    struct StructSetOperand: InstructionImmediate {
+        var object: VReg
+        var value: VReg
+        var field: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (object, value, field) = pc.read((VReg, VReg, UInt32).self)
+            return Self(object: object, value: value, field: field)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.object, $0.value, $0.field) as (VReg, VReg, UInt32), to: CodeSlot.self) }
+        }
+    }
+
+    struct ArrayNewOperand: InstructionImmediate {
+        var typeID: UInt32
+        var operands: VReg
+        var result: VReg
+        var safepoint: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (typeID, operands, result) = pc.read((UInt32, VReg, VReg).self)
+            let (safepoint, _, _, _, _) = pc.read((UInt32, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(typeID: typeID, operands: operands, result: result, safepoint: safepoint)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.typeID, $0.operands, $0.result) as (UInt32, VReg, VReg), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.safepoint, 0, 0, 0, 0) as (UInt32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct ArrayNewDefaultOperand: InstructionImmediate {
+        var typeID: UInt32
+        var length: VReg
+        var result: VReg
+        var safepoint: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (typeID, length, result) = pc.read((UInt32, VReg, VReg).self)
+            let (safepoint, _, _, _, _) = pc.read((UInt32, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(typeID: typeID, length: length, result: result, safepoint: safepoint)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.typeID, $0.length, $0.result) as (UInt32, VReg, VReg), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.safepoint, 0, 0, 0, 0) as (UInt32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct ArrayNewFixedOperand: InstructionImmediate {
+        var typeID: UInt32
+        var count: UInt32
+        var operands: VReg
+        var result: VReg
+        var safepoint: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (typeID, count) = pc.read((UInt32, UInt32).self)
+            let (operands, result, safepoint) = pc.read((VReg, VReg, UInt32).self)
+            return Self(typeID: typeID, count: count, operands: operands, result: result, safepoint: safepoint)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.typeID, $0.count) as (UInt32, UInt32), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.operands, $0.result, $0.safepoint) as (VReg, VReg, UInt32), to: CodeSlot.self) }
+        }
+    }
+
+    struct ArrayNewDataOperand: InstructionImmediate {
+        var typeID: UInt32
+        var segmentIndex: UInt32
+        var operands: VReg
+        var result: VReg
+        var safepoint: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (typeID, segmentIndex) = pc.read((UInt32, UInt32).self)
+            let (operands, result, safepoint) = pc.read((VReg, VReg, UInt32).self)
+            return Self(typeID: typeID, segmentIndex: segmentIndex, operands: operands, result: result, safepoint: safepoint)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.typeID, $0.segmentIndex) as (UInt32, UInt32), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.operands, $0.result, $0.safepoint) as (VReg, VReg, UInt32), to: CodeSlot.self) }
+        }
+    }
+
+    struct ArrayNewElemOperand: InstructionImmediate {
+        var typeID: UInt32
+        var segmentIndex: UInt32
+        var operands: VReg
+        var result: VReg
+        var safepoint: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (typeID, segmentIndex) = pc.read((UInt32, UInt32).self)
+            let (operands, result, safepoint) = pc.read((VReg, VReg, UInt32).self)
+            return Self(typeID: typeID, segmentIndex: segmentIndex, operands: operands, result: result, safepoint: safepoint)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.typeID, $0.segmentIndex) as (UInt32, UInt32), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.operands, $0.result, $0.safepoint) as (VReg, VReg, UInt32), to: CodeSlot.self) }
+        }
+    }
+
+    struct ArrayGetOperand: InstructionImmediate {
+        var operands: VReg
+        var result: VReg
+        var element: UInt8
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (operands, result, element, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(operands: operands, result: result, element: element)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.operands, $0.result, $0.element, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct ArraySetOperand: InstructionImmediate {
+        var operands: VReg
+        var element: UInt8
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (operands, element, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(operands: operands, element: element)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.operands, $0.element, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct ArrayLenOperand: InstructionImmediate {
+        var array: VReg
+        var result: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (array, result, _, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(array: array, result: result)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.array, $0.result, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct ArrayFillOperand: InstructionImmediate {
+        var operands: VReg
+        var element: UInt8
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (operands, element, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(operands: operands, element: element)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.operands, $0.element, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct ArrayCopyOperand: InstructionImmediate {
+        var operands: VReg
+        var element: UInt8
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (operands, element, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(operands: operands, element: element)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.operands, $0.element, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct ArrayInitDataOperand: InstructionImmediate {
+        var segmentIndex: UInt32
+        var operands: VReg
+        var element: UInt8
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (segmentIndex, operands, element, _) = pc.read((UInt32, VReg, UInt8, UInt8).self)
+            return Self(segmentIndex: segmentIndex, operands: operands, element: element)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.segmentIndex, $0.operands, $0.element, 0) as (UInt32, VReg, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct RefTestOperand: InstructionImmediate {
+        var value: VReg
+        var result: VReg
+        var target: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let value = VReg(byteOffset: Int16(truncatingIfNeeded: word0))
+                let result = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 16))
+                let target = UInt32(truncatingIfNeeded: word0 >> 32)
+                return Self(value: value, result: result, target: target)
+            #else
+                let (value, result, target) = pc.read((VReg, VReg, UInt32).self)
+                return Self(value: value, result: result, target: target)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.value, $0.result, $0.target) as (VReg, VReg, UInt32), to: CodeSlot.self) }
+        }
+    }
+
+    struct RefCastOperand: InstructionImmediate {
+        var value: VReg
+        var result: VReg
+        var target: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (value, result, target) = pc.read((VReg, VReg, UInt32).self)
+            return Self(value: value, result: result, target: target)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.value, $0.result, $0.target) as (VReg, VReg, UInt32), to: CodeSlot.self) }
+        }
+    }
+
+    struct ArrayInitElemOperand: InstructionImmediate {
+        var segmentIndex: UInt32
+        var operands: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (segmentIndex, operands, _, _) = pc.read((UInt32, VReg, UInt8, UInt8).self)
+            return Self(segmentIndex: segmentIndex, operands: operands)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.segmentIndex, $0.operands, 0, 0) as (UInt32, VReg, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
     struct SelectMemoryOperand: InstructionImmediate {
         var memory: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
@@ -4397,6 +4765,28 @@ extension Instruction {
         case .refAsNonNull(let immediate): return immediate
         case .brIfNull(let immediate): return immediate
         case .brIfNotNull(let immediate): return immediate
+        case .refI31(let immediate): return immediate
+        case .i31GetS(let immediate): return immediate
+        case .i31GetU(let immediate): return immediate
+        case .refEq(let immediate): return immediate
+        case .structNew(let immediate): return immediate
+        case .structNewDefault(let immediate): return immediate
+        case .structGet(let immediate): return immediate
+        case .structSet(let immediate): return immediate
+        case .arrayNew(let immediate): return immediate
+        case .arrayNewDefault(let immediate): return immediate
+        case .arrayNewFixed(let immediate): return immediate
+        case .arrayNewData(let immediate): return immediate
+        case .arrayNewElem(let immediate): return immediate
+        case .arrayGet(let immediate): return immediate
+        case .arraySet(let immediate): return immediate
+        case .arrayLen(let immediate): return immediate
+        case .arrayFill(let immediate): return immediate
+        case .arrayCopy(let immediate): return immediate
+        case .arrayInitData(let immediate): return immediate
+        case .refTest(let immediate): return immediate
+        case .refCast(let immediate): return immediate
+        case .arrayInitElem(let immediate): return immediate
         case .selectMemory(let immediate): return immediate
         case .selectSharedMemory(let immediate): return immediate
         default: return nil
@@ -5131,6 +5521,28 @@ extension Instruction {
         case .refAsNonNull(let immediate): immediate.emit(to: emit)
         case .brIfNull(let immediate): immediate.emit(to: emit)
         case .brIfNotNull(let immediate): immediate.emit(to: emit)
+        case .refI31(let immediate): immediate.emit(to: emit)
+        case .i31GetS(let immediate): immediate.emit(to: emit)
+        case .i31GetU(let immediate): immediate.emit(to: emit)
+        case .refEq(let immediate): immediate.emit(to: emit)
+        case .structNew(let immediate): immediate.emit(to: emit)
+        case .structNewDefault(let immediate): immediate.emit(to: emit)
+        case .structGet(let immediate): immediate.emit(to: emit)
+        case .structSet(let immediate): immediate.emit(to: emit)
+        case .arrayNew(let immediate): immediate.emit(to: emit)
+        case .arrayNewDefault(let immediate): immediate.emit(to: emit)
+        case .arrayNewFixed(let immediate): immediate.emit(to: emit)
+        case .arrayNewData(let immediate): immediate.emit(to: emit)
+        case .arrayNewElem(let immediate): immediate.emit(to: emit)
+        case .arrayGet(let immediate): immediate.emit(to: emit)
+        case .arraySet(let immediate): immediate.emit(to: emit)
+        case .arrayLen(let immediate): immediate.emit(to: emit)
+        case .arrayFill(let immediate): immediate.emit(to: emit)
+        case .arrayCopy(let immediate): immediate.emit(to: emit)
+        case .arrayInitData(let immediate): immediate.emit(to: emit)
+        case .refTest(let immediate): immediate.emit(to: emit)
+        case .refCast(let immediate): immediate.emit(to: emit)
+        case .arrayInitElem(let immediate): immediate.emit(to: emit)
         case .selectMemory(let immediate): immediate.emit(to: emit)
         case .selectSharedMemory(let immediate): immediate.emit(to: emit)
         default: return
@@ -5876,14 +6288,36 @@ extension Instruction {
         case .refAsNonNull: return 730
         case .brIfNull: return 731
         case .brIfNotNull: return 732
-        case .selectMemory: return 733
-        default: return 734  // .selectSharedMemory
+        case .refI31: return 733
+        case .i31GetS: return 734
+        case .i31GetU: return 735
+        case .refEq: return 736
+        case .structNew: return 737
+        case .structNewDefault: return 738
+        case .structGet: return 739
+        case .structSet: return 740
+        case .arrayNew: return 741
+        case .arrayNewDefault: return 742
+        case .arrayNewFixed: return 743
+        case .arrayNewData: return 744
+        case .arrayNewElem: return 745
+        case .arrayGet: return 746
+        case .arraySet: return 747
+        case .arrayLen: return 748
+        case .arrayFill: return 749
+        case .arrayCopy: return 750
+        case .arrayInitData: return 751
+        case .refTest: return 752
+        case .refCast: return 753
+        case .arrayInitElem: return 754
+        case .selectMemory: return 755
+        default: return 756  // .selectSharedMemory
         }
     }
 }
 extension Instruction {
     /// The number of opcodes, trap pseudo-instructions included.
-    static let opcodeCount = 735
+    static let opcodeCount = 757
 
     /// Whether only the direct-threaded dispatcher implements this instruction;
     /// `Execution.doExecute` has no case for it.
@@ -6639,8 +7073,30 @@ extension Instruction {
         case 730: return .refAsNonNull(Instruction.RefAsNonNullOperand.load(from: &pc))
         case 731: return .brIfNull(Instruction.BrIfOperand.load(from: &pc))
         case 732: return .brIfNotNull(Instruction.BrIfOperand.load(from: &pc))
-        case 733: return .selectMemory(Instruction.SelectMemoryOperand.load(from: &pc))
-        case 734: return .selectSharedMemory(Instruction.SelectSharedMemoryOperand.load(from: &pc))
+        case 733: return .refI31(Instruction.RefI31Operand.load(from: &pc))
+        case 734: return .i31GetS(Instruction.I31GetSOperand.load(from: &pc))
+        case 735: return .i31GetU(Instruction.I31GetUOperand.load(from: &pc))
+        case 736: return .refEq(Instruction.RefEqOperand.load(from: &pc))
+        case 737: return .structNew(Instruction.StructNewOperand.load(from: &pc))
+        case 738: return .structNewDefault(Instruction.StructNewDefaultOperand.load(from: &pc))
+        case 739: return .structGet(Instruction.StructGetOperand.load(from: &pc))
+        case 740: return .structSet(Instruction.StructSetOperand.load(from: &pc))
+        case 741: return .arrayNew(Instruction.ArrayNewOperand.load(from: &pc))
+        case 742: return .arrayNewDefault(Instruction.ArrayNewDefaultOperand.load(from: &pc))
+        case 743: return .arrayNewFixed(Instruction.ArrayNewFixedOperand.load(from: &pc))
+        case 744: return .arrayNewData(Instruction.ArrayNewDataOperand.load(from: &pc))
+        case 745: return .arrayNewElem(Instruction.ArrayNewElemOperand.load(from: &pc))
+        case 746: return .arrayGet(Instruction.ArrayGetOperand.load(from: &pc))
+        case 747: return .arraySet(Instruction.ArraySetOperand.load(from: &pc))
+        case 748: return .arrayLen(Instruction.ArrayLenOperand.load(from: &pc))
+        case 749: return .arrayFill(Instruction.ArrayFillOperand.load(from: &pc))
+        case 750: return .arrayCopy(Instruction.ArrayCopyOperand.load(from: &pc))
+        case 751: return .arrayInitData(Instruction.ArrayInitDataOperand.load(from: &pc))
+        case 752: return .refTest(Instruction.RefTestOperand.load(from: &pc))
+        case 753: return .refCast(Instruction.RefCastOperand.load(from: &pc))
+        case 754: return .arrayInitElem(Instruction.ArrayInitElemOperand.load(from: &pc))
+        case 755: return .selectMemory(Instruction.SelectMemoryOperand.load(from: &pc))
+        case 756: return .selectSharedMemory(Instruction.SelectSharedMemoryOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -7388,8 +7844,30 @@ extension Instruction {
         case 730: return "refAsNonNull"
         case 731: return "brIfNull"
         case 732: return "brIfNotNull"
-        case 733: return "selectMemory"
-        case 734: return "selectSharedMemory"
+        case 733: return "refI31"
+        case 734: return "i31GetS"
+        case 735: return "i31GetU"
+        case 736: return "refEq"
+        case 737: return "structNew"
+        case 738: return "structNewDefault"
+        case 739: return "structGet"
+        case 740: return "structSet"
+        case 741: return "arrayNew"
+        case 742: return "arrayNewDefault"
+        case 743: return "arrayNewFixed"
+        case 744: return "arrayNewData"
+        case 745: return "arrayNewElem"
+        case 746: return "arrayGet"
+        case 747: return "arraySet"
+        case 748: return "arrayLen"
+        case 749: return "arrayFill"
+        case 750: return "arrayCopy"
+        case 751: return "arrayInitData"
+        case 752: return "refTest"
+        case 753: return "refCast"
+        case 754: return "arrayInitElem"
+        case 755: return "selectMemory"
+        case 756: return "selectSharedMemory"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }

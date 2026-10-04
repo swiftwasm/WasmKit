@@ -824,6 +824,84 @@ extension Parser: BinaryInstructionDecoder {
     @inlinable mutating func visitRefNull() throws(WasmParserError) -> WasmTypes.HeapType {
         return try stream.parseHeapType(features: features)
     }
+    @inlinable mutating func visitStructNew() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitStructNewDefault() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitStructGet() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        try parseTypeAndFieldIndex()
+    }
+    @inlinable mutating func visitStructGetS() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        try parseTypeAndFieldIndex()
+    }
+    @inlinable mutating func visitStructGetU() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        try parseTypeAndFieldIndex()
+    }
+    @inlinable mutating func visitStructSet() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        try parseTypeAndFieldIndex()
+    }
+    @inlinable mutating func parseTypeAndFieldIndex() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let fieldIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, fieldIndex)
+    }
+    @inlinable mutating func visitArrayNew() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayNewDefault() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayNewFixed() throws(WasmParserError) -> (typeIndex: UInt32, size: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let size: UInt32 = try parseUnsigned()
+        return (typeIndex, size)
+    }
+    @inlinable mutating func visitArrayNewData() throws(WasmParserError) -> (typeIndex: UInt32, dataIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let dataIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, dataIndex)
+    }
+    @inlinable mutating func visitArrayNewElem() throws(WasmParserError) -> (typeIndex: UInt32, elemIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let elemIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, elemIndex)
+    }
+    @inlinable mutating func visitArrayGet() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayGetS() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayGetU() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArraySet() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayFill() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayCopy() throws(WasmParserError) -> (dstType: UInt32, srcType: UInt32) {
+        let destination: UInt32 = try parseUnsigned()
+        let source: UInt32 = try parseUnsigned()
+        return (destination, source)
+    }
+    @inlinable mutating func visitArrayInitData() throws(WasmParserError) -> (typeIndex: UInt32, dataIndex: UInt32) {
+        try visitArrayNewData()
+    }
+    @inlinable mutating func visitArrayInitElem() throws(WasmParserError) -> (typeIndex: UInt32, elemIndex: UInt32) {
+        try visitArrayNewElem()
+    }
+    @inlinable mutating func visitRefTest(_: Instruction.RefTest) throws(WasmParserError) -> HeapType {
+        try stream.parseHeapType(features: features)
+    }
+    @inlinable mutating func visitRefCast(_: Instruction.RefCast) throws(WasmParserError) -> HeapType {
+        try stream.parseHeapType(features: features)
+    }
+    @inlinable mutating func visitBrOnCast() throws(WasmParserError) -> BrOnCast { try parseBrOnCast() }
+    @inlinable mutating func visitBrOnCastFail() throws(WasmParserError) -> BrOnCast { try parseBrOnCast() }
+
+    /// > Note:
+    /// <https://webassembly.github.io/gc/core/binary/instructions.html#control-instructions>
+    @inlinable mutating func parseBrOnCast() throws(WasmParserError) -> BrOnCast {
+        // Bit 0 makes the source type nullable, and bit 1 the target type.
+        let flags = try stream.consumeAny()
+        guard flags & ~0b11 == 0 else {
+            throw makeError(.malformedCastFlags(flags))
+        }
+        let relativeDepth: UInt32 = try parseUnsigned()
+        let sourceHeapType = try stream.parseHeapType(features: features)
+        let targetHeapType = try stream.parseHeapType(features: features)
+        return BrOnCast(
+            relativeDepth: relativeDepth,
+            sourceType: ReferenceType(isNullable: flags & 0b01 != 0, heapType: sourceHeapType),
+            targetType: ReferenceType(isNullable: flags & 0b10 != 0, heapType: targetHeapType)
+        )
+    }
     @inlinable mutating func visitBrOnNull() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
     @inlinable mutating func visitBrOnNonNull() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
 

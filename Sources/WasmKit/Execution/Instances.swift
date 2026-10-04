@@ -68,8 +68,8 @@ extension EntityHandle: ValidatableEntity where T: ValidatableEntity, T: ~Copyab
 }
 
 package struct InstanceEntity /* : ~Copyable */ {
-    /// The canonical signature of each type in the module's type section.
-    var types: [FunctionType]
+    /// The canonical definition of each type in the module's type section.
+    var types: [SubType]
     /// The canonical type ID of each type in the module's type section.
     var typeIDs: [InternedFuncType]
     var functions: ImmutableArray<InternalFunction>
@@ -241,7 +241,7 @@ public struct Instance {
                 // Print slot space information
                 let localTypes = code.withValue { $0.locals }
                 let stackLayout = try StackLayout(
-                    type: store.engine.funcTypeInterner.resolve(function.type),
+                    type: store.engine.typeRegistry.resolve(function.type),
                     locals: localTypes,
                     codeSize: code.expression.count
                 )
@@ -346,32 +346,31 @@ struct TableEntity: ~Copyable {
     /// The raw slot value for a reference, where `0` is always null.
     ///
     /// A function address is a live `EntityHandle` pointer and so is never `0`,
-    /// which leaves `0` free to mean null without any encoding. An extern or
-    /// exception address is an embedder-chosen integer and `0` is a valid one --
-    /// the spec suite stores `(ref.extern 0)` -- so those are biased by one.
-    /// ``UntypedValue`` already reserves the top bit for null, so a valid
-    /// address is below `1 << 63` and the bias cannot wrap onto `0`.
+    /// which leaves `0` free to mean null without any encoding, and so is an
+    /// exception, which is an object in the GC heap. A reference of the internal
+    /// or external hierarchy is stored as ``UntypedValue`` encodes it, which is
+    /// never `0` for a non-null one.
     static func rawValue(_ reference: Reference) -> Int {
         switch reference {
-        case .function(let address):
+        case .function(let address), .exception(let address):
             return address ?? 0
-        case .extern(let address), .exception(let address):
-            return address.map { $0 &+ 1 } ?? 0
+        case .extern(nil), .any(nil):
+            return 0
+        case .extern, .any, .externalized:
+            return Int(truncatingIfNeeded: UntypedValue(.ref(reference)).storage)
         }
     }
 
     /// Rebuilds a typed reference from a raw slot, using the table's element type.
     static func reference(_ raw: Int, type: ReferenceType) -> Reference {
-        switch type.heapType {
-        case .abstract(.externRef):
-            return .extern(raw == 0 ? nil : raw &- 1)
-        case .abstract(.exnRef):
-            return .exception(raw == 0 ? nil : raw &- 1)
-        case .abstract(.funcRef), .concrete:
+        switch type.heapType.topType {
+        case .funcRef:
             return .function(raw == 0 ? nil : raw)
-        case .abstract(.any), .abstract(.eq), .abstract(.i31), .abstract(.structRef), .abstract(.arrayRef),
-            .abstract(.noneRef), .abstract(.noExtern), .abstract(.noFunc), .abstract(.noExn):
-            preconditionFailure("GC reference type \(type) is not supported yet")
+        case .exnRef:
+            return .exception(raw == 0 ? nil : raw)
+        default:
+            let value = raw == 0 ? UntypedValue.nullReference : UntypedValue(storage: UInt64(UInt(bitPattern: raw)))
+            return value.asReference(type)
         }
     }
 
@@ -576,9 +575,17 @@ public struct Table: Equatable {
 
     /// Accesses the element at the given index.
     public subscript(index: Int) -> Reference {
-        get { handle.withValue { $0.reference(at: index) } }
+        get {
+            guard case .ref(let reference) = allocator.gcHeap.exporting(.ref(handle.withValue { $0.reference(at: index) })) else {
+                preconditionFailure()
+            }
+            return reference
+        }
         nonmutating set {
-            handle.withValue { $0.elements[index] = TableEntity.rawValue(newValue) }
+            guard case .ref(let reference)? = try? allocator.gcHeap.importing(.ref(newValue)) else {
+                preconditionFailure("\(newValue) refers to an object that has been unrooted")
+            }
+            handle.withValue { $0.elements[index] = TableEntity.rawValue(reference) }
         }
     }
 }
@@ -1146,8 +1153,8 @@ struct GlobalEntity /* : ~Copyable */ {
         }
     }
 
-    init(globalType: GlobalType, initialValue: Value) throws {
-        try initialValue.checkType(globalType.valueType)
+    init(globalType: GlobalType, initialValue: Value, heap: GCHeap) throws {
+        try initialValue.checkType(globalType.valueType, heap: heap)
         self.rawStorage = GlobalEntity.rawStorage(of: initialValue)
         self.globalType = globalType
     }
@@ -1170,7 +1177,7 @@ public struct Global: Equatable {
 
     /// The value of the global instance.
     public var value: Value {
-        handle.value
+        allocator.gcHeap.exporting(handle.value)
     }
 
     /// Assigns a new value to the global instance.
@@ -1182,7 +1189,8 @@ public struct Global: Equatable {
             guard global.globalType.mutability == .variable else {
                 throw Trap(.cannotAssignToImmutableGlobal)
             }
-            try value.checkType(global.globalType.valueType)
+            let value = try allocator.gcHeap.importing(value)
+            try value.checkType(global.globalType.valueType, heap: allocator.gcHeap)
             global.value = value
         }
     }
@@ -1224,7 +1232,7 @@ public struct Global: Equatable {
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
     public init(store: Store, type: GlobalType, value: Value) throws {
-        let handle = try store.allocator.allocate(globalType: type, initialValue: value)
+        let handle = try store.allocator.allocate(globalType: type, initialValue: store.allocator.gcHeap.importing(value))
         self.init(handle: handle, allocator: store.allocator)
     }
 }
@@ -1348,7 +1356,7 @@ enum InternalExternalValue {
 
 extension InternalInstance {
     var instructionMapping: DebuggerInstructionMapping { withValue { $0.instructionMapping } }
-    var types: [FunctionType] { withValue { $0.types } }
+    var types: [SubType] { withValue { $0.types } }
     var typeCanonicalizer: TypeCanonicalizer { TypeCanonicalizer(typeIDs: withValue { $0.typeIDs }) }
     var functions: ImmutableArray<InternalFunction> { withValue { $0.functions } }
     var tables: ImmutableArray<InternalTable> { withValue { $0.tables } }

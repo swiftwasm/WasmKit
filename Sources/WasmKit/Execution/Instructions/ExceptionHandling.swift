@@ -29,8 +29,7 @@ extension Execution {
         if ref.isNullRef {
             throw Trap(.message(.init("null exception reference")))
         }
-        let exception = getException(at: Int(ref.i64))
-        throw exception
+        throw store.value.allocator.gcHeap.exception(UInt32(truncatingIfNeeded: ref.storage))
     }
 
     /// Register exception handlers for a `try_table` block.
@@ -70,7 +69,7 @@ extension Execution {
     mutating func handleException(
         _ exception: WasmKitException,
         sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms
-    ) -> Bool {
+    ) throws -> Bool {
         // Search from the top of the handler stack (most recently registered)
         while let handler = exceptionHandlers.last {
             exceptionHandlers.removeLast()
@@ -111,12 +110,12 @@ extension Execution {
                 }
                 // For catch_ref, also write the exnref after the payload
                 if handler.isRef {
-                    let exnAddr = storeException(exception)
+                    let exnAddr = try storeException(exception, tag: handlerTag)
                     sp[i64: handler.payloadRegBase + slotOffset] = UntypedValue(.ref(.exception(exnAddr))).storage
                 }
             } else if handler.isRef {
                 // catch_all_ref: write exnref at the base
-                let exnAddr = storeException(exception)
+                let exnAddr = try storeException(exception, tag: nil)
                 sp[i64: handler.payloadRegBase] = UntypedValue(.ref(.exception(exnAddr))).storage
             }
             // catch_all without ref: nothing to write
@@ -126,15 +125,14 @@ extension Execution {
         return false
     }
 
-    /// Store an exception and return its address for use as an `exnref`.
-    private mutating func storeException(_ exception: WasmKitException) -> ExceptionAddress {
-        let addr = storedExceptions.count
-        storedExceptions.append(exception)
-        return addr
-    }
-
-    /// Get a stored exception by its address.
-    func getException(at address: Int) -> WasmKitException {
-        return storedExceptions[address]
+    /// Stores an exception in the GC heap and returns it as an `exnref`, the
+    /// object's offset. `tag` is the tag the exception was caught by, if any.
+    private func storeException(_ exception: WasmKitException, tag: InternalTag?) throws -> ExceptionAddress {
+        // A catch_all_ref clause does not name the tag, but the exception's tag
+        // identity is the tag entity's address.
+        let tag = tag ?? InternalTag(bitPattern: UInt(bitPattern: exception.tagIdentity)).unsafelyUnwrapped
+        let object = try store.value.allocator.gcHeap.allocateException(
+            exception, tagType: tag.type, resourceLimiter: store.value.resourceLimiter)
+        return ExceptionAddress(object)
     }
 }

@@ -3,6 +3,12 @@
 /// NOTE: This type assumes any non-null references can be represented as a
 ///       63-bits unsigned integer. This assumption allows us to use the
 ///       same storage space for all value types.
+///
+/// A null reference of any type has bit 63 set. A non-null reference of the
+/// internal (`any`) and external (`extern`) hierarchies shares one encoding,
+/// so that `any.convert_extern` and `extern.convert_any` leave its bits alone:
+/// its low two bits are `01` or `11` for an `i31ref` (see ``AnyRef``), and
+/// `10` for a host's external value shifted left by two.
 struct UntypedValue: Equatable, Hashable {
     /// The internal storage of the value.
     let storage: UInt64
@@ -80,8 +86,14 @@ struct UntypedValue: Equatable, Hashable {
         case .v128:
             assertionFailure("v128 cannot be represented in UntypedValue; use stack-slot based storage")
             storage = 0
-        case .ref(.function(let value)), .ref(.extern(let value)), .ref(.exception(let value)):
+        case .ref(.function(let value)), .ref(.exception(let value)):
             storage = encodeOptionalInt(value)
+        case .ref(.extern(let value)):
+            storage = value.map { AnyRef(internalizing: $0).storage } ?? Self.isNullMaskPattern
+        case .ref(.any(let reference)):
+            storage = reference?.storage ?? Self.isNullMaskPattern
+        case .ref(.externalized(let reference)):
+            storage = reference.storage
         }
     }
 
@@ -121,17 +133,20 @@ struct UntypedValue: Equatable, Hashable {
             guard storage & Self.isNullMaskPattern == 0 else { return nil }
             return Int(storage)
         }
-        switch type.heapType {
-        case .abstract(.funcRef), .concrete:
-            // A concrete heap type is always a function type.
+        switch type.heapType.topType {
+        case .funcRef:
             return .function(decodeOptionalInt())
-        case .abstract(.externRef):
-            return .extern(decodeOptionalInt())
-        case .abstract(.exnRef):
+        case .exnRef:
             return .exception(decodeOptionalInt())
-        case .abstract(.any), .abstract(.eq), .abstract(.i31), .abstract(.structRef), .abstract(.arrayRef),
-            .abstract(.noneRef), .abstract(.noExtern), .abstract(.noFunc), .abstract(.noExn):
-            preconditionFailure("GC reference type \(type) is not supported yet")
+        case .externRef:
+            guard !isNullRef else { return .extern(nil) }
+            let reference = AnyRef(storage: storage)
+            if let value = reference.internalizedValue {
+                return .extern(value)
+            }
+            return .externalized(reference)
+        default:
+            return .any(isNullRef ? nil : AnyRef(storage: storage))
         }
     }
 

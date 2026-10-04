@@ -177,6 +177,7 @@ func parseTextInstruction<V: InstructionVisitor>(
     case "ref.func":
         let (functionIndex) = try expressionParser.visitRefFunc(wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitRefFunc(functionIndex: functionIndex) }
+    case "ref.eq": return { visitor throws(V.VisitorError) in return try visitor.visitRefEq() }
     case "ref.as_non_null": return { visitor throws(V.VisitorError) in return try visitor.visitRefAsNonNull() }
     case "br_on_null":
         let (relativeDepth) = try expressionParser.visitBrOnNull(wat: &wat)
@@ -887,6 +888,75 @@ func parseTextInstruction<V: InstructionVisitor>(
     case "i16x8.relaxed_q15mulr_s": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i16x8RelaxedQ15MulrS) }
     case "i16x8.relaxed_dot_i8x16_i7x16_s": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i16x8RelaxedDotI8X16I7X16S) }
     case "i32x4.relaxed_dot_i8x16_i7x16_add_s": return { visitor throws(V.VisitorError) in return try visitor.visitSimd(.i32x4RelaxedDotI8X16I7X16AddS) }
+    case "struct.new":
+        let (typeIndex) = try expressionParser.visitStructNew(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitStructNew(typeIndex: typeIndex) }
+    case "struct.new_default":
+        let (typeIndex) = try expressionParser.visitStructNewDefault(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitStructNewDefault(typeIndex: typeIndex) }
+    case "struct.get":
+        let (typeIndex, fieldIndex) = try expressionParser.visitStructGet(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitStructGet(typeIndex: typeIndex, fieldIndex: fieldIndex) }
+    case "struct.get_s":
+        let (typeIndex, fieldIndex) = try expressionParser.visitStructGetS(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitStructGetS(typeIndex: typeIndex, fieldIndex: fieldIndex) }
+    case "struct.get_u":
+        let (typeIndex, fieldIndex) = try expressionParser.visitStructGetU(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitStructGetU(typeIndex: typeIndex, fieldIndex: fieldIndex) }
+    case "struct.set":
+        let (typeIndex, fieldIndex) = try expressionParser.visitStructSet(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitStructSet(typeIndex: typeIndex, fieldIndex: fieldIndex) }
+    case "array.new":
+        let (typeIndex) = try expressionParser.visitArrayNew(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitArrayNew(typeIndex: typeIndex) }
+    case "array.new_default":
+        let (typeIndex) = try expressionParser.visitArrayNewDefault(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitArrayNewDefault(typeIndex: typeIndex) }
+    case "array.new_fixed":
+        let (typeIndex, size) = try expressionParser.visitArrayNewFixed(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitArrayNewFixed(typeIndex: typeIndex, size: size) }
+    case "array.new_data":
+        let (typeIndex, dataIndex) = try expressionParser.visitArrayNewData(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitArrayNewData(typeIndex: typeIndex, dataIndex: dataIndex) }
+    case "array.new_elem":
+        let (typeIndex, elemIndex) = try expressionParser.visitArrayNewElem(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitArrayNewElem(typeIndex: typeIndex, elemIndex: elemIndex) }
+    case "array.get":
+        let (typeIndex) = try expressionParser.visitArrayGet(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitArrayGet(typeIndex: typeIndex) }
+    case "array.get_s":
+        let (typeIndex) = try expressionParser.visitArrayGetS(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitArrayGetS(typeIndex: typeIndex) }
+    case "array.get_u":
+        let (typeIndex) = try expressionParser.visitArrayGetU(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitArrayGetU(typeIndex: typeIndex) }
+    case "array.set":
+        let (typeIndex) = try expressionParser.visitArraySet(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitArraySet(typeIndex: typeIndex) }
+    case "array.len": return { visitor throws(V.VisitorError) in return try visitor.visitArrayLen() }
+    case "array.fill":
+        let (typeIndex) = try expressionParser.visitArrayFill(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitArrayFill(typeIndex: typeIndex) }
+    case "array.copy":
+        let (dstType, srcType) = try expressionParser.visitArrayCopy(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitArrayCopy(dstType: dstType, srcType: srcType) }
+    case "array.init_data":
+        let (typeIndex, dataIndex) = try expressionParser.visitArrayInitData(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitArrayInitData(typeIndex: typeIndex, dataIndex: dataIndex) }
+    case "array.init_elem":
+        let (typeIndex, elemIndex) = try expressionParser.visitArrayInitElem(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitArrayInitElem(typeIndex: typeIndex, elemIndex: elemIndex) }
+    case "br_on_cast":
+        let (cast) = try expressionParser.visitBrOnCast(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitBrOnCast(cast: cast) }
+    case "br_on_cast_fail":
+        let (cast) = try expressionParser.visitBrOnCastFail(wat: &wat)
+        return { visitor throws(V.VisitorError) in return try visitor.visitBrOnCastFail(cast: cast) }
+    case "any.convert_extern": return { visitor throws(V.VisitorError) in return try visitor.visitAnyConvertExtern() }
+    case "extern.convert_any": return { visitor throws(V.VisitorError) in return try visitor.visitExternConvertAny() }
+    case "ref.i31": return { visitor throws(V.VisitorError) in return try visitor.visitRefI31() }
+    case "i31.get_s": return { visitor throws(V.VisitorError) in return try visitor.visitI31GetS() }
+    case "i31.get_u": return { visitor throws(V.VisitorError) in return try visitor.visitI31GetU() }
     default: return nil
     }
 }

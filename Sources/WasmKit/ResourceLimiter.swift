@@ -16,6 +16,14 @@ public protocol ResourceLimiter: AnyObject, Sendable {
     /// - Returns: `true` if the table growth should be allowed. `false` if
     ///   the table growth should be denied.
     func limitTableGrowth(to desired: Int) throws -> Bool
+
+    /// Limit the growth of a store's GC heap, where the structs and arrays of
+    /// the WebAssembly GC proposal live, to the specified number of bytes.
+    ///
+    /// - Parameter desired: The desired size of the GC heap in bytes.
+    /// - Returns: `true` if the growth should be allowed. `false` if the
+    ///   growth should be denied, which traps the allocation that needed it.
+    func limitGCHeapGrowth(to desired: Int) throws -> Bool
 }
 
 // By default, we don't limit resource growth.
@@ -24,6 +32,9 @@ extension ResourceLimiter {
         return true
     }
     public func limitTableGrowth(to desired: Int) throws -> Bool {
+        return true
+    }
+    public func limitGCHeapGrowth(to desired: Int) throws -> Bool {
         return true
     }
 }

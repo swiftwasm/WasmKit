@@ -94,17 +94,22 @@ public struct Function: Equatable {
         _ body: @escaping Implementation, results: [ValueType]
     ) -> RawImplementation {
         { caller, parameters, out in
-            let produced = try body(caller, Array(parameters))
-            guard produced.count == results.count else {
-                throw Trap(.resultTypesMismatch(expected: results, got: produced))
-            }
-            for index in 0..<produced.count {
-                do {
-                    try produced[index].checkType(results[index])
-                } catch {
+            let heap = caller.store.allocator.gcHeap
+            // The host's handles to the parameters' objects last as long as the call.
+            try heap.withRootScope {
+                let produced = try body(caller, parameters.map(heap.exporting))
+                guard produced.count == results.count else {
                     throw Trap(.resultTypesMismatch(expected: results, got: produced))
                 }
-                out[index] = produced[index]
+                for index in 0..<produced.count {
+                    let value = try heap.importing(produced[index])
+                    do {
+                        try value.checkType(results[index], heap: heap)
+                    } catch {
+                        throw Trap(.resultTypesMismatch(expected: results, got: produced))
+                    }
+                    out[index] = value
+                }
             }
         }
     }
@@ -124,7 +129,7 @@ public struct Function: Equatable {
 
     /// The signature type of the function.
     public var type: FunctionType {
-        store.allocator.funcTypeInterner.resolve(handle.type)
+        store.allocator.typeRegistry.resolve(handle.type)
     }
 
     /// Invokes a function of the given address with the given parameters.
@@ -234,14 +239,16 @@ extension InternalFunction {
         if isWasm {
             let entity = wasm
             let resolvedType = store.engine.resolveType(entity.type)
-            try check(functionType: resolvedType, parameters: arguments)
+            let heap = store.allocator.gcHeap
+            let arguments = try arguments.map(heap.importing)
+            try check(functionType: resolvedType, parameters: arguments, heap: heap)
             return try executeWasm(
                 store: store,
                 function: self,
                 type: resolvedType,
                 arguments: arguments,
                 stack: &stack
-            )
+            ).map(heap.exporting)
         } else {
             // A host function does not run on the guest stack at all.
             return try invokeHost(arguments, store: store)
@@ -251,7 +258,7 @@ extension InternalFunction {
     private func invokeHost(_ arguments: [Value], store: Store) throws -> [Value] {
         let entity = host
         let resolvedType = store.engine.resolveType(entity.type)
-        try check(functionType: resolvedType, parameters: arguments)
+        try check(functionType: resolvedType, parameters: arguments, heap: store.allocator.gcHeap)
         let caller = Caller(instanceHandle: nil, store: store)
         var results = [Value](repeating: .i32(0), count: resolvedType.results.count)
         let implementation = entity.implementation
@@ -260,23 +267,23 @@ extension InternalFunction {
                 try implementation(caller, parameters, out)
             }
         }
-        try check(functionType: resolvedType, results: results)
+        try check(functionType: resolvedType, results: results, heap: store.allocator.gcHeap)
         return results
     }
 
-    private func check(expectedTypes: [ValueType], values: [Value]) -> Bool {
+    private func check(expectedTypes: [ValueType], values: [Value], heap: GCHeap) -> Bool {
         guard expectedTypes.count == values.count else { return false }
-        return zip(values, expectedTypes).allSatisfy { $0.matches($1) }
+        return zip(values, expectedTypes).allSatisfy { $0.matches($1, heap: heap) }
     }
 
-    private func check(functionType: FunctionType, parameters: [Value]) throws {
-        guard check(expectedTypes: functionType.parameters, values: parameters) else {
+    private func check(functionType: FunctionType, parameters: [Value], heap: GCHeap) throws {
+        guard check(expectedTypes: functionType.parameters, values: parameters, heap: heap) else {
             throw Trap(.parameterTypesMismatch(expected: functionType.parameters, got: parameters))
         }
     }
 
-    private func check(functionType: FunctionType, results: [Value]) throws {
-        guard check(expectedTypes: functionType.results, values: results) else {
+    private func check(functionType: FunctionType, results: [Value], heap: GCHeap) throws {
+        guard check(expectedTypes: functionType.results, values: results, heap: heap) else {
             throw Trap(.resultTypesMismatch(expected: functionType.results, got: results))
         }
     }
@@ -353,7 +360,8 @@ struct WasmFunctionEntity {
             try InstructionTranslator(
                 allocator: store.allocator.iseqAllocator,
                 engineConfiguration: engine.configuration,
-                funcTypeInterner: engine.funcTypeInterner,
+                typeRegistry: engine.typeRegistry,
+                stackMapTable: store.allocator.gcHeap.stackMapTable,
                 module: instance,
                 type: engine.resolveType(type),
                 locals: code.locals,

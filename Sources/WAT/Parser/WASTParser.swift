@@ -3,6 +3,8 @@ import WasmTypes
 
 protocol WASTConstInstructionVisitor: InstructionVisitor {
     mutating func visitRefExtern(value: UInt32) throws(WatParserError)
+    /// Visits `ref.host`, the script notation for a host value that was internalized into `anyref`.
+    mutating func visitRefHost(value: UInt32) throws(WatParserError)
 }
 
 /// A parser for WAST format.
@@ -71,6 +73,9 @@ struct WASTParser {
         func visitRefExtern(value: UInt32) throws(WatParserError) {
             addValue(.refExtern(value: value))
         }
+        func visitRefHost(value: UInt32) throws(WatParserError) {
+            addValue(.refHost(value: value))
+        }
     }
 
     mutating func argumentValues() throws(WatParserError) -> [WASTConstValue] {
@@ -95,6 +100,7 @@ struct WASTParser {
             case .refNull(let heapTy): value = .refNull(heapTy)
             case .refFunc(let index): value = .refFunc(functionIndex: index)
             case .refExtern(let v): value = .refExtern(value: v)
+            case .refHost(let v): value = .refHost(value: v)
             }
             values.append(value)
         })
@@ -156,6 +162,8 @@ public enum WASTConstValue {
     case refNull(HeapType)
     case refFunc(functionIndex: UInt32)
     case refExtern(value: UInt32)
+    /// A host value internalized into `anyref`, written `(ref.host N)`.
+    case refHost(value: UInt32)
 }
 
 public struct WASTInvoke {
@@ -210,6 +218,18 @@ public enum WASTExpectValue {
     /// A value that is expected to be a non-null reference
     /// to an extern, optionally with a specific value.
     case refExtern(value: UInt32?)
+    /// A value that is expected to be a non-null reference to a struct.
+    case refStruct
+    /// A value that is expected to be a non-null reference to an array.
+    case refArray
+    /// A value that is expected to be a non-null `eqref`: an i31, a struct or an array.
+    case refEq
+    /// A value that is expected to be a non-null `i31ref`.
+    case refI31
+    /// A value that is expected to be any non-null internal reference.
+    case refAny
+    /// A value that is expected to be the host value with the given number, internalized into `anyref`.
+    case refHost(value: UInt32)
     /// A value that is expected to be a canonical NaN.
     /// Corresponds to `f32.const nan:canonical` in WAST.
     case f32CanonicalNaN

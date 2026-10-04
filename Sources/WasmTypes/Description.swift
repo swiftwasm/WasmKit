@@ -96,7 +96,20 @@ extension Reference: CustomStringConvertible {
         case .function(let address): return "funcref(\(addressDescription(address)))"
         case .extern(let address): return "externref(\(addressDescription(address)))"
         case .exception(let address): return "exnref(\(addressDescription(address)))"
+        case .any(let reference): return "anyref(\(reference.map { "\($0)" } ?? "null"))"
+        case .externalized(let reference): return "externref(\(reference))"
         }
+    }
+}
+
+extension AnyRef: CustomStringConvertible {
+    public var description: String {
+        if let i31 {
+            return "i31(\(i31))"
+        } else if let internalizedValue {
+            return "host(\(internalizedValue))"
+        }
+        return "object"
     }
 }
 

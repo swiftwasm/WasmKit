@@ -189,6 +189,22 @@ public struct BrTable: Equatable, Sendable {
     }
 }
 
+/// The immediates of `br_on_cast` and `br_on_cast_fail`.
+public struct BrOnCast: Equatable, Sendable {
+    /// The label to branch to.
+    public let relativeDepth: UInt32
+    /// The type of the operand.
+    public let sourceType: ReferenceType
+    /// The type the operand is cast to.
+    public let targetType: ReferenceType
+
+    public init(relativeDepth: UInt32, sourceType: ReferenceType, targetType: ReferenceType) {
+        self.relativeDepth = relativeDepth
+        self.sourceType = sourceType
+        self.targetType = targetType
+    }
+}
+
 /// A custom section in a module
 public struct CustomSection: Equatable, Sendable {
     public let name: String

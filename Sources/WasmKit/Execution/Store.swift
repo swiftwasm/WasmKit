@@ -87,8 +87,10 @@ public final class Store {
     /// Create a new store associated with the given engine.
     public init(engine: Engine) {
         self.engine = engine
-        self.allocator = StoreAllocator(funcTypeInterner: engine.funcTypeInterner)
+        self.allocator = StoreAllocator(
+            typeRegistry: engine.typeRegistry, maxGCHeapSize: engine.configuration.maxGCHeapSize)
         self.isFuelMetered = engine.configuration.fuelMetering
+        allocator.gcHeap.isStressMode = engine.configuration.gcStressMode
     }
 }
 

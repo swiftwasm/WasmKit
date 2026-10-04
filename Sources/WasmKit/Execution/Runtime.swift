@@ -8,8 +8,8 @@ public final class Runtime {
     var interceptor: EngineInterceptor? {
         engine.interceptor
     }
-    var funcTypeInterner: Interner<FunctionType> {
-        engine.funcTypeInterner
+    var typeRegistry: TypeRegistry {
+        engine.typeRegistry
     }
     var configuration: EngineConfiguration {
         engine.configuration
@@ -39,10 +39,10 @@ public final class Runtime {
     }
 
     func resolveType(_ type: InternedFuncType) -> FunctionType {
-        return funcTypeInterner.resolve(type)
+        return typeRegistry.resolve(type)
     }
     func internType(_ type: FunctionType) -> InternedFuncType {
-        return funcTypeInterner.intern(type)
+        return typeRegistry.intern(type)
     }
 
     public func instantiate(module: Module) throws -> Instance {
