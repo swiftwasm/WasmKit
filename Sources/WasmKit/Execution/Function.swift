@@ -135,7 +135,8 @@ public struct Function: Equatable {
     /// - Returns: The results of the function invocation.
     @discardableResult
     public func invoke(_ arguments: [Value] = []) throws -> [Value] {
-        return try handle.invoke(arguments, store: store)
+        var stack = ExecutionStack(engine: store.engine)
+        return try handle.invoke(arguments, store: store, stack: &stack)
     }
 
     /// Invokes a function of the given address with the given parameters.
@@ -227,22 +228,6 @@ extension InternalFunction: ValidatableEntity {
 }
 
 extension InternalFunction {
-    func invoke(_ arguments: [Value], store: Store) throws -> [Value] {
-        if isWasm {
-            let entity = wasm
-            let resolvedType = store.engine.resolveType(entity.type)
-            try check(functionType: resolvedType, parameters: arguments)
-            return try executeWasm(
-                store: store,
-                function: self,
-                type: resolvedType,
-                arguments: arguments
-            )
-        } else {
-            return try invokeHost(arguments, store: store)
-        }
-    }
-
     func invoke(
         _ arguments: [Value], store: Store, stack: inout ExecutionStack
     ) throws -> [Value] {

@@ -226,7 +226,8 @@ public struct Module: Sendable {
         // Step 17.
         if let startIndex = start {
             let startFunction = try instance.functions[validating: Int(startIndex)]
-            _ = try startFunction.invoke([], store: store)
+            var stack = ExecutionStack(engine: store.engine)
+            _ = try startFunction.invoke([], store: store, stack: &stack)
         }
 
         // Compile all functions eagerly if the engine is in eager compilation mode

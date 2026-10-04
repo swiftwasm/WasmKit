@@ -232,7 +232,8 @@
             }
 
             // 2. Call underlying core function
-            let coreResults = try handle.coreFunction.invoke(coreArgs, store: store)
+            var stack = ExecutionStack(engine: store.engine)
+            let coreResults = try handle.coreFunction.invoke(coreArgs, store: store, stack: &stack)
 
             // 3. Lift return values to component values
             let results: [ComponentValue]
@@ -276,7 +277,7 @@
 
             // 4. Execute post-return if specified
             if let postReturn = handle.canonOptions.postReturn {
-                _ = try postReturn.invoke(coreResults, store: store)
+                _ = try postReturn.invoke(coreResults, store: store, stack: &stack)
             }
 
             return results
