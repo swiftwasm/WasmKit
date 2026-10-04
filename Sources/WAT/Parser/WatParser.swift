@@ -128,6 +128,8 @@ struct WatParser {
 
     struct FunctionDecl: NamedFieldDecl, ImportableModuleFieldDecl {
         var id: Name?
+        /// The name from `(@name "...")`, which the name section prefers over `id`.
+        var nameAnnotation: String?
         var exports: [String]
         var typeUse: TypeUse
         var kind: FunctionKind
@@ -231,6 +233,8 @@ struct WatParser {
 
     struct TagDecl: NamedFieldDecl, ImportableModuleFieldDecl {
         var id: Name?
+        /// The name from `(@name "...")`, which the name section prefers over `id`.
+        var nameAnnotation: String?
         var exports: [String]
         var typeUse: TypeUse
         var kind: TagKind
@@ -309,7 +313,11 @@ struct WatParser {
             let importNames = try importNames()
             if try parser.takeParenBlockStart("func") {
                 let id = try parser.takeId()
-                kind = .function(FunctionDecl(id: id, exports: [], typeUse: try typeUse(mayHaveName: true), kind: .imported(importNames)))
+                let nameAnnotation = try parser.takeNameAnnotation()
+                kind = .function(
+                    FunctionDecl(
+                        id: id, nameAnnotation: nameAnnotation, exports: [], typeUse: try typeUse(mayHaveName: true),
+                        kind: .imported(importNames)))
             } else if try parser.takeParenBlockStart("table") {
                 let id = try parser.takeId()
                 kind = .table(TableDecl(id: id, exports: [], type: try tableType(), importNames: importNames))
@@ -321,7 +329,11 @@ struct WatParser {
                 kind = .global(GlobalDecl(id: id, exports: [], type: try globalType(), kind: .imported(importNames)))
             } else if try parser.takeParenBlockStart("tag") {
                 let id = try parser.takeId()
-                kind = .tag(TagDecl(id: id, exports: [], typeUse: try typeUse(mayHaveName: false), kind: .imported(importNames)))
+                let nameAnnotation = try parser.takeNameAnnotation()
+                kind = .tag(
+                    TagDecl(
+                        id: id, nameAnnotation: nameAnnotation, exports: [], typeUse: try typeUse(mayHaveName: false),
+                        kind: .imported(importNames)))
             } else {
                 throw WatParserError("unexpected token", location: parser.lexer.location())
             }
@@ -329,6 +341,7 @@ struct WatParser {
             try parser.expect(.rightParen)  // closing paren for import
         case "func":
             let id = try parser.takeId()
+            let nameAnnotation = try parser.takeNameAnnotation()
             let exports = try inlineExports()
             let importNames = try inlineImport()
             let typeUse = try typeUse(mayHaveName: true)
@@ -339,7 +352,7 @@ struct WatParser {
                 let locals = try self.locals()
                 functionKind = .definition(locals: locals, body: parser.lexer)
             }
-            kind = .function(FunctionDecl(id: id, exports: exports, typeUse: typeUse, kind: functionKind))
+            kind = .function(FunctionDecl(id: id, nameAnnotation: nameAnnotation, exports: exports, typeUse: typeUse, kind: functionKind))
             try parser.skipParenBlock()
         case "table":
             let id = try parser.takeId()
@@ -450,6 +463,7 @@ struct WatParser {
             kind = .global(GlobalDecl(id: id, exports: exports, type: type, kind: globalKind))
         case "tag":
             let id = try parser.takeId()
+            let nameAnnotation = try parser.takeNameAnnotation()
             let exports = try inlineExports()
             let importNames = try inlineImport()
             let tagTypeUse = try typeUse(mayHaveName: false)
@@ -459,7 +473,7 @@ struct WatParser {
             } else {
                 tagKind = .definition
             }
-            kind = .tag(TagDecl(id: id, exports: exports, typeUse: tagTypeUse, kind: tagKind))
+            kind = .tag(TagDecl(id: id, nameAnnotation: nameAnnotation, exports: exports, typeUse: tagTypeUse, kind: tagKind))
             try parser.expect(.rightParen)
         case "export":
             let name = try parser.expectString()
