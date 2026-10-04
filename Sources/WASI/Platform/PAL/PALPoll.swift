@@ -54,8 +54,18 @@ enum PlatformPoll {
             guard result > 0 else {
                 throw _wasiError(fromErrno: err)
             }
-            return pollfds.map { fd in
+            return zip(pollfds, subscriptions).map { fd, subscription in
                 var state: ReadyState = []
+                #if canImport(Darwin)
+                    // Darwin's poll supports few devices besides ttys and flags
+                    // the rest, /dev/null among them, POLLNVAL although they are
+                    // open. select(2) reports such a device as always ready, so
+                    // do the same; a closed descriptor still fails F_GETFD.
+                    if fd.revents & Int16(POLLNVAL) != 0, fcntl(fd.fd, F_GETFD) != -1 {
+                        state.insert(subscription.waitWrite ? .writable : .readable)
+                        return state
+                    }
+                #endif
                 if fd.revents & Int16(POLLIN) != 0 { state.insert(.readable) }
                 if fd.revents & Int16(POLLOUT) != 0 { state.insert(.writable) }
                 if fd.revents & Int16(POLLHUP) != 0 { state.insert(.hangup) }
