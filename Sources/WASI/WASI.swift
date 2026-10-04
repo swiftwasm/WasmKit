@@ -1338,7 +1338,14 @@ final class WASIImplementation: Sendable {
         oldFd: WASIAbi.Fd, oldFlags: WASIAbi.LookupFlags, oldPath: String,
         newFd: WASIAbi.Fd, newPath: String
     ) throws {
-        throw WASIAbi.Errno.ENOTSUP
+        // Hard-linking the target of a symlink would let a link inside the
+        // sandbox name a file outside it, so following is refused as in wasmtime.
+        guard !oldFlags.contains(.SYMLINK_FOLLOW) else {
+            throw WASIAbi.Errno.EINVAL
+        }
+        let oldDirEntry = try directoryEntry(fd: oldFd)
+        let newDirEntry = try directoryEntry(fd: newFd)
+        try oldDirEntry.link(from: oldPath, toDir: newDirEntry, to: newPath)
     }
 
     /// Open a file or directory.

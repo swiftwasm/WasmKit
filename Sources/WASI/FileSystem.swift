@@ -74,6 +74,9 @@ extension WASIEntry {
     func removeDirectory(atPath path: String) throws
     func removeFile(atPath path: String) throws
     func symlink(from sourcePath: String, to destPath: String) throws
+    /// Creates a hard link at `destPath` in `newDir` to the entry at
+    /// `sourcePath`, without following a symlink there.
+    func link(from sourcePath: String, toDir newDir: any WASIDir, to destPath: String) throws
     func rename(from sourcePath: String, toDir newDir: any WASIDir, to destPath: String) throws
     func readEntries(cookie: WASIAbi.DirCookie) throws -> WASIReaddirEntries
     func attributes(path: String, symlinkFollow: Bool) throws -> WASIAbi.Filestat
@@ -82,6 +85,12 @@ extension WASIEntry {
         atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags, symlinkFollow: Bool
     ) throws
+}
+
+extension WASIDir {
+    @_spi(WASIPlatform) public func link(from sourcePath: String, toDir newDir: any WASIDir, to destPath: String) throws {
+        throw WASIAbi.Errno.ENOTSUP
+    }
 }
 
 /// A single directory entry.

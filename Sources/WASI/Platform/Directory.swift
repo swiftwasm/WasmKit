@@ -115,6 +115,19 @@ extension DirEntry: WASIDir, FdWASIEntry {
         }
     }
 
+    func link(from sourcePath: String, toDir newDir: any WASIDir, to destPath: String) throws {
+        guard let newDir = newDir as? Self else {
+            throw WASIAbi.Errno.EBADF
+        }
+        let sourceResult = try SandboxPrimitives.openParent(start: fd, path: sourcePath)
+        let destResult = try SandboxPrimitives.openParent(start: newDir.fd, path: destPath)
+        try sourceResult.withFields { sourceDir, sourceBasename in
+            try destResult.withFields { destDir, destBasename in
+                try sourceDir.createHardLink(at: sourceBasename, to: destDir, at: destBasename)
+            }
+        }
+    }
+
     func rename(from sourcePath: String, toDir newDir: any WASIDir, to destPath: String) throws {
         guard let newDir = newDir as? Self else {
             throw WASIAbi.Errno.EBADF

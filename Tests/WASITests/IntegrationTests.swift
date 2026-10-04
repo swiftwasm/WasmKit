@@ -103,7 +103,6 @@ struct IntegrationTests {
         #else
             return [
                 "WASI Rust tests": [
-                    "path_link",  // path_link is not implemented
                     "symlink_create",  // path_symlink accepts an absolute target
                 ]
             ]

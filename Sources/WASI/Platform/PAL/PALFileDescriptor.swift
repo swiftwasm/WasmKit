@@ -409,6 +409,23 @@ struct FileDescriptor: Sendable, Hashable {
         #endif
     }
 
+    /// Creates a hard link at `newPath` relative to `newDir` to the entry
+    /// at `path` relative to this descriptor, without following a symlink
+    /// there; the C equivalent is `linkat`.
+    func createHardLink(at path: String, to newDir: FileDescriptor, at newPath: String) throws {
+        #if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
+            try valueOrErrno(retryOnInterrupt: false) {
+                path.withCString { oldCStr in
+                    newPath.withCString { newCStr in
+                        linkat(rawValue, oldCStr, newDir.rawValue, newCStr, 0)
+                    }
+                }
+            }
+        #else
+            throw WASIAbi.Errno.ENOTSUP
+        #endif
+    }
+
     /// Removes a file or directory entry relative to this directory
     /// descriptor; the C equivalent is `unlinkat`.
     func remove(at path: String, options: RemoveOptions = []) throws {
