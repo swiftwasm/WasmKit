@@ -45,9 +45,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
             options.insert(.directory)
         }
 
-        if fdflags.contains(.APPEND) {
-            options.insert(.append)
-        }
+        options.formUnion(fdflags.platformOpenOptions)
 
         let mode: FileDescriptor.AccessMode
         switch (accessMode.contains(.read), accessMode.contains(.write)) {

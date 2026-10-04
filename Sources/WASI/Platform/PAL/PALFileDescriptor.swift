@@ -572,10 +572,12 @@ enum PlatformScheduler {
         #if !os(WASI)
             if flags & O_APPEND != 0 { options.insert(.append) }
             if flags & O_NONBLOCK != 0 { options.insert(.nonBlocking) }
-            if flags & O_DSYNC != 0 { options.insert(.dataSync) }
-            if flags & O_SYNC != 0 { options.insert(.fileSync) }
+            // Glibc's O_SYNC and O_RSYNC include the O_DSYNC bit, so test
+            // every bit of each rather than any of them.
+            if flags & O_DSYNC == O_DSYNC { options.insert(.dataSync) }
+            if flags & O_SYNC == O_SYNC { options.insert(.fileSync) }
             #if os(Linux)
-                if flags & O_RSYNC != 0 { options.insert(.readSync) }
+                if flags & O_RSYNC == O_RSYNC { options.insert(.readSync) }
             #endif
         #endif
         return options
