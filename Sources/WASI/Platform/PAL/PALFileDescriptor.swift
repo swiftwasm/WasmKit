@@ -389,6 +389,26 @@ struct FileDescriptor: Sendable, Hashable {
         #endif
     }
 
+    /// Sets the timestamps of a path relative to this directory descriptor;
+    /// the C equivalent is `utimensat`.
+    func setTimes(
+        at path: String, options: AtOptions = [],
+        access: FileTime = .omit, modification: FileTime = .omit
+    ) throws {
+        #if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
+            let times = ContiguousArray([_posixTimespec(access), _posixTimespec(modification)])
+            _ = try times.withUnsafeBufferPointer { timesPtr in
+                try valueOrErrno(retryOnInterrupt: false) {
+                    path.withCString {
+                        utimensat(rawValue, $0, timesPtr.baseAddress!, options.contains(.noFollow) ? AT_SYMLINK_NOFOLLOW : 0)
+                    }
+                }
+            }
+        #else
+            throw WASIAbi.Errno.ENOTSUP
+        #endif
+    }
+
     /// Removes a file or directory entry relative to this directory
     /// descriptor; the C equivalent is `unlinkat`.
     func remove(at path: String, options: RemoveOptions = []) throws {

@@ -77,17 +77,17 @@ extension DirEntry: WASIDir, FdWASIEntry {
         atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags, symlinkFollow: Bool
     ) throws {
-        let fd = try openFile(
-            symlinkFollow: symlinkFollow, path: path,
-            oflags: [], accessMode: .write, fdflags: []
+        let (access, modification) = try WASIAbi.Timestamp.platformTimeSpec(
+            atim: atim, mtim: mtim, fstFlags: fstFlags
         )
-        try withThrowing {
-            let (access, modification) = try WASIAbi.Timestamp.platformTimeSpec(
-                atim: atim, mtim: mtim, fstFlags: fstFlags
-            )
-            try fd.setTimes(access: access, modification: modification)
-        } defer: {
-            try fd.close()
+        // Following happens in the sandbox, and `utimensat` never follows a
+        // symlink in the last component itself.
+        let result =
+            symlinkFollow
+            ? try SandboxPrimitives.openParentFollowingSymlinks(start: fd, path: path)
+            : try SandboxPrimitives.openParent(start: fd, path: path)
+        try result.withFields { dir, basename in
+            try dir.setTimes(at: basename, options: .noFollow, access: access, modification: modification)
         }
     }
 

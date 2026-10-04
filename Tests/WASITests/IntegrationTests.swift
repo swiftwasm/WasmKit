@@ -105,7 +105,6 @@ struct IntegrationTests {
                 "WASI Rust tests": [
                     "path_link",  // path_link is not implemented
                     "symlink_create",  // path_symlink accepts an absolute target
-                    "symlink_filestat",  // path_filestat_set_times without SYMLINK_FOLLOW fails with LOOP on a symlink
                 ]
             ]
         #endif
