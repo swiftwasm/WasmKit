@@ -174,10 +174,12 @@ struct FileDescriptor: Sendable, Hashable {
         #endif
     }
 
-    /// Reads at the given absolute offset without changing the current offset
-    /// (except on Windows, where the CRT offers no `pread` and the offset moves).
+    /// Reads at the given absolute offset without changing the current offset.
     func read(fromAbsoluteOffset offset: Int64, into buffer: UnsafeMutableRawBufferPointer) throws -> Int {
         #if os(Windows)
+            // The CRT offers no `pread`; seek there and back.
+            let current = try seek(offset: 0, from: .current)
+            defer { _ = try? seek(offset: current, from: .start) }
             _ = try seek(offset: offset, from: .start)
             return try read(into: buffer)
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
@@ -196,6 +198,9 @@ struct FileDescriptor: Sendable, Hashable {
     /// Writes all of `buffer` at the given absolute offset.
     func writeAll(toAbsoluteOffset offset: Int64, _ buffer: UnsafeRawBufferPointer) throws -> Int {
         #if os(Windows)
+            // The CRT offers no `pwrite`; seek there and back.
+            let current = try seek(offset: 0, from: .current)
+            defer { _ = try? seek(offset: current, from: .start) }
             _ = try seek(offset: offset, from: .start)
             var written = 0
             while written < buffer.count {

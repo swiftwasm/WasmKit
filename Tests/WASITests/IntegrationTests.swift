@@ -41,9 +41,6 @@ struct IntegrationTests {
     static var skipTests: [String: Set<String>] {
         #if os(Windows)
             return [
-                "WASI C tests": [
-                    "pwrite-with-append",  // pwrite moves the file offset
-                ],
                 "WASI Rust tests": [
                     "fd_flags_set",  // fd_fdstat_set_flags cannot turn APPEND off
                     "path_filestat",  // fd_fdstat_get does not report APPEND
