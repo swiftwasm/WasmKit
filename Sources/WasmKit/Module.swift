@@ -63,7 +63,7 @@ public struct Module: Sendable {
     public let imports: [Import]
     public let exports: [Export]
     public let customSections: [CustomSection]
-    public let types: [FunctionType]
+    let types: TypeSection
 
     let moduleImports: ModuleImports
     let importedFunctionTypes: [TypeIndex]
@@ -77,7 +77,7 @@ public struct Module: Sendable {
     let dataCount: UInt32?
 
     init(
-        types: [FunctionType],
+        types: TypeSection,
         functions: [GuestFunction],
         elements: [ElementSegment],
         data: [DataSegment],
@@ -126,11 +126,11 @@ public struct Module: Sendable {
         self.tagTypes = tagTypes + tags.map { $0.type }
     }
 
-    static func resolveType(_ index: TypeIndex, typeSection: [FunctionType]) throws(WasmKitError) -> FunctionType {
-        guard Int(index) < typeSection.count else {
-            throw WasmKitError("Type index \(index) is out of range")
-        }
-        return typeSection[Int(index)]
+    /// Returns the function type that the given type index defines, or `nil` if the index is out of
+    /// range or defines a non-function type.
+    @_spi(Fuzzing) @_spi(OnlyForCLI)
+    public func functionType(at index: UInt32) -> FunctionType? {
+        try? types.functionType(at: index)
     }
 
     internal func resolveFunctionType(_ index: FunctionIndex) throws(WasmKitError) -> FunctionType {
@@ -138,10 +138,7 @@ public struct Module: Sendable {
             throw WasmKitError("Function index \(index) is out of range")
         }
         if Int(index) < self.moduleImports.numberOfFunctions {
-            return try Self.resolveType(
-                importedFunctionTypes[Int(index)],
-                typeSection: types
-            )
+            return try types.functionType(at: importedFunctionTypes[Int(index)])
         }
         return functions[Int(index) - self.moduleImports.numberOfFunctions].type
     }
@@ -356,6 +353,46 @@ typealias LocalIndex = UInt32
 typealias LabelIndex = UInt32
 
 // MARK: - Module Entities
+
+/// The type definitions of a module.
+///
+/// This hides how the definitions are stored from the rest of the runtime, so that the storage only GC
+/// types need can be opted out later.
+struct TypeSection: Sendable {
+    /// The recursive groups in the order the type section declares them.
+    let recursiveGroups: [RecursiveGroup]
+    /// The definitions of every group in order, so that a type index addresses one directly.
+    private let definitions: [SubType]
+
+    init(_ recursiveGroups: [RecursiveGroup]) {
+        self.recursiveGroups = recursiveGroups
+        self.definitions = recursiveGroups.flatMap(\.types)
+    }
+
+    /// The number of type indices the section defines.
+    var count: Int { definitions.count }
+
+    /// Resolves a type index that must name a function type.
+    func functionType(at index: TypeIndex) throws(WasmKitError) -> FunctionType {
+        guard Int(index) < definitions.count else {
+            throw WasmKitError("Type index \(index) is out of range")
+        }
+        guard case .function(let type) = definitions[Int(index)].body else {
+            throw WasmKitError("Type index \(index) does not define a function type")
+        }
+        return type
+    }
+
+    /// The function type of every definition, for a module that ``ModuleValidator`` accepted.
+    var functionTypes: [FunctionType] {
+        definitions.map {
+            guard case .function(let type) = $0.body else {
+                preconditionFailure("Internal consistency error: GC type definition passed validation")
+            }
+            return type
+        }
+    }
+}
 
 /// An executable function representation in a module
 /// > Note:

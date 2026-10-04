@@ -184,7 +184,7 @@ import WasmTypes
 
     @Test(arguments: [AbstractHeapType.funcRef, .externRef])
     func nonNullableFuncAndExternNeedFunctionReferences(heapType: AbstractHeapType) throws {
-        let typeSection: [UInt8] = [0x01, 0x60, 0x01, 0x64, heapType.rawValue, 0x00]
+        let typeSection: [UInt8] = [0x01, 0x60, 0x01, 0x64, heapType.binaryEncoding, 0x00]
         let gcAlone = Self.errorMessage { _ = try typeGroups(typeSection, features: .gc) }
         #expect(gcAlone == "malformed value type: 100")
         #expect(

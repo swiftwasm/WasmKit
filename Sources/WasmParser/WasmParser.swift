@@ -389,7 +389,7 @@ extension ByteStream {
             guard features.contains(.exceptionHandling) else { return nil }
             return ReferenceType(isNullable: true, heapType: .abstract(.noExn))
         case 0x6A...0x6E, 0x71...0x73:
-            guard features.contains(.gc), let heapType = AbstractHeapType(rawValue: byte) else { return nil }
+            guard features.contains(.gc), let heapType = AbstractHeapType(binaryEncoding: byte) else { return nil }
             return ReferenceType(isNullable: true, heapType: .abstract(heapType))
         case 0x6F: return .externRef
         case 0x70: return .funcRef
@@ -415,7 +415,7 @@ extension ByteStream {
         case 0x74 where features.contains(.exceptionHandling),
             .some(0x6A...0x6E) where features.contains(.gc),
             .some(0x71...0x73) where features.contains(.gc):
-            if let b, let heapType = AbstractHeapType(rawValue: b) {
+            if let b, let heapType = AbstractHeapType(binaryEncoding: b) {
                 _ = try consumeAny()
                 return .abstract(heapType)
             }

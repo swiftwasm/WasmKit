@@ -12,8 +12,8 @@ import WasmParser
     }
 
     @Test(arguments: ["any", "eq", "i31", "struct", "array", "none", "noextern", "nofunc", "noexn"])
-    func parseRefusesHeapTypeInFunctionType(_ heapType: String) throws {
-        try Self.expectParseError(
+    func validatorRefusesHeapTypeInFunctionType(_ heapType: String) throws {
+        try Self.expectValidationError(
             RefusedModule(
                 testDescription: heapType,
                 wat: "(module (type (func (param (ref null \(heapType))))))",
@@ -30,8 +30,22 @@ import WasmParser
     ].map { RefusedModule(testDescription: $0, wat: $1, message: "GC type definitions are not implemented yet") }
 
     @Test(arguments: gcTypeDefinitions)
-    func parseRefusesGCTypeDefinition(_ module: RefusedModule) throws {
-        try Self.expectParseError(module)
+    func validatorRefusesGCTypeDefinition(_ module: RefusedModule) throws {
+        try Self.expectValidationError(module)
+    }
+
+    @Test func parseRefusesFunctionOfStructType() {
+        // (module (type (struct)) (func (type 0))), which wat2wasm refuses to encode.
+        let bytes: [UInt8] = [
+            0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
+            0x01, 0x03, 0x01, 0x5F, 0x00,
+            0x03, 0x02, 0x01, 0x00,
+            0x0A, 0x04, 0x01, 0x02, 0x00, 0x0B,
+        ]
+        let error = #expect(throws: WasmKitError.self) {
+            try parseWasm(bytes: bytes, features: .all)
+        }
+        #expect(Self.messageText(error) == "Type index 0 does not define a function type")
     }
 
     @Test func parseAdmitsSingletonRecGroupOfFinalFunction() throws {
@@ -83,8 +97,8 @@ import WasmParser
     ]
 
     @Test(arguments: modulesWithGCHeapTypes)
-    func parseRefusesHeapType(_ module: RefusedModule) throws {
-        try Self.expectParseError(module)
+    func validatorRefusesHeapType(_ module: RefusedModule) throws {
+        try Self.expectValidationError(module)
     }
 
     static let functionsWithGCHeapTypes: [RefusedModule] = [
@@ -138,12 +152,12 @@ import WasmParser
         #expect(Self.messageText(error) == "heap type any is not implemented yet")
     }
 
-    private static func expectParseError(
+    private static func expectValidationError(
         _ module: RefusedModule, sourceLocation: SourceLocation = #_sourceLocation
     ) throws {
-        let bytes = try wat2wasm(module.wat, features: module.features)
+        let parsed = try parseWasm(bytes: wat2wasm(module.wat, features: module.features), features: module.features)
         let error = #expect(throws: WasmKitError.self, sourceLocation: sourceLocation) {
-            try parseWasm(bytes: bytes, features: module.features)
+            try parsed.instantiate(store: Store(engine: Engine()))
         }
         #expect(Self.messageText(error) == module.message, sourceLocation: sourceLocation)
     }

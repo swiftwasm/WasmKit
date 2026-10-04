@@ -139,7 +139,7 @@ extension ReferenceType: WasmEncodable {
     package func encode(to encoder: inout Encoder) {
         switch (isNullable, heapType) {
         // Use short form when available
-        case (true, .abstract(let abstract)): encoder.output.append(abstract.rawValue)
+        case (true, .abstract(let abstract)): encoder.output.append(abstract.binaryEncoding)
         default:
             encoder.output.append(isNullable ? 0x63 : 0x64)
             encoder.encode(heapType)
@@ -150,7 +150,7 @@ extension ReferenceType: WasmEncodable {
 extension HeapType: WasmEncodable {
     package func encode(to encoder: inout Encoder) {
         switch self {
-        case .abstract(let abstract): encoder.output.append(abstract.rawValue)
+        case .abstract(let abstract): encoder.output.append(abstract.binaryEncoding)
         case .concrete(let typeIndex):
             // Note that the typeIndex is decoded as s33,
             // so we need to encode it as signed.

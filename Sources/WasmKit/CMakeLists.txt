@@ -4,7 +4,6 @@ add_wasmkit_library(WasmKit
   Module.swift
   ModuleParser.swift
   ModuleParser+FileSystem.swift
-  GCRefusal.swift
   SIMDOpcode.swift
   Translator.swift
   Validator.swift

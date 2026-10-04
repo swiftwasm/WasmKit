@@ -14,36 +14,35 @@ public struct FunctionType: Equatable, Hashable, Sendable {
     public let results: [ValueType]
 }
 
-/// An abstract heap type. The raw value is the type's binary encoding.
 public enum AbstractHeapType: UInt8, Equatable, Hashable, Sendable {
     /// A reference to any kind of function.
-    case funcRef = 0x70  // -> to be renamed func
+    case funcRef  // -> to be renamed func
 
     /// An external host data.
-    case externRef = 0x6F  // -> to be renamed extern
+    case externRef  // -> to be renamed extern
 
     /// A reference to an exception.
-    case exnRef = 0x69
+    case exnRef
 
     /// The top of the GC hierarchy of internal references.
-    case any = 0x6E
+    case any
     /// A reference that `ref.eq` can compare: an `i31`, a struct or an array.
-    case eq = 0x6D
+    case eq
     /// An unboxed 31-bit integer.
-    case i31 = 0x6C
+    case i31
     /// A reference to a GC struct.
-    case structRef = 0x6B
+    case structRef
     /// A reference to a GC array.
-    case arrayRef = 0x6A
+    case arrayRef
     /// The bottom of the GC hierarchy of internal references. `none` would read as `nil` in an
     /// `AbstractHeapType?` context.
-    case noneRef = 0x71
+    case noneRef
     /// The bottom of the external hierarchy.
-    case noExtern = 0x72
+    case noExtern
     /// The bottom of the function hierarchy.
-    case noFunc = 0x73
+    case noFunc
     /// The bottom of the exception hierarchy.
-    case noExn = 0x74
+    case noExn
 }
 
 public enum HeapType: Equatable, Hashable, Sendable {

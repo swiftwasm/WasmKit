@@ -281,7 +281,7 @@ extension StoreAllocator {
     ) throws -> InternalInstance {
         // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
 
-        let canonicalizer = try TypeCanonicalizer(typeSection: module.types, interner: funcTypeInterner)
+        let canonicalizer = try TypeCanonicalizer(typeSection: module.types.functionTypes, interner: funcTypeInterner)
         var importedFunctions: [InternalFunction] = []
         var importedTables: [InternalTable] = []
         var importedMemories: [InternalMemory] = []

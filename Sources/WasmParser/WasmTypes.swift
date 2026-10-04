@@ -1,5 +1,47 @@
 import WasmTypes
 
+extension AbstractHeapType {
+    /// The byte that encodes this heap type in the binary format.
+    ///
+    /// > Note:
+    /// <https://webassembly.github.io/gc/core/binary/types.html#heap-types>
+    package var binaryEncoding: UInt8 {
+        switch self {
+        case .funcRef: 0x70
+        case .externRef: 0x6F
+        case .exnRef: 0x69
+        case .any: 0x6E
+        case .eq: 0x6D
+        case .i31: 0x6C
+        case .structRef: 0x6B
+        case .arrayRef: 0x6A
+        case .noneRef: 0x71
+        case .noExtern: 0x72
+        case .noFunc: 0x73
+        case .noExn: 0x74
+        }
+    }
+
+    @usableFromInline
+    package init?(binaryEncoding: UInt8) {
+        switch binaryEncoding {
+        case 0x70: self = .funcRef
+        case 0x6F: self = .externRef
+        case 0x69: self = .exnRef
+        case 0x6E: self = .any
+        case 0x6D: self = .eq
+        case 0x6C: self = .i31
+        case 0x6B: self = .structRef
+        case 0x6A: self = .arrayRef
+        case 0x71: self = .noneRef
+        case 0x72: self = .noExtern
+        case 0x73: self = .noFunc
+        case 0x74: self = .noExn
+        default: return nil
+        }
+    }
+}
+
 /// Function code in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-code>
