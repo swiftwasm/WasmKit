@@ -20,34 +20,6 @@ import WasmTypes
         #endif
         return try FileManager.default.contentsOfDirectory(atPath: fdDirectory).count
     }
-
-    private func withReducedOpenFileLimit<Result>(
-        extraDescriptors: Int,
-        _ body: () throws -> Result
-    ) throws -> Result {
-        #if os(macOS)
-            let nofileResource = RLIMIT_NOFILE
-        #else
-            let nofileResource = __rlimit_resource_t(RLIMIT_NOFILE.rawValue)
-        #endif
-        var original = rlimit()
-        guard getrlimit(nofileResource, &original) == 0 else {
-            throw TestSupport.Error(errno: errno)
-        }
-
-        let currentOpen = try currentOpenFileDescriptorCount()
-        let desiredSoft = rlim_t(currentOpen + extraDescriptors)
-        var reduced = original
-        reduced.rlim_cur = min(original.rlim_cur, desiredSoft)
-        guard setrlimit(nofileResource, &reduced) == 0 else {
-            throw TestSupport.Error(errno: errno)
-        }
-        defer {
-            var original = original
-            _ = setrlimit(nofileResource, &original)
-        }
-        return try body()
-    }
 #endif
 
 @Suite
@@ -1687,17 +1659,23 @@ struct WASITests {
                     count: 4096
                 )
 
-                try withReducedOpenFileLimit(extraDescriptors: 32) {
-                    for _ in 0..<512 {
-                        let bytesRead = try wasi.fd_readdir(
-                            fd: dirFd,
-                            buffer: buffer,
-                            cookie: 0,
-                            memory: memory
-                        )
-                        #expect(bytesRead > 0)
-                    }
+                // Count descriptors rather than lowering RLIMIT_NOFILE: the
+                // limit is process-wide, so it would starve tests running in
+                // parallel. A leak shows as one descriptor per call, far more
+                // than those tests hold open at once.
+                let iterations = 512
+                let openBefore = try currentOpenFileDescriptorCount()
+                for _ in 0..<iterations {
+                    let bytesRead = try wasi.fd_readdir(
+                        fd: dirFd,
+                        buffer: buffer,
+                        cookie: 0,
+                        memory: memory
+                    )
+                    #expect(bytesRead > 0)
                 }
+                let openAfter = try currentOpenFileDescriptorCount()
+                #expect(openAfter - openBefore < iterations / 2)
             }
         }
     #endif
