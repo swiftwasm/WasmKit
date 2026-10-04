@@ -1420,6 +1420,11 @@ final class WASIImplementation: Sendable {
 
     /// Create a symbolic link.
     func path_symlink(oldPath: String, dirFd: WASIAbi.Fd, newPath: String) throws {
+        // Sandboxed resolution never follows an absolute target, so refuse
+        // to create such a link at all, as wasmtime does.
+        guard !oldPath.hasPrefix("/") else {
+            throw WASIAbi.Errno.EPERM
+        }
         let dirEntry = try directoryEntry(fd: dirFd)
         try dirEntry.symlink(from: oldPath, to: newPath)
     }
