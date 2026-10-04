@@ -386,7 +386,9 @@ extension ByteStream {
             guard features.contains(.exceptionHandling) else { return nil }
             return .exnRef
         case 0x74:
-            guard features.contains(.exceptionHandling) else { return nil }
+            // `noexn` is part of exception handling, but WasmKit runs none of the bottom heap types
+            // yet, so it also needs the opt-in GC feature, unlike in wasm-tools.
+            guard features.contains(.exceptionHandling), features.contains(.gc) else { return nil }
             return ReferenceType(isNullable: true, heapType: .abstract(.noExn))
         case 0x6A...0x6E, 0x71...0x73:
             guard features.contains(.gc), let heapType = AbstractHeapType(binaryEncoding: byte) else { return nil }
@@ -412,7 +414,7 @@ extension ByteStream {
         case 0x70:
             _ = try consumeAny()
             return .funcRef
-        case 0x74 where features.contains(.exceptionHandling),
+        case 0x74 where features.contains(.exceptionHandling) && features.contains(.gc),
             .some(0x6A...0x6E) where features.contains(.gc),
             .some(0x71...0x73) where features.contains(.gc):
             if let b, let heapType = AbstractHeapType(binaryEncoding: b) {
@@ -662,7 +664,7 @@ extension Parser {
         case 0x7B...0x7F, 0x70, 0x6F, 0x69, 0x63, 0x64,
             0x6A...0x6E where features.contains(.gc),
             0x71...0x73 where features.contains(.gc),
-            0x74 where features.contains(.exceptionHandling):
+            0x74 where features.contains(.exceptionHandling) && features.contains(.gc):
             return try .type(stream.parseValueType(features: features))
         default:
             let rawIndex = try stream.parseVarSigned33()

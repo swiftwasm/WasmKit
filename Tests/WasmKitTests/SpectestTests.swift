@@ -23,7 +23,7 @@ struct SpectestTests {
     static var testPaths: [String] {
         return [
             // Wasm 3.0, which includes memory64, tail calls, exception handling, extended
-            // constant expressions, relaxed SIMD, typed function references, multi-memory and GC.
+            // constant expressions, relaxed SIMD, typed function references and multi-memory.
             Self.testsuite.path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/memory64").path,

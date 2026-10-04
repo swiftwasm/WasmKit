@@ -131,7 +131,7 @@ struct UntypedValue: Equatable, Hashable {
             return .exception(decodeOptionalInt())
         case .abstract(.any), .abstract(.eq), .abstract(.i31), .abstract(.structRef), .abstract(.arrayRef),
             .abstract(.noneRef), .abstract(.noExtern), .abstract(.noFunc), .abstract(.noExn):
-            preconditionFailure("Internal consistency error: GC reference type \(type) passed validation")
+            preconditionFailure("GC reference type \(type) is not supported yet")
         }
     }
 

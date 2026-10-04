@@ -383,11 +383,11 @@ struct TypeSection: Sendable {
         return type
     }
 
-    /// The function type of every definition, for a module that ``ModuleValidator`` accepted.
+    /// The function type of every definition. WasmKit does not run GC type definitions yet.
     var functionTypes: [FunctionType] {
         definitions.map {
             guard case .function(let type) = $0.body else {
-                preconditionFailure("Internal consistency error: GC type definition passed validation")
+                preconditionFailure("GC type definitions are not supported yet")
             }
             return type
         }
