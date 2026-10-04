@@ -490,17 +490,6 @@ private func runRoot(
     }
 }
 
-func executeWasm(
-    store: Store,
-    function handle: InternalFunction,
-    type: FunctionType,
-    arguments: [Value]
-) throws -> [Value] {
-    var stack = ExecutionStack(engine: store.engine)
-    return try executeWasm(
-        store: store, function: handle, type: type, arguments: arguments, stack: &stack)
-}
-
 /// As above, on a stack the caller owns and can use again.
 func executeWasm(
     store: Store,
