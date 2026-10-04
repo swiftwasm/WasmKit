@@ -505,7 +505,7 @@
                 }
 
                 // Wasm function arguments are also addressed as locals.
-                let functionType = store.engine.funcTypeInterner.resolve(currentFunction.type)
+                let functionType = store.engine.typeRegistry.resolve(currentFunction.type)
 
                 let localsCount = functionType.parameters.count + wasm.locals.count
 

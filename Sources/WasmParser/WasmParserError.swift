@@ -169,6 +169,11 @@ extension WasmParserError.Message {
     }
 
     @usableFromInline
+    static func malformedCastFlags(_ byte: UInt8) -> Self {
+        Self("Malformed cast flags: \(byte)")
+    }
+
+    @usableFromInline
     static func malformedCompositeType(_ byte: UInt8) -> Self {
         Self("Malformed composite type: \(byte)")
     }

@@ -70,19 +70,27 @@ extension InternalInstance {
         _ = try elementType(index)
     }
 
-    func resolveType(_ index: TypeIndex) throws(WasmKitError) -> FunctionType {
+    /// The canonical definition of the type at `index` in the module's type section.
+    func definedType(_ index: TypeIndex) throws(WasmKitError) -> SubType {
         guard Int(index) < self.types.count else {
             throw WasmKitError(message: .indexOutOfBounds("type", index, max: UInt32(self.types.count)))
         }
         return self.types[Int(index)]
     }
+    /// The function type at `index` in the module's type section.
+    func resolveType(_ index: TypeIndex) throws(WasmKitError) -> FunctionType {
+        guard case .function(let type) = try definedType(index).body else {
+            throw WasmKitError("type mismatch: type \(index) is not a function type")
+        }
+        return type
+    }
     func resolveBlockType(_ blockType: BlockType) throws(WasmKitError) -> FunctionType {
         if case .type(.ref(let referenceType)) = blockType, case .concrete = referenceType.heapType {
             return FunctionType(parameters: [], results: [.ref(try typeCanonicalizer.canonicalize(referenceType))])
         }
-        return try FunctionType(blockType: blockType, typeSection: self.types)
+        return try FunctionType(blockType: blockType, resolveType: resolveType)
     }
-    func functionType(_ index: FunctionIndex, interner: Interner<FunctionType>) throws(WasmKitError) -> FunctionType {
+    func functionType(_ index: FunctionIndex, interner: TypeRegistry) throws(WasmKitError) -> FunctionType {
         return try interner.resolve(self.functions[validating: Int(index)].type)
     }
     func globalType(_ index: GlobalIndex) throws(WasmKitError) -> ValueType {
@@ -640,6 +648,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     struct ValueStack {
+        let typeRegistry: TypeRegistry
         private var values: [MetaValueOnStack] = []
         private var startSlotOffsets: [Int] = []
         /// The current physical slot height of the stack (excluding locals/const pool base).
@@ -651,9 +660,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let stackRegBase: VReg
         let stackLayout: StackLayout
 
-        init(stackLayout: StackLayout) {
+        init(stackLayout: StackLayout, typeRegistry: TypeRegistry) {
             self.stackRegBase = stackLayout.stackRegBase
             self.stackLayout = stackLayout
+            self.typeRegistry = typeRegistry
         }
 
         mutating func push(_ value: ValueType) -> VReg {
@@ -733,6 +743,25 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             return makeValueSource(valueIndexFromTop: depth)
         }
 
+        /// The slots, relative to `sp`, of the materialized entries that may hold a
+        /// reference to a GC object.
+        func objectReferenceSlots() -> [Int32] {
+            var slots: [Int32] = []
+            for index in values.indices {
+                guard case .stack(let type) = values[index] else { continue }
+                let mayReferToObject: Bool
+                switch type {
+                case .some(let type): mayReferToObject = type.mayReferToObject
+                case .bottomRef: mayReferToObject = true
+                case .unknown: mayReferToObject = false
+                }
+                if mayReferToObject {
+                    slots.append(Int32(stackRegBase.slotIndex) + Int32(startSlotOffsets[index]))
+                }
+            }
+            return slots
+        }
+
         func peekType(depth: Int) -> MetaValue {
             return self.values[valueHeight - 1 - depth].type
         }
@@ -778,15 +807,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             if case .some(let actual) = value, actual == expected {
                 return register
             }
-            try Self.check(value, matches: expected)
+            try Self.check(value, matches: expected, in: typeRegistry)
             return register
         }
         /// Checks that a value of type `actual` can be used where `expected` is.
         @inline(never)
-        static func check(_ actual: MetaValue, matches expected: ValueType) throws(WasmKitError) {
+        static func check(_ actual: MetaValue, matches expected: ValueType, in registry: TypeRegistry) throws(WasmKitError) {
             switch actual {
             case .some(let actual):
-                guard actual == expected || actual.isSubtype(of: expected) else {
+                guard actual == expected || actual.isSubtype(of: expected, in: registry) else {
                     throw WasmKitError("Expected \(expected) on the stack top but got \(actual)")
                 }
             case .unknown: break  // OK
@@ -2558,7 +2587,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     let allocator: ISeqAllocator
-    let funcTypeInterner: Interner<FunctionType>
+    let typeRegistry: TypeRegistry
     let engineConfiguration: EngineConfiguration
     var module: InternalInstance
     /// The fuel region being translated, when the engine meters fuel; `nil` otherwise.
@@ -2601,6 +2630,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
     let validator: InstructionValidator
 
+    /// The stack maps of the function, and where they go once it is translated.
+    private var stackMaps: GCStackMapBuilder
+    private let stackMapTable: GCStackMapTable
+    /// The map of the call being translated, until its instruction is emitted.
+    private var pendingCallSiteMap: Int32?
+
     // Wasm debugging support.
 
     /// Current Wasm offset, updated for every instruction including non-emitting ones.
@@ -2637,7 +2672,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     init(
         allocator: ISeqAllocator,
         engineConfiguration: EngineConfiguration,
-        funcTypeInterner: Interner<FunctionType>,
+        typeRegistry: TypeRegistry,
+        stackMapTable: GCStackMapTable,
         module: InternalInstance,
         type: FunctionType,
         locals: [WasmTypes.ValueType],
@@ -2646,7 +2682,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         isIntercepting: Bool
     ) throws(WasmKitError) {
         self.allocator = allocator
-        self.funcTypeInterner = funcTypeInterner
+        self.typeRegistry = typeRegistry
         self.engineConfiguration = engineConfiguration
         self.type = type
         self.module = module
@@ -2658,7 +2694,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             locals: locals,
             codeSize: codeSize
         )
-        self.valueStack = ValueStack(stackLayout: stackLayout)
+        self.valueStack = ValueStack(stackLayout: stackLayout, typeRegistry: typeRegistry)
         self.locals = Locals(types: type.parameters + locals)
         self.tracksLocalInitialization = self.locals.hasNonDefaultable
         self.isLocalInitialized =
@@ -2669,8 +2705,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         self.functionIndex = functionIndex
         self.isIntercepting = isIntercepting
         self.constantSlots = ConstSlots(stackLayout: stackLayout)
-        self.validator = InstructionValidator(context: module)
+        self.validator = InstructionValidator(context: module, typeRegistry: typeRegistry)
         self.maxFrameSlotIndex = stackLayout.stackRegBaseSlotIndex
+        self.stackMapTable = stackMapTable
+        let stackLayout = self.stackLayout
+        self.stackMaps = GCStackMapBuilder(
+            frameSlots: (type.parameters + locals).enumerated().compactMap { index, type in
+                type.mayReferToObject ? Int32(stackLayout.localSlotIndex(LocalIndex(index))) : nil
+            })
 
         do {
             let endLabel = self.iseqBuilder.allocLabel()
@@ -2992,7 +3034,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             guard try checkBeforePop(typeHint: type, depth: stackDepth) else { return }
             let actual = valueStack.peekType(depth: stackDepth)
             if case .some(let actualType) = actual, actualType == type { continue }
-            try ValueStack.check(actual, matches: type)
+            try ValueStack.check(actual, matches: type, in: typeRegistry)
         }
     }
 
@@ -3157,6 +3199,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 }
             }
         #endif
+
+        if let maps = stackMaps.finish() {
+            stackMapTable.maps[buffer.baseAddress.unsafelyUnwrapped] = maps
+        }
 
         let frameInit = allocator.allocateFrameInit(
             constants: self.constantSlots.values,
@@ -3421,7 +3467,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
         if case .if(_, _, isElse: false) = toBePopped.kind {
             let blockType = toBePopped.blockType
-            guard blockType.parameters.isSubtype(of: blockType.results) else {
+            guard blockType.parameters.isSubtype(of: blockType.results, in: typeRegistry) else {
                 throw WasmKitError(message: .parameterResultTypeMismatch(blockType: blockType))
             }
         }
@@ -3988,6 +4034,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             return nil
         }
 
+        // The arguments belong to the callee, which maps them as its parameters.
+        pendingCallSiteMap = stackMaps.addMap(valueStack.objectReferenceSlots(), isAllocationSite: false)
+
         // The arguments are the start of the callee's parameter area.
         let argumentsSlotIndex = stackLayout.stackRegBaseSlotIndex + valueStack.slotHeight
         self.maxFrameSlotIndex = max(
@@ -3999,7 +4048,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         return VReg(slotIndex: argumentsSlotIndex)
     }
     mutating func visitCall(functionIndex: UInt32) throws(WasmKitError) -> Output {
-        let calleeType = try self.module.functionType(functionIndex, interner: funcTypeInterner)
+        let calleeType = try self.module.functionType(functionIndex, interner: typeRegistry)
         guard let arguments = try visitCallLike(calleeType: calleeType) else { return }
         guard let callee = self.module.resolveCallee(functionIndex) else {
             // Skip actual code emission if validation-only mode
@@ -4019,10 +4068,35 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             spAddend = LVReg(slotIndex: spAddendSlotIndex)
             if module.isSameInstance(wasm.instance) {
                 emit(.compilingCall(Instruction.CallOperand(callee: callee, arguments: arguments, spAddend: spAddend)))
+                bindCallSite()
                 return
             }
         }
         emit(.call(Instruction.CallOperand(callee: callee, arguments: arguments, spAddend: spAddend)))
+        bindCallSite()
+    }
+
+    /// Records that the call just emitted returns to the current position.
+    private mutating func bindCallSite() {
+        guard let map = pendingCallSiteMap else { return }
+        stackMaps.addCallSite(returnOffset: iseqBuilder.insertingPC.offsetFromHead, map: map)
+        pendingCallSiteMap = nil
+    }
+
+    /// Records the map of an instruction that allocates, whose `operands` are
+    /// still read after the allocation, and returns its index.
+    private mutating func allocationSiteMap(operands: VReg? = nil, types: [ValueType] = []) -> UInt32 {
+        var slots = valueStack.objectReferenceSlots()
+        if let operands {
+            var slot = Int32(operands.slotIndex)
+            for type in types {
+                if type.mayReferToObject {
+                    slots.append(slot)
+                }
+                slot += Int32(type.stackSlotCount)
+            }
+        }
+        return UInt32(stackMaps.addMap(slots, isAllocationSite: true))
     }
 
     mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(WasmKitError) -> Output {
@@ -4032,7 +4106,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let calleeType = try self.module.resolveType(typeIndex)
         guard let arguments = try visitCallLike(calleeType: calleeType) else { return }
         guard let address = address else { return }
-        let internType = funcTypeInterner.intern(calleeType)
+        let internType = try module.typeCanonicalizer.canonicalID(of: typeIndex)
         let operand = Instruction.CallIndirectOperand(
             tableIndex: tableIndex,
             type: internType,
@@ -4040,6 +4114,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             arguments: arguments
         )
         emit(.callIndirect(operand))
+        bindCallSite()
     }
 
     /// Pops the arguments of a tail call onto the value stack, and returns where
@@ -4055,7 +4130,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitReturnCall(functionIndex: UInt32) throws(WasmKitError) {
-        let calleeType = try self.module.functionType(functionIndex, interner: funcTypeInterner)
+        let calleeType = try self.module.functionType(functionIndex, interner: typeRegistry)
         try validator.validateReturnCallLike(calleeType: calleeType, callerType: type)
 
         guard let callee = self.module.resolveCallee(functionIndex) else {
@@ -4083,7 +4158,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let address = try popOnStackOperand(addressType)  // function address
         guard let address = address else { return }
 
-        let internType = funcTypeInterner.intern(calleeType)
+        let internType = try module.typeCanonicalizer.canonicalID(of: typeIndex)
 
         // Clean up all exception handlers before the tail call
         let handlersToUnwind = controlStack.catchHandlersToUnwind(
@@ -4109,7 +4184,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
     mutating func visitThrow(tagIndex: UInt32) throws(WasmKitError) -> Output {
         let tag = try module.tags[validating: Int(tagIndex)]
-        let tagType = funcTypeInterner.resolve(tag.type)
+        let tagType = typeRegistry.resolve(tag.type)
         // Pop tag parameter values and ensure they're on the physical stack
         for param in tagType.parameters.reversed() {
             guard (try popOnStackOperand(param)) != nil else { return }
@@ -4188,7 +4263,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             var catchTypes: [ValueType]
             if let tagIndex {
                 tag = try module.tags[validating: Int(tagIndex)]
-                let tagType = funcTypeInterner.resolve(tag!.type)
+                let tagType = typeRegistry.resolve(tag!.type)
                 catchTypes = tagType.parameters
             } else {
                 tag = nil
@@ -4200,7 +4275,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             }
 
             // Validate that the caught value types match the target label's copy types
-            guard catchTypes.isSubtype(of: targetFrame.copyTypes) else {
+            guard catchTypes.isSubtype(of: targetFrame.copyTypes, in: typeRegistry) else {
                 throw WasmKitError(message: .catchTypeMismatch)
             }
 
@@ -4293,7 +4368,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                     throw WasmKitError(message: .cannotSelectOnReferenceTypes)
                 }
             case .some(let operandType):
-                guard operandType.isSubtype(of: type) else {
+                guard operandType.isSubtype(of: type, in: typeRegistry) else {
                     throw WasmKitError(message: .typeMismatchOnSelect(expected: type, actual: operandType))
                 }
             }
@@ -5214,6 +5289,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         guard let arguments = try visitCallLike(calleeType: calleeType) else { return }
         guard let callee else { return }
         emit(.callRef(Instruction.CallRefOperand(callee: callee, arguments: arguments)))
+        bindCallSite()
     }
 
     mutating func visitReturnCallRef(typeIndex: UInt32) throws(WasmKitError) -> Output {
@@ -6582,22 +6658,16 @@ extension FunctionType {
         }
     }
 
-    fileprivate init(blockType: WasmParser.BlockType, typeSection: [FunctionType]) throws(WasmKitError) {
+    fileprivate init(
+        blockType: WasmParser.BlockType, resolveType: (TypeIndex) throws(WasmKitError) -> FunctionType
+    ) throws(WasmKitError) {
         switch blockType {
         case .type(let valueType):
             self.init(parameters: [], results: [valueType])
         case .empty:
             self.init(parameters: [], results: [])
         case .funcType(let typeIndex):
-            let typeIndex = Int(typeIndex)
-            guard typeIndex < typeSection.count else {
-                throw WasmKitError(message: .indexOutOfBounds("type", typeIndex, max: typeSection.count))
-            }
-            let funcType = typeSection[typeIndex]
-            self.init(
-                parameters: funcType.parameters,
-                results: funcType.results
-            )
+            self = try resolveType(typeIndex)
         }
         try checkFitsInterpreter()
     }
@@ -6606,5 +6676,417 @@ extension FunctionType {
 extension ValueType {
     fileprivate static func address(isMemory64: Bool) -> ValueType {
         return isMemory64 ? .i64 : .i32
+    }
+}
+
+// MARK: - GC instructions
+
+extension InstructionTranslator {
+    private func gcInstructionNotSupported(_ name: String) throws(WasmKitError) -> Never {
+        throw WasmKitError("\(name) is not supported yet")
+    }
+
+    /// Rejects a GC instruction unless the module was parsed with that feature.
+    private func requireGC(_ instruction: String) throws(WasmKitError) {
+        guard module.features.contains(.gc) else {
+            throw WasmKitError("\(instruction) requires the gc feature")
+        }
+    }
+
+    private static let eqRef = ValueType.ref(ReferenceType(isNullable: true, heapType: .abstract(.eq)))
+    private static let i31Ref = ValueType.ref(ReferenceType(isNullable: true, heapType: .abstract(.i31)))
+
+    mutating func visitRefEq() throws(WasmKitError) -> Output {
+        try requireGC("ref.eq")
+        try pop2PushEmit((Self.eqRef, Self.eqRef), .i32) { operands, result in
+            .refEq(Instruction.RefEqOperand(lhs: operands.1, rhs: operands.0, result: result))
+        }
+    }
+    mutating func visitRefI31() throws(WasmKitError) -> Output {
+        try requireGC("ref.i31")
+        try popPushEmit(.i32, .ref(ReferenceType(isNullable: false, heapType: .abstract(.i31)))) { value, result in
+            .refI31(Instruction.RefI31Operand(value: LVReg(value), result: LVReg(result)))
+        }
+    }
+    mutating func visitI31GetS() throws(WasmKitError) -> Output {
+        try requireGC("i31.get_s")
+        try popPushEmit(Self.i31Ref, .i32) { value, result in
+            .i31GetS(Instruction.I31GetSOperand(value: LVReg(value), result: LVReg(result)))
+        }
+    }
+    mutating func visitI31GetU() throws(WasmKitError) -> Output {
+        try requireGC("i31.get_u")
+        try popPushEmit(Self.i31Ref, .i32) { value, result in
+            .i31GetU(Instruction.I31GetUOperand(value: LVReg(value), result: LVReg(result)))
+        }
+    }
+
+    /// Moves the reference on top of the stack from the hierarchy of `from` to
+    /// the one of `to`, keeping its nullability. The value's bits stay the same.
+    private mutating func convertReference(from: AbstractHeapType, to: AbstractHeapType) throws(WasmKitError) {
+        let operandType = ValueType.ref(ReferenceType(isNullable: true, heapType: .abstract(from)))
+        guard try checkBeforePop(typeHint: operandType) else {
+            // Unreachable code with an empty stack: the result is as specific as possible.
+            _ = valueStack.push(.ref(ReferenceType(isNullable: false, heapType: .abstract(to))))
+            return
+        }
+        iseqBuilder.resetLastEmission()
+        let (type, source) = try valueStack.popRef()
+        if let type {
+            guard type.heapType.isSubtype(of: .abstract(from), in: typeRegistry) else {
+                throw WasmKitError("type mismatch: expected \(operandType) but got \(type)")
+            }
+        }
+        let result = ValueType.ref(ReferenceType(isNullable: type?.isNullable ?? false, heapType: .abstract(to)))
+        switch source {
+        case .local(let index): valueStack.pushLocal(index, type: result)
+        case .const(let value, _): valueStack.pushConst(value, type: result)
+        // A popped stack slot is the slot the next push takes.
+        case .vreg: _ = valueStack.push(result)
+        }
+    }
+
+    /// The canonical ID and definition of the struct type at `typeIndex`.
+    private func structType(_ typeIndex: TypeIndex) throws(WasmKitError) -> (id: UInt32, type: StructType) {
+        guard case .structType(let type) = try module.definedType(typeIndex).body else {
+            throw WasmKitError("type mismatch: type \(typeIndex) is not a struct type")
+        }
+        return (try module.typeCanonicalizer.canonicalID(of: typeIndex).id, type)
+    }
+
+    /// The canonical ID and element of the array type at `typeIndex`.
+    private func arrayType(_ typeIndex: TypeIndex) throws(WasmKitError) -> (id: UInt32, element: FieldType) {
+        guard case .arrayType(let type) = try module.definedType(typeIndex).body else {
+            throw WasmKitError("type mismatch: type \(typeIndex) is not an array type")
+        }
+        return (try module.typeCanonicalizer.canonicalID(of: typeIndex).id, type.element)
+    }
+
+    private func field(_ fieldIndex: UInt32, of type: StructType) throws(WasmKitError) -> FieldType {
+        guard Int(fieldIndex) < type.fields.count else {
+            throw WasmKitError(message: .indexOutOfBounds("field", fieldIndex, max: type.fields.count))
+        }
+        return type.fields[Int(fieldIndex)]
+    }
+
+    private static func reference(to id: UInt32, isNullable: Bool) -> ValueType {
+        .ref(ReferenceType(isNullable: isNullable, heapType: .concrete(typeIndex: id)))
+    }
+
+    /// Pops operands of the given types, last one first, into consecutive slots,
+    /// and returns the slot of the first one, or `nil` if the stack is
+    /// unreachable and polymorphic.
+    private mutating func popOperandsOnStack(_ types: [ValueType]) throws(WasmKitError) -> VReg? {
+        var hasAll = true
+        for type in types.reversed() {
+            if try popOnStackOperand(type) == nil {
+                hasAll = false
+            }
+        }
+        guard hasAll else { return nil }
+        return VReg(slotIndex: stackLayout.stackRegBaseSlotIndex + valueStack.slotHeight)
+    }
+
+    private static func requireMutable(_ field: FieldType) throws(WasmKitError) {
+        guard field.isMutable else {
+            throw WasmKitError("immutable field")
+        }
+    }
+
+    /// Requires an array element that `array.new_data` and `array.init_data` can read from bytes.
+    private static func requireNumericOrVector(_ element: FieldType) throws(WasmKitError) {
+        if case .value(.ref) = element.storage {
+            throw WasmKitError("type mismatch: array element is a reference")
+        }
+    }
+
+    /// Requires that the elements of segment `elemIndex` fit an array element.
+    private func requireElements(_ elemIndex: ElementIndex, fit element: FieldType) throws(WasmKitError) {
+        let segmentType = try module.elementType(elemIndex)
+        guard case .value(let elementType) = element.storage, ValueType.ref(segmentType).isSubtype(of: elementType, in: typeRegistry) else {
+            throw WasmKitError("type mismatch: element segment \(elemIndex) does not fit the array")
+        }
+    }
+
+    mutating func visitStructNew(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        try requireGC("struct.new")
+        let (id, type) = try structType(typeIndex)
+        let fieldTypes = type.fields.map(\.storage.unpacked)
+        let operands = try popOperandsOnStack(fieldTypes)
+        guard let operands else {
+            _ = valueStack.push(Self.reference(to: id, isNullable: false))
+            return
+        }
+        let safepoint = allocationSiteMap(operands: operands, types: fieldTypes)
+        let result = valueStack.push(Self.reference(to: id, isNullable: false))
+        emit(.structNew(Instruction.StructNewOperand(typeID: id, operands: operands, result: result, safepoint: safepoint)))
+    }
+    mutating func visitStructNewDefault(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        try requireGC("struct.new_default")
+        let (id, type) = try structType(typeIndex)
+        guard type.fields.allSatisfy(\.storage.unpacked.isDefaultable) else {
+            throw WasmKitError("type mismatch: a field of struct \(typeIndex) has no default value")
+        }
+        let safepoint = allocationSiteMap()
+        pushEmit(
+            Self.reference(to: id, isNullable: false),
+            { .structNewDefault(Instruction.StructNewDefaultOperand(typeID: id, result: $0, safepoint: safepoint)) })
+    }
+    private mutating func visitStructGet(typeIndex: UInt32, fieldIndex: UInt32, signed: Bool?) throws(WasmKitError) {
+        try requireGC("struct.get")
+        let (id, type) = try structType(typeIndex)
+        let field = try field(fieldIndex, of: type)
+        guard field.storage.isPacked == (signed != nil) else {
+            throw WasmKitError("type mismatch: packed field needs struct.get_s or struct.get_u, and only a packed one may use them")
+        }
+        let layout = typeRegistry.entry(id).structLayout.unsafelyUnwrapped.fields[Int(fieldIndex)]
+        let access = GCFieldAccess(offset: layout.offset, storage: layout.storage, signed: signed ?? false)
+        try popPushEmit(Self.reference(to: id, isNullable: true), field.storage.unpacked) { object, result in
+            .structGet(Instruction.StructGetOperand(object: object, result: result, field: access.structField))
+        }
+    }
+    mutating func visitStructGet(typeIndex: UInt32, fieldIndex: UInt32) throws(WasmKitError) -> Output {
+        try visitStructGet(typeIndex: typeIndex, fieldIndex: fieldIndex, signed: nil)
+    }
+    mutating func visitStructGetS(typeIndex: UInt32, fieldIndex: UInt32) throws(WasmKitError) -> Output {
+        try visitStructGet(typeIndex: typeIndex, fieldIndex: fieldIndex, signed: true)
+    }
+    mutating func visitStructGetU(typeIndex: UInt32, fieldIndex: UInt32) throws(WasmKitError) -> Output {
+        try visitStructGet(typeIndex: typeIndex, fieldIndex: fieldIndex, signed: false)
+    }
+    mutating func visitStructSet(typeIndex: UInt32, fieldIndex: UInt32) throws(WasmKitError) -> Output {
+        try requireGC("struct.set")
+        let (id, type) = try structType(typeIndex)
+        let field = try field(fieldIndex, of: type)
+        try Self.requireMutable(field)
+        let layout = typeRegistry.entry(id).structLayout.unsafelyUnwrapped.fields[Int(fieldIndex)]
+        let access = GCFieldAccess(offset: layout.offset, storage: layout.storage)
+        let value = try popVRegOperand(field.storage.unpacked)
+        let object = try popVRegOperand(Self.reference(to: id, isNullable: true))
+        guard let value, let object else { return }
+        emit(.structSet(Instruction.StructSetOperand(object: object, value: value, field: access.structField)))
+    }
+    mutating func visitArrayNew(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        try requireGC("array.new")
+        let (id, element) = try arrayType(typeIndex)
+        let operandTypes = [element.storage.unpacked, .i32]
+        let operands = try popOperandsOnStack(operandTypes)
+        guard let operands else {
+            _ = valueStack.push(Self.reference(to: id, isNullable: false))
+            return
+        }
+        let safepoint = allocationSiteMap(operands: operands, types: operandTypes)
+        let result = valueStack.push(Self.reference(to: id, isNullable: false))
+        emit(.arrayNew(Instruction.ArrayNewOperand(typeID: id, operands: operands, result: result, safepoint: safepoint)))
+    }
+    mutating func visitArrayNewDefault(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        try requireGC("array.new_default")
+        let (id, element) = try arrayType(typeIndex)
+        guard element.storage.unpacked.isDefaultable else {
+            throw WasmKitError("type mismatch: the elements of array \(typeIndex) have no default value")
+        }
+        let length = try popVRegOperand(.i32)
+        let safepoint = allocationSiteMap()
+        let result = valueStack.push(Self.reference(to: id, isNullable: false))
+        guard let length else { return }
+        emit(.arrayNewDefault(Instruction.ArrayNewDefaultOperand(typeID: id, length: length, result: result, safepoint: safepoint)))
+    }
+    mutating func visitArrayNewFixed(typeIndex: UInt32, size: UInt32) throws(WasmKitError) -> Output {
+        try requireGC("array.new_fixed")
+        let (id, element) = try arrayType(typeIndex)
+        // Each operand is a slot of the frame, so a count beyond the frame's size cannot validate.
+        guard size <= UInt32(VReg.maxSlotIndex) else {
+            throw WasmKitError("array.new_fixed of \(size) elements is too large for the interpreter")
+        }
+        let operandTypes = Array(repeating: element.storage.unpacked, count: Int(size))
+        let operands = try popOperandsOnStack(operandTypes)
+        guard let operands else {
+            _ = valueStack.push(Self.reference(to: id, isNullable: false))
+            return
+        }
+        let safepoint = allocationSiteMap(operands: operands, types: operandTypes)
+        let result = valueStack.push(Self.reference(to: id, isNullable: false))
+        emit(
+            .arrayNewFixed(
+                Instruction.ArrayNewFixedOperand(typeID: id, count: size, operands: operands, result: result, safepoint: safepoint)))
+    }
+    mutating func visitArrayNewData(typeIndex: UInt32, dataIndex: UInt32) throws(WasmKitError) -> Output {
+        try requireGC("array.new_data")
+        let (id, element) = try arrayType(typeIndex)
+        try Self.requireNumericOrVector(element)
+        try validator.validateDataSegment(dataIndex)
+        let operands = try popOperandsOnStack([.i32, .i32])
+        let safepoint = allocationSiteMap()
+        let result = valueStack.push(Self.reference(to: id, isNullable: false))
+        guard let operands else { return }
+        emit(
+            .arrayNewData(
+                Instruction.ArrayNewDataOperand(
+                    typeID: id, segmentIndex: dataIndex, operands: operands, result: result, safepoint: safepoint)))
+    }
+    mutating func visitArrayNewElem(typeIndex: UInt32, elemIndex: UInt32) throws(WasmKitError) -> Output {
+        try requireGC("array.new_elem")
+        let (id, element) = try arrayType(typeIndex)
+        try requireElements(elemIndex, fit: element)
+        let operands = try popOperandsOnStack([.i32, .i32])
+        let safepoint = allocationSiteMap()
+        let result = valueStack.push(Self.reference(to: id, isNullable: false))
+        guard let operands else { return }
+        emit(
+            .arrayNewElem(
+                Instruction.ArrayNewElemOperand(
+                    typeID: id, segmentIndex: elemIndex, operands: operands, result: result, safepoint: safepoint)))
+    }
+    private mutating func visitArrayGet(typeIndex: UInt32, signed: Bool?) throws(WasmKitError) {
+        try requireGC("array.get")
+        let (id, element) = try arrayType(typeIndex)
+        guard element.storage.isPacked == (signed != nil) else {
+            throw WasmKitError("type mismatch: packed element needs array.get_s or array.get_u, and only a packed one may use them")
+        }
+        let access = GCFieldAccess(storage: FieldStorage(element.storage), signed: signed ?? false)
+        let operands = try popOperandsOnStack([Self.reference(to: id, isNullable: true), .i32])
+        let result = valueStack.push(element.storage.unpacked)
+        guard let operands else { return }
+        emit(.arrayGet(Instruction.ArrayGetOperand(operands: operands, result: result, element: access.arrayElement)))
+    }
+    mutating func visitArrayGet(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        try visitArrayGet(typeIndex: typeIndex, signed: nil)
+    }
+    mutating func visitArrayGetS(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        try visitArrayGet(typeIndex: typeIndex, signed: true)
+    }
+    mutating func visitArrayGetU(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        try visitArrayGet(typeIndex: typeIndex, signed: false)
+    }
+    mutating func visitArraySet(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        try requireGC("array.set")
+        let (id, element) = try arrayType(typeIndex)
+        try Self.requireMutable(element)
+        let access = GCFieldAccess(storage: FieldStorage(element.storage))
+        guard let operands = try popOperandsOnStack([Self.reference(to: id, isNullable: true), .i32, element.storage.unpacked]) else { return }
+        emit(.arraySet(Instruction.ArraySetOperand(operands: operands, element: access.arrayElement)))
+    }
+    mutating func visitArrayLen() throws(WasmKitError) -> Output {
+        try requireGC("array.len")
+        try popPushEmit(.ref(ReferenceType(isNullable: true, heapType: .abstract(.arrayRef))), .i32) { array, result in
+            .arrayLen(Instruction.ArrayLenOperand(array: array, result: result))
+        }
+    }
+    mutating func visitArrayFill(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        try requireGC("array.fill")
+        let (id, element) = try arrayType(typeIndex)
+        try Self.requireMutable(element)
+        let access = GCFieldAccess(storage: FieldStorage(element.storage))
+        guard let operands = try popOperandsOnStack([Self.reference(to: id, isNullable: true), .i32, element.storage.unpacked, .i32]) else {
+            return
+        }
+        emit(.arrayFill(Instruction.ArrayFillOperand(operands: operands, element: access.arrayElement)))
+    }
+    mutating func visitArrayCopy(dstType: UInt32, srcType: UInt32) throws(WasmKitError) -> Output {
+        try requireGC("array.copy")
+        let (destinationID, destination) = try arrayType(dstType)
+        let (sourceID, source) = try arrayType(srcType)
+        try Self.requireMutable(destination)
+        let fits: Bool
+        switch (source.storage, destination.storage) {
+        case (.packed(let sourcePacked), .packed(let destinationPacked)): fits = sourcePacked == destinationPacked
+        case (.value(let sourceValue), .value(let destinationValue)): fits = sourceValue.isSubtype(of: destinationValue, in: typeRegistry)
+        default: fits = false
+        }
+        guard fits else {
+            throw WasmKitError("type mismatch: array \(srcType) cannot be copied to array \(dstType)")
+        }
+        let access = GCFieldAccess(storage: FieldStorage(destination.storage))
+        guard
+            let operands = try popOperandsOnStack([
+                Self.reference(to: destinationID, isNullable: true), .i32, Self.reference(to: sourceID, isNullable: true), .i32, .i32,
+            ])
+        else { return }
+        emit(.arrayCopy(Instruction.ArrayCopyOperand(operands: operands, element: access.arrayElement)))
+    }
+    mutating func visitArrayInitData(typeIndex: UInt32, dataIndex: UInt32) throws(WasmKitError) -> Output {
+        try requireGC("array.init_data")
+        let (id, element) = try arrayType(typeIndex)
+        try Self.requireMutable(element)
+        try Self.requireNumericOrVector(element)
+        try validator.validateDataSegment(dataIndex)
+        let access = GCFieldAccess(storage: FieldStorage(element.storage))
+        guard let operands = try popOperandsOnStack([Self.reference(to: id, isNullable: true), .i32, .i32, .i32]) else { return }
+        emit(.arrayInitData(Instruction.ArrayInitDataOperand(segmentIndex: dataIndex, operands: operands, element: access.arrayElement)))
+    }
+    mutating func visitArrayInitElem(typeIndex: UInt32, elemIndex: UInt32) throws(WasmKitError) -> Output {
+        try requireGC("array.init_elem")
+        let (id, element) = try arrayType(typeIndex)
+        try Self.requireMutable(element)
+        try requireElements(elemIndex, fit: element)
+        guard let operands = try popOperandsOnStack([Self.reference(to: id, isNullable: true), .i32, .i32, .i32]) else { return }
+        emit(.arrayInitElem(Instruction.ArrayInitElemOperand(segmentIndex: elemIndex, operands: operands)))
+    }
+    /// Pops a reference that a cast to `target` may test: one of the same hierarchy.
+    private mutating func popCastOperand(target: ReferenceType) throws(WasmKitError) -> ValueSource? {
+        let (type, source) = try popRefOperand()
+        if let type, type.heapType.topType != target.heapType.topType {
+            throw WasmKitError("type mismatch: cannot cast \(type) to \(target)")
+        }
+        return source
+    }
+
+    private mutating func visitRefTest(heapType: HeapType, isNullable: Bool, name: String) throws(WasmKitError) {
+        try requireGC(name)
+        let target = ReferenceType(isNullable: isNullable, heapType: try module.typeCanonicalizer.canonicalize(heapType))
+        let value = try popCastOperand(target: target)
+        let result = valueStack.push(.i32)
+        guard let value else { return }
+        emit(.refTest(Instruction.RefTestOperand(value: ensureOnVReg(value), result: result, target: CastTarget(type: target).encoded)))
+    }
+    mutating func visitRefTest(_ refTest: WasmParser.Instruction.RefTest, heapType: HeapType) throws(WasmKitError) -> Output {
+        try visitRefTest(heapType: heapType, isNullable: refTest == .refTestNullable, name: "ref.test")
+    }
+    mutating func visitRefCast(_ refCast: WasmParser.Instruction.RefCast, heapType: HeapType) throws(WasmKitError) -> Output {
+        try requireGC("ref.cast")
+        let target = ReferenceType(isNullable: refCast == .refCastNullable, heapType: try module.typeCanonicalizer.canonicalize(heapType))
+        let value = try popCastOperand(target: target)
+        let result = valueStack.push(.ref(target))
+        guard let value else { return }
+        emit(.refCast(Instruction.RefCastOperand(value: ensureOnVReg(value), result: result, target: CastTarget(type: target).encoded)))
+    }
+
+    /// `br_on_cast` branches with the operand cast to the target type when the
+    /// cast succeeds, and `br_on_cast_fail` with the operand when it fails. Each
+    /// is a test of the operand followed by a `br_if`.
+    private mutating func visitBrOnCast(_ cast: BrOnCast, branchesOnFailure: Bool, name: String) throws(WasmKitError) {
+        try requireGC(name)
+        let source = try module.typeCanonicalizer.canonicalize(cast.sourceType)
+        let target = try module.typeCanonicalizer.canonicalize(cast.targetType)
+        guard target.isSubtype(of: source, in: typeRegistry) else {
+            throw WasmKitError("type mismatch: \(target) is not a subtype of \(source)")
+        }
+        // The operand once the cast failed: it is not null if a nullable target would take null.
+        let difference = ReferenceType(isNullable: source.isNullable && !target.isNullable, heapType: source.heapType)
+        let (branchType, fallThroughType) = branchesOnFailure ? (difference, target) : (target, difference)
+        let operand = try popOperand(.ref(source))
+        repushOperand(operand, type: .some(.ref(branchType)))
+        let condition = valueStack.push(.i32)
+        if let operand {
+            let castTarget = CastTarget(type: target, negated: branchesOnFailure)
+            emit(.refTest(Instruction.RefTestOperand(value: ensureOnVReg(operand), result: condition, target: castTarget.encoded)))
+        }
+        try visitBrIf(relativeDepth: cast.relativeDepth)
+        let (_, remaining) = try popAnyOperand()
+        repushOperand(remaining, type: .some(.ref(fallThroughType)))
+    }
+    mutating func visitBrOnCast(cast: BrOnCast) throws(WasmKitError) -> Output {
+        try visitBrOnCast(cast, branchesOnFailure: false, name: "br_on_cast")
+    }
+    mutating func visitBrOnCastFail(cast: BrOnCast) throws(WasmKitError) -> Output {
+        try visitBrOnCast(cast, branchesOnFailure: true, name: "br_on_cast_fail")
+    }
+    mutating func visitAnyConvertExtern() throws(WasmKitError) -> Output {
+        try requireGC("any.convert_extern")
+        try convertReference(from: .externRef, to: .any)
+    }
+    mutating func visitExternConvertAny() throws(WasmKitError) -> Output {
+        try requireGC("extern.convert_any")
+        try convertReference(from: .any, to: .externRef)
     }
 }

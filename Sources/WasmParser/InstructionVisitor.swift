@@ -448,6 +448,14 @@ public enum Instruction: Equatable, Sendable {
         case v128Store32Lane
         case v128Store64Lane
     }
+    public enum RefTest: Equatable, Sendable {
+        case refTestNonNull
+        case refTestNullable
+    }
+    public enum RefCast: Equatable, Sendable {
+        case refCastNonNull
+        case refCastNullable
+    }
     case `unreachable`
     case `nop`
     case `block`(blockType: BlockType)
@@ -487,6 +495,7 @@ public enum Instruction: Equatable, Sendable {
     case `refNull`(type: HeapType)
     case `refIsNull`
     case `refFunc`(functionIndex: UInt32)
+    case `refEq`
     case `refAsNonNull`
     case `brOnNull`(relativeDepth: UInt32)
     case `brOnNonNull`(relativeDepth: UInt32)
@@ -566,6 +575,35 @@ public enum Instruction: Equatable, Sendable {
     case `simd`(Instruction.Simd)
     case `simdLane`(Instruction.SimdLane, lane: UInt8)
     case `simdMemLane`(Instruction.SimdMemLane, memarg: MemArg, lane: UInt8)
+    case `structNew`(typeIndex: UInt32)
+    case `structNewDefault`(typeIndex: UInt32)
+    case `structGet`(typeIndex: UInt32, fieldIndex: UInt32)
+    case `structGetS`(typeIndex: UInt32, fieldIndex: UInt32)
+    case `structGetU`(typeIndex: UInt32, fieldIndex: UInt32)
+    case `structSet`(typeIndex: UInt32, fieldIndex: UInt32)
+    case `arrayNew`(typeIndex: UInt32)
+    case `arrayNewDefault`(typeIndex: UInt32)
+    case `arrayNewFixed`(typeIndex: UInt32, size: UInt32)
+    case `arrayNewData`(typeIndex: UInt32, dataIndex: UInt32)
+    case `arrayNewElem`(typeIndex: UInt32, elemIndex: UInt32)
+    case `arrayGet`(typeIndex: UInt32)
+    case `arrayGetS`(typeIndex: UInt32)
+    case `arrayGetU`(typeIndex: UInt32)
+    case `arraySet`(typeIndex: UInt32)
+    case `arrayLen`
+    case `arrayFill`(typeIndex: UInt32)
+    case `arrayCopy`(dstType: UInt32, srcType: UInt32)
+    case `arrayInitData`(typeIndex: UInt32, dataIndex: UInt32)
+    case `arrayInitElem`(typeIndex: UInt32, elemIndex: UInt32)
+    case `refTest`(Instruction.RefTest, heapType: HeapType)
+    case `refCast`(Instruction.RefCast, heapType: HeapType)
+    case `brOnCast`(cast: BrOnCast)
+    case `brOnCastFail`(cast: BrOnCast)
+    case `anyConvertExtern`
+    case `externConvertAny`
+    case `refI31`
+    case `i31GetS`
+    case `i31GetU`
 }
 
 /// A visitor that visits all instructions by a single visit method.
@@ -614,6 +652,7 @@ extension AnyInstructionVisitor {
     public mutating func visitRefNull(type: HeapType) throws(VisitorError) { return try self.visit(.refNull(type: type)) }
     public mutating func visitRefIsNull() throws(VisitorError) { return try self.visit(.refIsNull) }
     public mutating func visitRefFunc(functionIndex: UInt32) throws(VisitorError) { return try self.visit(.refFunc(functionIndex: functionIndex)) }
+    public mutating func visitRefEq() throws(VisitorError) { return try self.visit(.refEq) }
     public mutating func visitRefAsNonNull() throws(VisitorError) { return try self.visit(.refAsNonNull) }
     public mutating func visitBrOnNull(relativeDepth: UInt32) throws(VisitorError) { return try self.visit(.brOnNull(relativeDepth: relativeDepth)) }
     public mutating func visitBrOnNonNull(relativeDepth: UInt32) throws(VisitorError) { return try self.visit(.brOnNonNull(relativeDepth: relativeDepth)) }
@@ -693,6 +732,35 @@ extension AnyInstructionVisitor {
     public mutating func visitSimd(_ simd: Instruction.Simd) throws(VisitorError) { return try self.visit(.simd(simd)) }
     public mutating func visitSimdLane(_ simdLane: Instruction.SimdLane, lane: UInt8) throws(VisitorError) { return try self.visit(.simdLane(simdLane, lane: lane)) }
     public mutating func visitSimdMemLane(_ simdMemLane: Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws(VisitorError) { return try self.visit(.simdMemLane(simdMemLane, memarg: memarg, lane: lane)) }
+    public mutating func visitStructNew(typeIndex: UInt32) throws(VisitorError) { return try self.visit(.structNew(typeIndex: typeIndex)) }
+    public mutating func visitStructNewDefault(typeIndex: UInt32) throws(VisitorError) { return try self.visit(.structNewDefault(typeIndex: typeIndex)) }
+    public mutating func visitStructGet(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError) { return try self.visit(.structGet(typeIndex: typeIndex, fieldIndex: fieldIndex)) }
+    public mutating func visitStructGetS(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError) { return try self.visit(.structGetS(typeIndex: typeIndex, fieldIndex: fieldIndex)) }
+    public mutating func visitStructGetU(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError) { return try self.visit(.structGetU(typeIndex: typeIndex, fieldIndex: fieldIndex)) }
+    public mutating func visitStructSet(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError) { return try self.visit(.structSet(typeIndex: typeIndex, fieldIndex: fieldIndex)) }
+    public mutating func visitArrayNew(typeIndex: UInt32) throws(VisitorError) { return try self.visit(.arrayNew(typeIndex: typeIndex)) }
+    public mutating func visitArrayNewDefault(typeIndex: UInt32) throws(VisitorError) { return try self.visit(.arrayNewDefault(typeIndex: typeIndex)) }
+    public mutating func visitArrayNewFixed(typeIndex: UInt32, size: UInt32) throws(VisitorError) { return try self.visit(.arrayNewFixed(typeIndex: typeIndex, size: size)) }
+    public mutating func visitArrayNewData(typeIndex: UInt32, dataIndex: UInt32) throws(VisitorError) { return try self.visit(.arrayNewData(typeIndex: typeIndex, dataIndex: dataIndex)) }
+    public mutating func visitArrayNewElem(typeIndex: UInt32, elemIndex: UInt32) throws(VisitorError) { return try self.visit(.arrayNewElem(typeIndex: typeIndex, elemIndex: elemIndex)) }
+    public mutating func visitArrayGet(typeIndex: UInt32) throws(VisitorError) { return try self.visit(.arrayGet(typeIndex: typeIndex)) }
+    public mutating func visitArrayGetS(typeIndex: UInt32) throws(VisitorError) { return try self.visit(.arrayGetS(typeIndex: typeIndex)) }
+    public mutating func visitArrayGetU(typeIndex: UInt32) throws(VisitorError) { return try self.visit(.arrayGetU(typeIndex: typeIndex)) }
+    public mutating func visitArraySet(typeIndex: UInt32) throws(VisitorError) { return try self.visit(.arraySet(typeIndex: typeIndex)) }
+    public mutating func visitArrayLen() throws(VisitorError) { return try self.visit(.arrayLen) }
+    public mutating func visitArrayFill(typeIndex: UInt32) throws(VisitorError) { return try self.visit(.arrayFill(typeIndex: typeIndex)) }
+    public mutating func visitArrayCopy(dstType: UInt32, srcType: UInt32) throws(VisitorError) { return try self.visit(.arrayCopy(dstType: dstType, srcType: srcType)) }
+    public mutating func visitArrayInitData(typeIndex: UInt32, dataIndex: UInt32) throws(VisitorError) { return try self.visit(.arrayInitData(typeIndex: typeIndex, dataIndex: dataIndex)) }
+    public mutating func visitArrayInitElem(typeIndex: UInt32, elemIndex: UInt32) throws(VisitorError) { return try self.visit(.arrayInitElem(typeIndex: typeIndex, elemIndex: elemIndex)) }
+    public mutating func visitRefTest(_ refTest: Instruction.RefTest, heapType: HeapType) throws(VisitorError) { return try self.visit(.refTest(refTest, heapType: heapType)) }
+    public mutating func visitRefCast(_ refCast: Instruction.RefCast, heapType: HeapType) throws(VisitorError) { return try self.visit(.refCast(refCast, heapType: heapType)) }
+    public mutating func visitBrOnCast(cast: BrOnCast) throws(VisitorError) { return try self.visit(.brOnCast(cast: cast)) }
+    public mutating func visitBrOnCastFail(cast: BrOnCast) throws(VisitorError) { return try self.visit(.brOnCastFail(cast: cast)) }
+    public mutating func visitAnyConvertExtern() throws(VisitorError) { return try self.visit(.anyConvertExtern) }
+    public mutating func visitExternConvertAny() throws(VisitorError) { return try self.visit(.externConvertAny) }
+    public mutating func visitRefI31() throws(VisitorError) { return try self.visit(.refI31) }
+    public mutating func visitI31GetS() throws(VisitorError) { return try self.visit(.i31GetS) }
+    public mutating func visitI31GetU() throws(VisitorError) { return try self.visit(.i31GetU) }
 }
 
 /// A visitor for WebAssembly instructions.
@@ -783,6 +851,8 @@ public protocol InstructionVisitor: ~Copyable {
     mutating func visitRefIsNull() throws(VisitorError)
     /// Visiting `ref.func` instruction.
     mutating func visitRefFunc(functionIndex: UInt32) throws(VisitorError)
+    /// Visiting `ref.eq` instruction.
+    mutating func visitRefEq() throws(VisitorError)
     /// Visiting `ref.as_non_null` instruction.
     mutating func visitRefAsNonNull() throws(VisitorError)
     /// Visiting `br_on_null` instruction.
@@ -941,6 +1011,64 @@ public protocol InstructionVisitor: ~Copyable {
     mutating func visitSimdLane(_: Instruction.SimdLane, lane: UInt8) throws(VisitorError)
     /// Visiting `simdMemLane` category instruction.
     mutating func visitSimdMemLane(_: Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws(VisitorError)
+    /// Visiting `struct.new` instruction.
+    mutating func visitStructNew(typeIndex: UInt32) throws(VisitorError)
+    /// Visiting `struct.new_default` instruction.
+    mutating func visitStructNewDefault(typeIndex: UInt32) throws(VisitorError)
+    /// Visiting `struct.get` instruction.
+    mutating func visitStructGet(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError)
+    /// Visiting `struct.get_s` instruction.
+    mutating func visitStructGetS(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError)
+    /// Visiting `struct.get_u` instruction.
+    mutating func visitStructGetU(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError)
+    /// Visiting `struct.set` instruction.
+    mutating func visitStructSet(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError)
+    /// Visiting `array.new` instruction.
+    mutating func visitArrayNew(typeIndex: UInt32) throws(VisitorError)
+    /// Visiting `array.new_default` instruction.
+    mutating func visitArrayNewDefault(typeIndex: UInt32) throws(VisitorError)
+    /// Visiting `array.new_fixed` instruction.
+    mutating func visitArrayNewFixed(typeIndex: UInt32, size: UInt32) throws(VisitorError)
+    /// Visiting `array.new_data` instruction.
+    mutating func visitArrayNewData(typeIndex: UInt32, dataIndex: UInt32) throws(VisitorError)
+    /// Visiting `array.new_elem` instruction.
+    mutating func visitArrayNewElem(typeIndex: UInt32, elemIndex: UInt32) throws(VisitorError)
+    /// Visiting `array.get` instruction.
+    mutating func visitArrayGet(typeIndex: UInt32) throws(VisitorError)
+    /// Visiting `array.get_s` instruction.
+    mutating func visitArrayGetS(typeIndex: UInt32) throws(VisitorError)
+    /// Visiting `array.get_u` instruction.
+    mutating func visitArrayGetU(typeIndex: UInt32) throws(VisitorError)
+    /// Visiting `array.set` instruction.
+    mutating func visitArraySet(typeIndex: UInt32) throws(VisitorError)
+    /// Visiting `array.len` instruction.
+    mutating func visitArrayLen() throws(VisitorError)
+    /// Visiting `array.fill` instruction.
+    mutating func visitArrayFill(typeIndex: UInt32) throws(VisitorError)
+    /// Visiting `array.copy` instruction.
+    mutating func visitArrayCopy(dstType: UInt32, srcType: UInt32) throws(VisitorError)
+    /// Visiting `array.init_data` instruction.
+    mutating func visitArrayInitData(typeIndex: UInt32, dataIndex: UInt32) throws(VisitorError)
+    /// Visiting `array.init_elem` instruction.
+    mutating func visitArrayInitElem(typeIndex: UInt32, elemIndex: UInt32) throws(VisitorError)
+    /// Visiting `refTest` category instruction.
+    mutating func visitRefTest(_: Instruction.RefTest, heapType: HeapType) throws(VisitorError)
+    /// Visiting `refCast` category instruction.
+    mutating func visitRefCast(_: Instruction.RefCast, heapType: HeapType) throws(VisitorError)
+    /// Visiting `br_on_cast` instruction.
+    mutating func visitBrOnCast(cast: BrOnCast) throws(VisitorError)
+    /// Visiting `br_on_cast_fail` instruction.
+    mutating func visitBrOnCastFail(cast: BrOnCast) throws(VisitorError)
+    /// Visiting `any.convert_extern` instruction.
+    mutating func visitAnyConvertExtern() throws(VisitorError)
+    /// Visiting `extern.convert_any` instruction.
+    mutating func visitExternConvertAny() throws(VisitorError)
+    /// Visiting `ref.i31` instruction.
+    mutating func visitRefI31() throws(VisitorError)
+    /// Visiting `i31.get_s` instruction.
+    mutating func visitI31GetS() throws(VisitorError)
+    /// Visiting `i31.get_u` instruction.
+    mutating func visitI31GetU() throws(VisitorError)
     /// Returns: `true` if the parser should silently proceed parsing.
     mutating func visitUnknown(_ opcode: [UInt8]) throws(VisitorError) -> Bool
 }
@@ -994,6 +1122,7 @@ extension InstructionVisitor where Self: ~Copyable {
         case let .refNull(type): return try visitRefNull(type: type)
         case .refIsNull: return try visitRefIsNull()
         case let .refFunc(functionIndex): return try visitRefFunc(functionIndex: functionIndex)
+        case .refEq: return try visitRefEq()
         case .refAsNonNull: return try visitRefAsNonNull()
         case let .brOnNull(relativeDepth): return try visitBrOnNull(relativeDepth: relativeDepth)
         case let .brOnNonNull(relativeDepth): return try visitBrOnNonNull(relativeDepth: relativeDepth)
@@ -1073,6 +1202,35 @@ extension InstructionVisitor where Self: ~Copyable {
         case let .simd(simd): return try visitSimd(simd)
         case let .simdLane(simdLane, lane): return try visitSimdLane(simdLane, lane: lane)
         case let .simdMemLane(simdMemLane, memarg, lane): return try visitSimdMemLane(simdMemLane, memarg: memarg, lane: lane)
+        case let .structNew(typeIndex): return try visitStructNew(typeIndex: typeIndex)
+        case let .structNewDefault(typeIndex): return try visitStructNewDefault(typeIndex: typeIndex)
+        case let .structGet(typeIndex, fieldIndex): return try visitStructGet(typeIndex: typeIndex, fieldIndex: fieldIndex)
+        case let .structGetS(typeIndex, fieldIndex): return try visitStructGetS(typeIndex: typeIndex, fieldIndex: fieldIndex)
+        case let .structGetU(typeIndex, fieldIndex): return try visitStructGetU(typeIndex: typeIndex, fieldIndex: fieldIndex)
+        case let .structSet(typeIndex, fieldIndex): return try visitStructSet(typeIndex: typeIndex, fieldIndex: fieldIndex)
+        case let .arrayNew(typeIndex): return try visitArrayNew(typeIndex: typeIndex)
+        case let .arrayNewDefault(typeIndex): return try visitArrayNewDefault(typeIndex: typeIndex)
+        case let .arrayNewFixed(typeIndex, size): return try visitArrayNewFixed(typeIndex: typeIndex, size: size)
+        case let .arrayNewData(typeIndex, dataIndex): return try visitArrayNewData(typeIndex: typeIndex, dataIndex: dataIndex)
+        case let .arrayNewElem(typeIndex, elemIndex): return try visitArrayNewElem(typeIndex: typeIndex, elemIndex: elemIndex)
+        case let .arrayGet(typeIndex): return try visitArrayGet(typeIndex: typeIndex)
+        case let .arrayGetS(typeIndex): return try visitArrayGetS(typeIndex: typeIndex)
+        case let .arrayGetU(typeIndex): return try visitArrayGetU(typeIndex: typeIndex)
+        case let .arraySet(typeIndex): return try visitArraySet(typeIndex: typeIndex)
+        case .arrayLen: return try visitArrayLen()
+        case let .arrayFill(typeIndex): return try visitArrayFill(typeIndex: typeIndex)
+        case let .arrayCopy(dstType, srcType): return try visitArrayCopy(dstType: dstType, srcType: srcType)
+        case let .arrayInitData(typeIndex, dataIndex): return try visitArrayInitData(typeIndex: typeIndex, dataIndex: dataIndex)
+        case let .arrayInitElem(typeIndex, elemIndex): return try visitArrayInitElem(typeIndex: typeIndex, elemIndex: elemIndex)
+        case let .refTest(refTest, heapType): return try visitRefTest(refTest, heapType: heapType)
+        case let .refCast(refCast, heapType): return try visitRefCast(refCast, heapType: heapType)
+        case let .brOnCast(cast): return try visitBrOnCast(cast: cast)
+        case let .brOnCastFail(cast): return try visitBrOnCastFail(cast: cast)
+        case .anyConvertExtern: return try visitAnyConvertExtern()
+        case .externConvertAny: return try visitExternConvertAny()
+        case .refI31: return try visitRefI31()
+        case .i31GetS: return try visitI31GetS()
+        case .i31GetU: return try visitI31GetU()
         }
     }
 }
@@ -1118,6 +1276,7 @@ extension InstructionVisitor where Self: ~Copyable {
     public mutating func visitRefNull(type: HeapType) throws(VisitorError) {}
     public mutating func visitRefIsNull() throws(VisitorError) {}
     public mutating func visitRefFunc(functionIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitRefEq() throws(VisitorError) {}
     public mutating func visitRefAsNonNull() throws(VisitorError) {}
     public mutating func visitBrOnNull(relativeDepth: UInt32) throws(VisitorError) {}
     public mutating func visitBrOnNonNull(relativeDepth: UInt32) throws(VisitorError) {}
@@ -1197,6 +1356,35 @@ extension InstructionVisitor where Self: ~Copyable {
     public mutating func visitSimd(_ simd: Instruction.Simd) throws(VisitorError) {}
     public mutating func visitSimdLane(_ simdLane: Instruction.SimdLane, lane: UInt8) throws(VisitorError) {}
     public mutating func visitSimdMemLane(_ simdMemLane: Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws(VisitorError) {}
+    public mutating func visitStructNew(typeIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitStructNewDefault(typeIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitStructGet(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitStructGetS(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitStructGetU(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitStructSet(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitArrayNew(typeIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitArrayNewDefault(typeIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitArrayNewFixed(typeIndex: UInt32, size: UInt32) throws(VisitorError) {}
+    public mutating func visitArrayNewData(typeIndex: UInt32, dataIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitArrayNewElem(typeIndex: UInt32, elemIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitArrayGet(typeIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitArrayGetS(typeIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitArrayGetU(typeIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitArraySet(typeIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitArrayLen() throws(VisitorError) {}
+    public mutating func visitArrayFill(typeIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitArrayCopy(dstType: UInt32, srcType: UInt32) throws(VisitorError) {}
+    public mutating func visitArrayInitData(typeIndex: UInt32, dataIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitArrayInitElem(typeIndex: UInt32, elemIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitRefTest(_ refTest: Instruction.RefTest, heapType: HeapType) throws(VisitorError) {}
+    public mutating func visitRefCast(_ refCast: Instruction.RefCast, heapType: HeapType) throws(VisitorError) {}
+    public mutating func visitBrOnCast(cast: BrOnCast) throws(VisitorError) {}
+    public mutating func visitBrOnCastFail(cast: BrOnCast) throws(VisitorError) {}
+    public mutating func visitAnyConvertExtern() throws(VisitorError) {}
+    public mutating func visitExternConvertAny() throws(VisitorError) {}
+    public mutating func visitRefI31() throws(VisitorError) {}
+    public mutating func visitI31GetS() throws(VisitorError) {}
+    public mutating func visitI31GetU() throws(VisitorError) {}
     public mutating func visitUnknown(_ opcode: [UInt8]) throws(VisitorError) -> Bool { false }
 }
 

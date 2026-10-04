@@ -70,7 +70,11 @@ public struct WasmKitException: Error, CustomStringConvertible {
     let payload: [Value]
 
     init(tag: InternalTag, payload: [Value]) {
-        self.tagIdentity = tag.bitPattern
+        self.init(tagIdentity: tag.bitPattern, payload: payload)
+    }
+
+    init(tagIdentity: Int, payload: [Value]) {
+        self.tagIdentity = tagIdentity
         self.payload = payload
     }
 
@@ -123,6 +127,18 @@ package enum TrapReason: Error, CustomStringConvertible, Sendable {
     case nullFunctionReference
     /// `ref.as_non_null` was given a null reference.
     case nullReference
+    /// `i31.get_s` or `i31.get_u` was given a null reference.
+    case nullI31Reference
+    /// A struct instruction was given a null reference.
+    case nullStructReference
+    /// An array instruction was given a null reference.
+    case nullArrayReference
+    /// An array instruction accessed an element out of the array's bounds.
+    case arrayOutOfBounds
+    /// `ref.cast` was given a reference that is not of the target type.
+    case castFailure
+    /// An allocation needed the GC heap to grow beyond its limit.
+    case outOfGCHeapMemory
 
     /// The description of the trap reason.
     package var description: String {
@@ -149,6 +165,18 @@ package enum TrapReason: Error, CustomStringConvertible, Sendable {
             return "null function reference"
         case .nullReference:
             return "null reference"
+        case .nullI31Reference:
+            return "null i31 reference"
+        case .nullStructReference:
+            return "null structure reference"
+        case .nullArrayReference:
+            return "null array reference"
+        case .arrayOutOfBounds:
+            return "out of bounds array access"
+        case .castFailure:
+            return "cast failure"
+        case .outOfGCHeapMemory:
+            return "out of GC heap memory"
         case .indirectCallToNull(let elementIndex):
             return "indirect call to null element (uninitialized element \(elementIndex))"
         case .typeMismatchCall(let actual, let expected):

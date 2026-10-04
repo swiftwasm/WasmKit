@@ -292,8 +292,9 @@ extension VMGen {
 
         /// The instruction definition of this binary operation.
         var instruction: Instruction {
-            Instruction(name: name, documentation: "WebAssembly Core Instruction `\(lhsType).\(VMGen.snakeCase(pascalCase: op))`",
-                        mayThrow: mayThrow, immediateLayout: .binary)
+            Instruction(
+                name: name, documentation: "WebAssembly Core Instruction `\(lhsType).\(VMGen.snakeCase(pascalCase: op))`",
+                mayThrow: mayThrow, immediateLayout: .binary)
         }
     }
 
@@ -335,8 +336,9 @@ extension VMGen {
 
         /// The instruction definition of this unary operation.
         var instruction: Instruction {
-            var inst = Instruction(name: name, documentation: "WebAssembly Core Instruction `\(inputType).\(VMGen.snakeCase(pascalCase: op))`",
-                        mayThrow: mayThrow, immediateLayout: .unary)
+            var inst = Instruction(
+                name: name, documentation: "WebAssembly Core Instruction `\(inputType).\(VMGen.snakeCase(pascalCase: op))`",
+                mayThrow: mayThrow, immediateLayout: .unary)
             inst.handlerIdentity = handlerIdentity
             return inst
         }
@@ -400,14 +402,14 @@ extension VMGen {
         }
         // Truncation
         let truncInOut: [(source: String, result: String)] = [
-            ("f32", "i32"), ("f64", "i32"), ("f32", "i64"), ("f64", "i64")
+            ("f32", "i32"), ("f64", "i32"), ("f32", "i64"), ("f64", "i64"),
         ]
         results += truncInOut.flatMap { source, result in
             [
                 UnOpInfo(op: "TruncTo\(result.uppercased())S", name: "\(result)Trunc\(source.uppercased())S", inputType: source, resultType: result, mayThrow: true),
                 UnOpInfo(op: "TruncTo\(result.uppercased())U", name: "\(result)Trunc\(source.uppercased())U", inputType: source, resultType: result, mayThrow: true),
                 UnOpInfo(op: "TruncSatTo\(result.uppercased())S", name: "\(result)TruncSat\(source.uppercased())S", inputType: source, resultType: result),
-                UnOpInfo(op: "TruncSatTo\(result.uppercased())U", name: "\(result)TruncSat\(source.uppercased())U", inputType: source, resultType: result)
+                UnOpInfo(op: "TruncSatTo\(result.uppercased())U", name: "\(result)TruncSat\(source.uppercased())U", inputType: source, resultType: result),
             ]
         }
         // Conversion
@@ -427,19 +429,18 @@ extension VMGen {
         }
         // Reinterpret
         let reinterpretInOut: [(source: String, result: String)] = [
-            ("i32", "f32"), ("i64", "f64"), ("f32", "i32"), ("f64", "i64")
+            ("i32", "f32"), ("i64", "f64"), ("f32", "i32"), ("f64", "i64"),
         ]
         results += reinterpretInOut.flatMap { source, result in
             // A reinterpret is a pure slot move of the value's bit width.
             let width = source.hasSuffix("32") ? 32 : 64
             return [
-                UnOpInfo(op: "ReinterpretTo\(result.uppercased())", name: "\(result)Reinterpret\(source.uppercased())", inputType: source, resultType: result, handlerIdentity: "move(\(width))"),
+                UnOpInfo(op: "ReinterpretTo\(result.uppercased())", name: "\(result)Reinterpret\(source.uppercased())", inputType: source, resultType: result, handlerIdentity: "move(\(width))")
             ]
         }
         return results
     }
     static let intUnaryInsts: [UnOpInfo] = buildIntUnaryInsts()
-
 
     // MARK: - Float instructions
 
@@ -461,7 +462,7 @@ extension VMGen {
         }
         // (T, T) -> i32 for all T in float types
         results += [
-            "Eq", "Ne", "Lt", "Gt", "Le", "Ge"
+            "Eq", "Ne", "Lt", "Gt", "Le", "Ge",
         ].flatMap { op -> [BinOpInfo] in
             floatValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: "i32") }
         }
@@ -526,15 +527,17 @@ extension VMGen {
             "\(loadAs),\(isSigned ? "sext\(type)" : "zext")"
         }
         var instruction: Instruction {
-            var inst = Instruction(name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
-                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .load)
+            var inst = Instruction(
+                name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
+                mayThrow: false, useCurrentMemory: .read, immediateLayout: .load)
             inst.mayDispatchToTrap = true
             inst.handlerIdentity = "load(\(identitySuffix))"
             return inst
         }
         var atomicInstruction: Instruction {
-            var inst = Instruction(name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
-                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .load)
+            var inst = Instruction(
+                name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
+                mayThrow: false, useCurrentMemory: .read, immediateLayout: .load)
             inst.mayDispatchToTrap = true
             inst.handlerIdentity = "atomicLoad(\(identitySuffix))"
             return inst
@@ -613,15 +616,17 @@ extension VMGen {
         let isFloatingPoint: Bool
 
         var instruction: Instruction {
-            var inst = Instruction(name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
-                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .store)
+            var inst = Instruction(
+                name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
+                mayThrow: false, useCurrentMemory: .read, immediateLayout: .store)
             inst.mayDispatchToTrap = true
             inst.handlerIdentity = "store(\(storeWidth))"
             return inst
         }
         var atomicInstruction: Instruction {
-            var inst = Instruction(name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
-                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .store)
+            var inst = Instruction(
+                name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
+                mayThrow: false, useCurrentMemory: .read, immediateLayout: .store)
             inst.mayDispatchToTrap = true
             inst.handlerIdentity = "atomicStore(\(storeWidth))"
             return inst
@@ -692,8 +697,9 @@ extension VMGen {
             } else {
                 doc = "WebAssembly Core Instruction `\(type).atomic.rmw.\(VMGen.snakeCase(pascalCase: op))`"
             }
-            var inst = Instruction(name: name, documentation: doc,
-                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .rmw)
+            var inst = Instruction(
+                name: name, documentation: doc,
+                mayThrow: false, useCurrentMemory: .read, immediateLayout: .rmw)
             inst.mayDispatchToTrap = true
             // The handler truncates the operand to `accessWidth` bits, applies the
             // atomic operation and zero-extends the old value back into the slot, so
@@ -777,8 +783,9 @@ extension VMGen {
         ("i64AtomicRmw16CmpxchgU", "i64.atomic.rmw16.cmpxchg_u", 16),
         ("i64AtomicRmw32CmpxchgU", "i64.atomic.rmw32.cmpxchg_u", 32),
     ].map { (name, wasmName, width) in
-        var inst = Instruction(name: name, documentation: "WebAssembly Core Instruction `\(wasmName)`",
-                    mayThrow: false, useCurrentMemory: .read, immediateLayout: .cmpxchg)
+        var inst = Instruction(
+            name: name, documentation: "WebAssembly Core Instruction `\(wasmName)`",
+            mayThrow: false, useCurrentMemory: .read, immediateLayout: .cmpxchg)
         inst.mayDispatchToTrap = true
         inst.handlerIdentity = "rmw(Cmpxchg,\(width))"
         return inst
@@ -799,12 +806,15 @@ extension VMGen {
     }
 
     static let atomicWaitNotifyInsts: [Instruction] = [
-        Instruction(name: "memoryAtomicWait32", documentation: "WebAssembly Core Instruction `memory.atomic.wait32`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .atomicWait),
-        Instruction(name: "memoryAtomicWait64", documentation: "WebAssembly Core Instruction `memory.atomic.wait64`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .atomicWait),
-        Instruction(name: "memoryAtomicNotify", documentation: "WebAssembly Core Instruction `memory.atomic.notify`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .atomicNotify),
+        Instruction(
+            name: "memoryAtomicWait32", documentation: "WebAssembly Core Instruction `memory.atomic.wait32`",
+            mayThrow: true, useCurrentMemory: .read, immediateLayout: .atomicWait),
+        Instruction(
+            name: "memoryAtomicWait64", documentation: "WebAssembly Core Instruction `memory.atomic.wait64`",
+            mayThrow: true, useCurrentMemory: .read, immediateLayout: .atomicWait),
+        Instruction(
+            name: "memoryAtomicNotify", documentation: "WebAssembly Core Instruction `memory.atomic.notify`",
+            mayThrow: true, useCurrentMemory: .read, immediateLayout: .atomicNotify),
         Instruction(name: "atomicFence", documentation: "WebAssembly Core Instruction `atomic.fence`"),
     ]
     static let memoryOpInsts: [Instruction] = [
@@ -914,12 +924,13 @@ extension VMGen {
         Instruction(name: "onExit", documentation: "Intercept the exit of a function", immediate: "OnExitOperand"),
 
         // Debugging
-        Instruction(name: "breakpoint",
+        Instruction(
+            name: "breakpoint",
             documentation: """
-            Stop the VM on this instruction as a breakpoint
+                Stop the VM on this instruction as a breakpoint
 
-            This instruction is used in debugging scenarios.
-            """,
+                This instruction is used in debugging scenarios.
+                """,
             isControl: true, mayThrow: true, mayUpdateFrame: true
         ),
     ]
@@ -927,17 +938,23 @@ extension VMGen {
     // MARK: - Exception handling instructions
 
     static let exceptionHandlingInsts: [Instruction] = [
-        Instruction(name: "throwTag", documentation: "WebAssembly Exception Handling `throw`",
-                    isControl: true, mayThrow: true) {
+        Instruction(
+            name: "throwTag", documentation: "WebAssembly Exception Handling `throw`",
+            isControl: true, mayThrow: true
+        ) {
             $0.field(name: "tagIndex", type: .UInt32)
             $0.field(name: "payloadBase", type: .VReg)
         },
-        Instruction(name: "throwRef", documentation: "WebAssembly Exception Handling `throw_ref`",
-                    isControl: true, mayThrow: true) {
+        Instruction(
+            name: "throwRef", documentation: "WebAssembly Exception Handling `throw_ref`",
+            isControl: true, mayThrow: true
+        ) {
             $0.field(name: "exnRef", type: .VReg)
         },
-        Instruction(name: "catchHandlers", documentation: "Register exception handlers for a `try_table` block",
-                    isControl: true) {
+        Instruction(
+            name: "catchHandlers", documentation: "Register exception handlers for a `try_table` block",
+            isControl: true
+        ) {
             $0.field(name: "rawBaseAddress", type: .UInt64)
             $0.field(name: "count", type: .UInt16)
         },
@@ -1632,23 +1649,27 @@ extension VMGen {
                 isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write, immediateLayout: .call
             ),
             Instruction(
-                name: "compilingCall", documentation: """
-                Compile a callee function (if not compiled) and call it.
+                name: "compilingCall",
+                documentation: """
+                    Compile a callee function (if not compiled) and call it.
 
-                This instruction is replaced by `internalCall` after the callee is compiled.
-                """,
+                    This instruction is replaced by `internalCall` after the callee is compiled.
+                    """,
                 isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .call
             ),
             Instruction(
-                name: "internalCall", documentation: """
-                Call a function defined in the current module
+                name: "internalCall",
+                documentation: """
+                    Call a function defined in the current module
 
-                This instruction can skip switching the current instance.
-                """,
+                    This instruction can skip switching the current instance.
+                    """,
                 isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .call
             ),
-            Instruction(name: "callIndirect", documentation: "WebAssembly Core Instruction `call_indirect`",
-                        isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+            Instruction(
+                name: "callIndirect", documentation: "WebAssembly Core Instruction `call_indirect`",
+                isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write
+            ) {
                 $0.field(name: "tableIndex", type: .UInt32)
                 $0.field(name: "rawType", type: .UInt32)
                 $0.field(name: "index", type: .VReg)
@@ -1657,22 +1678,27 @@ extension VMGen {
             // A tail call's `arguments` is the slot of its first argument, and
             // `frameBase` is where the parameter area of the current frame
             // starts, which is where the callee's parameter area goes.
-            Instruction(name: "returnCall", documentation: "WebAssembly Core Instruction `return_call`",
-                        isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+            Instruction(
+                name: "returnCall", documentation: "WebAssembly Core Instruction `return_call`",
+                isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write
+            ) {
                 $0.field(name: "rawCallee", type: .UInt64)
                 $0.field(name: "arguments", type: .VReg)
                 $0.field(name: "frameBase", type: .LVReg)
             },
-            Instruction(name: "returnCallIndirect", documentation: "WebAssembly Core Instruction `return_call_indirect`",
-                        isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+            Instruction(
+                name: "returnCallIndirect", documentation: "WebAssembly Core Instruction `return_call_indirect`",
+                isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write
+            ) {
                 $0.field(name: "tableIndex", type: .UInt32)
                 $0.field(name: "rawType", type: .UInt32)
                 $0.field(name: "index", type: .VReg)
                 $0.field(name: "arguments", type: .VReg)
                 $0.field(name: "frameBase", type: .LVReg)
             },
-            Instruction(name: "unreachable", documentation: "WebAssembly Core Instruction `unreachable`",
-                        isControl: true, mayThrow: true),
+            Instruction(
+                name: "unreachable", documentation: "WebAssembly Core Instruction `unreachable`",
+                isControl: true, mayThrow: true),
             Instruction(name: "nop", documentation: "WebAssembly Core Instruction `nop`"),
             Instruction(
                 name: "br", documentation: "Unconditional pc-relative branch",
@@ -1686,21 +1712,26 @@ extension VMGen {
                 isControl: true, mayUpdateFrame: false, immediateLayout: .brIfOperand),
             // `index` first keeps its frame access a plain `[base, index]`
             // address; the table pointer second lets both slots load together.
-            Instruction(name: "brTable", documentation: "WebAssembly Core Instruction `br_table`",
-                        isControl: true, mayUpdateFrame: false) {
+            Instruction(
+                name: "brTable", documentation: "WebAssembly Core Instruction `br_table`",
+                isControl: true, mayUpdateFrame: false
+            ) {
                 $0.field(name: "index", type: .VReg)
                 $0.field(name: "lastIndex", type: .UInt16)
                 $0.field(name: "rawBaseAddress", type: .UInt64)
             },
-            Instruction(name: "_return", documentation: "Return from a function",
-                        isControl: true, mayUpdateFrame: true, useCurrentMemory: .write),
-            Instruction(name: "endOfExecution", documentation: """
-                        End the execution of the VM
+            Instruction(
+                name: "_return", documentation: "Return from a function",
+                isControl: true, mayUpdateFrame: true, useCurrentMemory: .write),
+            Instruction(
+                name: "endOfExecution",
+                documentation: """
+                    End the execution of the VM
 
-                        This instruction is used to signal the end of the execution of the VM at
-                        the root frame.
-                        """,
-                        isControl: true, mayThrow: true, mayUpdateFrame: true),
+                    This instruction is used to signal the end of the execution of the VM at
+                    the root frame.
+                    """,
+                isControl: true, mayThrow: true, mayUpdateFrame: true),
         ]
         let simdInsts: [Instruction] = [
             Instruction(name: "v128Const", documentation: "WebAssembly SIMD Instruction `v128.const`", immediateLayout: .v128Const),
@@ -1806,13 +1837,17 @@ extension VMGen {
         instructions += [consumeFuel, outOfFuelTrap]
         // Typed function references
         instructions += [
-            Instruction(name: "callRef", documentation: "WebAssembly Core Instruction `call_ref`",
-                        isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+            Instruction(
+                name: "callRef", documentation: "WebAssembly Core Instruction `call_ref`",
+                isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write
+            ) {
                 $0.field(name: "callee", type: .VReg)
                 $0.field(name: "arguments", type: .VReg)
             },
-            Instruction(name: "returnCallRef", documentation: "WebAssembly Core Instruction `return_call_ref`",
-                        isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+            Instruction(
+                name: "returnCallRef", documentation: "WebAssembly Core Instruction `return_call_ref`",
+                isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write
+            ) {
                 $0.field(name: "callee", type: .VReg)
                 $0.field(name: "arguments", type: .VReg)
                 $0.field(name: "frameBase", type: .LVReg)
@@ -1827,6 +1862,168 @@ extension VMGen {
             Instruction(
                 name: "brIfNotNull", documentation: "Conditional pc-relative branch if the condition is not a null reference",
                 isControl: true, mayUpdateFrame: false, immediateLayout: .brIfOperand),
+        ]
+        // Garbage collection
+        instructions += [
+            Instruction(name: "refI31", documentation: "WebAssembly Core Instruction `ref.i31`") {
+                $0.field(name: "value", type: .LVReg)
+                $0.field(name: "result", type: .LVReg)
+            },
+            Instruction(name: "i31GetS", documentation: "WebAssembly Core Instruction `i31.get_s`", mayThrow: true) {
+                $0.field(name: "value", type: .LVReg)
+                $0.field(name: "result", type: .LVReg)
+            },
+            Instruction(name: "i31GetU", documentation: "WebAssembly Core Instruction `i31.get_u`", mayThrow: true) {
+                $0.field(name: "value", type: .LVReg)
+                $0.field(name: "result", type: .LVReg)
+            },
+            Instruction(name: "refEq", documentation: "WebAssembly Core Instruction `ref.eq`") {
+                $0.field(name: "lhs", type: .VReg)
+                $0.field(name: "rhs", type: .VReg)
+                $0.field(name: "result", type: .VReg)
+            },
+            Instruction(
+                name: "structNew",
+                documentation: "WebAssembly Core Instruction `struct.new`. The field values are consecutive from `operands`.",
+                mayThrow: true
+            ) {
+                $0.field(name: "typeID", type: .UInt32)
+                $0.field(name: "operands", type: .VReg)
+                $0.field(name: "result", type: .VReg)
+                $0.field(name: "safepoint", type: .UInt32)
+            },
+            Instruction(name: "structNewDefault", documentation: "WebAssembly Core Instruction `struct.new_default`", mayThrow: true) {
+                $0.field(name: "typeID", type: .UInt32)
+                $0.field(name: "result", type: .VReg)
+                $0.field(name: "safepoint", type: .UInt32)
+            },
+            Instruction(
+                name: "structGet",
+                documentation: "WebAssembly Core Instruction `struct.get`, `struct.get_s` or `struct.get_u`. See `GCFieldAccess`.",
+                mayThrow: true
+            ) {
+                $0.field(name: "object", type: .VReg)
+                $0.field(name: "result", type: .VReg)
+                $0.field(name: "field", type: .UInt32)
+            },
+            Instruction(name: "structSet", documentation: "WebAssembly Core Instruction `struct.set`. See `GCFieldAccess`.", mayThrow: true) {
+                $0.field(name: "object", type: .VReg)
+                $0.field(name: "value", type: .VReg)
+                $0.field(name: "field", type: .UInt32)
+            },
+            Instruction(
+                name: "arrayNew",
+                documentation: "WebAssembly Core Instruction `array.new`. The operands are the value then the length.",
+                mayThrow: true
+            ) {
+                $0.field(name: "typeID", type: .UInt32)
+                $0.field(name: "operands", type: .VReg)
+                $0.field(name: "result", type: .VReg)
+                $0.field(name: "safepoint", type: .UInt32)
+            },
+            Instruction(name: "arrayNewDefault", documentation: "WebAssembly Core Instruction `array.new_default`", mayThrow: true) {
+                $0.field(name: "typeID", type: .UInt32)
+                $0.field(name: "length", type: .VReg)
+                $0.field(name: "result", type: .VReg)
+                $0.field(name: "safepoint", type: .UInt32)
+            },
+            Instruction(
+                name: "arrayNewFixed",
+                documentation: "WebAssembly Core Instruction `array.new_fixed`. The elements are consecutive from `operands`.",
+                mayThrow: true
+            ) {
+                $0.field(name: "typeID", type: .UInt32)
+                $0.field(name: "count", type: .UInt32)
+                $0.field(name: "operands", type: .VReg)
+                $0.field(name: "result", type: .VReg)
+                $0.field(name: "safepoint", type: .UInt32)
+            },
+            Instruction(
+                name: "arrayNewData",
+                documentation: "WebAssembly Core Instruction `array.new_data`. The operands are the offset then the length.",
+                mayThrow: true
+            ) {
+                $0.field(name: "typeID", type: .UInt32)
+                $0.field(name: "segmentIndex", type: .UInt32)
+                $0.field(name: "operands", type: .VReg)
+                $0.field(name: "result", type: .VReg)
+                $0.field(name: "safepoint", type: .UInt32)
+            },
+            Instruction(
+                name: "arrayNewElem",
+                documentation: "WebAssembly Core Instruction `array.new_elem`. The operands are the offset then the length.",
+                mayThrow: true
+            ) {
+                $0.field(name: "typeID", type: .UInt32)
+                $0.field(name: "segmentIndex", type: .UInt32)
+                $0.field(name: "operands", type: .VReg)
+                $0.field(name: "result", type: .VReg)
+                $0.field(name: "safepoint", type: .UInt32)
+            },
+            Instruction(
+                name: "arrayGet",
+                documentation: "WebAssembly Core Instruction `array.get`, `array.get_s` or `array.get_u`. The operands are the array then the index.",
+                mayThrow: true
+            ) {
+                $0.field(name: "operands", type: .VReg)
+                $0.field(name: "result", type: .VReg)
+                $0.field(name: "element", type: .UInt8)
+            },
+            Instruction(
+                name: "arraySet",
+                documentation: "WebAssembly Core Instruction `array.set`. The operands are the array, the index, then the value.",
+                mayThrow: true
+            ) {
+                $0.field(name: "operands", type: .VReg)
+                $0.field(name: "element", type: .UInt8)
+            },
+            Instruction(name: "arrayLen", documentation: "WebAssembly Core Instruction `array.len`", mayThrow: true) {
+                $0.field(name: "array", type: .VReg)
+                $0.field(name: "result", type: .VReg)
+            },
+            Instruction(
+                name: "arrayFill",
+                documentation: "WebAssembly Core Instruction `array.fill`. The operands are the array, the offset, the value, then the length.",
+                mayThrow: true
+            ) {
+                $0.field(name: "operands", type: .VReg)
+                $0.field(name: "element", type: .UInt8)
+            },
+            Instruction(
+                name: "arrayCopy",
+                documentation: "WebAssembly Core Instruction `array.copy`. The operands are the destination array and offset, the source array and offset, then the length.",
+                mayThrow: true
+            ) {
+                $0.field(name: "operands", type: .VReg)
+                $0.field(name: "element", type: .UInt8)
+            },
+            Instruction(
+                name: "arrayInitData",
+                documentation: "WebAssembly Core Instruction `array.init_data`. The operands are the array, the destination offset, the source offset, then the length.",
+                mayThrow: true
+            ) {
+                $0.field(name: "segmentIndex", type: .UInt32)
+                $0.field(name: "operands", type: .VReg)
+                $0.field(name: "element", type: .UInt8)
+            },
+            Instruction(name: "refTest", documentation: "WebAssembly Core Instruction `ref.test`. See `CastTarget`.") {
+                $0.field(name: "value", type: .VReg)
+                $0.field(name: "result", type: .VReg)
+                $0.field(name: "target", type: .UInt32)
+            },
+            Instruction(name: "refCast", documentation: "WebAssembly Core Instruction `ref.cast`. See `CastTarget`.", mayThrow: true) {
+                $0.field(name: "value", type: .VReg)
+                $0.field(name: "result", type: .VReg)
+                $0.field(name: "target", type: .UInt32)
+            },
+            Instruction(
+                name: "arrayInitElem",
+                documentation: "WebAssembly Core Instruction `array.init_elem`. The operands are the array, the destination offset, the source offset, then the length.",
+                mayThrow: true
+            ) {
+                $0.field(name: "segmentIndex", type: .UInt32)
+                $0.field(name: "operands", type: .VReg)
+            },
         ]
         // Multi-memory
         instructions += [

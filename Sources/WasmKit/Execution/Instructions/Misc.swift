@@ -48,18 +48,8 @@ extension Execution {
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#reference-instructions>
 extension Execution {
     mutating func refNull(sp: Sp, immediate: Instruction.RefNullOperand) {
-        let value: Value
-        switch immediate.type {
-        case .externRef:
-            value = .ref(.extern(nil))
-        case .funcRef:
-            value = .ref(.function(nil))
-        case .exnRef:
-            value = .ref(.exception(nil))
-        case .any, .eq, .i31, .structRef, .arrayRef, .noneRef, .noExtern, .noFunc, .noExn:
-            preconditionFailure("ref.null of GC heap type \(immediate.type) is not supported yet")
-        }
-        sp[immediate.result] = UntypedValue(value)
+        // Every reference type has the same null.
+        sp[immediate.result] = .nullReference
     }
     mutating func refIsNull(sp: Sp, immediate: Instruction.RefIsNullOperand) {
         let value = sp[immediate.value]
@@ -71,6 +61,29 @@ extension Execution {
             result = .i32(0)
         }
         sp[immediate.result] = UntypedValue(result)
+    }
+    mutating func refI31(sp: Sp, immediate: Instruction.RefI31Operand) {
+        sp[immediate.result] = UntypedValue(storage: AnyRef(i31: sp[immediate.value].i32).storage)
+    }
+    mutating func i31GetS(sp: Sp, immediate: Instruction.I31GetSOperand) throws {
+        let value = sp[immediate.value]
+        guard !value.isNullRef else {
+            throw Trap(.nullI31Reference)
+        }
+        // Sign-extend the 31-bit payload.
+        let payload = UInt32(truncatingIfNeeded: value.storage >> 1)
+        sp[immediate.result] = .i32(UInt32(bitPattern: Int32(bitPattern: payload << 1) >> 1))
+    }
+    mutating func i31GetU(sp: Sp, immediate: Instruction.I31GetUOperand) throws {
+        let value = sp[immediate.value]
+        guard !value.isNullRef else {
+            throw Trap(.nullI31Reference)
+        }
+        sp[immediate.result] = .i32(UInt32(truncatingIfNeeded: value.storage >> 1) & 0x7FFF_FFFF)
+    }
+    mutating func refEq(sp: Sp, immediate: Instruction.RefEqOperand) {
+        // Two references are equal if they are both null, the same i31 value, or the same object.
+        sp[immediate.result] = .i32(sp[immediate.lhs].storage == sp[immediate.rhs].storage ? 1 : 0)
     }
     mutating func refAsNonNull(sp: Sp, immediate: Instruction.RefAsNonNullOperand) throws {
         let value = sp[immediate.value]

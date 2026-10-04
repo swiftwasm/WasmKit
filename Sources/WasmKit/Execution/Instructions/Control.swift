@@ -167,7 +167,11 @@ extension Execution {
             throw Trap(.indirectCallToNull(elementIndex))
         }
         let function = InternalFunction(bitPattern: rawBitPattern)
-        guard function.type == expectedType else {
+        // A function of a declared subtype of the expected type may be called too.
+        guard
+            function.type == expectedType
+                || store.value.engine.typeRegistry.isSubtype(.concrete(typeIndex: function.type.id), of: .concrete(typeIndex: expectedType.id))
+        else {
             throw Trap(
                 .typeMismatchCall(
                     actual: store.value.engine.resolveType(function.type),

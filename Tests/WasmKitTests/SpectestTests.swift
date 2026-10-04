@@ -79,5 +79,30 @@ struct SpectestTests {
             // Sanity check that non-default threading models work.
             try Self.run(test: test, configuration: defaultConfig)
         }
+
+        /// The spec files that allocate GC objects, and WasmKit's own GC tests.
+        static var gcTestCases: [TestCase] {
+            get throws {
+                let gcFiles: Set<String> = [
+                    "array.wast", "array_copy.wast", "array_fill.wast", "array_init_data.wast", "array_init_elem.wast",
+                    "array_new_data.wast", "array_new_elem.wast", "br_on_cast.wast", "br_on_cast_fail.wast", "extern.wast",
+                    "i31.wast", "ref_cast.wast", "ref_eq.wast", "ref_test.wast", "struct.wast", "type-subtyping.wast",
+                    "try_table.wast", "throw_ref.wast",
+                ]
+                return try testCases(in: [testsuite.path, projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/gc").path])
+                    .filter { gcFiles.contains(URL(fileURLWithPath: $0.path).lastPathComponent) || $0.path.contains("ExtraSuite/gc/") }
+            }
+        }
+
+        @Test(
+            .disabled("unable to run spectest on Android due to missing files on emulator", platforms: [.android]),
+            arguments: try SpectestTests.gcTestCases
+        )
+        func runWithGCStress(test: TestCase) throws {
+            // Every allocation collects, so a root the stack maps miss fails a test.
+            var configuration = EngineConfiguration()
+            configuration.gcStressMode = true
+            try Self.run(test: test, configuration: configuration)
+        }
     #endif
 }

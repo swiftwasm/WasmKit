@@ -111,7 +111,7 @@ struct EncoderTests {
             try String(contentsOf: wast, encoding: .utf8),
             features: Spectest.deriveFeatureSet(wast: wast)
         )
-        let skip = Self.skippedDirectives(in: wast)
+        let skip = Self.leftOutDirectives(in: wast)
         var watModules: [ModuleDirective] = []
         var starts: [Int] = []
 
@@ -167,8 +167,16 @@ struct EncoderTests {
         }
     }
 
-    private static func skippedDirectives(in wast: URL) -> [Int: String] {
-        Spectest.isTopLevel(wast) ? Spectest.skippedDirectives[wast.lastPathComponent] ?? [:] : [:]
+    /// The directives in `wast` that its reference tool cannot parse, by the line they start on.
+    private static func leftOutDirectives(in wast: URL) -> [Int: String] {
+        guard Spectest.isTopLevel(wast) else { return [:] }
+        let unparsed = usesWasmTools(wast) ? Spectest.unparsedByWasmTools : Spectest.unparsedByWast2json
+        return unparsed[wast.lastPathComponent] ?? [:]
+    }
+
+    private static func usesWasmTools(_ wastFile: URL) -> Bool {
+        ["gc", "annotations"].contains(wastFile.deletingLastPathComponent().lastPathComponent)
+            || (Spectest.isTopLevel(wastFile) && wasmToolsFiles.contains(wastFile.lastPathComponent))
     }
 
     // MARK: - Module Comparison
@@ -461,11 +469,6 @@ struct EncoderTests {
             }
         }
 
-        private static func usesWasmTools(_ wastFile: URL) -> Bool {
-            ["gc", "annotations"].contains(wastFile.deletingLastPathComponent().lastPathComponent)
-                || (Spectest.isTopLevel(wastFile) && wasmToolsFiles.contains(wastFile.lastPathComponent))
-        }
-
         /// The script in `wastFile` with the directives starting on `leftOut` blanked, keeping the
         /// line numbers. `starts` is the line every directive in the file starts on.
         private static func script(of wastFile: URL, leavingOut leftOut: [Int], starts: [Int]) throws -> String {
@@ -483,7 +486,7 @@ struct EncoderTests {
         private func wast2jsonModules(wastFile: URL, starts: [Int], tempDir: String) throws -> [ReferenceModule]? {
             guard let wast2json = TestSupport.lookupExecutable("wast2json") else { return nil }
             var input = wastFile
-            let skipped = Array(Self.skippedDirectives(in: wastFile).keys)
+            let skipped = Array(Self.leftOutDirectives(in: wastFile).keys)
             if !skipped.isEmpty {
                 input = URL(fileURLWithPath: tempDir).appendingPathComponent(wastFile.lastPathComponent)
                 try Self.script(of: wastFile, leavingOut: skipped, starts: starts).write(to: input, atomically: true, encoding: .utf8)
@@ -499,9 +502,7 @@ struct EncoderTests {
         /// which runs it. `starts` is the line every directive in the file starts on.
         private func wasmToolsModules(wastFile: URL, starts: [Int]) throws -> [ReferenceModule]? {
             #if ComponentModel
-                let leftOut =
-                    Array(Self.skippedDirectives(in: wastFile).keys)
-                    + (Spectest.unparsedByWasmTools[wastFile.lastPathComponent] ?? [:]).keys
+                let leftOut = Array(Self.leftOutDirectives(in: wastFile).keys)
                 let script = try Self.script(of: wastFile, leavingOut: leftOut, starts: starts)
                 let (json, wasmFiles) = try wast2json(wastContent: Array(script.utf8), wastFileName: wastFile.lastPathComponent)
                 return json.commands.filter { $0.type == "module" }.map {

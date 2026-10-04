@@ -20,9 +20,6 @@ struct Execution: ~Copyable {
     /// The stack of active exception handlers for `try_table` blocks.
     var exceptionHandlers: [ExceptionHandler] = []
 
-    /// Storage for caught exceptions that may be referenced via `exnref`.
-    var storedExceptions: [WasmKitException] = []
-
     /// An active exception handler entry registered by a `try_table` block.
     struct ExceptionHandler {
         /// The tag to match, `nil` for `catch_all`/`catch_all_ref`.
@@ -704,7 +701,7 @@ extension Execution {
                 self.resetError()
 
                 if let exception = error as? WasmKitException {
-                    if handleException(exception, sp: &sp, pc: &pc, md: &md, ms: &ms) {
+                    if try handleException(exception, sp: &sp, pc: &pc, md: &md, ms: &ms) {
                         continue
                     }
                     throw exception
@@ -751,7 +748,7 @@ extension Execution {
                 // them in memory, and every instruction would store and reload them.
                 var handlerSp = sp
                 var handlerPc = pc
-                guard handleException(exception, sp: &handlerSp, pc: &handlerPc, md: &md, ms: &ms) else {
+                guard try handleException(exception, sp: &handlerSp, pc: &handlerPc, md: &md, ms: &ms) else {
                     throw exception
                 }
                 opcode = handlerPc.read(OpcodeID.self)
@@ -781,7 +778,7 @@ extension Execution {
                 return try doExecute(opcode, sp: &sp, pc: &pc, md: &md, ms: &ms)
             } catch let exception as WasmKitException {
                 // A matching handler leaves `pc` at the head slot it resumes from.
-                guard handleException(exception, sp: &sp, pc: &pc, md: &md, ms: &ms) else { throw exception }
+                guard try handleException(exception, sp: &sp, pc: &pc, md: &md, ms: &ms) else { throw exception }
                 return pc.read(CodeSlot.self)
             } catch let trap as Trap {
                 throw trap.withBacktrace(Self.captureBacktrace(sp: sp, pc: pc, store: store.value))
@@ -876,6 +873,10 @@ extension Execution {
         function: EntityHandle<HostFunctionEntity>, parameterArea: Sp,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
+        // The host function may allocate, or call back into Wasm, which may.
+        let heap = store.value.allocator.gcHeap
+        heap.suspendedFrames.append((sp, pc))
+        defer { heap.suspendedFrames.removeLast() }
         try invokeHostFunction(function: function, sp: sp, parameterArea: parameterArea)
         // A host function may re-enter the guest and grow the caller's
         // default memory. A malloc-backed memory moves when it grows, so the
@@ -917,6 +918,11 @@ extension Execution {
             let saved = SavedSlots(of: sp)
             Self.moveArguments(from: argumentSlots, to: parameterArea, slotCount: layout.parameterSlotCount)
             saved.store(below: newSp)
+            // No call site maps the tail-calling frame, so a collection only walks
+            // the frames that `newSp` returns to.
+            let heap = store.value.allocator.gcHeap
+            heap.suspendedFrames.append((newSp, pc))
+            defer { heap.suspendedFrames.removeLast() }
             try invokeHostFunction(function: host, sp: newSp, parameterArea: parameterArea)
             if let instance = newSp.currentInstance {
                 CurrentMemory.mayUpdateCurrentInstance(instance: instance, md: &md, ms: &ms)

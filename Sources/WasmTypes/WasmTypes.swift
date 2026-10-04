@@ -227,6 +227,56 @@ public enum Reference: Hashable, Sendable {
     case extern(ExternAddress?)
     /// A reference to an exception.
     case exception(ExceptionAddress?)
+    /// A reference of the GC proposal's internal hierarchy: an `anyref` or a
+    /// reference of one of its subtypes, such as an `i31ref`.
+    case any(AnyRef?)
+    /// A non-null `externref` that `extern.convert_any` made from an internal
+    /// reference other than an internalized host value.
+    case externalized(AnyRef)
+}
+
+/// A non-null reference of the GC proposal's internal hierarchy.
+///
+/// It is either an unboxed 31-bit integer (an `i31ref`), or an external value
+/// of the host that `any.convert_extern` internalized.
+public struct AnyRef: Hashable, Sendable {
+    /// The reference's bits as WasmKit stores them in a value slot. The low two
+    /// bits tell its kind: `01` or `11` is an `i31ref` with the value in the
+    /// upper bits, and `10` is an internalized host value shifted left by two.
+    /// A reference to an object that the host holds is a root handle of its
+    /// store instead, with bit 62 set.
+    package let storage: UInt64
+
+    package init(storage: UInt64) {
+        self.storage = storage
+    }
+
+    /// The largest host value that a reference can hold.
+    public static var maxHostValue: ExternAddress { ExternAddress.max >> 3 }
+
+    /// Creates an `i31ref` from the low 31 bits of `value`, as `ref.i31` does.
+    public init(i31 value: UInt32) {
+        self.storage = UInt64(value & 0x7FFF_FFFF) << 1 | 1
+    }
+
+    /// Creates the internal reference that `any.convert_extern` makes from the
+    /// host value `value`, which must be in `0...maxHostValue`.
+    public init(internalizing value: ExternAddress) {
+        precondition(value >= 0 && value <= Self.maxHostValue, "host value \(value) out of range")
+        self.storage = UInt64(value) << 2 | 0b10
+    }
+
+    /// The value of an `i31ref`, zero-extended, or `nil` for other references.
+    public var i31: UInt32? {
+        guard storage & 1 == 1 else { return nil }
+        return UInt32(truncatingIfNeeded: storage >> 1) & 0x7FFF_FFFF
+    }
+
+    /// The host value an internalized reference holds, or `nil` for other references.
+    public var internalizedValue: ExternAddress? {
+        guard storage & 0b11 == 0b10 else { return nil }
+        return ExternAddress(truncatingIfNeeded: storage >> 2)
+    }
 }
 
 /// Runtime representation of a value.

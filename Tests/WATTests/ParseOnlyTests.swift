@@ -30,11 +30,10 @@ struct ParseOnlyTests {
         #endif
     }
 
-    private func parseAllModulesInWast(_ source: String, features: WasmFeatureSet, skip: [Int: String] = [:]) throws {
+    private func parseAllModulesInWast(_ source: String, features: WasmFeatureSet) throws {
         var wast = try parseWAST(source, features: features)
-        while let (result, location) = wast.nextDirectiveResult() {
-            if !skip.isEmpty, skip[location.computeLineAndColumn().line] != nil { continue }
-            switch try result.get() {
+        while let (directive, _) = try wast.nextDirective() {
+            switch directive {
             case .module(let module):
                 try parseWasmBytes(TestSupport.encode(module.source, features: features), features: features)
             case .assertUnlinkable(let wat, _):
@@ -67,10 +66,9 @@ struct ParseOnlyTests {
     @Test(arguments: ParseOnlyTests.unsupportedWastFiles)
     func parseOnlyUnsupportedSpec(wastFile: URL) throws {
         let source = try String(contentsOf: wastFile, encoding: .utf8)
-        let skip = Spectest.skippedDirectives[wastFile.lastPathComponent] ?? [:]
         var features = Spectest.deriveFeatureSet(wast: wastFile)
         // Wasm 3.0 includes typed function references, which only some files get for wast2json.
         features.insert(.functionReferences)
-        try parseAllModulesInWast(source, features: features, skip: skip)
+        try parseAllModulesInWast(source, features: features)
     }
 }

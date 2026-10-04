@@ -42,6 +42,18 @@ class BumpAllocator<T: ~Copyable> {
         return pointer
     }
 
+    /// Calls `body` with every value allocated so far, in allocation order.
+    func forEachAllocated(_ body: (UnsafeMutablePointer<T>) throws -> Void) rethrows {
+        for page in pages {
+            for index in page.indices {
+                try body(page.baseAddress.unsafelyUnwrapped + index)
+            }
+        }
+        for index in 0..<currentOffset {
+            try body(currentPage.baseAddress.unsafelyUnwrapped + index)
+        }
+    }
+
     /// Allocates a new value and returns a pointer to it.
     ///
     /// - Note: The allocated memory must be initialized before
@@ -166,48 +178,6 @@ struct Interned<T: Internable>: Equatable, Hashable, Sendable {
     let id: T.Offset
 }
 
-/// A deduplicating interner for values of type `Item`.
-///
-/// Thread-safe when the `MultiThread` trait is enabled: all access is
-/// serialized by the internal `PlatformMutex`.
-final class Interner<Item: Hashable & Internable & Sendable>: Sendable {
-    private struct State {
-        var itemByIntern: [Item]
-        var internByItem: [Item: Interned<Item>]
-    }
-
-    // `var` because the single-threaded PlatformMutex fallback mutates in
-    // place; the mutex itself guarantees exclusivity, which Sendable checking
-    // cannot see.
-    nonisolated(unsafe) private var state: PlatformMutex<State>
-
-    init() {
-        state = PlatformMutex(State(itemByIntern: [], internByItem: [:]))
-    }
-
-    /// Interns the given `item` and returns an interned value.
-    /// If the item is already interned, returns the existing interned value.
-    func intern(_ item: Item) -> Interned<Item> {
-        state.withLock { state in
-            if let interned = state.internByItem[item] {
-                return interned
-            }
-            let id = state.itemByIntern.count
-            state.itemByIntern.append(item)
-            let newInterned = Interned<Item>(id: Item.Offset(id))
-            state.internByItem[item] = newInterned
-            return newInterned
-        }
-    }
-
-    /// Resolves the given `interned` value to the original value.
-    func resolve(_ interned: Interned<Item>) -> Item {
-        state.withLock { state in
-            state.itemByIntern[Int(interned.id)]
-        }
-    }
-}
-
 /// A function type is internable for efficient equality comparison.
 /// Usually used for signature checking at indirect calls.
 extension FunctionType: Internable {
@@ -238,9 +208,11 @@ class StoreAllocator {
     #endif
 
     /// Function type interner shared across stores associated with the same `Runtime`.
-    let funcTypeInterner: Interner<FunctionType>
+    let typeRegistry: TypeRegistry
+    /// Where the structs and arrays of this store live.
+    let gcHeap: GCHeap
 
-    init(funcTypeInterner: Interner<FunctionType>) {
+    init(typeRegistry: TypeRegistry, maxGCHeapSize: Int) {
         instances = BumpAllocator(initialCapacity: 2)
         functions = BumpAllocator(initialCapacity: 64)
         hostFunctions = BumpAllocator(initialCapacity: 32)
@@ -253,12 +225,47 @@ class StoreAllocator {
         datas = BumpAllocator(initialCapacity: 64)
         arrayAllocator = ImmutableArrayAllocator()
         iseqAllocator = ISeqAllocator()
-        self.funcTypeInterner = funcTypeInterner
+        self.typeRegistry = typeRegistry
+        self.gcHeap = GCHeap(maxSize: maxGCHeapSize, typeRegistry: typeRegistry)
 
         #if ComponentModel
             componentInstances = BumpAllocator(initialCapacity: 2)
             componentFunctions = BumpAllocator(initialCapacity: 16)
         #endif
+        gcHeap.visitStoreRoots = { [unowned self] visit in self.visitObjectReferences(visit) }
+    }
+
+    /// Calls `visit` with every reference to a GC object in the store's
+    /// globals, tables and element segments, updating it to what `visit` sets.
+    private func visitObjectReferences(_ visit: (inout UInt32) -> Void) {
+        globals.forEachAllocated { global in
+            guard global.pointee.globalType.valueType.mayReferToObject,
+                GCHeap.isObjectReference(global.pointee.rawStorage.lo)
+            else { return }
+            var object = UInt32(truncatingIfNeeded: global.pointee.rawStorage.lo)
+            visit(&object)
+            global.pointee.rawStorage.lo = UInt64(object)
+        }
+        tables.forEachAllocated { table in
+            guard ValueType.ref(table.pointee.tableType.elementType).mayReferToObject else { return }
+            table.pointee.elements.withUnsafeMutableBufferPointer { elements in
+                for index in elements.indices where GCHeap.isObjectReference(UInt64(UInt(bitPattern: elements[index]))) {
+                    var object = UInt32(truncatingIfNeeded: elements[index])
+                    visit(&object)
+                    elements[index] = Int(object)
+                }
+            }
+        }
+        elements.forEachAllocated { segment in
+            guard ValueType.ref(segment.pointee.type).mayReferToObject else { return }
+            for index in segment.pointee.references.indices {
+                let value = UntypedValue(.ref(segment.pointee.references[index]))
+                guard GCHeap.isObjectReference(value.storage) else { continue }
+                var object = UInt32(truncatingIfNeeded: value.storage)
+                visit(&object)
+                segment.pointee.references[index] = UntypedValue(storage: UInt64(object)).asReference(segment.pointee.type)
+            }
+        }
     }
 }
 
@@ -281,7 +288,7 @@ extension StoreAllocator {
     ) throws -> InternalInstance {
         // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
 
-        let canonicalizer = try TypeCanonicalizer(typeSection: module.types, interner: funcTypeInterner)
+        let canonicalizer = try TypeCanonicalizer(typeSection: module.types, registry: typeRegistry)
         var importedFunctions: [InternalFunction] = []
         var importedTables: [InternalTable] = []
         var importedMemories: [InternalMemory] = []
@@ -306,7 +313,7 @@ extension StoreAllocator {
                     throw WasmKitError(message: .indexOutOfBounds("type", typeIndex, max: module.types.count))
                 }
                 let expected = try canonicalizer.canonicalID(of: typeIndex)
-                guard expected == type else {
+                guard type == expected || typeRegistry.isSubtype(.concrete(typeIndex: type.id), of: .concrete(typeIndex: expected.id)) else {
                     throw WasmKitError(
                         message: .incompatibleFunctionType(importEntry, actual: engine.resolveType(type), expected: engine.resolveType(expected))
                     )
@@ -357,7 +364,7 @@ extension StoreAllocator {
                 let matches =
                     switch globalType.mutability {
                     case .variable: provided == globalType
-                    case .constant: provided.mutability == .constant && provided.valueType.isSubtype(of: globalType.valueType)
+                    case .constant: provided.mutability == .constant && provided.valueType.isSubtype(of: globalType.valueType, in: typeRegistry)
                     }
                 guard matches else {
                     throw WasmKitError(message: .incompatibleGlobalType(importEntry, actual: provided, expected: globalType))
@@ -417,7 +424,9 @@ extension StoreAllocator {
             imports: importedFunctions,
             internals: module.functions,
             allocateHandle: { f, index in
-                let type = engine.internType(try canonicalizer.canonicalize(f.type))
+                // The function has the canonical type it declares, which a `rec` group or a
+                // declared supertype tells apart from other types with the same signature.
+                let type = try canonicalizer.canonicalID(of: f.typeIndex)
                 return allocate(function: f, type: type, index: FunctionIndex(index), instance: instanceHandle)
             }
         )
@@ -429,12 +438,15 @@ extension StoreAllocator {
         var constEvalContext = ConstEvaluationContext(
             functions: functions,
             globals: importedGlobals,
+            canonicalizer: canonicalizer,
+            gcHeap: gcHeap,
+            resourceLimiter: resourceLimiter,
             onFunctionReferenced: { function in
                 functionRefs.insert(function)
             }
         )
         var constTypeContext = ConstExpressionTypeContext(
-            canonicalizer: canonicalizer, functions: functions, globalTypes: importedGlobalTypes
+            canonicalizer: canonicalizer, typeRegistry: typeRegistry, functions: functions, globalTypes: importedGlobalTypes
         )
 
         // Step 3.
@@ -556,7 +568,7 @@ extension StoreAllocator {
 
         // Steps 20-21.
         let instanceEntity = InstanceEntity(
-            types: canonicalizer.typeIDs.map { engine.resolveType($0) },
+            types: canonicalizer.typeIDs.map { typeRegistry.subType($0.id) },
             typeIDs: canonicalizer.typeIDs,
             functions: functions,
             tables: tables,
@@ -644,7 +656,7 @@ extension StoreAllocator {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-global>
     func allocate(globalType: GlobalType, initialValue: Value) throws -> InternalGlobal {
-        let pointer = try globals.allocate(initializing: GlobalEntity(globalType: globalType, initialValue: initialValue))
+        let pointer = try globals.allocate(initializing: GlobalEntity(globalType: globalType, initialValue: initialValue, heap: gcHeap))
         return InternalGlobal(unsafe: pointer)
     }
 

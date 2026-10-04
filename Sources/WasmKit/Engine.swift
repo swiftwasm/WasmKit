@@ -13,7 +13,7 @@ public final class Engine {
     /// The engine configuration.
     public let configuration: EngineConfiguration
     let interceptor: EngineInterceptor?
-    let funcTypeInterner: Interner<FunctionType>
+    let typeRegistry: TypeRegistry
 
     /// The head slot of the `returnCrossInstance` handler under this engine's
     /// threading model.
@@ -52,7 +52,7 @@ public final class Engine {
 
         self.configuration = configuration
         self.interceptor = interceptor
-        self.funcTypeInterner = Interner()
+        self.typeRegistry = TypeRegistry()
         self.crossInstanceReturnSlot = Instruction.returnCrossInstance(.init()).headSlot(
             threadingModel: configuration.threadingModel
         )
@@ -63,7 +63,7 @@ public final class Engine {
     public func instantiate(module: Module) -> Instance { fatalError() }
 }
 
-// `configuration` is immutable and `funcTypeInterner` synchronizes its mutable
+// `configuration` is immutable and `typeRegistry` synchronizes its mutable
 // state. Concurrent clients must reject engines with interceptors, whose
 // implementations are not currently Sendable.
 extension Engine: @unchecked Sendable {}
@@ -176,6 +176,15 @@ public struct EngineConfiguration: Sendable {
     /// never metered, which is why this lives on the engine rather than on the store.
     public var fuelMetering: Bool
 
+    /// The largest size in bytes the GC heap of a store may grow to, where the
+    /// structs and arrays of the WebAssembly GC proposal live. An allocation
+    /// that needs more traps. Capped at 4 GiB. (Default: 1 GiB)
+    public var maxGCHeapSize: Int = 1 << 30
+
+    /// Whether every allocation in the GC heap collects first, so that a missed
+    /// root shows up as a failure in testing instead of a rare crash.
+    package var gcStressMode: Bool = false
+
     /// FIXME: Make it public once we add mprotect-based bounds checking with JIT.
     /// Extra reserved bytes after the 4 GiB wasm32 address space for future
     /// unchecked constant-offset accesses in JIT code.
@@ -213,9 +222,9 @@ public struct EngineConfiguration: Sendable {
 
 extension Engine {
     func resolveType(_ type: InternedFuncType) -> FunctionType {
-        return funcTypeInterner.resolve(type)
+        return typeRegistry.resolve(type)
     }
     func internType(_ type: FunctionType) -> InternedFuncType {
-        return funcTypeInterner.intern(type)
+        return typeRegistry.intern(type)
     }
 }
