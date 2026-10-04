@@ -1,9 +1,12 @@
 import Foundation
 import Testing
-import WASTRunner
 import WasmParser
 
 @testable import WAT
+
+#if ComponentModel
+    import WasmTools
+#endif
 
 @Suite
 struct EncoderTests {
@@ -16,22 +19,39 @@ struct EncoderTests {
         "--enable-threads"
     ]
 
-    /// Files whose output wast2json cannot produce or encodes differently, on top of the
-    /// proposals WasmKit does not implement.
-    private static let excludedFiles: [String] =
-        UnsupportedSpectests.affectedFiles + [
-            // wast2json 1.0.42 cannot parse these: an `exnref` result, and a global read
-            // from a table initializer.
-            "try_table.wast", "elem.wast",
-            // wast2json writes no value type for a relaxed-SIMD `either` result.
-            "i16x8_relaxed_q15mulr_s.wast", "i8x16_relaxed_swizzle.wast", "relaxed_dot_product.wast",
-            "relaxed_laneselect.wast", "relaxed_madd_nmadd.wast", "relaxed_min_max.wast",
-            // Written before Wasm 3.0 made text-format limits u64; the top-level memory.wast
-            // expects an out-of-range limit to fail validation instead.
-            "proposals/threads/memory.wast",
-        ]
+    /// Files whose output wast2json cannot produce or encodes differently.
+    private static let excludedFiles: [String] = [
+        // WAT does not parse custom annotations.
+        "annotations.wast",
+        // wast2json 1.0.42 cannot parse these: an `exnref` result, and a global read from a table
+        // initializer. wasm-tools encodes them differently from wabt, whose choices WAT follows: it
+        // keeps an empty `else`, and writes `(elem funcref ...)` in a form that leaves it nullable.
+        "try_table.wast", "elem.wast",
+        // wast2json writes no value type for a relaxed-SIMD `either` result.
+        "i16x8_relaxed_q15mulr_s.wast", "i8x16_relaxed_swizzle.wast", "relaxed_dot_product.wast",
+        "relaxed_laneselect.wast", "relaxed_madd_nmadd.wast", "relaxed_min_max.wast",
+        // Written before Wasm 3.0 made text-format limits u64; the top-level memory.wast
+        // expects an out-of-range limit to fail validation instead.
+        "proposals/threads/memory.wast",
+    ]
+
+    /// Files with GC types, which wast2json 1.0.42 cannot parse, so they are compared with
+    /// wasm-tools instead.
+    private static let wasmToolsFiles: Set<String> = [
+        "array.wast", "array_copy.wast", "array_fill.wast", "array_init_data.wast", "array_init_elem.wast",
+        "array_new_data.wast", "array_new_elem.wast", "br_on_cast.wast", "br_on_cast_fail.wast", "extern.wast",
+        "i31.wast", "ref_cast.wast", "ref_eq.wast", "ref_null.wast", "ref_test.wast", "struct.wast", "tag.wast",
+        "type-canon.wast", "type-equivalence.wast", "type-rec.wast", "type-subtyping.wast",
+    ]
 
     // MARK: - Supporting Types
+
+    /// A module that the reference tool encoded.
+    struct ReferenceModule {
+        let name: String?
+        /// `nil` for a module the tool wrote out as text.
+        let bytes: [UInt8]?
+    }
 
     struct CompatibilityTestStats {
         var run: Int = 0
@@ -76,22 +96,28 @@ struct EncoderTests {
 
     // MARK: - WAST File Parsing
 
+    /// The module directives in `wast`, and the line every directive starts on.
     private func parseWastFile(
         wast: URL,
         stats: inout CompatibilityTestStats
-    ) throws -> [ModuleDirective] {
+    ) throws -> (modules: [ModuleDirective], starts: [Int]) {
         func recordFail() {
             stats.failed.insert(wast.lastPathComponent)
         }
 
-        var parser = WASTParser(
+        var script = try parseWAST(
             try String(contentsOf: wast, encoding: .utf8),
             features: Spectest.deriveFeatureSet(wast: wast)
         )
+        let skip = Self.skippedDirectives(in: wast)
         var watModules: [ModuleDirective] = []
+        var starts: [Int] = []
 
-        while let directive = try parser.nextDirective() {
-            switch directive {
+        while let (result, location) = script.nextDirectiveResult() {
+            let line = location.computeLineAndColumn().line
+            starts.append(line)
+            guard skip[line] == nil else { continue }
+            switch try result.get() {
             case .module(let moduleDirective):
                 watModules.append(moduleDirective)
             case .assertMalformed(let module, let message):
@@ -105,7 +131,7 @@ struct EncoderTests {
                 break
             }
         }
-        return watModules
+        return (watModules, starts)
     }
 
     private func validateMalformedModule(
@@ -135,11 +161,16 @@ struct EncoderTests {
         }
     }
 
+    private static func skippedDirectives(in wast: URL) -> [Int: String] {
+        Spectest.isTopLevel(wast) ? Spectest.skippedDirectives[wast.lastPathComponent] ?? [:] : [:]
+    }
+
     // MARK: - Module Comparison
 
     private func compareModules(
         watModules: [ModuleDirective],
-        moduleBinaryFiles: [(binary: URL, name: String?)],
+        referenceModules: [ReferenceModule],
+        usesWasmTools: Bool,
         wast: URL,
         tempDir: String,
         stats: inout CompatibilityTestStats
@@ -155,11 +186,12 @@ struct EncoderTests {
             }
         }
 
-        assertEqual(watModules.count, moduleBinaryFiles.count)
+        assertEqual(watModules.count, referenceModules.count)
 
-        for (watModule, moduleFile) in zip(watModules, moduleBinaryFiles) {
+        for (watModule, moduleFile) in zip(watModules, referenceModules) {
+            // wasm-tools writes a quoted module out as text.
+            guard let expectedBytes = moduleFile.bytes else { continue }
             stats.run += 1
-            let expectedBytes = try Array(Data(contentsOf: moduleFile.binary))
 
             do {
                 // Check module name
@@ -171,6 +203,19 @@ struct EncoderTests {
                     wast: wast,
                     recordFail: recordFail
                 )
+
+                if usesWasmTools {
+                    // wasm-tools always writes a name section.
+                    let moduleBytes = try TestSupport.encode(watModule.source, options: EncodeOptions(nameSection: true))
+                    if try Self.wasmToolsParts(of: moduleBytes) != Self.wasmToolsParts(of: expectedBytes) {
+                        recordFail()
+                        let (line, column) = watModule.location.computeLineAndColumn()
+                        Self.saveBinariesAndRecord(
+                            expected: expectedBytes, actual: moduleBytes, description: "module differs from wasm-tools",
+                            watModule: watModule, wast: wast, tempDir: tempDir, line: line, column: column)
+                    }
+                    continue
+                }
 
                 // Encode and compare module bytes
                 let moduleBytes = try TestSupport.encode(watModule.source)
@@ -232,6 +277,61 @@ struct EncoderTests {
             )
             return
         }
+    }
+
+    /// A part of a module compared with wasm-tools.
+    private enum WasmToolsPart: Equatable {
+        case section(id: UInt8, content: ArraySlice<UInt8>)
+        /// wasm-tools picks other element segment forms than wabt, whose choices WAT follows, so
+        /// segments are compared decoded.
+        case elements([ElementSegment])
+        case nameSubsection(id: UInt8, content: ArraySlice<UInt8>)
+    }
+
+    /// The parts of `bytes` that WAT and wasm-tools encode alike.
+    private static func wasmToolsParts(of bytes: [UInt8]) throws -> [WasmToolsPart] {
+        var parts: [WasmToolsPart] = []
+        for (id, content) in try sections(of: bytes[8...]) {
+            switch id {
+            case 9:
+                var parser = WasmParser.Parser(bytes: bytes, features: .all)
+                while let payload = try parser.parseNext() {
+                    if case .elementSection(let elements) = payload {
+                        parts.append(.elements(elements))
+                    }
+                }
+            case 0 where content.starts(with: [4] + Array("name".utf8)):
+                // WAT does not write module (0) or tag (11) names yet.
+                for (id, subsection) in try sections(of: content.dropFirst(5)) where id != 0 && id != 11 {
+                    parts.append(.nameSubsection(id: id, content: subsection))
+                }
+            default:
+                parts.append(.section(id: id, content: content))
+            }
+        }
+        return parts
+    }
+
+    /// The id and content of each section, or name subsection, in `bytes`.
+    private static func sections(of bytes: ArraySlice<UInt8>) throws -> [(id: UInt8, content: ArraySlice<UInt8>)] {
+        var sections: [(id: UInt8, content: ArraySlice<UInt8>)] = []
+        var index = bytes.startIndex
+        while index < bytes.endIndex {
+            let id = bytes[index]
+            index += 1
+            var size = 0
+            var shift = 0
+            while true {
+                let byte = bytes[index]
+                index += 1
+                size |= Int(byte & 0x7F) << shift
+                shift += 7
+                if byte < 0x80 { break }
+            }
+            sections.append((id, bytes[index..<(index + size)]))
+            index += size
+        }
+        return sections
     }
 
     private static func assertEqual<T: Equatable>(
@@ -312,19 +412,12 @@ struct EncoderTests {
             arguments: Spectest.wastFiles(include: [], exclude: Self.excludedFiles)
         )
         func spectest(wastFile: URL) throws {
-            guard let wast2json = TestSupport.lookupExecutable("wast2json") else {
-                return  // Skip the test if wast2json is not found in PATH
-            }
-
             var stats = CompatibilityTestStats()
             try TestSupport.withTemporaryDirectory { tempDir, shouldRetain in
-                let json = makeJsonPath(from: wastFile, in: tempDir)
-                try runWast2Json(wast2json: wast2json, wastFile: wastFile, json: json)
-
                 let watModules: [ModuleDirective]
-
+                let starts: [Int]
                 do {
-                    watModules = try parseWastFile(wast: wastFile, stats: &stats)
+                    (watModules, starts) = try parseWastFile(wast: wastFile, stats: &stats)
                 } catch {
                     stats.failed.insert(wastFile.lastPathComponent)
                     shouldRetain = true
@@ -332,11 +425,19 @@ struct EncoderTests {
                     return
                 }
 
-                let moduleBinaryFiles = try Spectest.moduleFiles(json: json)
+                let usesWasmTools = Self.usesWasmTools(wastFile)
+                guard
+                    let referenceModules = try usesWasmTools
+                        ? wasmToolsModules(wastFile: wastFile, starts: starts)
+                        : wast2jsonModules(wastFile: wastFile, starts: starts, tempDir: tempDir)
+                else {
+                    return  // Skip the test if the reference tool is not available
+                }
                 do {
                     try compareModules(
                         watModules: watModules,
-                        moduleBinaryFiles: moduleBinaryFiles,
+                        referenceModules: referenceModules,
+                        usesWasmTools: usesWasmTools,
                         wast: wastFile,
                         tempDir: tempDir,
                         stats: &stats
@@ -352,6 +453,60 @@ struct EncoderTests {
                     shouldRetain = true
                 }
             }
+        }
+
+        private static func usesWasmTools(_ wastFile: URL) -> Bool {
+            wastFile.deletingLastPathComponent().lastPathComponent == "gc"
+                || (Spectest.isTopLevel(wastFile) && wasmToolsFiles.contains(wastFile.lastPathComponent))
+        }
+
+        /// The script in `wastFile` with the directives starting on `leftOut` blanked, keeping the
+        /// line numbers. `starts` is the line every directive in the file starts on.
+        private static func script(of wastFile: URL, leavingOut leftOut: [Int], starts: [Int]) throws -> String {
+            var lines = try String(contentsOf: wastFile, encoding: .utf8).split(separator: "\n", omittingEmptySubsequences: false)
+            for start in leftOut {
+                let end = starts.first { $0 > start } ?? lines.count + 1
+                for index in (start - 1)..<(end - 1) {
+                    lines[index] = ""
+                }
+            }
+            return lines.joined(separator: "\n")
+        }
+
+        /// The modules wast2json writes for `wastFile`, or `nil` if it is not in PATH.
+        private func wast2jsonModules(wastFile: URL, starts: [Int], tempDir: String) throws -> [ReferenceModule]? {
+            guard let wast2json = TestSupport.lookupExecutable("wast2json") else { return nil }
+            var input = wastFile
+            let skipped = Array(Self.skippedDirectives(in: wastFile).keys)
+            if !skipped.isEmpty {
+                input = URL(fileURLWithPath: tempDir).appendingPathComponent(wastFile.lastPathComponent)
+                try Self.script(of: wastFile, leavingOut: skipped, starts: starts).write(to: input, atomically: true, encoding: .utf8)
+            }
+            let json = makeJsonPath(from: wastFile, in: tempDir)
+            try runWast2Json(wast2json: wast2json, wastFile: input, json: json)
+            return try Spectest.moduleFiles(json: json).map {
+                ReferenceModule(name: $0.name, bytes: try Array(Data(contentsOf: $0.binary)))
+            }
+        }
+
+        /// The modules wasm-tools writes for `wastFile`, or `nil` without the ComponentModel trait,
+        /// which runs it. `starts` is the line every directive in the file starts on.
+        private func wasmToolsModules(wastFile: URL, starts: [Int]) throws -> [ReferenceModule]? {
+            #if ComponentModel
+                let leftOut =
+                    Array(Self.skippedDirectives(in: wastFile).keys)
+                    + (Spectest.unparsedByWasmTools[wastFile.lastPathComponent] ?? [:]).keys
+                let script = try Self.script(of: wastFile, leavingOut: leftOut, starts: starts)
+                let (json, wasmFiles) = try wast2json(wastContent: Array(script.utf8), wastFileName: wastFile.lastPathComponent)
+                return json.commands.filter { $0.type == "module" }.map {
+                    // wasm-tools names a module without its `$`, and writes a quoted module out as text.
+                    ReferenceModule(
+                        name: $0.name.map { "$" + $0 },
+                        bytes: $0.filename.flatMap { $0.hasSuffix(".wasm") ? wasmFiles[$0] : nil })
+                }
+            #else
+                return nil
+            #endif
         }
 
         // MARK: - Test Helpers

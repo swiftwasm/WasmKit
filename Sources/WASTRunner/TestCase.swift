@@ -544,6 +544,7 @@ extension WASTRunContext {
             features.insert(.tailCall)
             features.insert(.functionReferences)
             features.insert(.multiMemory)
+            features.insert(.gc)
         }
         if rootPath.hasSuffix("memory64") {
             features.insert(.memory64)
@@ -568,6 +569,10 @@ extension WASTRunContext {
             // Shared memories at a non-zero index.
             features.insert(.multiMemory)
             features.insert(.threads)
+        }
+        if rootPath.hasSuffix("gc") {
+            // WasmKit's own GC tests, which check what the proposal needs on its own.
+            features.insert(.gc)
         }
         if rootPath.hasSuffix("fuel") {
             // A tail call is one of the ways a guest can run forever, so the fuel suite needs it.
