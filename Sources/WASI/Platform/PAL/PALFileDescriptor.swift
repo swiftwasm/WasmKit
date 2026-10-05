@@ -144,6 +144,7 @@ struct FileDescriptor: Sendable, Hashable {
 
     func close() throws {
         #if os(Windows)
+            WindowsFileSystem.openOptions.set([], for: self)
             try valueOrErrno(retryOnInterrupt: false) { _close(rawValue) }
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             try valueOrErrno(retryOnInterrupt: false) { _pal_close(rawValue) }
@@ -166,6 +167,10 @@ struct FileDescriptor: Sendable, Hashable {
     func write(_ buffer: UnsafeRawBufferPointer) throws -> Int {
         guard let base = buffer.baseAddress, buffer.count > 0 else { return 0 }
         #if os(Windows)
+            if WindowsFileSystem.openOptions.get(self).contains(.append) {
+                // A pipe or console cannot seek, and appends anyway.
+                _ = try? seek(offset: 0, from: .end)
+            }
             return try Int(valueOrErrno { _write(rawValue, base, UInt32(min(buffer.count, Int(Int32.max)))) })
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             return try valueOrErrno { _pal_write(rawValue, base, buffer.count) }
@@ -198,13 +203,16 @@ struct FileDescriptor: Sendable, Hashable {
     /// Writes all of `buffer` at the given absolute offset.
     func writeAll(toAbsoluteOffset offset: Int64, _ buffer: UnsafeRawBufferPointer) throws -> Int {
         #if os(Windows)
-            // The CRT offers no `pwrite`; seek there and back.
+            // The CRT offers no `pwrite`; seek there and back. Write with
+            // `_write` directly, since `write` would move to the end under
+            // append, and POSIX writes at the offset regardless.
             let current = try seek(offset: 0, from: .current)
             defer { _ = try? seek(offset: current, from: .start) }
             _ = try seek(offset: offset, from: .start)
             var written = 0
             while written < buffer.count {
-                written += try write(UnsafeRawBufferPointer(rebasing: buffer[written...]))
+                let chunk = UnsafeRawBufferPointer(rebasing: buffer[written...])
+                written += try Int(valueOrErrno { _write(rawValue, chunk.baseAddress!, UInt32(min(chunk.count, Int(Int32.max)))) })
             }
             return written
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
@@ -281,8 +289,8 @@ struct FileDescriptor: Sendable, Hashable {
     /// bits representable as `OpenOptions` are reported.
     func status() throws -> OpenOptions {
         #if os(Windows)
-            // The CRT offers no F_GETFL equivalent; report no flags.
-            return []
+            // The CRT offers no F_GETFL equivalent; report what open recorded.
+            return WindowsFileSystem.openOptions.get(self)
         #elseif os(WASI)
             throw WASIAbi.Errno.ENOTSUP
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android)
@@ -295,7 +303,11 @@ struct FileDescriptor: Sendable, Hashable {
 
     func setStatus(_ options: OpenOptions) throws {
         #if os(Windows)
-            // The CRT offers no F_SETFL equivalent; accept and ignore.
+            // The CRT offers no F_SETFL equivalent. Like F_SETFL on Linux,
+            // change only append and nonblocking.
+            let settable: OpenOptions = [.append, .nonBlocking]
+            let current = WindowsFileSystem.openOptions.get(self)
+            WindowsFileSystem.openOptions.set(current.subtracting(settable).union(options.intersection(settable)), for: self)
         #elseif os(WASI)
             throw WASIAbi.Errno.ENOTSUP
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android)

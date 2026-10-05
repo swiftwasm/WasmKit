@@ -314,10 +314,36 @@
                 throw error
             }
 
-            // The CRT's _O_APPEND moves to the end of the file before each write.
-            var crtFlags: CInt = mode == .readOnly ? _O_RDONLY : 0
-            if options.contains(.append) { crtFlags |= _O_APPEND }
-            return try wrap(handle, crtFlags: crtFlags)
+            let fd = try wrap(handle, crtFlags: mode == .readOnly ? _O_RDONLY : 0)
+            openOptions.set(options.intersection(OpenOptionsTable.recorded), for: fd)
+            return fd
+        }
+
+        /// The status flags POSIX keeps with an open file (`F_GETFL`) but
+        /// Windows does not, by CRT descriptor. `write` seeks to the end
+        /// first when `.append` is set, as the CRT's own `_O_APPEND` does.
+        static let openOptions = OpenOptionsTable()
+
+        final class OpenOptionsTable: @unchecked Sendable {
+            static let recorded: FileDescriptor.OpenOptions = [.append, .nonBlocking, .dataSync, .fileSync, .readSync]
+            private let lock = UnsafeMutablePointer<SRWLOCK>.allocate(capacity: 1)
+            private var options: [CInt: FileDescriptor.OpenOptions] = [:]
+
+            init() {
+                InitializeSRWLock(lock)
+            }
+
+            func get(_ fd: FileDescriptor) -> FileDescriptor.OpenOptions {
+                AcquireSRWLockShared(lock)
+                defer { ReleaseSRWLockShared(lock) }
+                return options[fd.rawValue] ?? []
+            }
+
+            func set(_ value: FileDescriptor.OpenOptions, for fd: FileDescriptor) {
+                AcquireSRWLockExclusive(lock)
+                defer { ReleaseSRWLockExclusive(lock) }
+                options[fd.rawValue] = value.isEmpty ? nil : value
+            }
         }
 
         static func createDirectory(at name: String, in dir: FileDescriptor) throws {

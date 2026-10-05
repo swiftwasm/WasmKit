@@ -42,8 +42,6 @@ struct IntegrationTests {
         #if os(Windows)
             return [
                 "WASI Rust tests": [
-                    "fd_flags_set",  // fd_fdstat_set_flags cannot turn APPEND off
-                    "path_filestat",  // fd_fdstat_get does not report APPEND
                     "poll_oneoff_stdio",  // poll_oneoff on a descriptor is not supported
                     "stdio",  // fd_fdstat_get fails on the NUL device given as stdin
                 ],
