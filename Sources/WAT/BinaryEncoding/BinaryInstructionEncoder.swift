@@ -36,11 +36,17 @@ protocol BinaryInstructionEncoder: InstructionVisitor {
     mutating func encodeImmediates(value: V128) throws(VisitorError)
     mutating func encodeImmediates(blockType: BlockType, tryCatch: TryCatch) throws(VisitorError)
     mutating func encodeImmediates(dataIndex: UInt32, memory: UInt32) throws(VisitorError)
+    mutating func encodeImmediates(destType: UInt32, srcType: UInt32) throws(VisitorError)
     mutating func encodeImmediates(dstMem: UInt32, srcMem: UInt32) throws(VisitorError)
     mutating func encodeImmediates(dstTable: UInt32, srcTable: UInt32) throws(VisitorError)
     mutating func encodeImmediates(elemIndex: UInt32, table: UInt32) throws(VisitorError)
     mutating func encodeImmediates(memarg: MemArg, lane: UInt8) throws(VisitorError)
+    mutating func encodeImmediates(typeIndex: UInt32, dataIndex: UInt32) throws(VisitorError)
+    mutating func encodeImmediates(typeIndex: UInt32, elemIndex: UInt32) throws(VisitorError)
+    mutating func encodeImmediates(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError)
+    mutating func encodeImmediates(typeIndex: UInt32, size: UInt32) throws(VisitorError)
     mutating func encodeImmediates(typeIndex: UInt32, tableIndex: UInt32) throws(VisitorError)
+    mutating func encodeImmediates(relativeDepth: UInt32, castFrom: ReferenceType, castTo: ReferenceType) throws(VisitorError)
 }
 
 // BinaryInstructionEncoder implements the InstructionVisitor protocol to call the corresponding encode method.
@@ -933,5 +939,116 @@ extension BinaryInstructionEncoder {
 
         try encodeInstruction(opcode)
         try encodeImmediates(memarg: memarg, lane: lane)
+    }
+    mutating func visitRefI31() throws(VisitorError) { try encodeInstruction([0xFB, 0x1C]) }
+    mutating func visitI31GetS() throws(VisitorError) { try encodeInstruction([0xFB, 0x1D]) }
+    mutating func visitI31GetU() throws(VisitorError) { try encodeInstruction([0xFB, 0x1E]) }
+    mutating func visitStructNew(typeIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x00])
+        try encodeImmediates(typeIndex: typeIndex)
+    }
+    mutating func visitStructNewDefault(typeIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x01])
+        try encodeImmediates(typeIndex: typeIndex)
+    }
+    mutating func visitStructGet(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x02])
+        try encodeImmediates(typeIndex: typeIndex, fieldIndex: fieldIndex)
+    }
+    mutating func visitStructGetS(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x03])
+        try encodeImmediates(typeIndex: typeIndex, fieldIndex: fieldIndex)
+    }
+    mutating func visitStructGetU(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x04])
+        try encodeImmediates(typeIndex: typeIndex, fieldIndex: fieldIndex)
+    }
+    mutating func visitStructSet(typeIndex: UInt32, fieldIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x05])
+        try encodeImmediates(typeIndex: typeIndex, fieldIndex: fieldIndex)
+    }
+    mutating func visitArrayNew(typeIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x06])
+        try encodeImmediates(typeIndex: typeIndex)
+    }
+    mutating func visitArrayNewDefault(typeIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x07])
+        try encodeImmediates(typeIndex: typeIndex)
+    }
+    mutating func visitArrayNewFixed(typeIndex: UInt32, size: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x08])
+        try encodeImmediates(typeIndex: typeIndex, size: size)
+    }
+    mutating func visitArrayGet(typeIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x0B])
+        try encodeImmediates(typeIndex: typeIndex)
+    }
+    mutating func visitArrayGetS(typeIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x0C])
+        try encodeImmediates(typeIndex: typeIndex)
+    }
+    mutating func visitArrayGetU(typeIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x0D])
+        try encodeImmediates(typeIndex: typeIndex)
+    }
+    mutating func visitArraySet(typeIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x0E])
+        try encodeImmediates(typeIndex: typeIndex)
+    }
+    mutating func visitArrayLen() throws(VisitorError) { try encodeInstruction([0xFB, 0x0F]) }
+    mutating func visitRefEq() throws(VisitorError) { try encodeInstruction([0xD3]) }
+    mutating func visitAnyConvertExtern() throws(VisitorError) { try encodeInstruction([0xFB, 0x1A]) }
+    mutating func visitExternConvertAny() throws(VisitorError) { try encodeInstruction([0xFB, 0x1B]) }
+    mutating func visitArrayNewData(typeIndex: UInt32, dataIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x09])
+        try encodeImmediates(typeIndex: typeIndex, dataIndex: dataIndex)
+    }
+    mutating func visitArrayNewElem(typeIndex: UInt32, elemIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x0A])
+        try encodeImmediates(typeIndex: typeIndex, elemIndex: elemIndex)
+    }
+    mutating func visitArrayFill(typeIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x10])
+        try encodeImmediates(typeIndex: typeIndex)
+    }
+    mutating func visitArrayCopy(destType: UInt32, srcType: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x11])
+        try encodeImmediates(destType: destType, srcType: srcType)
+    }
+    mutating func visitArrayInitData(typeIndex: UInt32, dataIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x12])
+        try encodeImmediates(typeIndex: typeIndex, dataIndex: dataIndex)
+    }
+    mutating func visitArrayInitElem(typeIndex: UInt32, elemIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x13])
+        try encodeImmediates(typeIndex: typeIndex, elemIndex: elemIndex)
+    }
+    mutating func visitRefTest(_ refTest: Instruction.RefTest, type: HeapType) throws(VisitorError) {
+        let opcode: [UInt8]
+        switch refTest {
+        case .refTest: opcode = [0xFB, 0x14]
+        case .refTestNull: opcode = [0xFB, 0x15]
+        }
+
+        try encodeInstruction(opcode)
+        try encodeImmediates(type: type)
+    }
+    mutating func visitRefCast(_ refCast: Instruction.RefCast, type: HeapType) throws(VisitorError) {
+        let opcode: [UInt8]
+        switch refCast {
+        case .refCast: opcode = [0xFB, 0x16]
+        case .refCastNull: opcode = [0xFB, 0x17]
+        }
+
+        try encodeInstruction(opcode)
+        try encodeImmediates(type: type)
+    }
+    mutating func visitBrOnCast(relativeDepth: UInt32, castFrom: ReferenceType, castTo: ReferenceType) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x18])
+        try encodeImmediates(relativeDepth: relativeDepth, castFrom: castFrom, castTo: castTo)
+    }
+    mutating func visitBrOnCastFail(relativeDepth: UInt32, castFrom: ReferenceType, castTo: ReferenceType) throws(VisitorError) {
+        try encodeInstruction([0xFB, 0x19])
+        try encodeImmediates(relativeDepth: relativeDepth, castFrom: castFrom, castTo: castTo)
     }
 }

@@ -3,6 +3,7 @@ import WasmTypes
 
 protocol WASTConstInstructionVisitor: InstructionVisitor {
     mutating func visitRefExtern(value: UInt32) throws(WatParserError)
+    mutating func visitRefHost(value: UInt32) throws(WatParserError)
 }
 
 /// A parser for WAST format.
@@ -53,23 +54,28 @@ struct WASTParser {
         return result
     }
 
-    struct ConstExpressionCollector: WASTConstInstructionVisitor {
+    struct ConstExpressionCollector: WASTConstInstructionVisitor, AnyInstructionVisitor {
+        typealias VisitorError = WatParserError
         var binaryOffset: Int = 0
         let addValue: (WASTConstValue) -> Void
 
-        mutating func visitI32Const(value: Int32) throws(WatParserError) { addValue(.i32(UInt32(bitPattern: value))) }
-        mutating func visitI64Const(value: Int64) throws(WatParserError) { addValue(.i64(UInt64(bitPattern: value))) }
-        mutating func visitF32Const(value: IEEE754.Float32) throws(WatParserError) { addValue(.f32(value.bitPattern)) }
-        mutating func visitF64Const(value: IEEE754.Float64) throws(WatParserError) { addValue(.f64(value.bitPattern)) }
-        mutating func visitV128Const(value: V128) throws(WatParserError) { addValue(.v128(value)) }
-        mutating func visitRefFunc(functionIndex: UInt32) throws(WatParserError) {
-            addValue(.refFunc(functionIndex: functionIndex))
-        }
-        mutating func visitRefNull(type: HeapType) throws(WatParserError) {
-            addValue(.refNull(type))
+        mutating func visit(_ instruction: Instruction) throws(WatParserError) {
+            switch instruction {
+            case .i32Const(let value): addValue(.i32(UInt32(bitPattern: value)))
+            case .i64Const(let value): addValue(.i64(UInt64(bitPattern: value)))
+            case .f32Const(let value): addValue(.f32(value.bitPattern))
+            case .f64Const(let value): addValue(.f64(value.bitPattern))
+            case .v128Const(let value): addValue(.v128(value))
+            case .refFunc(let functionIndex): addValue(.refFunc(functionIndex: functionIndex))
+            case .refNull(let type): addValue(.refNull(type))
+            default: throw WatParserError("unexpected instruction \(instruction) in a WAST value", location: nil)
+            }
         }
         func visitRefExtern(value: UInt32) throws(WatParserError) {
             addValue(.refExtern(value: value))
+        }
+        func visitRefHost(value: UInt32) throws(WatParserError) {
+            addValue(.refHost(value: value))
         }
     }
 
@@ -95,6 +101,7 @@ struct WASTParser {
             case .refNull(let heapTy): value = .refNull(heapTy)
             case .refFunc(let index): value = .refFunc(functionIndex: index)
             case .refExtern(let v): value = .refExtern(value: v)
+            case .refHost(let v): value = .refHost(value: v)
             }
             values.append(value)
         })
@@ -156,6 +163,7 @@ public enum WASTConstValue {
     case refNull(HeapType)
     case refFunc(functionIndex: UInt32)
     case refExtern(value: UInt32)
+    case refHost(value: UInt32)
 }
 
 public struct WASTInvoke {
@@ -210,6 +218,16 @@ public enum WASTExpectValue {
     /// A value that is expected to be a non-null reference
     /// to an extern, optionally with a specific value.
     case refExtern(value: UInt32?)
+    /// A value that is expected to be a non-null i31 reference.
+    case refI31
+    /// A value that is expected to be a non-null struct reference.
+    case refStruct
+    /// A value that is expected to be a non-null array reference.
+    case refArray
+    /// A value that is expected to be a non-null reference to an i31, struct or array.
+    case refEq
+    /// A value that is expected to be a host reference with a specific value.
+    case refHost(value: UInt32)
     /// A value that is expected to be a canonical NaN.
     /// Corresponds to `f32.const nan:canonical` in WAST.
     case f32CanonicalNaN

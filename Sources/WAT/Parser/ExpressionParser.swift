@@ -109,15 +109,15 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
         }
     }
 
-    mutating func parseElemExprList(visitor: inout Visitor, wat: inout Wat) throws(WatParserError) {
+    mutating func parseElemExprList(visitor: inout Visitor, wat: inout Wat) throws(WatParserError) where Visitor == ElementExprCollector {
         while true {
-            let needRightParen = try parser.takeParenBlockStart("item")
-            guard try instruction(visitor: &visitor, wat: &wat) else {
+            if try parser.takeParenBlockStart("item") {
+                try parse(visitor: &visitor, wat: &wat)
+                try parser.expect(.rightParen)
+            } else if try !instruction(visitor: &visitor, wat: &wat) {
                 break
             }
-            if needRightParen {
-                try parser.expect(.rightParen)
-            }
+            visitor.finishItem()
         }
     }
 
@@ -128,6 +128,11 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
         // WAST allows extra const value instruction
         if try parser.takeParenBlockStart("ref.extern") {
             try visitor.visitRefExtern(value: parser.expectUnsignedInt())
+            try parser.expect(.rightParen)
+            return true
+        }
+        if try parser.takeParenBlockStart("ref.host") {
+            try visitor.visitRefHost(value: parser.expectUnsignedInt())
             try parser.expect(.rightParen)
             return true
         }
@@ -268,6 +273,22 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
             try parser.expect(.rightParen)
             return .refExtern(value: nil)
         }
+        if try parser.takeParenBlockStart("ref.i31"), try parser.isEndOfParen() {
+            try parser.expect(.rightParen)
+            return .refI31
+        }
+        if try parser.takeParenBlockStart("ref.struct"), try parser.isEndOfParen() {
+            try parser.expect(.rightParen)
+            return .refStruct
+        }
+        if try parser.takeParenBlockStart("ref.array"), try parser.isEndOfParen() {
+            try parser.expect(.rightParen)
+            return .refArray
+        }
+        if try parser.takeParenBlockStart("ref.eq"), try parser.isEndOfParen() {
+            try parser.expect(.rightParen)
+            return .refEq
+        }
         parser = initialParser
         return nil
     }
@@ -392,6 +413,16 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
                     return try visitor.visitSelect()
                 }
             }
+        case "ref.test":
+            let type = try withWatParser({ parser throws(WatParserError) in try parser.refType() }).resolve(wat.types)
+            return { visitor in
+                try visitor.visitRefTest(type.isNullable ? .refTestNull : .refTest, type: type.heapType)
+            }
+        case "ref.cast":
+            let type = try withWatParser({ parser throws(WatParserError) in try parser.refType() }).resolve(wat.types)
+            return { visitor in
+                try visitor.visitRefCast(type.isNullable ? .refCastNull : .refCast, type: type.heapType)
+            }
         case "else":
             // This path should not be reached when parsing folded "if" instruction.
             // It should be separately handled in foldedInstruction().
@@ -441,6 +472,33 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
     private mutating func functionIndex(wat: inout Wat) throws(WatParserError) -> UInt32 {
         let funcUse = try parser.expectIndexOrId()
         return UInt32(try wat.functionsMap.resolve(use: funcUse).index)
+    }
+
+    private mutating func typeIndex(wat: inout Wat) throws(WatParserError) -> UInt32 {
+        let use = try parser.expectIndexOrId()
+        return UInt32(try wat.types.resolve(use: use).index)
+    }
+
+    private mutating func structField(wat: inout Wat) throws(WatParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        let (type, typeIndex) = try wat.types.nameMapping.resolve(use: try parser.expectIndexOrId())
+        let fieldUse = try parser.expectIndexOrId()
+        switch fieldUse {
+        case .index(let fieldIndex, _):
+            return (UInt32(typeIndex), fieldIndex)
+        case .id(let name, let location):
+            guard let fieldIndex = type.fieldNames[name.value] else {
+                throw WatParserError("unknown field \(name.value)", location: location)
+            }
+            return (UInt32(typeIndex), UInt32(fieldIndex))
+        }
+    }
+
+    private mutating func requiredDataIndex(wat: inout Wat) throws(WatParserError) -> UInt32 {
+        UInt32(try wat.data.resolve(use: try parser.expectIndexOrId()).index)
+    }
+
+    private mutating func requiredElementIndex(wat: inout Wat) throws(WatParserError) -> UInt32 {
+        UInt32(try wat.elementsMap.resolve(use: try parser.expectIndexOrId()).index)
     }
 
     private mutating func memoryIndex(wat: inout Wat) throws(WatParserError) -> UInt32 {
@@ -617,8 +675,7 @@ extension ExpressionParser {
         return UInt32(try wat.functionsMap.resolve(use: use).index)
     }
     mutating func visitCallRef(wat: inout Wat) throws(WatParserError) -> UInt32 {
-        let use = try parser.expectIndexOrId()
-        return UInt32(try wat.types.resolve(use: use).index)
+        return try typeIndex(wat: &wat)
     }
     mutating func visitReturnCallRef(wat: inout Wat) throws(WatParserError) -> UInt32 {
         return try visitCallRef(wat: &wat)
@@ -667,6 +724,77 @@ extension ExpressionParser {
     }
     mutating func visitBrOnNonNull(wat: inout Wat) throws(WatParserError) -> UInt32 {
         return try labelIndex()
+    }
+    mutating func visitBrOnCast(wat: inout Wat) throws(WatParserError) -> (relativeDepth: UInt32, castFrom: ReferenceType, castTo: ReferenceType) {
+        let relativeDepth = try labelIndex()
+        let castFrom = try withWatParser({ parser throws(WatParserError) in try parser.refType() }).resolve(wat.types)
+        let castTo = try withWatParser({ parser throws(WatParserError) in try parser.refType() }).resolve(wat.types)
+        return (relativeDepth, castFrom, castTo)
+    }
+    mutating func visitBrOnCastFail(wat: inout Wat) throws(WatParserError) -> (relativeDepth: UInt32, castFrom: ReferenceType, castTo: ReferenceType) {
+        return try visitBrOnCast(wat: &wat)
+    }
+    mutating func visitStructNew(wat: inout Wat) throws(WatParserError) -> UInt32 {
+        return try typeIndex(wat: &wat)
+    }
+    mutating func visitStructNewDefault(wat: inout Wat) throws(WatParserError) -> UInt32 {
+        return try typeIndex(wat: &wat)
+    }
+    mutating func visitStructGet(wat: inout Wat) throws(WatParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        return try structField(wat: &wat)
+    }
+    mutating func visitStructGetS(wat: inout Wat) throws(WatParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        return try structField(wat: &wat)
+    }
+    mutating func visitStructGetU(wat: inout Wat) throws(WatParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        return try structField(wat: &wat)
+    }
+    mutating func visitStructSet(wat: inout Wat) throws(WatParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        return try structField(wat: &wat)
+    }
+    mutating func visitArrayNew(wat: inout Wat) throws(WatParserError) -> UInt32 {
+        return try typeIndex(wat: &wat)
+    }
+    mutating func visitArrayNewDefault(wat: inout Wat) throws(WatParserError) -> UInt32 {
+        return try typeIndex(wat: &wat)
+    }
+    mutating func visitArrayNewFixed(wat: inout Wat) throws(WatParserError) -> (typeIndex: UInt32, size: UInt32) {
+        let typeIndex = try self.typeIndex(wat: &wat)
+        let size = try parser.expectUnsignedInt(UInt32.self)
+        return (typeIndex, size)
+    }
+    mutating func visitArrayGet(wat: inout Wat) throws(WatParserError) -> UInt32 {
+        return try typeIndex(wat: &wat)
+    }
+    mutating func visitArrayGetS(wat: inout Wat) throws(WatParserError) -> UInt32 {
+        return try typeIndex(wat: &wat)
+    }
+    mutating func visitArrayGetU(wat: inout Wat) throws(WatParserError) -> UInt32 {
+        return try typeIndex(wat: &wat)
+    }
+    mutating func visitArraySet(wat: inout Wat) throws(WatParserError) -> UInt32 {
+        return try typeIndex(wat: &wat)
+    }
+    mutating func visitArrayNewData(wat: inout Wat) throws(WatParserError) -> (typeIndex: UInt32, dataIndex: UInt32) {
+        let typeIndex = try self.typeIndex(wat: &wat)
+        return (typeIndex, try requiredDataIndex(wat: &wat))
+    }
+    mutating func visitArrayNewElem(wat: inout Wat) throws(WatParserError) -> (typeIndex: UInt32, elemIndex: UInt32) {
+        let typeIndex = try self.typeIndex(wat: &wat)
+        return (typeIndex, try requiredElementIndex(wat: &wat))
+    }
+    mutating func visitArrayFill(wat: inout Wat) throws(WatParserError) -> UInt32 {
+        return try typeIndex(wat: &wat)
+    }
+    mutating func visitArrayCopy(wat: inout Wat) throws(WatParserError) -> (destType: UInt32, srcType: UInt32) {
+        let destType = try typeIndex(wat: &wat)
+        return (destType, try typeIndex(wat: &wat))
+    }
+    mutating func visitArrayInitData(wat: inout Wat) throws(WatParserError) -> (typeIndex: UInt32, dataIndex: UInt32) {
+        return try visitArrayNewData(wat: &wat)
+    }
+    mutating func visitArrayInitElem(wat: inout Wat) throws(WatParserError) -> (typeIndex: UInt32, elemIndex: UInt32) {
+        return try visitArrayNewElem(wat: &wat)
     }
     mutating func visitCallIndirect(wat: inout Wat) throws(WatParserError) -> (typeIndex: UInt32, tableIndex: UInt32) {
         let tableIndex: UInt32

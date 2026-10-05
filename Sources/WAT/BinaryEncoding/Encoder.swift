@@ -257,8 +257,15 @@ extension TableType: WasmEncodable {
 struct ElementExprCollector: AnyInstructionVisitor {
     typealias VisitorError = WatParserError
     var binaryOffset: Int = 0
-    var isAllRefFunc: Bool = true
-    var instructions: [Instruction] = []
+    private(set) var items: [[Instruction]] = []
+    private var currentItem: [Instruction] = []
+
+    var isAllRefFunc: Bool {
+        items.allSatisfy { item in
+            if item.count == 1, case .refFunc = item[0] { return true }
+            return false
+        }
+    }
 
     mutating func parse(indices: WatParser.ElementDecl.Indices, wat: inout Wat) throws(WatParserError) {
         switch indices {
@@ -271,7 +278,7 @@ struct ElementExprCollector: AnyInstructionVisitor {
     }
 
     private mutating func addFunctionIndex(_ index: UInt32) {
-        instructions.append(.refFunc(functionIndex: index))
+        items.append([.refFunc(functionIndex: index)])
     }
 
     private mutating func parseFunctionList(lexer: Lexer, wat: Wat) throws(WatParserError) {
@@ -283,11 +290,12 @@ struct ElementExprCollector: AnyInstructionVisitor {
     }
 
     mutating func visit(_ instruction: Instruction) {
-        if case .refFunc = instruction {
-        } else {
-            isAllRefFunc = false
-        }
-        instructions.append(instruction)
+        currentItem.append(instruction)
+    }
+
+    mutating func finishItem() {
+        items.append(currentItem)
+        currentItem = []
     }
 }
 
@@ -377,24 +385,17 @@ extension WAT.WatParser.ElementDecl {
         }
 
         if useExpression {
-            try encoder.encodeVector(collector.instructions) { instruction, encoder throws(WatParserError) in
+            try encoder.encodeVector(collector.items) { item, encoder throws(WatParserError) in
                 var exprEncoder = ExpressionEncoder()
-                switch instruction {
-                case .globalGet(let globalIndex):
-                    try exprEncoder.visitGlobalGet(globalIndex: globalIndex)
-                case .refFunc(let functionIndex):
-                    try exprEncoder.visitRefFunc(functionIndex: functionIndex)
-                case .refNull(let type):
-                    try exprEncoder.visitRefNull(type: type)
-                default:
-                    throw WatParserError("unexpected instruction in element expression \(instruction)", location: nil)
+                for instruction in item {
+                    try exprEncoder.visit(instruction)
                 }
                 try exprEncoder.visitEnd()
                 encoder.output.append(contentsOf: exprEncoder.encoder.output)
             }
         } else {
-            encoder.encodeVector(collector.instructions) { instruction, encoder in
-                guard case .refFunc(let funcIndex) = instruction else { fatalError("non-ref.func instruction in non-expression mode") }
+            encoder.encodeVector(collector.items) { item, encoder in
+                guard item.count == 1, case .refFunc(let funcIndex) = item[0] else { fatalError("non-ref.func item in non-expression mode") }
                 encoder.writeUnsignedLEB128(funcIndex)
             }
         }
@@ -699,6 +700,35 @@ struct ExpressionEncoder: BinaryInstructionEncoder {
     mutating func encodeImmediates(typeIndex: UInt32, tableIndex: UInt32) {
         encodeUnsigned(typeIndex)
         encodeUnsigned(tableIndex)
+    }
+    mutating func encodeImmediates(typeIndex: UInt32, fieldIndex: UInt32) {
+        encodeUnsigned(typeIndex)
+        encodeUnsigned(fieldIndex)
+    }
+    mutating func encodeImmediates(typeIndex: UInt32, size: UInt32) {
+        encodeUnsigned(typeIndex)
+        encodeUnsigned(size)
+    }
+    mutating func encodeImmediates(typeIndex: UInt32, dataIndex: UInt32) {
+        encodeUnsigned(typeIndex)
+        encodeImmediates(dataIndex: dataIndex)
+    }
+    mutating func encodeImmediates(typeIndex: UInt32, elemIndex: UInt32) {
+        encodeUnsigned(typeIndex)
+        encodeUnsigned(elemIndex)
+    }
+    mutating func encodeImmediates(destType: UInt32, srcType: UInt32) {
+        encodeUnsigned(destType)
+        encodeUnsigned(srcType)
+    }
+    mutating func encodeImmediates(relativeDepth: UInt32, castFrom: WasmTypes.ReferenceType, castTo: WasmTypes.ReferenceType) {
+        var flags: UInt8 = 0
+        if castFrom.isNullable { flags |= 0b01 }
+        if castTo.isNullable { flags |= 0b10 }
+        encodeByte(flags)
+        encodeUnsigned(relativeDepth)
+        encoder.encode(castFrom.heapType)
+        encoder.encode(castTo.heapType)
     }
 }
 

@@ -522,6 +522,8 @@ extension WASTRunContext {
                 }
             case .refExtern(let value): return .ref(.extern(Int(value)))
             case .refFunc(let value): return .ref(.function(Int(value)))
+            case .refHost:
+                throw SpectestError("ref.host is not supported yet")
             }
         }
         return try function.invoke(args)

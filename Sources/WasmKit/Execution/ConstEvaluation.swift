@@ -138,6 +138,10 @@ extension WasmParser.ElementSegment {
     static func _evaluateInits<C: ConstEvaluationContextProtocol>(
         context: C, expression: ConstExpression
     ) throws -> Reference {
+        // Function-index items have no `end`.
+        guard expression.count == 1 || (expression.count == 2 && expression[1] == .end) else {
+            throw WasmKitError(message: .unexpectedElementInitializer(expression: "\(expression)"))
+        }
         switch expression[0] {
         case .refFunc(let index):
             return try context.functionRef(index)
