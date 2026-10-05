@@ -697,7 +697,7 @@ enum PlatformScheduler {
                 default: fileType = .unknown
                 }
             #endif
-            self.init(name: name, fileType: fileType)
+            self.init(name: name, fileType: fileType, inode: UInt64(entry.pointee.d_ino))
         }
     }
 

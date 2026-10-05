@@ -153,7 +153,6 @@ extension DirEntry: WASIDir, FdWASIEntry {
     }
 
     struct HostDirectoryIterator: WASIReaddirIterator {
-        let fd: FileDescriptor
         let stream: FileDescriptor.DirectoryStream
         var entryIndex: Int
 
@@ -166,7 +165,6 @@ extension DirEntry: WASIDir, FdWASIEntry {
             let newFd = try fd.open(at: ".", .readOnly)
             let stream = try newFd.contentsOfDirectory()
 
-            self.fd = fd
             self.entryIndex = 0
             self.stream = stream
 
@@ -174,8 +172,9 @@ extension DirEntry: WASIDir, FdWASIEntry {
             // simply skips everything.
             let skippedCount = Int(clamping: cookie)
             while entryIndex < skippedCount {
-                guard let entry = next() else { break }
+                guard let entry = stream.next() else { break }
                 _ = try entry.get()
+                entryIndex += 1
             }
         }
 
@@ -187,13 +186,14 @@ extension DirEntry: WASIDir, FdWASIEntry {
             return Result(catching: { () -> ReaddirElement in
                 let entry = try entry.get()
                 let name = entry.name
-                let stat = try fd.attributes(at: name, options: [.noFollow])
                 let dirent = WASIAbi.Dirent(
                     // We can't use telldir and seekdir because the location data
                     // is valid for only the same dirp but and there is no way to
                     // share dirp among fd_readdir calls.
                     dNext: WASIAbi.DirCookie(entryIndex + 1),
-                    dIno: stat.inode,
+                    // The inode readdir reports, as wasmtime does, rather
+                    // than one `fstatat` per entry.
+                    dIno: entry.inode,
                     dirNameLen: WASIAbi.DirNameLen(name.utf8.count),
                     dType: WASIAbi.FileType(platformFileType: entry.fileType)
                 )
