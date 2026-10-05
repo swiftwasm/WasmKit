@@ -111,7 +111,18 @@ extension DirEntry: WASIDir, FdWASIEntry {
             start: fd, path: destPath
         )
         try result.withFields { destDir, destBasename in
-            try destDir.createSymlink(original: sourcePath, link: destBasename)
+            try destDir.createSymlink(original: sourcePath, link: destBasename) {
+                // Look the target up inside the sandbox, relative to the
+                // directory the link goes in.
+                guard let (parent, _) = splitParent(path: destPath) else { return false }
+                let targetPath = parent.isEmpty ? sourcePath : parent.string + "/" + sourcePath
+                guard
+                    let target = try? SandboxPrimitives.openAt(
+                        start: fd, path: GuestPath(targetPath), mode: .readOnly, options: .directory, permissions: [])
+                else { return false }
+                try? target.close()
+                return true
+            }
         }
     }
 

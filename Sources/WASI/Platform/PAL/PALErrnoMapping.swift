@@ -199,6 +199,15 @@ private func _mapWindowsError(_ code: UInt32) -> WASIAbi.Errno? {
             return .ENOSPC
         case ERROR_DIR_NOT_EMPTY:
             return .ENOTEMPTY
+        case ERROR_DIRECTORY:
+            return .ENOTDIR
+        case ERROR_INVALID_NAME:
+            return .ENOENT
+        case ERROR_CANT_RESOLVE_FILENAME,
+            ERROR_STOPPED_ON_SYMLINK:
+            return .ELOOP
+        case ERROR_PRIVILEGE_NOT_HELD:
+            return .EPERM
         case ERROR_WAIT_NO_CHILDREN,
             ERROR_CHILD_NOT_COMPLETE:
             return .ECHILD

@@ -126,7 +126,9 @@ struct FileDescriptor: Sendable, Hashable {
 
     /// Opens a host directory for use as a WASI preopen.
     static func openPreopenDirectory(_ path: String) throws -> FileDescriptor {
-        #if os(Windows) || os(WASI)
+        #if os(Windows)
+            return try WindowsFileSystem.openPreopenDirectory(path)
+        #elseif os(WASI)
             return try open(path, .readWrite)
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android)
             let fd = try valueOrErrno {
@@ -301,12 +303,7 @@ struct FileDescriptor: Sendable, Hashable {
     /// Queries file metadata; the C equivalent is `fstat`.
     func attributes() throws -> Attributes {
         #if os(Windows)
-            var info = BY_HANDLE_FILE_INFORMATION()
-            let handle = HANDLE(bitPattern: _get_osfhandle(rawValue))
-            guard GetFileInformationByHandle(handle, &info) else {
-                throw _wasiError(fromWin32: GetLastError())
-            }
-            return Attributes(windowsFileInformation: info)
+            return try WindowsFileSystem.attributes(of: self)
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             var statBuffer = stat()
             try valueOrErrno(retryOnInterrupt: false) { fstat(rawValue, &statBuffer) }
@@ -370,6 +367,8 @@ struct FileDescriptor: Sendable, Hashable {
                 path.withCString { openat(rawValue, $0, flags, _palMode(permissions)) }
             }
             return FileDescriptor(rawValue: fd)
+        #elseif os(Windows)
+            return try WindowsFileSystem.open(at: path, in: self, mode: mode, options: options)
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
@@ -384,6 +383,10 @@ struct FileDescriptor: Sendable, Hashable {
                 path.withCString { fstatat(rawValue, $0, &statBuffer, options.contains(.noFollow) ? AT_SYMLINK_NOFOLLOW : 0) }
             }
             return Attributes(stat: statBuffer)
+        #elseif os(Windows)
+            // The Windows layer never follows a symlink; the sandbox does.
+            guard options.contains(.noFollow) else { throw WASIAbi.Errno.ENOTSUP }
+            return try WindowsFileSystem.attributes(at: path, in: self)
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
@@ -404,6 +407,10 @@ struct FileDescriptor: Sendable, Hashable {
                     }
                 }
             }
+        #elseif os(Windows)
+            // The Windows layer never follows a symlink; the sandbox does.
+            guard options.contains(.noFollow) else { throw WASIAbi.Errno.ENOTSUP }
+            try WindowsFileSystem.setTimes(at: path, in: self, access: access, modification: modification)
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
@@ -421,6 +428,8 @@ struct FileDescriptor: Sendable, Hashable {
                     }
                 }
             }
+        #elseif os(Windows)
+            try WindowsFileSystem.createHardLink(at: path, in: self, to: newPath, in: newDir)
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
@@ -433,6 +442,8 @@ struct FileDescriptor: Sendable, Hashable {
             try valueOrErrno(retryOnInterrupt: false) {
                 path.withCString { unlinkat(rawValue, $0, options.contains(.removeDirectory) ? AT_REMOVEDIR : 0) }
             }
+        #elseif os(Windows)
+            try WindowsFileSystem.remove(at: path, in: self, directory: options.contains(.removeDirectory))
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
@@ -445,14 +456,18 @@ struct FileDescriptor: Sendable, Hashable {
             try valueOrErrno(retryOnInterrupt: false) {
                 path.withCString { mkdirat(rawValue, $0, _palMode(permissions)) }
             }
+        #elseif os(Windows)
+            try WindowsFileSystem.createDirectory(at: path, in: self)
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
     }
 
     /// Creates a symlink at `link` (relative to this directory descriptor)
-    /// pointing to `original`; the C equivalent is `symlinkat`.
-    func createSymlink(original: String, link: String) throws {
+    /// pointing to `original`; the C equivalent is `symlinkat`. Windows
+    /// records whether a symlink points to a directory and asks
+    /// `targetIsDirectory`; other platforms never call it.
+    func createSymlink(original: String, link: String, targetIsDirectory: () -> Bool) throws {
         #if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             try valueOrErrno(retryOnInterrupt: false) {
                 original.withCString { originalCStr in
@@ -461,6 +476,8 @@ struct FileDescriptor: Sendable, Hashable {
                     }
                 }
             }
+        #elseif os(Windows)
+            try WindowsFileSystem.createSymlink(original: original, link: link, in: self, targetIsDirectory: targetIsDirectory)
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
@@ -477,6 +494,8 @@ struct FileDescriptor: Sendable, Hashable {
                     }
                 }
             }
+        #elseif os(Windows)
+            try WindowsFileSystem.rename(at: path, in: self, to: newPath, in: newDir)
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
@@ -497,6 +516,12 @@ struct FileDescriptor: Sendable, Hashable {
                     readlinkat(rawValue, $0, base.assumingMemoryBound(to: CChar.self), buffer.count)
                 }
             }
+        #elseif os(Windows)
+            // Like readlink, truncate silently and add no NUL.
+            let target = Array(try WindowsFileSystem.readSymlink(at: path, in: self).utf8)
+            let count = min(target.count, buffer.count)
+            buffer.copyBytes(from: target[..<count])
+            return count
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
@@ -509,12 +534,16 @@ struct FileDescriptor: Sendable, Hashable {
             fileprivate let dirp: UnsafeMutablePointer<DIR>
         #elseif canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             fileprivate let dirp: OpaquePointer
+        #elseif os(Windows)
+            fileprivate let enumerator: WindowsFileSystem.DirectoryEnumerator
         #endif
 
         /// Closes the stream and the file descriptor it took ownership of.
         func close() {
             #if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
                 _ = closedir(dirp)
+            #elseif os(Windows)
+                enumerator.close()
             #endif
         }
 
@@ -529,6 +558,8 @@ struct FileDescriptor: Sendable, Hashable {
                 let errnoValue = _palErrno
                 if errnoValue == 0 { return nil }
                 return .failure(_wasiError(fromErrno: errnoValue))
+            #elseif os(Windows)
+                return enumerator.next()
             #else
                 return nil
             #endif
@@ -544,6 +575,8 @@ struct FileDescriptor: Sendable, Hashable {
                 throw _wasiError(fromErrno: _palErrno)
             }
             return DirectoryStream(dirp: dirp)
+        #elseif os(Windows)
+            return DirectoryStream(enumerator: WindowsFileSystem.DirectoryEnumerator(fd: self))
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
@@ -822,9 +855,11 @@ enum PlatformScheduler {
     }
 
     extension FileDescriptor.Attributes {
-        init(windowsFileInformation info: BY_HANDLE_FILE_INFORMATION) {
+        /// `isSymlink` comes from the reparse tag, which the file
+        /// information lacks: not every reparse point is a symlink.
+        init(windowsFileInformation info: BY_HANDLE_FILE_INFORMATION, isSymlink: Bool) {
             let fileType: FileDescriptor.FileType
-            if info.dwFileAttributes & DWORD(FILE_ATTRIBUTE_REPARSE_POINT) != 0 {
+            if isSymlink {
                 fileType = .symlink
             } else if info.dwFileAttributes & DWORD(FILE_ATTRIBUTE_DIRECTORY) != 0 {
                 fileType = .directory

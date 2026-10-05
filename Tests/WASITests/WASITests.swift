@@ -159,7 +159,7 @@ struct WASITests {
         }
     #endif
 
-    #if !os(Windows)
+    #if !os(Android)
         /// `path_filestat_get` and `path_filestat_set_times` follow a final
         /// symlink inside the sandbox, never through the host, so a link
         /// pointing out of the preopen reveals nothing about its target.
@@ -207,6 +207,65 @@ struct WASITests {
                         atim: 0, mtim: 0, fstFlags: [.ATIM, .MTIM])
                 }
             }
+        }
+
+        /// A hard link to a symlink links the symlink itself, so linking one
+        /// that points out of the preopen does not reach its target.
+        @Test
+        func pathLinkDoesNotFollowSymlinks() throws {
+            let t = try TestSupport.TemporaryDirectory()
+            try t.createDir(at: "External")
+            try t.createFile(at: "External/secret.txt", contents: "Secret")
+            try t.createDir(at: "Sandbox")
+            try t.createSymlink(at: "Sandbox/link-external-secret.txt", to: "../External/secret.txt")
+
+            let wasi = try WASIBridgeToHost(
+                fileSystem: .host().withPreopens([
+                    .init(guestPath: "/Sandbox", hostPath: t.url.appendingPathComponent("Sandbox").path)
+                ])
+            )
+            try wasi.runAndClose { _ in
+                let wasi = wasi.underlying
+                let sandboxFd: WASIAbi.Fd = 3
+
+                try wasi.path_link(
+                    oldFd: sandboxFd, oldFlags: [], oldPath: "link-external-secret.txt",
+                    newFd: sandboxFd, newPath: "hard-link")
+                let link = try wasi.path_filestat_get(dirFd: sandboxFd, flags: [], path: "hard-link")
+                #expect(link.filetype == .SYMBOLIC_LINK)
+                #expect(throws: WASIAbi.Errno.EPERM) {
+                    try wasi.path_filestat_get(dirFd: sandboxFd, flags: .SYMLINK_FOLLOW, path: "hard-link")
+                }
+                #expect(throws: WASIAbi.Errno.EINVAL) {
+                    try wasi.path_link(
+                        oldFd: sandboxFd, oldFlags: .SYMLINK_FOLLOW, oldPath: "link-external-secret.txt",
+                        newFd: sandboxFd, newPath: "followed-link")
+                }
+            }
+        }
+
+        /// A preopen cannot be renamed, or renamed over, through itself.
+        @Test
+        func renamingThePreopenItselfIsRefused() throws {
+            let t = try TestSupport.TemporaryDirectory()
+            try t.createDir(at: "Sandbox")
+            try t.createDir(at: "Sandbox/dir")
+
+            let wasi = try WASIBridgeToHost(
+                fileSystem: .host().withPreopens([
+                    .init(guestPath: "/Sandbox", hostPath: t.url.appendingPathComponent("Sandbox").path)
+                ])
+            )
+            try wasi.runAndClose { _ in
+                let wasi = wasi.underlying
+                let sandboxFd: WASIAbi.Fd = 3
+                for (oldPath, newPath) in [(".", "moved"), ("dir/..", "moved"), ("dir", ".")] {
+                    #expect(throws: (any Error).self, "\(oldPath) -> \(newPath)") {
+                        try wasi.path_rename(oldFd: sandboxFd, oldPath: oldPath, newFd: sandboxFd, newPath: newPath)
+                    }
+                }
+            }
+            #expect(FileManager.default.fileExists(atPath: t.url.appendingPathComponent("Sandbox/dir").path))
         }
     #endif
 

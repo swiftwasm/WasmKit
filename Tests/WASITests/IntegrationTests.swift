@@ -41,63 +41,14 @@ struct IntegrationTests {
     static var skipTests: [String: Set<String>] {
         #if os(Windows)
             return [
-                "WASI Assemblyscript tests": [],
                 "WASI C tests": [
-                    "fdopendir-with-access",
-                    "fopen-with-access",
-                    "lseek",
-                    "pread-with-access",
-                    "pwrite-with-access",
-                    "pwrite-with-append",
-                    "sock_shutdown-invalid_fd",
-                    "sock_shutdown-not_sock",
-                    "stat-dev-ino",
+                    "pwrite-with-append",  // pwrite moves the file offset
                 ],
                 "WASI Rust tests": [
-                    "close_preopen",
-                    "dangling_fd",
-                    "dangling_symlink",
-                    "dir_fd_op_failures",
-                    "directory_seek",
-                    "fd_advise",
-                    "fd_fdstat_set_rights",
-                    "fd_filestat_set",
-                    "fd_flags_set",
-                    "fd_readdir",
-                    "file_allocate",
-                    "file_pread_pwrite",
-                    "file_seek_tell",
-                    "file_truncation",
-                    "file_unbuffered_write",
-                    "fstflags_validate",
-                    "interesting_paths",
-                    "isatty",
-                    "nofollow_errors",
-                    "overwrite_preopen",
-                    "path_exists",
-                    "path_filestat",
-                    "path_link",
-                    "path_open_create_existing",
-                    "path_open_dirfd_not_dir",
-                    "path_open_missing",
-                    "path_open_nonblock",
-                    "path_open_preopen",
-                    "path_open_read_write",
-                    "path_rename",
-                    "path_rename_dir_trailing_slashes",
-                    "path_symlink_trailing_slashes",
-                    "poll_oneoff_stdio",
-                    "readlink",
-                    "remove_directory_trailing_slashes",
-                    "remove_nonempty_directory",
-                    "renumber",
-                    "sched_yield",
-                    "stdio",
-                    "symlink_create",
-                    "symlink_filestat",
-                    "symlink_loop",
-                    "truncation_rights",
-                    "unlink_file_trailing_slashes",
+                    "fd_flags_set",  // fd_fdstat_set_flags cannot turn APPEND off
+                    "path_filestat",  // fd_fdstat_get does not report APPEND
+                    "poll_oneoff_stdio",  // poll_oneoff on a descriptor is not supported
+                    "stdio",  // fd_fdstat_get fails on the NUL device given as stdin
                 ],
             ]
         #else
