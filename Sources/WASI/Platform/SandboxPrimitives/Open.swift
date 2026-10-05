@@ -14,7 +14,7 @@ struct PathResolution {
     private var components: [GuestPath.Component]
     private var resolvedSymlinks: Int = 0
 
-    private static var MAX_SYMLINKS: Int {
+    static var MAX_SYMLINKS: Int {
         // Linux defines MAXSYMLINKS as 40, but on darwin platforms, it's 32.
         // Take a single conservative value here to avoid platform-specific
         // behavior as much as possible.

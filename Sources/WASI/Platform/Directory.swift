@@ -219,13 +219,14 @@ extension DirEntry: WASIDir, FdWASIEntry {
     }
 
     func attributes(path: String, symlinkFollow: Bool) throws -> WASIAbi.Filestat {
-        var options: FileDescriptor.AtOptions = []
-        if !symlinkFollow {
-            options.insert(.noFollow)
-        }
-        let result = try SandboxPrimitives.openParent(start: fd, path: path)
+        // Following happens in the sandbox, never in the host's `fstatat`,
+        // which would follow a symlink pointing out of the sandbox.
+        let result =
+            symlinkFollow
+            ? try SandboxPrimitives.openParentFollowingSymlinks(start: fd, path: path)
+            : try SandboxPrimitives.openParent(start: fd, path: path)
         return try result.withFields { dir, basename in
-            let attributes = try dir.attributes(at: basename, options: options)
+            let attributes = try dir.attributes(at: basename, options: .noFollow)
 
             return WASIAbi.Filestat(stat: attributes)
         }

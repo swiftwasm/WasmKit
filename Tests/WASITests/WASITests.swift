@@ -159,6 +159,57 @@ struct WASITests {
         }
     #endif
 
+    #if !os(Windows)
+        /// `path_filestat_get` and `path_filestat_set_times` follow a final
+        /// symlink inside the sandbox, never through the host, so a link
+        /// pointing out of the preopen reveals nothing about its target.
+        @Test
+        func pathFilestatFollowsSymlinksInsideTheSandbox() throws {
+            let t = try TestSupport.TemporaryDirectory()
+            try t.createDir(at: "External")
+            try t.createFile(at: "External/secret.txt", contents: "Secret")
+            try t.createDir(at: "Sandbox")
+            try t.createDir(at: "Sandbox/dir")
+            try t.createFile(at: "Sandbox/hello.txt", contents: "Hello")
+            try t.createSymlink(at: "Sandbox/link-hello.txt", to: "hello.txt")
+            try t.createSymlink(at: "Sandbox/dir/link-up-hello.txt", to: "../link-hello.txt")
+            try t.createSymlink(at: "Sandbox/link-external-secret.txt", to: "../External/secret.txt")
+            try t.createSymlink(at: "Sandbox/link-root", to: "/")
+            try t.createSymlink(at: "Sandbox/link-loop.txt", to: "link-loop.txt")
+
+            let wasi = try WASIBridgeToHost(
+                fileSystem: .host().withPreopens([
+                    .init(guestPath: "/Sandbox", hostPath: t.url.appendingPathComponent("Sandbox").path)
+                ])
+            )
+            try wasi.runAndClose { _ in
+                let wasi = wasi.underlying
+                let sandboxFd: WASIAbi.Fd = 3
+
+                let hello = try wasi.path_filestat_get(dirFd: sandboxFd, flags: .SYMLINK_FOLLOW, path: "link-hello.txt")
+                #expect(hello.size == 5)
+                let upHello = try wasi.path_filestat_get(dirFd: sandboxFd, flags: .SYMLINK_FOLLOW, path: "dir/link-up-hello.txt")
+                #expect(upHello.size == 5)
+                let link = try wasi.path_filestat_get(dirFd: sandboxFd, flags: [], path: "link-hello.txt")
+                #expect(link.filetype == .SYMBOLIC_LINK)
+                #expect(throws: WASIAbi.Errno.EPERM) {
+                    try wasi.path_filestat_get(dirFd: sandboxFd, flags: .SYMLINK_FOLLOW, path: "link-external-secret.txt")
+                }
+                #expect(throws: WASIAbi.Errno.EPERM) {
+                    try wasi.path_filestat_get(dirFd: sandboxFd, flags: .SYMLINK_FOLLOW, path: "link-root")
+                }
+                #expect(throws: WASIAbi.Errno.ELOOP) {
+                    try wasi.path_filestat_get(dirFd: sandboxFd, flags: .SYMLINK_FOLLOW, path: "link-loop.txt")
+                }
+                #expect(throws: WASIAbi.Errno.EPERM) {
+                    try wasi.path_filestat_set_times(
+                        dirFd: sandboxFd, flags: .SYMLINK_FOLLOW, path: "link-external-secret.txt",
+                        atim: 0, mtim: 0, fstFlags: [.ATIM, .MTIM])
+                }
+            }
+        }
+    #endif
+
     @Test
     func memoryFileSystem() throws {
         let fs = try MemoryFileSystem()
