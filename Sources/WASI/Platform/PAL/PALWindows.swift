@@ -187,11 +187,21 @@
             info.dwFileAttributes & DWORD(FILE_ATTRIBUTE_DIRECTORY) != 0
         }
 
-        /// `fstat`.
+        /// `fstat`. Character devices such as NUL and the console have no
+        /// file information, so only their type is reported.
         static func attributes(of fd: FileDescriptor) throws -> FileDescriptor.Attributes {
             let handle = handle(fd)
-            let isSymlink = isNameSurrogate(try? reparseTag(of: handle))
-            return FileDescriptor.Attributes(windowsFileInformation: try information(of: handle), isSymlink: isSymlink)
+            var info = BY_HANDLE_FILE_INFORMATION()
+            if GetFileInformationByHandle(handle, &info) {
+                let isSymlink = isNameSurrogate(try? reparseTag(of: handle))
+                return FileDescriptor.Attributes(windowsFileInformation: info, isSymlink: isSymlink)
+            }
+            let error = GetLastError()
+            guard GetFileType(handle) == DWORD(FILE_TYPE_CHAR) else { throw _wasiError(fromWin32: error) }
+            let zero = FileTime(seconds: 0, nanoseconds: 0)
+            return FileDescriptor.Attributes(
+                device: 0, inode: 0, fileType: .characterDevice, linkCount: 1, size: 0,
+                accessTime: zero, modificationTime: zero, creationTime: zero)
         }
 
         /// `fstatat` with `AT_SYMLINK_NOFOLLOW`.

@@ -43,7 +43,6 @@ struct IntegrationTests {
             return [
                 "WASI Rust tests": [
                     "poll_oneoff_stdio",  // poll_oneoff on a descriptor is not supported
-                    "stdio",  // fd_fdstat_get fails on the NUL device given as stdin
                 ],
             ]
         #else
