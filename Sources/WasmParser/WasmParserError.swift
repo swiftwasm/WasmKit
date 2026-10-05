@@ -208,4 +208,9 @@ extension WasmParserError.Message {
     static func invalidCatchClauseId(_ id: UInt8) -> Self {
         Self("Invalid catch clause id: \(id)")
     }
+
+    @usableFromInline
+    static func invalidCastFlags(_ flags: UInt8) -> Self {
+        Self("Invalid cast flags: \(flags)")
+    }
 }

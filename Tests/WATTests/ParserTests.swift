@@ -181,6 +181,12 @@ struct ParserTests {
         #expect(wat.elementsMap.count == 14)
     }
 
+    @Test(arguments: [#"(invoke "f" (nop))"#, #"(assert_return (invoke "f") (nop))"#])
+    func wastValueIsAValueInstruction(script: String) {
+        let error = #expect(throws: WatParserError.self) { try parseWast(script) }
+        #expect(error?.message == "unexpected instruction nop in a WAST value")
+    }
+
     // NOTE: We do the same check as a part of the EncoderTests, so it's
     // usually redundant and time-wasting to run this test every time.
     // Keeping it here just for local unit testing purposes.

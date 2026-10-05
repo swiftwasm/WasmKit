@@ -84,6 +84,18 @@ import WasmKit
         }
     }
 
+    @Test func refusesRefHostArgument() throws {
+        let script = """
+            (module (func (export "f")))
+            (invoke "f" (ref.host 1))
+            """
+        try withScript(script) { script in
+            let outcome = try SpectestRunner(configuration: EngineConfiguration())
+                .evaluate(test: script, reporter: NullSpectestProgressReporter())
+            #expect(outcome.failures.map { $0.reason } == ["ref.host is not supported yet"])
+        }
+    }
+
     /// Keeps the script out of `ExtraSuite`, which `SpectestTests` scans and would fail on it.
     private func withScript(_ text: String, _ body: (TestCase) throws -> Void) throws {
         let url = FileManager.default.temporaryDirectory

@@ -498,7 +498,7 @@ struct EncoderTests {
                     + (Spectest.unparsedByWasmTools[wastFile.lastPathComponent] ?? [:]).keys
                 let script = try Self.script(of: wastFile, leavingOut: leftOut, starts: starts)
                 let (json, wasmFiles) = try wast2json(wastContent: Array(script.utf8), wastFileName: wastFile.lastPathComponent)
-                return json.commands.filter { $0.type == "module" }.map {
+                return json.commands.filter { ["module", "module_definition"].contains($0.type) }.map {
                     // wasm-tools names a module without its `$`, and writes a quoted module out as text.
                     ReferenceModule(
                         name: $0.name.map { "$" + $0 },

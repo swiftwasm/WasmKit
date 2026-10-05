@@ -5332,6 +5332,100 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         try iseqBuilder.pinLabelHere(onBranchNotTaken)
     }
 
+    // MARK: - Garbage collection
+
+    // Without these, the visitor's defaults would translate each GC instruction to nothing.
+    mutating func visitRefI31() throws(WasmKitError) -> Output {
+        throw WasmKitError("ref.i31 is not supported yet")
+    }
+    mutating func visitI31GetS() throws(WasmKitError) -> Output {
+        throw WasmKitError("i31.get_s is not supported yet")
+    }
+    mutating func visitI31GetU() throws(WasmKitError) -> Output {
+        throw WasmKitError("i31.get_u is not supported yet")
+    }
+    mutating func visitStructNew(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("struct.new is not supported yet")
+    }
+    mutating func visitStructNewDefault(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("struct.new_default is not supported yet")
+    }
+    mutating func visitStructGet(typeIndex: UInt32, fieldIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("struct.get is not supported yet")
+    }
+    mutating func visitStructGetS(typeIndex: UInt32, fieldIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("struct.get_s is not supported yet")
+    }
+    mutating func visitStructGetU(typeIndex: UInt32, fieldIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("struct.get_u is not supported yet")
+    }
+    mutating func visitStructSet(typeIndex: UInt32, fieldIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("struct.set is not supported yet")
+    }
+    mutating func visitArrayNew(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("array.new is not supported yet")
+    }
+    mutating func visitArrayNewDefault(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("array.new_default is not supported yet")
+    }
+    mutating func visitArrayNewFixed(typeIndex: UInt32, size: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("array.new_fixed is not supported yet")
+    }
+    mutating func visitArrayGet(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("array.get is not supported yet")
+    }
+    mutating func visitArrayGetS(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("array.get_s is not supported yet")
+    }
+    mutating func visitArrayGetU(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("array.get_u is not supported yet")
+    }
+    mutating func visitArraySet(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("array.set is not supported yet")
+    }
+    mutating func visitArrayLen() throws(WasmKitError) -> Output {
+        throw WasmKitError("array.len is not supported yet")
+    }
+    mutating func visitRefEq() throws(WasmKitError) -> Output {
+        throw WasmKitError("ref.eq is not supported yet")
+    }
+    mutating func visitAnyConvertExtern() throws(WasmKitError) -> Output {
+        throw WasmKitError("any.convert_extern is not supported yet")
+    }
+    mutating func visitExternConvertAny() throws(WasmKitError) -> Output {
+        throw WasmKitError("extern.convert_any is not supported yet")
+    }
+    mutating func visitArrayNewData(typeIndex: UInt32, dataIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("array.new_data is not supported yet")
+    }
+    mutating func visitArrayNewElem(typeIndex: UInt32, elemIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("array.new_elem is not supported yet")
+    }
+    mutating func visitArrayFill(typeIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("array.fill is not supported yet")
+    }
+    mutating func visitArrayCopy(destType: UInt32, srcType: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("array.copy is not supported yet")
+    }
+    mutating func visitArrayInitData(typeIndex: UInt32, dataIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("array.init_data is not supported yet")
+    }
+    mutating func visitArrayInitElem(typeIndex: UInt32, elemIndex: UInt32) throws(WasmKitError) -> Output {
+        throw WasmKitError("array.init_elem is not supported yet")
+    }
+    mutating func visitRefTest(_ refTest: WasmParser.Instruction.RefTest, type: HeapType) throws(WasmKitError) -> Output {
+        throw WasmKitError("ref.test is not supported yet")
+    }
+    mutating func visitRefCast(_ refCast: WasmParser.Instruction.RefCast, type: HeapType) throws(WasmKitError) -> Output {
+        throw WasmKitError("ref.cast is not supported yet")
+    }
+    mutating func visitBrOnCast(relativeDepth: UInt32, castFrom: ReferenceType, castTo: ReferenceType) throws(WasmKitError) -> Output {
+        throw WasmKitError("br_on_cast is not supported yet")
+    }
+    mutating func visitBrOnCastFail(relativeDepth: UInt32, castFrom: ReferenceType, castTo: ReferenceType) throws(WasmKitError) -> Output {
+        throw WasmKitError("br_on_cast_fail is not supported yet")
+    }
+
     private mutating func visitUnary(_ operand: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws(WasmKitError) {
         try popPushEmit(operand, operand) { value, result in
             return instruction(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))

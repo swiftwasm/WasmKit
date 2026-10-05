@@ -827,6 +827,88 @@ extension Parser: BinaryInstructionDecoder {
     @inlinable mutating func visitBrOnNull() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
     @inlinable mutating func visitBrOnNonNull() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
 
+    @inlinable mutating func visitStructNew() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitStructNewDefault() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitStructGet() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let fieldIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, fieldIndex)
+    }
+    @inlinable mutating func visitStructGetS() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let fieldIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, fieldIndex)
+    }
+    @inlinable mutating func visitStructGetU() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let fieldIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, fieldIndex)
+    }
+    @inlinable mutating func visitStructSet() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let fieldIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, fieldIndex)
+    }
+    @inlinable mutating func visitArrayNew() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayNewDefault() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayNewFixed() throws(WasmParserError) -> (typeIndex: UInt32, size: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let size: UInt32 = try parseUnsigned()
+        return (typeIndex, size)
+    }
+    @inlinable mutating func visitArrayGet() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayGetS() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayGetU() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArraySet() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayNewData() throws(WasmParserError) -> (typeIndex: UInt32, dataIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let dataIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, dataIndex)
+    }
+    @inlinable mutating func visitArrayNewElem() throws(WasmParserError) -> (typeIndex: UInt32, elemIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let elemIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, elemIndex)
+    }
+    @inlinable mutating func visitArrayFill() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayCopy() throws(WasmParserError) -> (destType: UInt32, srcType: UInt32) {
+        let destType: UInt32 = try parseUnsigned()
+        let srcType: UInt32 = try parseUnsigned()
+        return (destType, srcType)
+    }
+    @inlinable mutating func visitArrayInitData() throws(WasmParserError) -> (typeIndex: UInt32, dataIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let dataIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, dataIndex)
+    }
+    @inlinable mutating func visitArrayInitElem() throws(WasmParserError) -> (typeIndex: UInt32, elemIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let elemIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, elemIndex)
+    }
+    @inlinable mutating func visitRefTest(_: Instruction.RefTest) throws(WasmParserError) -> HeapType {
+        try stream.parseHeapType(features: features)
+    }
+    @inlinable mutating func visitRefCast(_: Instruction.RefCast) throws(WasmParserError) -> HeapType {
+        try stream.parseHeapType(features: features)
+    }
+    @inlinable mutating func visitBrOnCast() throws(WasmParserError) -> (relativeDepth: UInt32, castFrom: ReferenceType, castTo: ReferenceType) {
+        try parseBrOnCastImmediates()
+    }
+    @inlinable mutating func visitBrOnCastFail() throws(WasmParserError) -> (relativeDepth: UInt32, castFrom: ReferenceType, castTo: ReferenceType) {
+        try parseBrOnCastImmediates()
+    }
+    @inlinable mutating func parseBrOnCastImmediates() throws(WasmParserError) -> (relativeDepth: UInt32, castFrom: ReferenceType, castTo: ReferenceType) {
+        let flags = try stream.consumeAny()
+        guard flags <= 0b11 else {
+            throw makeError(.invalidCastFlags(flags))
+        }
+        let relativeDepth: UInt32 = try parseUnsigned()
+        let castFrom = ReferenceType(isNullable: flags & 0b01 != 0, heapType: try stream.parseHeapType(features: features))
+        let castTo = ReferenceType(isNullable: flags & 0b10 != 0, heapType: try stream.parseHeapType(features: features))
+        return (relativeDepth, castFrom, castTo)
+    }
+
     @inlinable mutating func visitRefFunc() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
     @inlinable mutating func visitMemoryInit() throws(WasmParserError) -> (dataIndex: UInt32, memory: UInt32) {
         let dataIndex: DataIndex = try parseUnsigned()
@@ -950,6 +1032,9 @@ extension Parser: BinaryInstructionDecoder {
     @inline(__always)
     @inlinable
     mutating func parseInstruction() throws(WasmParserError) -> Instruction {
+        if !features.contains(.gc), let opcode = try stream.peek(), opcode == 0xFB || opcode == 0xD3 {
+            throw makeError(.illegalOpcode([opcode]))
+        }
         return try parseBinaryInstruction(decoder: &self)
     }
 

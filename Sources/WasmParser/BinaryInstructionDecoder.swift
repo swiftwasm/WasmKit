@@ -214,6 +214,52 @@ protocol BinaryInstructionDecoder {
     @inlinable mutating func visitSimdLane(_: Instruction.SimdLane) throws(WasmParserError) -> UInt8
     /// Decode `simdMemLane` category immediates
     @inlinable mutating func visitSimdMemLane(_: Instruction.SimdMemLane) throws(WasmParserError) -> (memarg: MemArg, lane: UInt8)
+    /// Decode `struct.new` immediates
+    @inlinable mutating func visitStructNew() throws(WasmParserError) -> UInt32
+    /// Decode `struct.new_default` immediates
+    @inlinable mutating func visitStructNewDefault() throws(WasmParserError) -> UInt32
+    /// Decode `struct.get` immediates
+    @inlinable mutating func visitStructGet() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32)
+    /// Decode `struct.get_s` immediates
+    @inlinable mutating func visitStructGetS() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32)
+    /// Decode `struct.get_u` immediates
+    @inlinable mutating func visitStructGetU() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32)
+    /// Decode `struct.set` immediates
+    @inlinable mutating func visitStructSet() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32)
+    /// Decode `array.new` immediates
+    @inlinable mutating func visitArrayNew() throws(WasmParserError) -> UInt32
+    /// Decode `array.new_default` immediates
+    @inlinable mutating func visitArrayNewDefault() throws(WasmParserError) -> UInt32
+    /// Decode `array.new_fixed` immediates
+    @inlinable mutating func visitArrayNewFixed() throws(WasmParserError) -> (typeIndex: UInt32, size: UInt32)
+    /// Decode `array.get` immediates
+    @inlinable mutating func visitArrayGet() throws(WasmParserError) -> UInt32
+    /// Decode `array.get_s` immediates
+    @inlinable mutating func visitArrayGetS() throws(WasmParserError) -> UInt32
+    /// Decode `array.get_u` immediates
+    @inlinable mutating func visitArrayGetU() throws(WasmParserError) -> UInt32
+    /// Decode `array.set` immediates
+    @inlinable mutating func visitArraySet() throws(WasmParserError) -> UInt32
+    /// Decode `array.new_data` immediates
+    @inlinable mutating func visitArrayNewData() throws(WasmParserError) -> (typeIndex: UInt32, dataIndex: UInt32)
+    /// Decode `array.new_elem` immediates
+    @inlinable mutating func visitArrayNewElem() throws(WasmParserError) -> (typeIndex: UInt32, elemIndex: UInt32)
+    /// Decode `array.fill` immediates
+    @inlinable mutating func visitArrayFill() throws(WasmParserError) -> UInt32
+    /// Decode `array.copy` immediates
+    @inlinable mutating func visitArrayCopy() throws(WasmParserError) -> (destType: UInt32, srcType: UInt32)
+    /// Decode `array.init_data` immediates
+    @inlinable mutating func visitArrayInitData() throws(WasmParserError) -> (typeIndex: UInt32, dataIndex: UInt32)
+    /// Decode `array.init_elem` immediates
+    @inlinable mutating func visitArrayInitElem() throws(WasmParserError) -> (typeIndex: UInt32, elemIndex: UInt32)
+    /// Decode `refTest` category immediates
+    @inlinable mutating func visitRefTest(_: Instruction.RefTest) throws(WasmParserError) -> HeapType
+    /// Decode `refCast` category immediates
+    @inlinable mutating func visitRefCast(_: Instruction.RefCast) throws(WasmParserError) -> HeapType
+    /// Decode `br_on_cast` immediates
+    @inlinable mutating func visitBrOnCast() throws(WasmParserError) -> (relativeDepth: UInt32, castFrom: ReferenceType, castTo: ReferenceType)
+    /// Decode `br_on_cast_fail` immediates
+    @inlinable mutating func visitBrOnCastFail() throws(WasmParserError) -> (relativeDepth: UInt32, castFrom: ReferenceType, castTo: ReferenceType)
 }
 
 @inlinable
@@ -655,6 +701,8 @@ func parseBinaryInstruction(
     case 0xD2:
         let (functionIndex) = try decoder.visitRefFunc()
         return .refFunc(functionIndex: functionIndex)
+    case 0xD3:
+        return .refEq
     case 0xD4:
         return .refAsNonNull
     case 0xD5:
@@ -663,6 +711,100 @@ func parseBinaryInstruction(
     case 0xD6:
         let (relativeDepth) = try decoder.visitBrOnNonNull()
         return .brOnNonNull(relativeDepth: relativeDepth)
+    case 0xFB:
+
+        let opcode1 = try decoder.claimNextByte()
+        switch opcode1 {
+        case 0x00:
+            let (typeIndex) = try decoder.visitStructNew()
+            return .structNew(typeIndex: typeIndex)
+        case 0x01:
+            let (typeIndex) = try decoder.visitStructNewDefault()
+            return .structNewDefault(typeIndex: typeIndex)
+        case 0x02:
+            let (typeIndex, fieldIndex) = try decoder.visitStructGet()
+            return .structGet(typeIndex: typeIndex, fieldIndex: fieldIndex)
+        case 0x03:
+            let (typeIndex, fieldIndex) = try decoder.visitStructGetS()
+            return .structGetS(typeIndex: typeIndex, fieldIndex: fieldIndex)
+        case 0x04:
+            let (typeIndex, fieldIndex) = try decoder.visitStructGetU()
+            return .structGetU(typeIndex: typeIndex, fieldIndex: fieldIndex)
+        case 0x05:
+            let (typeIndex, fieldIndex) = try decoder.visitStructSet()
+            return .structSet(typeIndex: typeIndex, fieldIndex: fieldIndex)
+        case 0x06:
+            let (typeIndex) = try decoder.visitArrayNew()
+            return .arrayNew(typeIndex: typeIndex)
+        case 0x07:
+            let (typeIndex) = try decoder.visitArrayNewDefault()
+            return .arrayNewDefault(typeIndex: typeIndex)
+        case 0x08:
+            let (typeIndex, size) = try decoder.visitArrayNewFixed()
+            return .arrayNewFixed(typeIndex: typeIndex, size: size)
+        case 0x09:
+            let (typeIndex, dataIndex) = try decoder.visitArrayNewData()
+            return .arrayNewData(typeIndex: typeIndex, dataIndex: dataIndex)
+        case 0x0A:
+            let (typeIndex, elemIndex) = try decoder.visitArrayNewElem()
+            return .arrayNewElem(typeIndex: typeIndex, elemIndex: elemIndex)
+        case 0x0B:
+            let (typeIndex) = try decoder.visitArrayGet()
+            return .arrayGet(typeIndex: typeIndex)
+        case 0x0C:
+            let (typeIndex) = try decoder.visitArrayGetS()
+            return .arrayGetS(typeIndex: typeIndex)
+        case 0x0D:
+            let (typeIndex) = try decoder.visitArrayGetU()
+            return .arrayGetU(typeIndex: typeIndex)
+        case 0x0E:
+            let (typeIndex) = try decoder.visitArraySet()
+            return .arraySet(typeIndex: typeIndex)
+        case 0x0F:
+            return .arrayLen
+        case 0x10:
+            let (typeIndex) = try decoder.visitArrayFill()
+            return .arrayFill(typeIndex: typeIndex)
+        case 0x11:
+            let (destType, srcType) = try decoder.visitArrayCopy()
+            return .arrayCopy(destType: destType, srcType: srcType)
+        case 0x12:
+            let (typeIndex, dataIndex) = try decoder.visitArrayInitData()
+            return .arrayInitData(typeIndex: typeIndex, dataIndex: dataIndex)
+        case 0x13:
+            let (typeIndex, elemIndex) = try decoder.visitArrayInitElem()
+            return .arrayInitElem(typeIndex: typeIndex, elemIndex: elemIndex)
+        case 0x14:
+            let (type) = try decoder.visitRefTest(.refTest)
+            return .refTest(.refTest, type: type)
+        case 0x15:
+            let (type) = try decoder.visitRefTest(.refTestNull)
+            return .refTest(.refTestNull, type: type)
+        case 0x16:
+            let (type) = try decoder.visitRefCast(.refCast)
+            return .refCast(.refCast, type: type)
+        case 0x17:
+            let (type) = try decoder.visitRefCast(.refCastNull)
+            return .refCast(.refCastNull, type: type)
+        case 0x18:
+            let (relativeDepth, castFrom, castTo) = try decoder.visitBrOnCast()
+            return .brOnCast(relativeDepth: relativeDepth, castFrom: castFrom, castTo: castTo)
+        case 0x19:
+            let (relativeDepth, castFrom, castTo) = try decoder.visitBrOnCastFail()
+            return .brOnCastFail(relativeDepth: relativeDepth, castFrom: castFrom, castTo: castTo)
+        case 0x1A:
+            return .anyConvertExtern
+        case 0x1B:
+            return .externConvertAny
+        case 0x1C:
+            return .refI31
+        case 0x1D:
+            return .i31GetS
+        case 0x1E:
+            return .i31GetU
+        default:
+            try decoder.throwUnknown([opcode0, opcode1])
+        }
     case 0xFC:
 
         let opcode1 = try decoder.claimNextByte()
