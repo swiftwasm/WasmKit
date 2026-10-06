@@ -110,7 +110,7 @@ struct Execution: ~Copyable {
             let symbolName = store.nameRegistry.symbolicate(.wasm(function))
             symbols.append(.init(name: symbolName, address: frame.pc))
         }
-        return Backtrace(symbols: symbols, trapSite: pc.map { UInt(bitPattern: $0) })
+        return Backtrace(symbols: symbols, trapSite: pc.map { UInt(bitPattern: $0) }, innermostSp: UInt(bitPattern: sp))
     }
 
     /// Lays the callee's frame-initialisation image (its constants and the
@@ -687,7 +687,11 @@ extension Execution {
                                 return wasmkit_trap_guard_run(wasmkit_direct_threaded_trap_guard_entry, &context)
                             }()
                             if trapped {
-                                throw Trap(.memoryOutOfBounds).withBacktrace(Self.captureBacktrace(sp: sp, store: storeValue))
+                                var backtrace = Self.captureBacktrace(sp: sp, store: storeValue)
+                                // The faulting handler ran on its own copy of `sp`, so this one may be
+                                // an outer frame's; reading locals through it would answer for the wrong frame.
+                                backtrace.innermostSp = nil
+                                throw Trap(.memoryOutOfBounds).withBacktrace(backtrace)
                             }
                         } else {
                             wasmkit_tc_start(handler, sp, pc, md, ms, execution)

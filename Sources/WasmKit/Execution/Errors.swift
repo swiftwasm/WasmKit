@@ -19,6 +19,9 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     /// addresses, in their callers, so none of them lies in the innermost frame.
     var trapSite: UInt? = nil
 
+    /// The stack pointer of the innermost frame, which locals are read through.
+    var innermostSp: UInt? = nil
+
     /// Textual description of the backtrace.
     public var description: String {
         symbols.enumerated().map { (index, symbol) in

@@ -23,10 +23,18 @@
             case exited(status: UInt32)
         }
 
+        /// A frame the host can address: where it is in the Wasm binary, and its stack pointer if known.
+        struct Frame {
+            let wasmPc: Int
+            let sp: Sp?
+        }
+
         package struct TrapState {
             package let description: String
-            /// Wasm addresses of the frames on the call stack, innermost first.
-            package let callStack: [Int]
+            /// Frames on the call stack, innermost first, whose stack the trap left in place.
+            let frames: [Frame]
+            /// Wasm addresses of ``frames``.
+            package var callStack: [Int] { self.frames.map(\.wasmPc) }
         }
 
         package enum Error: Swift.Error, @unchecked Sendable {
@@ -39,6 +47,7 @@
             case globalIndexOOB(UInt)
             case globalUnsupportedType(UInt)
             case notStoppedAtBreakpoint
+            case frameUnavailable(UInt)
             case linearMemoryNotInitialized
             case linearMemoryOOB(address: UInt, length: UInt)
         }
@@ -332,15 +341,15 @@
                 // The backtrace's addresses are return addresses, so the frame the trap was raised in
                 // comes from the trap site.
                 let trapSite = (trap.backtrace?.trapSite).flatMap { Pc(bitPattern: $0) }.flatMap { mapping.findWasm(forIseqAddressWithin: $0) }
-                self.state = .trapped(
-                    .init(
-                        description: "Trap: \(trap.reason)",
-                        callStack: (trapSite.map { [$0] } ?? [])
-                            + (trap.backtrace?.symbols ?? []).compactMap {
-                                mapping.firstWasm(forIseqAddress: $0.address)
-                            }
-                    )
-                )
+                let innermostSp = (trap.backtrace?.innermostSp).flatMap { Sp(bitPattern: $0) }
+                let frameSps = innermostSp.map { Execution.CallStack(sp: $0).map(\.sp) } ?? []
+                var frames = trapSite.map { [Frame(wasmPc: $0, sp: innermostSp)] } ?? []
+                for (i, symbol) in (trap.backtrace?.symbols ?? []).enumerated() {
+                    guard let wasmPc = mapping.firstWasm(forIseqAddress: symbol.address) else { continue }
+                    // A symbol is a frame's return address, so it lies in the next frame out.
+                    frames.append(Frame(wasmPc: wasmPc, sp: i + 1 < frameSps.count ? frameSps[i + 1] : nil))
+                }
+                self.state = .trapped(.init(description: "Trap: \(trap.reason)", frames: frames))
             }
         }
 
@@ -483,43 +492,43 @@
         }
 
         package func getLocal(frameIndex: UInt, localIndex: UInt) throws -> UInt64 {
-            guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
-                throw Error.notStoppedAtBreakpoint
+            switch self.state {
+            case .stoppedAtBreakpoint, .trapped: break
+            default: throw Error.notStoppedAtBreakpoint
             }
 
-            var i = 0
-            for frame in Execution.CallStack(sp: breakpoint.iseq.sp) {
-                guard frameIndex == i else {
-                    i += 1
-                    continue
-                }
-
-                guard let currentFunction = frame.sp.currentFunction else {
-                    throw Debugger.Error.unknownCurrentFunctionAtBreakpoint(frame.sp)
-                }
-
-                try currentFunction.ensureCompiled(store: StoreRef(store))
-
-                guard case .debuggable(let wasm, _) = currentFunction.code else {
-                    fatalError()
-                }
-
-                // Wasm function arguments are also addressed as locals.
-                let functionType = store.engine.funcTypeInterner.resolve(currentFunction.type)
-
-                let localsCount = functionType.parameters.count + wasm.locals.count
-
-                guard localIndex < localsCount else {
-                    throw Debugger.Error.stackLocalIndexOOB(localIndex)
-                }
-
-                let stackLayout = try wasm.withValue { code in
-                    try StackLayout(type: functionType, locals: code.locals, codeSize: code.expression.count)
-                }
-                return frame.sp[stackLayout.localSlotIndex(LocalIndex(localIndex))].storage
+            // Indexed as `qWasmCallStack` lists the frames.
+            let frames = self.frames(atRunStart: true)
+            guard frameIndex < frames.count else {
+                throw Error.stackFrameIndexOOB(frameIndex)
+            }
+            guard let frameSp = frames[Int(frameIndex)].sp else {
+                throw Error.frameUnavailable(frameIndex)
             }
 
-            throw Error.stackFrameIndexOOB(frameIndex)
+            guard let currentFunction = frameSp.currentFunction else {
+                throw Debugger.Error.unknownCurrentFunctionAtBreakpoint(frameSp)
+            }
+
+            try currentFunction.ensureCompiled(store: StoreRef(store))
+
+            guard case .debuggable(let wasm, _) = currentFunction.code else {
+                fatalError()
+            }
+
+            // Wasm function arguments are also addressed as locals.
+            let functionType = store.engine.funcTypeInterner.resolve(currentFunction.type)
+
+            let localsCount = functionType.parameters.count + wasm.locals.count
+
+            guard localIndex < localsCount else {
+                throw Debugger.Error.stackLocalIndexOOB(localIndex)
+            }
+
+            let stackLayout = try wasm.withValue { code in
+                try StackLayout(type: functionType, locals: code.locals, codeSize: code.expression.count)
+            }
+            return frameSp[stackLayout.localSlotIndex(LocalIndex(localIndex))].storage
         }
 
         /// The global at `index` in the debugged instance's global index space.
@@ -572,9 +581,14 @@
         /// Wasm addresses of the frames on the stack, innermost first. Frames with no reverse
         /// mapping are dropped.
         private func callStack(atRunStart: Bool) -> [Int] {
+            self.frames(atRunStart: atRunStart).map(\.wasmPc)
+        }
+
+        /// The frames ``callStack(atRunStart:)`` lists, with their stack pointers.
+        private func frames(atRunStart: Bool) -> [Frame] {
             // Trap call stacks already use run-start addresses.
             if case .trapped(let trap) = self.state {
-                return trap.callStack
+                return trap.frames
             }
 
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
@@ -582,11 +596,13 @@
             }
 
             let mapping = self.instance.handle.instructionMapping
-            var result = [atRunStart ? breakpoint.reportedPc : breakpoint.wasmPc]
-            for frame in Execution.CallStack(sp: breakpoint.iseq.sp) {
+            var result = [Frame(wasmPc: atRunStart ? breakpoint.reportedPc : breakpoint.wasmPc, sp: breakpoint.iseq.sp)]
+            let physical = Array(Execution.CallStack(sp: breakpoint.iseq.sp))
+            for (i, frame) in physical.enumerated() {
                 let wasm = atRunStart ? mapping.firstWasm(forIseqAddress: frame.pc) : mapping.findWasm(forIseqAddress: frame.pc)
                 guard let wasm else { continue }
-                result.append(wasm)
+                // `frame.pc` is a return address, so it lies in the next frame out.
+                result.append(Frame(wasmPc: wasm, sp: i + 1 < physical.count ? physical[i + 1].sp : nil))
             }
 
             return result

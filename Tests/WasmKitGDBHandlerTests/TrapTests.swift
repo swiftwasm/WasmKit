@@ -65,15 +65,67 @@
             }
         }
 
-        /// A trapped guest has no live frame to read a local from.
+        static let localWat = """
+            (module
+              (func (export "_start") (result i32)
+                (local $outer i32)
+                (local.set $outer (i32.const 42))
+                (call $boom (i32.const 7)))
+              (func $boom (param i32) (result i32)
+                (unreachable))
+            )
+            """
+
+        /// The trap leaves the stack in place, so the frames can still be read.
         @Test
-        func aLocalReadAfterATrapIsRefusedWithoutLosingTheTarget() throws {
-            try withHandler(debugging: Self.wat) { handler in
+        func aTrappedFrameStillAnswersALocalRead() throws {
+            try withHandler(debugging: Self.localWat) { handler in
                 _ = try handler.handle(command: .init(kind: .continue, arguments: ""))
 
                 let read = try handler.handle(command: .init(kind: .wasmLocal, arguments: "0;0"))
+                guard case .hexEncodedBinary(let bytes) = read.kind else {
+                    Issue.record("expected the parameter after a trap, got \(read.kind)")
+                    return
+                }
+                #expect(bytes.prefix(4).elementsEqual([7, 0, 0, 0]))
+            }
+        }
+
+        @Test
+        func anOuterTrappedFrameAnswersALocalRead() throws {
+            try withHandler(debugging: Self.localWat) { handler in
+                _ = try handler.handle(command: .init(kind: .continue, arguments: ""))
+
+                let read = try handler.handle(command: .init(kind: .wasmLocal, arguments: "1;0"))
+                guard case .hexEncodedBinary(let bytes) = read.kind else {
+                    Issue.record("expected the caller's local after a trap, got \(read.kind)")
+                    return
+                }
+                #expect(bytes.prefix(4).elementsEqual([42, 0, 0, 0]))
+            }
+        }
+
+        @Test
+        func anUnknownFrameAfterATrapIsRefused() throws {
+            try withHandler(debugging: Self.localWat) { handler in
+                _ = try handler.handle(command: .init(kind: .continue, arguments: ""))
+
+                let read = try handler.handle(command: .init(kind: .wasmLocal, arguments: "9;0"))
                 guard case .error = read.kind else {
-                    Issue.record("expected an error reply for a local read after a trap, got \(read.kind)")
+                    Issue.record("expected an error reply for an unknown frame, got \(read.kind)")
+                    return
+                }
+            }
+        }
+
+        @Test
+        func anUnknownLocalAfterATrapIsRefusedWithoutLosingTheTarget() throws {
+            try withHandler(debugging: Self.localWat) { handler in
+                _ = try handler.handle(command: .init(kind: .continue, arguments: ""))
+
+                let read = try handler.handle(command: .init(kind: .wasmLocal, arguments: "0;9"))
+                guard case .error = read.kind else {
+                    Issue.record("expected an error reply for an unknown local, got \(read.kind)")
                     return
                 }
 
