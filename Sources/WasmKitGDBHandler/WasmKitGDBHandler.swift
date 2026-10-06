@@ -106,11 +106,11 @@
         /// the only way to refuse a request the target understands but cannot answer.
         private static let errorReply = GDBTargetResponse.Kind.error(0x45)
 
-        /// Error code for refused memory reads, matching debugserver.
-        private static let memoryReadFailed: UInt8 = 0x08
+        /// Error code for refused reads, matching debugserver.
+        private static let readFailed: UInt8 = 0x08
 
-        /// Error code for refused memory writes, matching debugserver.
-        private static let memoryWriteFailed: UInt8 = 0x09
+        /// Error code for refused writes, matching debugserver.
+        private static let writeFailed: UInt8 = 0x09
 
         private var memoryView: DebuggerMemoryView
         /// User-set breakpoints, keyed by the address the debugger host
@@ -443,7 +443,7 @@
                     )
                 } catch {
                     logger.debug("memory read `\(command.arguments)` failed: \(error)")
-                    responseKind = .error(Self.memoryReadFailed)
+                    responseKind = .error(Self.readFailed)
                 }
 
             case .writeMemory:
@@ -457,7 +457,7 @@
                     responseKind = .ok
                 } catch {
                     logger.debug("memory write `\(command.arguments)` failed: \(error)")
-                    responseKind = .error(Self.memoryWriteFailed)
+                    responseKind = .error(Self.writeFailed)
                 }
 
             case .wasmCallStack:
@@ -544,9 +544,14 @@
                     throw Error.unknownWasmLocalArguments(command.arguments)
                 }
 
-                responseKind = .hexEncodedBinary(
-                    try self.debugger.getLocal(frameIndex: frameIndex, localIndex: localIndex).littleEndianBytes
-                )
+                do {
+                    responseKind = .hexEncodedBinary(
+                        try self.debugger.getLocal(frameIndex: frameIndex, localIndex: localIndex).littleEndianBytes
+                    )
+                } catch {
+                    logger.debug("local read `\(command.arguments)` failed: \(error)")
+                    responseKind = .error(Self.readFailed)
+                }
 
             case .wasmGlobal:
                 guard let request = WasmGlobalRequest(arguments: command.arguments) else {
@@ -559,9 +564,14 @@
                 if let instance = request.instance, instance != DebuggerMemoryView.moduleInstanceID {
                     responseKind = Self.errorReply
                 } else {
-                    responseKind = .hexEncodedBinary(
-                        try self.debugger.getGlobal(index: request.globalIndex).littleEndianBytes
-                    )
+                    do {
+                        responseKind = .hexEncodedBinary(
+                            try self.debugger.getGlobal(index: request.globalIndex).littleEndianBytes
+                        )
+                    } catch {
+                        logger.debug("global read `\(command.arguments)` failed: \(error)")
+                        responseKind = .error(Self.readFailed)
+                    }
                 }
 
             case .memoryRegionInfo:

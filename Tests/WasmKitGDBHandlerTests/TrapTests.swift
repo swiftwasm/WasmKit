@@ -64,6 +64,26 @@
                 #expect(bytes.count % 8 == 0)
             }
         }
+
+        /// A trapped guest has no live frame to read a local from.
+        @Test
+        func aLocalReadAfterATrapIsRefusedWithoutLosingTheTarget() throws {
+            try withHandler(debugging: Self.wat) { handler in
+                _ = try handler.handle(command: .init(kind: .continue, arguments: ""))
+
+                let read = try handler.handle(command: .init(kind: .wasmLocal, arguments: "0;0"))
+                guard case .error = read.kind else {
+                    Issue.record("expected an error reply for a local read after a trap, got \(read.kind)")
+                    return
+                }
+
+                let status = try handler.handle(command: .init(kind: .targetStatus, arguments: ""))
+                guard case .keyValuePairs = status.kind else {
+                    Issue.record("expected the target to still answer, got \(status.kind)")
+                    return
+                }
+            }
+        }
     }
 
 #endif

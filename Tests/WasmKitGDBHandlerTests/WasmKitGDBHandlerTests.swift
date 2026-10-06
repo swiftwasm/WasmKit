@@ -372,6 +372,18 @@
         }
 
         @Test
+        func wasmGlobalRefusesAnIndexOutOfRange() throws {
+            try withHandler(debugging: Self.globalWAT) { h in
+                let resp = try h.handle(
+                    command: .init(kind: .wasmGlobal, arguments: "2;instance:\(DebuggerMemoryView.moduleInstanceID)"))
+                guard case .error = resp.kind else {
+                    Issue.record("expected an error reply, got \(resp.kind)")
+                    return
+                }
+            }
+        }
+
+        @Test
         func wasmGlobalRejectsAnUnparsableInstance() throws {
             _ = try withHandler(debugging: Self.globalWAT) { h in
                 #expect(throws: WasmKitGDBHandler.Error.self) {
