@@ -211,7 +211,7 @@ import WasmTypes
             // A regular file is always ready, so this returns without waiting.
             let readyCount = try poll(
                 subscriptions: [.init(userData: 1, union: .fdRead(0))],
-                events: events, table, memory: memory)
+                events: events, table, memory: memory, now: { try bridge.underlying.clock_time_get(id: $0, precision: 0) })
             #expect(readyCount == 1)
             // And a timeout too large for the platform call does not overflow it.
             let readyWithClock = try poll(
@@ -219,7 +219,7 @@ import WasmTypes
                     .init(userData: 1, union: .fdRead(0)),
                     .init(userData: 2, union: .clock(.init(id: .MONOTONIC, timeout: .max, precision: 0, flags: []))),
                 ],
-                events: events, table, memory: memory)
+                events: events, table, memory: memory, now: { try bridge.underlying.clock_time_get(id: $0, precision: 0) })
             #expect(readyWithClock == 1)
         }
     }

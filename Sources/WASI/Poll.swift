@@ -10,25 +10,37 @@ extension FdTable {
     }
 }
 
+extension WASIAbi.Clock {
+    fileprivate func remainingDuration(now: (WASIAbi.ClockId) throws -> WASIAbi.Timestamp) throws -> WASIAbi.Timestamp {
+        guard id.rawValue <= WASIAbi.ClockId.THREAD_CPUTIME_ID.rawValue, flags.isSubset(of: .isAbsoluteTime) else {
+            throw WASIAbi.Errno.EINVAL
+        }
+        guard flags.contains(.isAbsoluteTime) else { return timeout }
+        let reading = try now(id)
+        return timeout > reading ? timeout - reading : 0
+    }
+}
+
 func poll<M: GuestMemory>(
     subscriptions: some Sequence<WASIAbi.Subscription>,
     events: UnsafeGuestBufferPointer<WASIAbi.Event>,
     _ fdTable: FdTable,
-    memory: M
+    memory: M,
+    now: (WASIAbi.ClockId) throws -> WASIAbi.Timestamp
 ) throws -> WASIAbi.Size {
     var pollSubscriptions = [PlatformPoll.Subscription]()
     var fdUserData = [WASIAbi.UserData]()
+    var clocks: [(userData: WASIAbi.UserData, remaining: WASIAbi.Timestamp)] = []
     // nil means no clock subscription, i.e. wait until a descriptor is ready.
-    var timeoutMilliseconds: UInt?
-    var clockUserData: WASIAbi.UserData?
+    var timeout: WASIAbi.Timestamp?
 
     for subscription in subscriptions {
         let union = subscription.union
         switch union {
         case .clock(let clock):
-            let timeout = UInt(clamping: clock.timeout / 1_000_000)
-            timeoutMilliseconds = min(timeoutMilliseconds ?? .max, timeout)
-            clockUserData = subscription.userData
+            let remaining = try clock.remainingDuration(now: now)
+            timeout = min(timeout ?? .max, remaining)
+            clocks.append((userData: subscription.userData, remaining: remaining))
         case .fdRead(let fd):
             pollSubscriptions.append(.init(fd: try fdTable.hostFileDescriptor(fd: fd), waitWrite: false))
             fdUserData.append(subscription.userData)
@@ -40,15 +52,20 @@ func poll<M: GuestMemory>(
         }
     }
 
-    let readyStates = try PlatformPoll.poll(
-        subscriptions: pollSubscriptions, timeoutMilliseconds: timeoutMilliseconds
-    )
+    let readyStates: [PlatformPoll.ReadyState]?
+    if pollSubscriptions.isEmpty, let timeout {
+        // `PlatformPoll.poll` counts its timeout in whole milliseconds.
+        try PlatformPoll.sleep(nanoseconds: timeout)
+        readyStates = nil
+    } else {
+        readyStates = try PlatformPoll.poll(subscriptions: pollSubscriptions, timeoutNanoseconds: timeout)
+    }
     var updatedEvents: WASIAbi.Size = 0
     guard let readyStates else {
         // Timed out with no ready descriptor.
-        if let clockUserData {
+        for clock in clocks where clock.remaining == timeout {
+            events.write(at: updatedEvents, .init(userData: clock.userData, error: .SUCCESS, eventType: .clock, fdReadWrite: .init(nBytes: 0, flags: .init(rawValue: 0))), to: memory)
             updatedEvents += 1
-            events.write(at: 0, .init(userData: clockUserData, error: .SUCCESS, eventType: .clock, fdReadWrite: .init(nBytes: 0, flags: .init(rawValue: 0))), to: memory)
         }
         return updatedEvents
     }
