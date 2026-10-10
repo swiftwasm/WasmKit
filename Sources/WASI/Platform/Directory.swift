@@ -45,9 +45,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
             options.insert(.directory)
         }
 
-        if fdflags.contains(.APPEND) {
-            options.insert(.append)
-        }
+        options.formUnion(fdflags.platformOpenOptions)
 
         let mode: FileDescriptor.AccessMode
         switch (accessMode.contains(.read), accessMode.contains(.write)) {
@@ -79,17 +77,17 @@ extension DirEntry: WASIDir, FdWASIEntry {
         atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags, symlinkFollow: Bool
     ) throws {
-        let fd = try openFile(
-            symlinkFollow: symlinkFollow, path: path,
-            oflags: [], accessMode: .write, fdflags: []
+        let (access, modification) = try WASIAbi.Timestamp.platformTimeSpec(
+            atim: atim, mtim: mtim, fstFlags: fstFlags
         )
-        try withThrowing {
-            let (access, modification) = try WASIAbi.Timestamp.platformTimeSpec(
-                atim: atim, mtim: mtim, fstFlags: fstFlags
-            )
-            try fd.setTimes(access: access, modification: modification)
-        } defer: {
-            try fd.close()
+        // Following happens in the sandbox, and `utimensat` never follows a
+        // symlink in the last component itself.
+        let result =
+            symlinkFollow
+            ? try SandboxPrimitives.openParentFollowingSymlinks(start: fd, path: path)
+            : try SandboxPrimitives.openParent(start: fd, path: path)
+        try result.withFields { dir, basename in
+            try dir.setTimes(at: basename, options: .noFollow, access: access, modification: modification)
         }
     }
 
@@ -113,7 +111,31 @@ extension DirEntry: WASIDir, FdWASIEntry {
             start: fd, path: destPath
         )
         try result.withFields { destDir, destBasename in
-            try destDir.createSymlink(original: sourcePath, link: destBasename)
+            try destDir.createSymlink(original: sourcePath, link: destBasename) {
+                // Look the target up inside the sandbox, relative to the
+                // directory the link goes in.
+                guard let (parent, _) = splitParent(path: destPath) else { return false }
+                let targetPath = parent.isEmpty ? sourcePath : parent.string + "/" + sourcePath
+                guard
+                    let target = try? SandboxPrimitives.openAt(
+                        start: fd, path: GuestPath(targetPath), mode: .readOnly, options: .directory, permissions: [])
+                else { return false }
+                try? target.close()
+                return true
+            }
+        }
+    }
+
+    func link(from sourcePath: String, toDir newDir: any WASIDir, to destPath: String) throws {
+        guard let newDir = newDir as? Self else {
+            throw WASIAbi.Errno.EBADF
+        }
+        let sourceResult = try SandboxPrimitives.openParent(start: fd, path: sourcePath)
+        let destResult = try SandboxPrimitives.openParent(start: newDir.fd, path: destPath)
+        try sourceResult.withFields { sourceDir, sourceBasename in
+            try destResult.withFields { destDir, destBasename in
+                try sourceDir.createHardLink(at: sourceBasename, to: destDir, at: destBasename)
+            }
         }
     }
 
@@ -153,7 +175,6 @@ extension DirEntry: WASIDir, FdWASIEntry {
     }
 
     struct HostDirectoryIterator: WASIReaddirIterator {
-        let fd: FileDescriptor
         let stream: FileDescriptor.DirectoryStream
         var entryIndex: Int
 
@@ -166,7 +187,6 @@ extension DirEntry: WASIDir, FdWASIEntry {
             let newFd = try fd.open(at: ".", .readOnly)
             let stream = try newFd.contentsOfDirectory()
 
-            self.fd = fd
             self.entryIndex = 0
             self.stream = stream
 
@@ -174,8 +194,9 @@ extension DirEntry: WASIDir, FdWASIEntry {
             // simply skips everything.
             let skippedCount = Int(clamping: cookie)
             while entryIndex < skippedCount {
-                guard let entry = next() else { break }
+                guard let entry = stream.next() else { break }
                 _ = try entry.get()
+                entryIndex += 1
             }
         }
 
@@ -187,13 +208,14 @@ extension DirEntry: WASIDir, FdWASIEntry {
             return Result(catching: { () -> ReaddirElement in
                 let entry = try entry.get()
                 let name = entry.name
-                let stat = try fd.attributes(at: name, options: [.noFollow])
                 let dirent = WASIAbi.Dirent(
                     // We can't use telldir and seekdir because the location data
                     // is valid for only the same dirp but and there is no way to
                     // share dirp among fd_readdir calls.
                     dNext: WASIAbi.DirCookie(entryIndex + 1),
-                    dIno: stat.inode,
+                    // The inode readdir reports, as wasmtime does, rather
+                    // than one `fstatat` per entry.
+                    dIno: entry.inode,
                     dirNameLen: WASIAbi.DirNameLen(name.utf8.count),
                     dType: WASIAbi.FileType(platformFileType: entry.fileType)
                 )
@@ -219,13 +241,14 @@ extension DirEntry: WASIDir, FdWASIEntry {
     }
 
     func attributes(path: String, symlinkFollow: Bool) throws -> WASIAbi.Filestat {
-        var options: FileDescriptor.AtOptions = []
-        if !symlinkFollow {
-            options.insert(.noFollow)
-        }
-        let result = try SandboxPrimitives.openParent(start: fd, path: path)
+        // Following happens in the sandbox, never in the host's `fstatat`,
+        // which would follow a symlink pointing out of the sandbox.
+        let result =
+            symlinkFollow
+            ? try SandboxPrimitives.openParentFollowingSymlinks(start: fd, path: path)
+            : try SandboxPrimitives.openParent(start: fd, path: path)
         return try result.withFields { dir, basename in
-            let attributes = try dir.attributes(at: basename, options: options)
+            let attributes = try dir.attributes(at: basename, options: .noFollow)
 
             return WASIAbi.Filestat(stat: attributes)
         }

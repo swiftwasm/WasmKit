@@ -40,6 +40,32 @@ extension SandboxPrimitives {
         }
         return splitPath
     }
+
+    /// Like `openParent`, but while the last component names a symlink,
+    /// replaces it with the symlink's target and resolves again, so that the
+    /// result never names a symlink. The host never follows a symlink
+    /// itself, which could lead it out of the sandbox.
+    static func openParentFollowingSymlinks(start: FileDescriptor, path: String) throws -> SplitPath {
+        var path = path
+        for _ in 0...PathResolution.MAX_SYMLINKS {
+            let result = try openParent(start: start, path: path)
+            let target: [UInt8]? = try result.withFields { dir, basename in
+                guard try dir.attributes(at: basename, options: .noFollow).fileType.isSymlink else { return nil }
+                return try readSymlink(in: dir, name: basename)
+            }
+            guard let target else { return result }
+            let targetPath = String(decoding: target, as: UTF8.self)
+            guard !GuestPath(targetPath).isAbsolute else {
+                // Ban absolute symlink to avoid sandbox-escaping.
+                throw WASIAbi.Errno.EPERM
+            }
+            // The target is relative to the directory holding the symlink.
+            // `start` stays the base, so `..` cannot climb above it.
+            guard let (parent, _) = splitParent(path: path) else { throw WASIAbi.Errno.ENOENT }
+            path = parent.isEmpty ? targetPath : parent.string + "/" + targetPath
+        }
+        throw WASIAbi.Errno.ELOOP
+    }
 }
 
 /// The return value of `SandboxPrimitives.openParent`.

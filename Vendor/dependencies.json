@@ -6,7 +6,7 @@
   },
   "wasi-testsuite": {
     "repository": "https://github.com/WebAssembly/wasi-testsuite.git",
-    "revision": "f442fae1a214263aeeddb5395c0c50dc9403b7f8",
+    "revision": "e0aa527fab67f2f311882bcee4f62cc755433b73",
     "categories": ["default"]
   },
   "wasi-threads": {

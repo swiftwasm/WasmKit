@@ -972,7 +972,8 @@ final class WASIImplementation: Sendable {
     /// Force the allocation of space in a file.
     func fd_allocate(fd: WASIAbi.Fd, offset: WASIAbi.FileSize, length: WASIAbi.FileSize) throws {
         try fdTable.withLock { table in
-            guard table[fd] != nil else {
+            // Only regular files can be allocated.
+            guard case .file = table[fd] else {
                 throw WASIAbi.Errno.EBADF
             }
         }
@@ -1337,7 +1338,14 @@ final class WASIImplementation: Sendable {
         oldFd: WASIAbi.Fd, oldFlags: WASIAbi.LookupFlags, oldPath: String,
         newFd: WASIAbi.Fd, newPath: String
     ) throws {
-        throw WASIAbi.Errno.ENOTSUP
+        // Hard-linking the target of a symlink would let a link inside the
+        // sandbox name a file outside it, so following is refused as in wasmtime.
+        guard !oldFlags.contains(.SYMLINK_FOLLOW) else {
+            throw WASIAbi.Errno.EINVAL
+        }
+        let oldDirEntry = try directoryEntry(fd: oldFd)
+        let newDirEntry = try directoryEntry(fd: newFd)
+        try oldDirEntry.link(from: oldPath, toDir: newDirEntry, to: newPath)
     }
 
     /// Open a file or directory.
@@ -1412,6 +1420,11 @@ final class WASIImplementation: Sendable {
 
     /// Create a symbolic link.
     func path_symlink(oldPath: String, dirFd: WASIAbi.Fd, newPath: String) throws {
+        // Sandboxed resolution never follows an absolute target, so refuse
+        // to create such a link at all, as wasmtime does.
+        guard !oldPath.hasPrefix("/") else {
+            throw WASIAbi.Errno.EPERM
+        }
         let dirEntry = try directoryEntry(fd: dirFd)
         try dirEntry.symlink(from: oldPath, to: newPath)
     }

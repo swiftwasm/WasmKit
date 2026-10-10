@@ -149,5 +149,6 @@ extension FileDescriptor {
     struct DirectoryEntry {
         let name: String
         let fileType: FileType
+        let inode: UInt64
     }
 }

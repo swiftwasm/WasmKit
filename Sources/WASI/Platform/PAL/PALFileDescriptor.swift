@@ -126,7 +126,9 @@ struct FileDescriptor: Sendable, Hashable {
 
     /// Opens a host directory for use as a WASI preopen.
     static func openPreopenDirectory(_ path: String) throws -> FileDescriptor {
-        #if os(Windows) || os(WASI)
+        #if os(Windows)
+            return try WindowsFileSystem.openPreopenDirectory(path)
+        #elseif os(WASI)
             return try open(path, .readWrite)
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android)
             let fd = try valueOrErrno {
@@ -142,6 +144,7 @@ struct FileDescriptor: Sendable, Hashable {
 
     func close() throws {
         #if os(Windows)
+            WindowsFileSystem.openOptions.set([], for: self)
             try valueOrErrno(retryOnInterrupt: false) { _close(rawValue) }
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             try valueOrErrno(retryOnInterrupt: false) { _pal_close(rawValue) }
@@ -164,6 +167,10 @@ struct FileDescriptor: Sendable, Hashable {
     func write(_ buffer: UnsafeRawBufferPointer) throws -> Int {
         guard let base = buffer.baseAddress, buffer.count > 0 else { return 0 }
         #if os(Windows)
+            if WindowsFileSystem.openOptions.get(self).contains(.append) {
+                // A pipe or console cannot seek, and appends anyway.
+                _ = try? seek(offset: 0, from: .end)
+            }
             return try Int(valueOrErrno { _write(rawValue, base, UInt32(min(buffer.count, Int(Int32.max)))) })
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             return try valueOrErrno { _pal_write(rawValue, base, buffer.count) }
@@ -172,10 +179,12 @@ struct FileDescriptor: Sendable, Hashable {
         #endif
     }
 
-    /// Reads at the given absolute offset without changing the current offset
-    /// (except on Windows, where the CRT offers no `pread` and the offset moves).
+    /// Reads at the given absolute offset without changing the current offset.
     func read(fromAbsoluteOffset offset: Int64, into buffer: UnsafeMutableRawBufferPointer) throws -> Int {
         #if os(Windows)
+            // The CRT offers no `pread`; seek there and back.
+            let current = try seek(offset: 0, from: .current)
+            defer { _ = try? seek(offset: current, from: .start) }
             _ = try seek(offset: offset, from: .start)
             return try read(into: buffer)
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
@@ -194,10 +203,16 @@ struct FileDescriptor: Sendable, Hashable {
     /// Writes all of `buffer` at the given absolute offset.
     func writeAll(toAbsoluteOffset offset: Int64, _ buffer: UnsafeRawBufferPointer) throws -> Int {
         #if os(Windows)
+            // The CRT offers no `pwrite`; seek there and back. Write with
+            // `_write` directly, since `write` would move to the end under
+            // append, and POSIX writes at the offset regardless.
+            let current = try seek(offset: 0, from: .current)
+            defer { _ = try? seek(offset: current, from: .start) }
             _ = try seek(offset: offset, from: .start)
             var written = 0
             while written < buffer.count {
-                written += try write(UnsafeRawBufferPointer(rebasing: buffer[written...]))
+                let chunk = UnsafeRawBufferPointer(rebasing: buffer[written...])
+                written += try Int(valueOrErrno { _write(rawValue, chunk.baseAddress!, UInt32(min(chunk.count, Int(Int32.max)))) })
             }
             return written
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
@@ -274,8 +289,8 @@ struct FileDescriptor: Sendable, Hashable {
     /// bits representable as `OpenOptions` are reported.
     func status() throws -> OpenOptions {
         #if os(Windows)
-            // The CRT offers no F_GETFL equivalent; report no flags.
-            return []
+            // The CRT offers no F_GETFL equivalent; report what open recorded.
+            return WindowsFileSystem.openOptions.get(self)
         #elseif os(WASI)
             throw WASIAbi.Errno.ENOTSUP
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android)
@@ -288,7 +303,11 @@ struct FileDescriptor: Sendable, Hashable {
 
     func setStatus(_ options: OpenOptions) throws {
         #if os(Windows)
-            // The CRT offers no F_SETFL equivalent; accept and ignore.
+            // The CRT offers no F_SETFL equivalent. Like F_SETFL on Linux,
+            // change only append and nonblocking.
+            let settable: OpenOptions = [.append, .nonBlocking]
+            let current = WindowsFileSystem.openOptions.get(self)
+            WindowsFileSystem.openOptions.set(current.subtracting(settable).union(options.intersection(settable)), for: self)
         #elseif os(WASI)
             throw WASIAbi.Errno.ENOTSUP
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android)
@@ -301,12 +320,7 @@ struct FileDescriptor: Sendable, Hashable {
     /// Queries file metadata; the C equivalent is `fstat`.
     func attributes() throws -> Attributes {
         #if os(Windows)
-            var info = BY_HANDLE_FILE_INFORMATION()
-            let handle = HANDLE(bitPattern: _get_osfhandle(rawValue))
-            guard GetFileInformationByHandle(handle, &info) else {
-                throw _wasiError(fromWin32: GetLastError())
-            }
-            return Attributes(windowsFileInformation: info)
+            return try WindowsFileSystem.attributes(of: self)
         #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             var statBuffer = stat()
             try valueOrErrno(retryOnInterrupt: false) { fstat(rawValue, &statBuffer) }
@@ -370,6 +384,8 @@ struct FileDescriptor: Sendable, Hashable {
                 path.withCString { openat(rawValue, $0, flags, _palMode(permissions)) }
             }
             return FileDescriptor(rawValue: fd)
+        #elseif os(Windows)
+            return try WindowsFileSystem.open(at: path, in: self, mode: mode, options: options)
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
@@ -384,6 +400,53 @@ struct FileDescriptor: Sendable, Hashable {
                 path.withCString { fstatat(rawValue, $0, &statBuffer, options.contains(.noFollow) ? AT_SYMLINK_NOFOLLOW : 0) }
             }
             return Attributes(stat: statBuffer)
+        #elseif os(Windows)
+            // The Windows layer never follows a symlink; the sandbox does.
+            guard options.contains(.noFollow) else { throw WASIAbi.Errno.ENOTSUP }
+            return try WindowsFileSystem.attributes(at: path, in: self)
+        #else
+            throw WASIAbi.Errno.ENOTSUP
+        #endif
+    }
+
+    /// Sets the timestamps of a path relative to this directory descriptor;
+    /// the C equivalent is `utimensat`.
+    func setTimes(
+        at path: String, options: AtOptions = [],
+        access: FileTime = .omit, modification: FileTime = .omit
+    ) throws {
+        #if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
+            let times = ContiguousArray([_posixTimespec(access), _posixTimespec(modification)])
+            _ = try times.withUnsafeBufferPointer { timesPtr in
+                try valueOrErrno(retryOnInterrupt: false) {
+                    path.withCString {
+                        utimensat(rawValue, $0, timesPtr.baseAddress!, options.contains(.noFollow) ? AT_SYMLINK_NOFOLLOW : 0)
+                    }
+                }
+            }
+        #elseif os(Windows)
+            // The Windows layer never follows a symlink; the sandbox does.
+            guard options.contains(.noFollow) else { throw WASIAbi.Errno.ENOTSUP }
+            try WindowsFileSystem.setTimes(at: path, in: self, access: access, modification: modification)
+        #else
+            throw WASIAbi.Errno.ENOTSUP
+        #endif
+    }
+
+    /// Creates a hard link at `newPath` relative to `newDir` to the entry
+    /// at `path` relative to this descriptor, without following a symlink
+    /// there; the C equivalent is `linkat`.
+    func createHardLink(at path: String, to newDir: FileDescriptor, at newPath: String) throws {
+        #if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
+            try valueOrErrno(retryOnInterrupt: false) {
+                path.withCString { oldCStr in
+                    newPath.withCString { newCStr in
+                        linkat(rawValue, oldCStr, newDir.rawValue, newCStr, 0)
+                    }
+                }
+            }
+        #elseif os(Windows)
+            try WindowsFileSystem.createHardLink(at: path, in: self, to: newPath, in: newDir)
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
@@ -396,6 +459,8 @@ struct FileDescriptor: Sendable, Hashable {
             try valueOrErrno(retryOnInterrupt: false) {
                 path.withCString { unlinkat(rawValue, $0, options.contains(.removeDirectory) ? AT_REMOVEDIR : 0) }
             }
+        #elseif os(Windows)
+            try WindowsFileSystem.remove(at: path, in: self, directory: options.contains(.removeDirectory))
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
@@ -408,14 +473,18 @@ struct FileDescriptor: Sendable, Hashable {
             try valueOrErrno(retryOnInterrupt: false) {
                 path.withCString { mkdirat(rawValue, $0, _palMode(permissions)) }
             }
+        #elseif os(Windows)
+            try WindowsFileSystem.createDirectory(at: path, in: self)
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
     }
 
     /// Creates a symlink at `link` (relative to this directory descriptor)
-    /// pointing to `original`; the C equivalent is `symlinkat`.
-    func createSymlink(original: String, link: String) throws {
+    /// pointing to `original`; the C equivalent is `symlinkat`. Windows
+    /// records whether a symlink points to a directory and asks
+    /// `targetIsDirectory`; other platforms never call it.
+    func createSymlink(original: String, link: String, targetIsDirectory: () -> Bool) throws {
         #if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             try valueOrErrno(retryOnInterrupt: false) {
                 original.withCString { originalCStr in
@@ -424,6 +493,8 @@ struct FileDescriptor: Sendable, Hashable {
                     }
                 }
             }
+        #elseif os(Windows)
+            try WindowsFileSystem.createSymlink(original: original, link: link, in: self, targetIsDirectory: targetIsDirectory)
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
@@ -440,6 +511,8 @@ struct FileDescriptor: Sendable, Hashable {
                     }
                 }
             }
+        #elseif os(Windows)
+            try WindowsFileSystem.rename(at: path, in: self, to: newPath, in: newDir)
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
@@ -460,6 +533,12 @@ struct FileDescriptor: Sendable, Hashable {
                     readlinkat(rawValue, $0, base.assumingMemoryBound(to: CChar.self), buffer.count)
                 }
             }
+        #elseif os(Windows)
+            // Like readlink, truncate silently and add no NUL.
+            let target = Array(try WindowsFileSystem.readSymlink(at: path, in: self).utf8)
+            let count = min(target.count, buffer.count)
+            buffer.copyBytes(from: target[..<count])
+            return count
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
@@ -472,12 +551,16 @@ struct FileDescriptor: Sendable, Hashable {
             fileprivate let dirp: UnsafeMutablePointer<DIR>
         #elseif canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
             fileprivate let dirp: OpaquePointer
+        #elseif os(Windows)
+            fileprivate let enumerator: WindowsFileSystem.DirectoryEnumerator
         #endif
 
         /// Closes the stream and the file descriptor it took ownership of.
         func close() {
             #if canImport(Darwin) || canImport(Glibc) || canImport(Musl) || canImport(Android) || os(WASI)
                 _ = closedir(dirp)
+            #elseif os(Windows)
+                enumerator.close()
             #endif
         }
 
@@ -492,6 +575,8 @@ struct FileDescriptor: Sendable, Hashable {
                 let errnoValue = _palErrno
                 if errnoValue == 0 { return nil }
                 return .failure(_wasiError(fromErrno: errnoValue))
+            #elseif os(Windows)
+                return enumerator.next()
             #else
                 return nil
             #endif
@@ -507,6 +592,8 @@ struct FileDescriptor: Sendable, Hashable {
                 throw _wasiError(fromErrno: _palErrno)
             }
             return DirectoryStream(dirp: dirp)
+        #elseif os(Windows)
+            return DirectoryStream(enumerator: WindowsFileSystem.DirectoryEnumerator(fd: self))
         #else
             throw WASIAbi.Errno.ENOTSUP
         #endif
@@ -572,10 +659,12 @@ enum PlatformScheduler {
         #if !os(WASI)
             if flags & O_APPEND != 0 { options.insert(.append) }
             if flags & O_NONBLOCK != 0 { options.insert(.nonBlocking) }
-            if flags & O_DSYNC != 0 { options.insert(.dataSync) }
-            if flags & O_SYNC != 0 { options.insert(.fileSync) }
+            // Glibc's O_SYNC and O_RSYNC include the O_DSYNC bit, so test
+            // every bit of each rather than any of them.
+            if flags & O_DSYNC == O_DSYNC { options.insert(.dataSync) }
+            if flags & O_SYNC == O_SYNC { options.insert(.fileSync) }
             #if os(Linux)
-                if flags & O_RSYNC != 0 { options.insert(.readSync) }
+                if flags & O_RSYNC == O_RSYNC { options.insert(.readSync) }
             #endif
         #endif
         return options
@@ -697,7 +786,7 @@ enum PlatformScheduler {
                 default: fileType = .unknown
                 }
             #endif
-            self.init(name: name, fileType: fileType)
+            self.init(name: name, fileType: fileType, inode: UInt64(entry.pointee.d_ino))
         }
     }
 
@@ -783,9 +872,11 @@ enum PlatformScheduler {
     }
 
     extension FileDescriptor.Attributes {
-        init(windowsFileInformation info: BY_HANDLE_FILE_INFORMATION) {
+        /// `isSymlink` comes from the reparse tag, which the file
+        /// information lacks: not every reparse point is a symlink.
+        init(windowsFileInformation info: BY_HANDLE_FILE_INFORMATION, isSymlink: Bool) {
             let fileType: FileDescriptor.FileType
-            if info.dwFileAttributes & DWORD(FILE_ATTRIBUTE_REPARSE_POINT) != 0 {
+            if isSymlink {
                 fileType = .symlink
             } else if info.dwFileAttributes & DWORD(FILE_ATTRIBUTE_DIRECTORY) != 0 {
                 fileType = .directory

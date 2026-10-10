@@ -20,34 +20,6 @@ import WasmTypes
         #endif
         return try FileManager.default.contentsOfDirectory(atPath: fdDirectory).count
     }
-
-    private func withReducedOpenFileLimit<Result>(
-        extraDescriptors: Int,
-        _ body: () throws -> Result
-    ) throws -> Result {
-        #if os(macOS)
-            let nofileResource = RLIMIT_NOFILE
-        #else
-            let nofileResource = __rlimit_resource_t(RLIMIT_NOFILE.rawValue)
-        #endif
-        var original = rlimit()
-        guard getrlimit(nofileResource, &original) == 0 else {
-            throw TestSupport.Error(errno: errno)
-        }
-
-        let currentOpen = try currentOpenFileDescriptorCount()
-        let desiredSoft = rlim_t(currentOpen + extraDescriptors)
-        var reduced = original
-        reduced.rlim_cur = min(original.rlim_cur, desiredSoft)
-        guard setrlimit(nofileResource, &reduced) == 0 else {
-            throw TestSupport.Error(errno: errno)
-        }
-        defer {
-            var original = original
-            _ = setrlimit(nofileResource, &original)
-        }
-        return try body()
-    }
 #endif
 
 @Suite
@@ -184,6 +156,116 @@ struct WASITests {
                     #expect(error == .ELOOP)
                 }
             }
+        }
+    #endif
+
+    #if !os(Android)
+        /// `path_filestat_get` and `path_filestat_set_times` follow a final
+        /// symlink inside the sandbox, never through the host, so a link
+        /// pointing out of the preopen reveals nothing about its target.
+        @Test
+        func pathFilestatFollowsSymlinksInsideTheSandbox() throws {
+            let t = try TestSupport.TemporaryDirectory()
+            try t.createDir(at: "External")
+            try t.createFile(at: "External/secret.txt", contents: "Secret")
+            try t.createDir(at: "Sandbox")
+            try t.createDir(at: "Sandbox/dir")
+            try t.createFile(at: "Sandbox/hello.txt", contents: "Hello")
+            try t.createSymlink(at: "Sandbox/link-hello.txt", to: "hello.txt")
+            try t.createSymlink(at: "Sandbox/dir/link-up-hello.txt", to: "../link-hello.txt")
+            try t.createSymlink(at: "Sandbox/link-external-secret.txt", to: "../External/secret.txt")
+            try t.createSymlink(at: "Sandbox/link-root", to: "/")
+            try t.createSymlink(at: "Sandbox/link-loop.txt", to: "link-loop.txt")
+
+            let wasi = try WASIBridgeToHost(
+                fileSystem: .host().withPreopens([
+                    .init(guestPath: "/Sandbox", hostPath: t.url.appendingPathComponent("Sandbox").path)
+                ])
+            )
+            try wasi.runAndClose { _ in
+                let wasi = wasi.underlying
+                let sandboxFd: WASIAbi.Fd = 3
+
+                let hello = try wasi.path_filestat_get(dirFd: sandboxFd, flags: .SYMLINK_FOLLOW, path: "link-hello.txt")
+                #expect(hello.size == 5)
+                let upHello = try wasi.path_filestat_get(dirFd: sandboxFd, flags: .SYMLINK_FOLLOW, path: "dir/link-up-hello.txt")
+                #expect(upHello.size == 5)
+                let link = try wasi.path_filestat_get(dirFd: sandboxFd, flags: [], path: "link-hello.txt")
+                #expect(link.filetype == .SYMBOLIC_LINK)
+                #expect(throws: WASIAbi.Errno.EPERM) {
+                    try wasi.path_filestat_get(dirFd: sandboxFd, flags: .SYMLINK_FOLLOW, path: "link-external-secret.txt")
+                }
+                #expect(throws: WASIAbi.Errno.EPERM) {
+                    try wasi.path_filestat_get(dirFd: sandboxFd, flags: .SYMLINK_FOLLOW, path: "link-root")
+                }
+                #expect(throws: WASIAbi.Errno.ELOOP) {
+                    try wasi.path_filestat_get(dirFd: sandboxFd, flags: .SYMLINK_FOLLOW, path: "link-loop.txt")
+                }
+                #expect(throws: WASIAbi.Errno.EPERM) {
+                    try wasi.path_filestat_set_times(
+                        dirFd: sandboxFd, flags: .SYMLINK_FOLLOW, path: "link-external-secret.txt",
+                        atim: 0, mtim: 0, fstFlags: [.ATIM, .MTIM])
+                }
+            }
+        }
+
+        /// A hard link to a symlink links the symlink itself, so linking one
+        /// that points out of the preopen does not reach its target.
+        @Test
+        func pathLinkDoesNotFollowSymlinks() throws {
+            let t = try TestSupport.TemporaryDirectory()
+            try t.createDir(at: "External")
+            try t.createFile(at: "External/secret.txt", contents: "Secret")
+            try t.createDir(at: "Sandbox")
+            try t.createSymlink(at: "Sandbox/link-external-secret.txt", to: "../External/secret.txt")
+
+            let wasi = try WASIBridgeToHost(
+                fileSystem: .host().withPreopens([
+                    .init(guestPath: "/Sandbox", hostPath: t.url.appendingPathComponent("Sandbox").path)
+                ])
+            )
+            try wasi.runAndClose { _ in
+                let wasi = wasi.underlying
+                let sandboxFd: WASIAbi.Fd = 3
+
+                try wasi.path_link(
+                    oldFd: sandboxFd, oldFlags: [], oldPath: "link-external-secret.txt",
+                    newFd: sandboxFd, newPath: "hard-link")
+                let link = try wasi.path_filestat_get(dirFd: sandboxFd, flags: [], path: "hard-link")
+                #expect(link.filetype == .SYMBOLIC_LINK)
+                #expect(throws: WASIAbi.Errno.EPERM) {
+                    try wasi.path_filestat_get(dirFd: sandboxFd, flags: .SYMLINK_FOLLOW, path: "hard-link")
+                }
+                #expect(throws: WASIAbi.Errno.EINVAL) {
+                    try wasi.path_link(
+                        oldFd: sandboxFd, oldFlags: .SYMLINK_FOLLOW, oldPath: "link-external-secret.txt",
+                        newFd: sandboxFd, newPath: "followed-link")
+                }
+            }
+        }
+
+        /// A preopen cannot be renamed, or renamed over, through itself.
+        @Test
+        func renamingThePreopenItselfIsRefused() throws {
+            let t = try TestSupport.TemporaryDirectory()
+            try t.createDir(at: "Sandbox")
+            try t.createDir(at: "Sandbox/dir")
+
+            let wasi = try WASIBridgeToHost(
+                fileSystem: .host().withPreopens([
+                    .init(guestPath: "/Sandbox", hostPath: t.url.appendingPathComponent("Sandbox").path)
+                ])
+            )
+            try wasi.runAndClose { _ in
+                let wasi = wasi.underlying
+                let sandboxFd: WASIAbi.Fd = 3
+                for (oldPath, newPath) in [(".", "moved"), ("dir/..", "moved"), ("dir", ".")] {
+                    #expect(throws: (any Error).self, "\(oldPath) -> \(newPath)") {
+                        try wasi.path_rename(oldFd: sandboxFd, oldPath: oldPath, newFd: sandboxFd, newPath: newPath)
+                    }
+                }
+            }
+            #expect(FileManager.default.fileExists(atPath: t.url.appendingPathComponent("Sandbox/dir").path))
         }
     #endif
 
@@ -1687,17 +1769,23 @@ struct WASITests {
                     count: 4096
                 )
 
-                try withReducedOpenFileLimit(extraDescriptors: 32) {
-                    for _ in 0..<512 {
-                        let bytesRead = try wasi.fd_readdir(
-                            fd: dirFd,
-                            buffer: buffer,
-                            cookie: 0,
-                            memory: memory
-                        )
-                        #expect(bytesRead > 0)
-                    }
+                // Count descriptors rather than lowering RLIMIT_NOFILE: the
+                // limit is process-wide, so it would starve tests running in
+                // parallel. A leak shows as one descriptor per call, far more
+                // than those tests hold open at once.
+                let iterations = 512
+                let openBefore = try currentOpenFileDescriptorCount()
+                for _ in 0..<iterations {
+                    let bytesRead = try wasi.fd_readdir(
+                        fd: dirFd,
+                        buffer: buffer,
+                        cookie: 0,
+                        memory: memory
+                    )
+                    #expect(bytesRead > 0)
                 }
+                let openAfter = try currentOpenFileDescriptorCount()
+                #expect(openAfter - openBefore < iterations / 2)
             }
         }
     #endif
