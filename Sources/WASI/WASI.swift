@@ -406,6 +406,9 @@ import WasmTypes
         public static let PROCESS_CPUTIME_ID = Self(rawValue: 2)
         /// The CPU-time clock associated with the current thread.
         public static let THREAD_CPUTIME_ID = Self(rawValue: 3)
+
+        /// The number of defined clock IDs, which are numbered from zero.
+        static var count: Int { Int(THREAD_CPUTIME_ID.rawValue) + 1 }
     }
 
     public typealias Timestamp = UInt64
@@ -1431,7 +1434,7 @@ final class WASIImplementation: Sendable {
         guard !subscriptions.isEmpty else { throw WASIAbi.Errno.EINVAL }
         let materializedSubscriptions = (0..<subscriptions.count).map { subscriptions.read(at: $0, in: memory) }
         let table = fdTable.withLock { $0 }
-        return try poll(subscriptions: materializedSubscriptions, events: events, table, memory: memory)
+        return try poll(subscriptions: materializedSubscriptions, events: events, table, memory: memory, now: { try self.clock_time_get(id: $0, precision: 0) })
     }
 
     /// Shut down socket send and receive channels.
