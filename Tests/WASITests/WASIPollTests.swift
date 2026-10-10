@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 import WasmTypes
 
@@ -13,6 +14,22 @@ import WasmTypes
     struct StoppedMonotonicClock: MonotonicClock {
         static let reading: WASIAbi.Timestamp = 2_000_000_000
         func now() throws -> MonotonicClock.Instant { Self.reading }
+        func resolution() throws -> MonotonicClock.Duration { 1 }
+    }
+
+    /// Each read moves the clock forward by 1 ns, so two readings never match.
+    final class AdvancingMonotonicClock: MonotonicClock {
+        private let next: Mutex<MonotonicClock.Instant>
+
+        init(start: MonotonicClock.Instant) { next = Mutex(start) }
+
+        func now() throws -> MonotonicClock.Instant {
+            next.withLock { value in
+                defer { value += 1 }
+                return value
+            }
+        }
+
         func resolution() throws -> MonotonicClock.Duration { 1 }
     }
 
@@ -119,6 +136,22 @@ import WasmTypes
         }
     }
 
+    /// Equal absolute deadlines keep their tie only if the clock is read once for them.
+    @Test(.disabled(if: TestSupport.pollUnavailable, "poll is not available on this platform"))
+    func equalAbsoluteDeadlinesStayTiedWhileTheClockAdvances() throws {
+        let start: WASIAbi.Timestamp = 2_000_000_000
+        let bridge = try WASIBridgeToHost(fileSystem: .memory(MemoryFileSystem()), monotonicClock: AdvancingMonotonicClock(start: start))
+        try bridge.runAndClose { wasi in
+            let deadline = start + 1_000_000
+            let subscriptions = [
+                Self.clock(1, .MONOTONIC, timeout: deadline, flags: .isAbsoluteTime),
+                Self.clock(2, .MONOTONIC, timeout: deadline, flags: .isAbsoluteTime),
+            ]
+            let (events, _) = try pollOneoff(wasi.underlying, subscriptions)
+            #expect(events == [Self.clockEvent(1), Self.clockEvent(2)])
+        }
+    }
+
     @Test(.disabled(if: TestSupport.pollUnavailable, "poll is not available on this platform"))
     func anAbsoluteTimeoutIsComparedByWhatRemains() throws {
         try withStoppedClocks { wasi in
@@ -218,6 +251,20 @@ import WasmTypes
                 ]
                 let (events, _) = try pollOneoff(wasi, subscriptions)
                 #expect(events == [.init(userData: 1, error: .SUCCESS, eventType: .fdRead, fdReadWrite: .init(nBytes: 0, flags: []))])
+            }
+        }
+
+        // `poll(2)` waits in whole milliseconds, so the wait ends at 2 ms, by which the 1.7 ms clock has also expired.
+        @Test(.disabled(if: TestSupport.pollUnavailable, "poll is not available on this platform"))
+        func clocksThatExpireBeforeAnFdTimeoutAreAllReported() throws {
+            try withPipeAsStdin { wasi, _ in
+                let subscriptions = [
+                    WASIAbi.Subscription(userData: 1, union: .fdRead(0)),
+                    Self.clock(2, .MONOTONIC, timeout: 1_000_001),
+                    Self.clock(3, .MONOTONIC, timeout: 1_700_000),
+                ]
+                let (events, _) = try pollOneoff(wasi, subscriptions)
+                #expect(events == [Self.clockEvent(2), Self.clockEvent(3)])
             }
         }
     #endif

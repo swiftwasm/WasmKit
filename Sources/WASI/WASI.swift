@@ -406,6 +406,9 @@ import WasmTypes
         public static let PROCESS_CPUTIME_ID = Self(rawValue: 2)
         /// The CPU-time clock associated with the current thread.
         public static let THREAD_CPUTIME_ID = Self(rawValue: 3)
+
+        /// The number of defined clock IDs, which are numbered from zero.
+        static var count: Int { Int(THREAD_CPUTIME_ID.rawValue) + 1 }
     }
 
     public typealias Timestamp = UInt64

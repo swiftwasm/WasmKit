@@ -33,12 +33,21 @@ func poll<M: GuestMemory>(
     var clocks: [(userData: WASIAbi.UserData, remaining: WASIAbi.Timestamp)] = []
     // nil means no clock subscription, i.e. wait until a descriptor is ready.
     var timeout: WASIAbi.Timestamp?
+    // One reading per clock, so subscriptions on the same clock share a deadline.
+    // Clock IDs are validated to be at most THREAD_CPUTIME_ID before they are read.
+    var clockReadings = [WASIAbi.Timestamp?](repeating: nil, count: WASIAbi.ClockId.count)
+    func clockReading(_ id: WASIAbi.ClockId) throws -> WASIAbi.Timestamp {
+        if let reading = clockReadings[Int(id.rawValue)] { return reading }
+        let reading = try now(id)
+        clockReadings[Int(id.rawValue)] = reading
+        return reading
+    }
 
     for subscription in subscriptions {
         let union = subscription.union
         switch union {
         case .clock(let clock):
-            let remaining = try clock.remainingDuration(now: now)
+            let remaining = try clock.remainingDuration(now: clockReading)
             timeout = min(timeout ?? .max, remaining)
             clocks.append((userData: subscription.userData, remaining: remaining))
         case .fdRead(let fd):
@@ -61,15 +70,7 @@ func poll<M: GuestMemory>(
         readyStates = try PlatformPoll.poll(subscriptions: pollSubscriptions, timeoutNanoseconds: timeout)
     }
     var updatedEvents: WASIAbi.Size = 0
-    guard let readyStates else {
-        // Timed out with no ready descriptor.
-        for clock in clocks where clock.remaining == timeout {
-            events.write(at: updatedEvents, .init(userData: clock.userData, error: .SUCCESS, eventType: .clock, fdReadWrite: .init(nBytes: 0, flags: .init(rawValue: 0))), to: memory)
-            updatedEvents += 1
-        }
-        return updatedEvents
-    }
-    for (i, state) in readyStates.enumerated() {
+    for (i, state) in (readyStates ?? []).enumerated() {
         guard !state.isEmpty else { continue }
         let eventIndex = updatedEvents
         updatedEvents += 1
@@ -84,5 +85,29 @@ func poll<M: GuestMemory>(
             events.write(at: .init(eventIndex), .init(userData: fdUserData[i], error: .EBADF, eventType: eventType, fdReadWrite: .init(nBytes: 0, flags: [])), to: memory)
         }
     }
+    // A ready descriptor ends the call with its own events, without clocks.
+    guard updatedEvents == 0 else { return updatedEvents }
+    // Otherwise report each clock whose deadline had passed when the wait ended.
+    // A wait that ended early waited for nothing, so only clocks already expired count.
+    let waited: WASIAbi.Timestamp
+    if readyStates != nil {
+        waited = 0
+    } else if pollSubscriptions.isEmpty {
+        waited = timeout ?? 0
+    } else {
+        waited = roundedUpToMilliseconds(timeout ?? 0)
+    }
+    for clock in clocks where clock.remaining <= waited {
+        events.write(at: updatedEvents, .init(userData: clock.userData, error: .SUCCESS, eventType: .clock, fdReadWrite: .init(nBytes: 0, flags: .init(rawValue: 0))), to: memory)
+        updatedEvents += 1
+    }
     return updatedEvents
+}
+
+/// Rounds up to whole milliseconds, which is the unit `poll(2)` waits in.
+/// Saturates at the largest timestamp.
+private func roundedUpToMilliseconds(_ nanoseconds: WASIAbi.Timestamp) -> WASIAbi.Timestamp {
+    let milliseconds = nanoseconds / 1_000_000 + (nanoseconds % 1_000_000 == 0 ? 0 : 1)
+    let (rounded, overflow) = milliseconds.multipliedReportingOverflow(by: 1_000_000)
+    return overflow ? .max : rounded
 }
