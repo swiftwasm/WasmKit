@@ -28,7 +28,7 @@ To use WasmKit in your package, add it as a [Swift Package Manager](https://www.
 Run the following commands in the same directory as your `Package.swift` manifest to add the dependency:
 
 ```
-swift package add-dependency https://github.com/swiftwasm/WasmKit --up-to-next-minor-from 0.4.1
+swift package add-dependency https://github.com/swiftwasm/WasmKit --up-to-next-minor-from 0.4.2
 swift package add-target-dependency WasmKit <your-package-target-name> --package WasmKit
 ```
 
@@ -37,7 +37,7 @@ You can also add the following snippet manually instead to your `Package.swift` 
 ```swift
 dependencies: [
     // ...other dependencies
-    .package(url: "https://github.com/swiftwasm/WasmKit.git", .upToNextMinor(from: "0.4.1")),
+    .package(url: "https://github.com/swiftwasm/WasmKit.git", .upToNextMinor(from: "0.4.2")),
 ],
 // ...other package configuration
 targets: [
@@ -104,10 +104,10 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | [Tail Call](https://github.com/WebAssembly/tail-call) | ✅ Implemented | [0.1.4] |
 | [Typed Function References](https://github.com/WebAssembly/function-references) | ✅ Implemented | [0.4.1] |
 | [Branch Hinting](https://github.com/WebAssembly/branch-hinting) | ❌ Not implemented | |
-| [Custom Annotation Syntax in the Text Format](https://github.com/WebAssembly/annotations) | ✅ Implemented | `main` branch |
+| [Custom Annotation Syntax in the Text Format](https://github.com/WebAssembly/annotations) | ✅ Implemented | [0.4.2] |
 | [Extended Constant Expressions](https://github.com/WebAssembly/extended-const) | ✅ Implemented | [0.4.0] |
 | [Garbage Collection](https://github.com/WebAssembly/gc) | ❌ Not implemented | |
-| [Multiple Memories](https://github.com/WebAssembly/multi-memory) | ✅ Implemented | `main` branch |
+| [Multiple Memories](https://github.com/WebAssembly/multi-memory) | ✅ Implemented | [0.4.2] |
 | [Relaxed SIMD](https://github.com/WebAssembly/relaxed-simd) | ✅ Implemented | [0.4.0] |
 
 [0.0.2]: https://github.com/swiftwasm/WasmKit/releases/tag/0.0.2
@@ -115,6 +115,7 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 [0.3.0]: https://github.com/swiftwasm/WasmKit/releases/tag/0.3.0
 [0.4.0]: https://github.com/swiftwasm/WasmKit/releases/tag/0.4.0
 [0.4.1]: https://github.com/swiftwasm/WasmKit/releases/tag/0.4.1
+[0.4.2]: https://github.com/swiftwasm/WasmKit/releases/tag/0.4.2
 
 #### Phase 4 - Standardize the Feature (WG)
 
