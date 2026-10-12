@@ -54,8 +54,6 @@
 
         /// The stack the guest runs on, kept alive for as long as the guest can be resumed.
         private let stack: ExecutionStack
-        /// The start of ``stack``, where the root frame is laid out.
-        private let stackBase: Sp
         private var execution: Execution
         private let store: Store
 
@@ -125,7 +123,6 @@
             self.module = module
             self.entrypointFunction = entrypointFunction
             let stack = ExecutionStack(engine: store.engine)
-            self.stackBase = stack.slots
             self.store = store
             self.execution = Execution(
                 store: StoreRef(store),
@@ -316,7 +313,7 @@
                 switch resumption {
                 case .entrypoint:
                     let type = self.entrypointFunction.type
-                    let sp = try Execution.layOutRootFrame(at: self.stackBase, type: type, arguments: [])
+                    let sp = try Execution.layOutRootFrame(at: self.stack.slots, type: type, arguments: [])
                     // The entrypoint returns to `endOfExecution`, so its frame keeps this address.
                     try self.execution.execute(sp: sp, pc: self.rootCode.pc, handle: self.entrypointFunction.handle, type: type)
                     self.recordEntrypointReturn()
@@ -391,7 +388,7 @@
 
         /// Records the entrypoint's results, which it left in the root frame.
         private mutating func recordEntrypointReturn() {
-            let rootSp = self.stackBase.advanced(by: StackLayout.numberOfSavingSlots)
+            let rootSp = self.stack.slots.advanced(by: StackLayout.numberOfSavingSlots)
             self.state = .entrypointReturned(Execution.readRootResults(sp: rootSp, type: self.entrypointFunction.type))
         }
 
