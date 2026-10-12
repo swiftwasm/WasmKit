@@ -98,7 +98,7 @@ public final class Store {
         self.engine = engine
         self.allocator = StoreAllocator(funcTypeInterner: engine.funcTypeInterner)
         self.isFuelMetered = engine.configuration.fuelMetering
-        self.epochCounter = UnsafePointer(engine.epochCounter.address)
+        self.epochCounter = UnsafePointer(engine.epochTicker.counter.address)
     }
 
     /// Stops guest code once the engine's epoch has advanced `ticks` times from now.

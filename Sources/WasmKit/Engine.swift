@@ -1,4 +1,3 @@
-import _CWasmKit
 import _CWasmKit.Platform
 
 import struct WasmParser.WasmFeatureSet
@@ -26,8 +25,13 @@ public final class Engine {
     /// and read through the execution state instead.
     let crossInstanceReturnSlot: CodeSlot
 
-    /// The epoch of this engine, advanced by ``incrementEpoch()`` from any thread.
-    let epochCounter = Cell<UInt64>(0)
+    /// Advances this engine's epoch. Send it to the thread that should stop guest code, such as
+    /// a timer.
+    ///
+    /// With ``EngineConfiguration/epochInterruption``, guest code checks the epoch at every
+    /// function entry and loop header, and stops once it reaches the deadline set by
+    /// ``Store/setEpochDeadline(ticksBeyondCurrent:)``.
+    public let epochTicker = EpochTicker()
 
     /// Whether this engine has an interceptor which is unsafe to share with
     /// concurrently executing stores.
@@ -62,30 +66,14 @@ public final class Engine {
         )
     }
 
-    /// Advances this engine's epoch by one tick.
-    ///
-    /// Safe to call from any thread, including while stores on this engine run guest code: this
-    /// is how another thread stops them. With ``EngineConfiguration/epochInterruption``, guest
-    /// code checks the epoch at every function entry and loop header, and stops once it reaches
-    /// the deadline set by ``Store/setEpochDeadline(ticksBeyondCurrent:)``. A ``ResumableCall``
-    /// suspends there, and any other call traps.
-    ///
-    /// A tick is whatever the embedder makes it, typically a timer firing. The check does not
-    /// synchronize with the increment, so a running guest notices the new epoch shortly after,
-    /// not at once.
-    public func incrementEpoch() {
-        wasmkit_epoch_increment(epochCounter.address)
-    }
-
     /// Migration aid for the old ``Runtime/instantiate(module:)``
     @available(*, unavailable, message: "Use ``Module/instantiate(store:imports:)`` instead")
     public func instantiate(module: Module) -> Instance { fatalError() }
 }
 
-// `configuration` is immutable, `funcTypeInterner` synchronizes its mutable
-// state, and `epochCounter` is only accessed atomically. Concurrent clients
-// must reject engines with interceptors, whose implementations are not
-// currently Sendable.
+// `configuration` is immutable and `funcTypeInterner` synchronizes its mutable
+// state. Concurrent clients must reject engines with interceptors, whose
+// implementations are not currently Sendable.
 extension Engine: @unchecked Sendable {}
 
 /// The configuration for the WebAssembly execution engine.
@@ -199,7 +187,7 @@ public struct EngineConfiguration: Sendable {
     /// Whether the engine instruments translated code to check the engine's epoch. (Default: `false`)
     ///
     /// When enabled, every function entry and loop header compares the epoch advanced by
-    /// ``Engine/incrementEpoch()`` with the store's deadline, set with
+    /// ``EpochTicker/increment()`` with the store's deadline, set with
     /// ``Store/setEpochDeadline(ticksBeyondCurrent:)``. Another thread can then stop a running
     /// guest: a ``ResumableCall`` suspends, and any other call traps.
     ///
@@ -225,7 +213,7 @@ public struct EngineConfiguration: Sendable {
     /// - Parameter fuelMetering: Whether translated code consumes fuel as it
     /// runs, so that execution can be bounded with ``Store/fuel``.
     /// - Parameter epochInterruption: Whether translated code checks the engine's epoch, so that
-    /// another thread can stop execution with ``Engine/incrementEpoch()``.
+    /// another thread can stop execution with ``Engine/epochTicker``.
     public init(
         threadingModel: ThreadingModel? = nil,
         compilationMode: CompilationMode? = nil,

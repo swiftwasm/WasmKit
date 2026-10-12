@@ -18,6 +18,7 @@ add_wasmkit_library(WasmKit
   Component/CanonicalOptions.swift
   Component/ComponentTypes.swift
   Execution/DebuggerInstructionMapping.swift
+  Execution/EpochTicker.swift
   Execution/Instructions/Control.swift
   Execution/Instructions/ControlAccumulator.swift
   Execution/Instructions/ControlAccumulatorFloat.swift

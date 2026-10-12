@@ -440,8 +440,8 @@ struct ResumableCallTests {
         }
         #expect(unexpired == [.i32(10)])
 
-        store.engine.incrementEpoch()
-        store.engine.incrementEpoch()
+        store.engine.epochTicker.increment()
+        store.engine.epochTicker.increment()
         for _ in 0..<2 {
             // The resumed call checks again where it stopped, so it stays put until the deadline moves.
             guard case .suspended(let suspension) = try call.resume() else {
@@ -467,7 +467,7 @@ struct ResumableCallTests {
         imports.define(
             module: "env", name: "tick",
             Function(store: store, parameters: [], results: []) { _, _ in
-                store.engine.incrementEpoch()
+                store.engine.epochTicker.increment()
                 return []
             })
         let f = try #require(
@@ -564,10 +564,10 @@ struct ResumableCallTests {
                 try Self.instantiate(#"(module (func (export "f") (loop $l (br $l))))"#, store: store).exports[function: "f"])
             let call = try ResumableCall(function: f)
             store.setEpochDeadline(ticksBeyondCurrent: 1)
-            let engine = store.engine
+            let ticker = store.engine.epochTicker
             let ticked = DispatchSemaphore(value: 0)
             DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(10)) {
-                engine.incrementEpoch()
+                ticker.increment()
                 ticked.signal()
             }
             guard case .suspended(let suspension) = try call.resume() else {

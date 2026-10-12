@@ -101,6 +101,7 @@ See [examples](https://github.com/swiftwasm/WasmKit/tree/main/Examples) for exec
 - ``ResumableCall``
 - ``Suspension``
 - ``ResumableCallError``
+- ``EpochTicker``
 
 ### Binary Parser
 
