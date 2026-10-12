@@ -53,6 +53,7 @@ enum VMGen {
             }
             precondition(
                 canonical.mayThrow == inst.mayThrow && canonical.mayUpdatePc == inst.mayUpdatePc
+                    && canonical.receivesPc == inst.receivesPc
                     && canonical.mayUpdateFrame == inst.mayUpdateFrame
                     && canonical.mayDispatchToTrap == inst.mayDispatchToTrap
                     && canonical.immediate?.type == inst.immediate?.type,
@@ -168,7 +169,7 @@ enum VMGen {
                 """
         }
         inlineImpls["consumeFuel"] = """
-            if let trap = consumeFuel(immediate: immediate) { %TRAP% }
+            if let trap = consumeFuel(immediate: immediate, sp: sp.pointee, pc: pc.pointee) { %TRAP% }
             """
         inlineImpls["selectAcc"] = """
             let onTrue = sp.pointee[immediate.onTrue]

@@ -96,6 +96,12 @@ See [examples](https://github.com/swiftwasm/WasmKit/tree/main/Examples) for exec
 - ``Instance``
 - ``Function``
 
+### Resumable Execution
+
+- ``ResumableCall``
+- ``Suspension``
+- ``ResumableCallError``
+
 ### Binary Parser
 
 - ``parseWasm(bytes:features:)``

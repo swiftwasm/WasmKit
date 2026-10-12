@@ -37,13 +37,14 @@ public final class Store {
     /// Whether a budget was ever set. Distinguishes "unlimited" from a budget that happens to
     /// hold `UInt64.max`.
     private var hasFuel: Bool = false
-    /// The program counter of the fuel charge that exhausted the budget.
+    /// Whether the innermost guest execution on this store can be suspended: it runs as a
+    /// ``ResumableCall``, and no host function lies between it and the code asking.
     ///
-    /// Written on the out-of-fuel path and not read yet: resuming a suspended execution needs the
-    /// program counter of the charge in order to retry it, and recording it keeps that change
-    /// additive. It lives here rather than in `Execution` because adding a stored property there
-    /// grows the call and throw handlers noticeably, even though they never read it.
-    var fuelTrapPC: UnsafeRawPointer? = nil
+    /// Every entry into the guest sets it for its own duration and restores it on the way out, so
+    /// a plain call made by a host function inside a resumable call reads `false`. Only the cold
+    /// paths that would suspend read it. It lives here rather than in `Execution` because adding a
+    /// stored property there grows the call and throw handlers, even though they never read it.
+    var isSuspendable: Bool = false
 
     /// The remaining execution budget of this store, or `nil` when execution is unlimited.
     /// (Default: `nil`)

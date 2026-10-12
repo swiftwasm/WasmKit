@@ -40,12 +40,10 @@ struct Execution: ~Copyable {
         let siblingsBelow: Int
     }
 
-    #if WasmDebuggingSupport
-        package init(store: StoreRef, stackEnd: UnsafeMutablePointer<StackSlot>) {
-            self.store = store
-            self.stackEnd = stackEnd
-        }
-    #endif
+    package init(store: StoreRef, stackEnd: UnsafeMutablePointer<StackSlot>) {
+        self.store = store
+        self.stackEnd = stackEnd
+    }
 
     /// Executes the given closure with a new execution state associated with
     /// the given ``Store`` instance, running on the given stack.
@@ -461,19 +459,7 @@ private func runRoot(
     type: FunctionType,
     arguments: [Value]
 ) throws -> [Value] {
-    // Advance the stack pointer to be able to reference negative indices
-    // for saving slots.
-    let sp = sp.advanced(by: StackLayout.numberOfSavingSlots)
-    // Mark root stack pointer and current function as nil.
-    sp.previousSP = nil
-    sp.currentFunction = nil
-    // The callee's parameter area starts at `sp`.
-    let layout = ParameterAreaLayout(type: type)
-    try ParameterAreaLayout.checkFitsVRegRange(layout.size)
-    for (index, argument) in arguments.enumerated() {
-        sp.storeValue(argument, at: layout.paramReg(index), type: type.parameters[index])
-    }
-
+    let sp = try Execution.layOutRootFrame(at: sp, type: type, arguments: arguments)
     try withUnsafeTemporaryAllocation(of: CodeSlot.self, capacity: 2) { rootISeq in
         rootISeq[0] = Instruction.endOfExecution(.init()).headSlot(
             threadingModel: store.value.engine.configuration.threadingModel
@@ -485,9 +471,7 @@ private func runRoot(
             type: type
         )
     }
-    return type.results.enumerated().map { (i, resultType) in
-        sp.loadValue(at: layout.resultReg(i), type: resultType)
-    }
+    return Execution.readRootResults(sp: sp, type: type)
 }
 
 /// As above, on a stack the caller owns and can use again.
@@ -498,6 +482,11 @@ func executeWasm(
     arguments: [Value],
     stack executionStack: inout ExecutionStack
 ) throws -> [Value] {
+    // A plain call cannot be suspended, even inside a resumable call: the host function that
+    // made it would have to be suspended with it.
+    let wasSuspendable = store.isSuspendable
+    store.isSuspendable = false
+    defer { store.isSuspendable = wasSuspendable }
     // NOTE: `store` variable must not outlive this function
     let store = StoreRef(store)
     return try Execution.with(store: store, stack: &executionStack) { (stack, sp) in
@@ -506,6 +495,57 @@ func executeWasm(
 }
 
 extension Execution {
+    /// Lays out the root frame of a call to a function of `type` at `base`, the start of a stack,
+    /// and returns the frame's stack pointer.
+    ///
+    /// The root frame has no function and no caller. Its parameter area, where the callee reads
+    /// its arguments from and writes its results to, starts at the returned pointer.
+    static func layOutRootFrame(at base: Sp, type: FunctionType, arguments: [Value]) throws -> Sp {
+        // Advance the stack pointer to be able to reference negative indices
+        // for saving slots.
+        let sp = base.advanced(by: StackLayout.numberOfSavingSlots)
+        // Mark root stack pointer, current function and return PC as nil. A stack walk stops at
+        // the frame without a return PC, and the slot otherwise holds whatever an earlier user of
+        // the stack memory left there.
+        sp.previousSP = nil
+        sp.currentFunction = nil
+        sp.returnPC = nil
+        let layout = ParameterAreaLayout(type: type)
+        try ParameterAreaLayout.checkFitsVRegRange(layout.size)
+        for (index, argument) in arguments.enumerated() {
+            sp.storeValue(argument, at: layout.paramReg(index), type: type.parameters[index])
+        }
+        return sp
+    }
+
+    /// The code a root frame returns to: a lone `endOfExecution`, in memory of its own so that a
+    /// frame can keep its address for as long as this lives.
+    ///
+    /// For an execution that outlives the call that starts it, such as a suspended
+    /// ``ResumableCall`` or a debugger stopped at a breakpoint. A plain call puts this code in a
+    /// temporary allocation instead.
+    struct RootCode: ~Copyable {
+        /// The head slot of the `endOfExecution`.
+        let pc: Pc
+
+        init(threadingModel: EngineConfiguration.ThreadingModel) {
+            pc = .allocate(capacity: 1)
+            pc.initialize(to: Instruction.endOfExecution(.init()).headSlot(threadingModel: threadingModel))
+        }
+
+        deinit {
+            pc.deallocate()
+        }
+    }
+
+    /// Reads the results a call of `type` left in the root frame at `sp`.
+    static func readRootResults(sp: Sp, type: FunctionType) -> [Value] {
+        let layout = ParameterAreaLayout(type: type)
+        return type.results.enumerated().map { (i, resultType) in
+            sp.loadValue(at: layout.resultReg(i), type: resultType)
+        }
+    }
+
     #if WasmDebuggingSupport
 
         /// Counterpart to the free `executeWasm` function but implemented as a method of `Execution`,
@@ -518,29 +558,14 @@ extension Execution {
             sp: Sp,
             pc: Pc
         ) throws -> [Value] {
-            // Advance the stack pointer to be able to reference negative indices
-            // for saving slots.
-            let sp = sp.advanced(by: StackLayout.numberOfSavingSlots)
-            // Mark root stack pointer and current function as nil.
-            sp.previousSP = nil
-            sp.currentFunction = nil
-            // The callee's parameter area starts at `sp`.
-            let layout = ParameterAreaLayout(type: type)
-            try ParameterAreaLayout.checkFitsVRegRange(layout.size)
-            for (index, argument) in arguments.enumerated() {
-                sp.storeValue(argument, at: layout.paramReg(index), type: type.parameters[index])
-            }
-
+            let sp = try Self.layOutRootFrame(at: sp, type: type, arguments: arguments)
             try self.execute(
                 sp: sp,
                 pc: pc,
                 handle: handle,
                 type: type
             )
-
-            return type.results.enumerated().map { (i, resultType) in
-                sp.loadValue(at: layout.resultReg(i), type: resultType)
-            }
+            return Self.readRootResults(sp: sp, type: type)
         }
 
     #endif
@@ -633,6 +658,29 @@ extension Execution {
             arguments: .zero,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
+        do {
+            switch self.store.value.engine.configuration.threadingModel {
+            case .direct:
+                try runDirectThreaded(sp: sp, pc: pc, md: md, ms: ms)
+            case .token:
+                try startTokenThreaded(sp: sp, pc: pc, md: md, ms: ms)
+            }
+        } catch is EndOfExecution {
+            return
+        }
+    }
+
+    /// Continues a suspended execution from the head slot `pc` in the frame `sp`, until the root
+    /// frame's `endOfExecution`.
+    mutating func resume(sp: Sp, pc: Pc) throws {
+        var md: Md = nil
+        var ms: Ms = 0
+        // The memory may have grown, and moved, while the execution was suspended.
+        if let instance = sp.currentInstance {
+            CurrentMemory.mayUpdateCurrentInstance(instance: instance, md: &md, ms: &ms)
+        } else {
+            CurrentMemory.assignNil(md: &md, ms: &ms)
+        }
         do {
             switch self.store.value.engine.configuration.threadingModel {
             case .direct:

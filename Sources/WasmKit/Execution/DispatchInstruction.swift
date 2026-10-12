@@ -1256,7 +1256,7 @@ extension Execution {
     @inline(__always)
     mutating func executeToken_consumeFuel(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.ConsumeFuelOperand.load(from: &pc.pointee)
-        if let trap = consumeFuel(immediate: immediate) { try trap.raise() }
+        if let trap = consumeFuel(immediate: immediate, sp: sp.pointee, pc: pc.pointee) { try trap.raise() }
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1595,7 +1595,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_memoryGrow") @inline(__always)
     mutating func execute_memoryGrow(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.MemoryGrowOperand.load(from: &pc.pointee)
-        try self.memoryGrow(sp: sp.pointee, md: &md.pointee, ms: &ms.pointee, immediate: immediate)
+        try self.memoryGrow(sp: sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee, immediate: immediate)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1603,7 +1603,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_memoryInit") @inline(__always)
     mutating func execute_memoryInit(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.MemoryInitOperand.load(from: &pc.pointee)
-        try self.memoryInit(sp: sp.pointee, immediate: immediate)
+        try self.memoryInit(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1619,7 +1619,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_memoryCopy") @inline(__always)
     mutating func execute_memoryCopy(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.MemoryCopyOperand.load(from: &pc.pointee)
-        try self.memoryCopy(sp: sp.pointee, immediate: immediate)
+        try self.memoryCopy(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1627,7 +1627,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_memoryFill") @inline(__always)
     mutating func execute_memoryFill(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.MemoryFillOperand.load(from: &pc.pointee)
-        try self.memoryFill(sp: sp.pointee, immediate: immediate)
+        try self.memoryFill(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2819,7 +2819,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_tableGrow") @inline(__always)
     mutating func execute_tableGrow(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.TableGrowOperand.load(from: &pc.pointee)
-        try self.tableGrow(sp: sp.pointee, immediate: immediate)
+        try self.tableGrow(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2827,7 +2827,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_tableFill") @inline(__always)
     mutating func execute_tableFill(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.TableFillOperand.load(from: &pc.pointee)
-        try self.tableFill(sp: sp.pointee, immediate: immediate)
+        try self.tableFill(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2835,7 +2835,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_tableCopy") @inline(__always)
     mutating func execute_tableCopy(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.TableCopyOperand.load(from: &pc.pointee)
-        try self.tableCopy(sp: sp.pointee, immediate: immediate)
+        try self.tableCopy(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2843,7 +2843,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_tableInit") @inline(__always)
     mutating func execute_tableInit(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.TableInitOperand.load(from: &pc.pointee)
-        try self.tableInit(sp: sp.pointee, immediate: immediate)
+        try self.tableInit(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -7138,7 +7138,7 @@ extension Execution {
         let immediate = Instruction.ConsumeFuelOperand.load(from: &pc.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
-        if let trap = consumeFuel(immediate: immediate) { return trap.directThreadedHeadSlot }
+        if let trap = consumeFuel(immediate: immediate, sp: sp.pointee, pc: pc.pointee) { return trap.directThreadedHeadSlot }
         return next
     }
     @_silgen_name("wasmkit_execute_outOfFuelTrap") @inline(__always)
