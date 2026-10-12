@@ -546,30 +546,6 @@ extension Execution {
         }
     }
 
-    #if WasmDebuggingSupport
-
-        /// Counterpart to the free `executeWasm` function but implemented as a method of `Execution`,
-        /// Useful for representation of debugger state that needs to own `Execution`'s memory.
-        mutating func executeWasm(
-            threadingModel: EngineConfiguration.ThreadingModel,
-            function handle: InternalFunction,
-            type: FunctionType,
-            arguments: [Value],
-            sp: Sp,
-            pc: Pc
-        ) throws -> [Value] {
-            let sp = try Self.layOutRootFrame(at: sp, type: type, arguments: arguments)
-            try self.execute(
-                sp: sp,
-                pc: pc,
-                handle: handle,
-                type: type
-            )
-            return Self.readRootResults(sp: sp, type: type)
-        }
-
-    #endif
-
     /// A namespace for the "current memory" (Md and Ms) management.
     enum CurrentMemory {
         /// Assigns the current memory to the given internal memory.
@@ -857,7 +833,7 @@ extension Execution {
         self.trap = trap
     }
 
-    /// Used by the debugger to resume execution after breakpoints.
+    /// Clears the error trap once it has been read.
     mutating func resetError() {
         self.trap?.deallocate()
         self.trap = nil
