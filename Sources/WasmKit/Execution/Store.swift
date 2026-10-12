@@ -1,3 +1,4 @@
+import _CWasmKit
 import WasmParser
 
 /// A budget for WebAssembly execution, measured in fuel.
@@ -46,6 +47,13 @@ public final class Store {
     /// stored property there grows the call and throw handlers, even though they never read it.
     var isSuspendable: Bool = false
 
+    /// The epoch at which guest code running on this store stops. `UInt64.max` means "never".
+    ///
+    /// In a ``Cell`` so that the `checkEpoch` handler reads it without an exclusivity check.
+    let epochDeadline = Cell<UInt64>(.max)
+    /// The engine's epoch, cached so that `checkEpoch` reaches it in one load.
+    let epochCounter: UnsafePointer<UInt64>
+
     /// The remaining execution budget of this store, or `nil` when execution is unlimited.
     /// (Default: `nil`)
     ///
@@ -90,6 +98,22 @@ public final class Store {
         self.engine = engine
         self.allocator = StoreAllocator(funcTypeInterner: engine.funcTypeInterner)
         self.isFuelMetered = engine.configuration.fuelMetering
+        self.epochCounter = UnsafePointer(engine.epochCounter.address)
+    }
+
+    /// Stops guest code once the engine's epoch has advanced `ticks` times from now.
+    /// (Default: never)
+    ///
+    /// Guest code checks the epoch at function entries and loop headers. At the deadline, a
+    /// ``ResumableCall`` suspends with ``Suspension/Reason/epochDeadlineReached`` and any other
+    /// call traps. Zero stops at the next check. Set a new deadline before resuming, or the call
+    /// suspends again at once.
+    ///
+    /// - Note: This has no effect unless the store's engine was configured with
+    ///   ``EngineConfiguration/epochInterruption``.
+    public func setEpochDeadline(ticksBeyondCurrent ticks: UInt64) {
+        let (deadline, overflow) = wasmkit_epoch_load(epochCounter).addingReportingOverflow(ticks)
+        epochDeadline.value = overflow ? .max : deadline
     }
 }
 

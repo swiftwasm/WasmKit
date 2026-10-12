@@ -5033,6 +5033,23 @@ WASMKIT_TC_CC static inline void wasmkit_tc_outOfFuelTrap(Sp sp, Pc pc, Md md, M
     WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
     WASMKIT_TC_MUSTTAIL return ((wasmkit_tc_exec)next)(sp, pc, md, ms, dead_ireg, dead_freg, state);
 }
+WASMKIT_TC_CC static inline void wasmkit_tc_checkEpoch(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, WASMKIT_TC_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_checkEpoch(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_checkEpoch(&sp, &pc, &md, &ms, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(uint64_t, dead_ireg);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    WASMKIT_TC_MUSTTAIL return ((wasmkit_tc_exec)next)(sp, pc, md, ms, dead_ireg, dead_freg, state);
+}
+WASMKIT_TC_CC static inline void wasmkit_tc_epochDeadlineTrap(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, WASMKIT_TC_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_epochDeadlineTrap(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_epochDeadlineTrap(&sp, &pc, &md, &ms, state, &error);
+    if (error) return wasmkit_execution_state_set_error(error, sp, pc, state);
+    WASMKIT_DEAD_ACCUMULATOR(uint64_t, dead_ireg);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    WASMKIT_TC_MUSTTAIL return ((wasmkit_tc_exec)next)(sp, pc, md, ms, dead_ireg, dead_freg, state);
+}
 WASMKIT_TC_CC static inline void wasmkit_tc_callRef(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, WASMKIT_TC_CONTEXT void *state) {
     SWIFT_CC(swift) uint64_t wasmkit_execute_callRef(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
     void * _Nullable error = NULL; uint64_t next;
@@ -5824,6 +5841,8 @@ static const uintptr_t wasmkit_tc_exec_handlers[] = {
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_i32LoadWithCopy),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_consumeFuel),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_outOfFuelTrap),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_checkEpoch),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_epochDeadlineTrap),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_callRef),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_returnCallRef),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_refAsNonNull),

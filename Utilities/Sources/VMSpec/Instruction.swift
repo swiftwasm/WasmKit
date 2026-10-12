@@ -1812,6 +1812,30 @@ extension VMGen {
         )
         outOfFuelTrap.isTrapPseudoInstruction = true
         instructions += [consumeFuel, outOfFuelTrap]
+        var checkEpoch = Instruction(
+            name: "checkEpoch",
+            documentation: """
+                Check the engine's epoch against the store's deadline
+
+                Emitted at function entry and at loop headers, and only when the engine is
+                configured with epoch interruption. Reaching the deadline dispatches to
+                `epochDeadlineTrap`.
+                """
+        )
+        checkEpoch.mayDispatchToTrap = true
+        var epochDeadlineTrap = Instruction(
+            name: "epochDeadlineTrap",
+            documentation: """
+                Suspend a resumable call at the `checkEpoch` that reached the deadline, or raise
+                `Trap(.epochDeadlineReached)`. Dispatched to by `checkEpoch`; never emitted.
+
+                Control-shaped so that it receives the program counter, from which it finds the
+                `checkEpoch` to run again when the call resumes.
+                """,
+            isControl: true, mayThrow: true
+        )
+        epochDeadlineTrap.isTrapPseudoInstruction = true
+        instructions += [checkEpoch, epochDeadlineTrap]
         // Typed function references
         instructions += [
             Instruction(name: "callRef", documentation: "WebAssembly Core Instruction `call_ref`",

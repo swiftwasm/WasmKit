@@ -59,6 +59,18 @@ static inline void wasmkit_atomic_fence(void) {
     __atomic_thread_fence(__ATOMIC_SEQ_CST);
 }
 
+// MARK: - Epoch Counter
+
+/// Reads an engine's epoch, which other threads may be advancing. Relaxed: the reader only has to
+/// see an advance eventually, and orders nothing else by it.
+static inline uint64_t wasmkit_epoch_load(const uint64_t *WASMKIT_NONNULL counter) {
+    return __atomic_load_n(counter, __ATOMIC_RELAXED);
+}
+
+static inline void wasmkit_epoch_increment(uint64_t *WASMKIT_NONNULL counter) {
+    __atomic_fetch_add(counter, 1, __ATOMIC_RELAXED);
+}
+
 // MARK: - Execution Parameters
 // See ExecutionContext.swift for more information about each execution
 // parameter.

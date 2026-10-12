@@ -440,13 +440,15 @@ extension Execution {
         case 725: return try self.executeToken_i32LoadWithCopy(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 726: return try self.executeToken_consumeFuel(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 727: return try self.execute_outOfFuelTrap(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 728: return try self.execute_callRef(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 729: return try self.execute_returnCallRef(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 730: return try self.execute_refAsNonNull(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 731: return self.execute_brIfNull(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 732: return self.execute_brIfNotNull(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 733: return self.execute_selectMemory(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 734: return self.execute_selectSharedMemory(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 728: return try self.executeToken_checkEpoch(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 729: return try self.execute_epochDeadlineTrap(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 730: return try self.execute_callRef(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 731: return try self.execute_returnCallRef(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 732: return try self.execute_refAsNonNull(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 733: return self.execute_brIfNull(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 734: return self.execute_brIfNotNull(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 735: return self.execute_selectMemory(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 736: return self.execute_selectSharedMemory(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -1257,6 +1259,13 @@ extension Execution {
     mutating func executeToken_consumeFuel(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.ConsumeFuelOperand.load(from: &pc.pointee)
         if let trap = consumeFuel(immediate: immediate, sp: sp.pointee, pc: pc.pointee) { try trap.raise() }
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        return next
+    }
+    @inline(__always)
+    mutating func executeToken_checkEpoch(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
+        if let trap = checkEpoch(sp: sp.pointee, pc: pc.pointee) { try trap.raise() }
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -7147,6 +7156,19 @@ extension Execution {
         (pc.pointee, next) = try self.outOfFuelTrap(sp: sp.pointee, pc: pc.pointee)
         return next
     }
+    @_silgen_name("wasmkit_execute_checkEpoch") @inline(__always)
+    mutating func execute_checkEpoch(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = checkEpoch(sp: sp.pointee, pc: pc.pointee) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_epochDeadlineTrap") @inline(__always)
+    mutating func execute_epochDeadlineTrap(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
+        let next: CodeSlot
+        (pc.pointee, next) = try self.epochDeadlineTrap(sp: sp.pointee, pc: pc.pointee)
+        return next
+    }
     @_silgen_name("wasmkit_execute_callRef") @inline(__always)
     mutating func execute_callRef(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.CallRefOperand.load(from: &pc.pointee)
@@ -7279,6 +7301,19 @@ extension Instruction {
             fatalError("Direct threading is not supported on this platform")
             #else
             return CodeSlot(wasmkit_tc_exec_handlers.727)
+            #endif
+        }
+        /// The direct-threaded head slot of the `epochDeadlineTrap` pseudo-instruction.
+        ///
+        /// Reads one element of the handler table directly: going through
+        /// `handler` would copy the whole table into a stack temporary and
+        /// leave the reading handler with a stack-protector prologue.
+        @inline(__always)
+        static var epochDeadlineTrapHeadSlot: CodeSlot {
+            #if !(arch(i386) || arch(x86_64) || arch(arm) || arch(arm64) || arch(arm64_32))
+            fatalError("Direct threading is not supported on this platform")
+            #else
+            return CodeSlot(wasmkit_tc_exec_handlers.729)
             #endif
         }
 }
