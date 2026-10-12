@@ -1,5 +1,5 @@
-import _CWasmKit
 import WasmParser
+import _CWasmKit
 
 /// A budget for WebAssembly execution, measured in fuel.
 ///

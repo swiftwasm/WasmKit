@@ -1,18 +1,12 @@
-#if canImport(Dispatch)
-    import Dispatch
-#endif
-#if canImport(Darwin)
-    import Darwin
-#elseif canImport(Glibc)
-    import Glibc
-#elseif canImport(Musl)
-    import Musl
-#endif
 import Testing
 import WAT
 import WasmParser
 
 @testable import WasmKit
+
+#if canImport(Dispatch)
+    import Dispatch
+#endif
 
 @Suite
 struct ResumableCallTests {
@@ -572,8 +566,7 @@ struct ResumableCallTests {
             store.setEpochDeadline(ticksBeyondCurrent: 1)
             let engine = store.engine
             let ticked = DispatchSemaphore(value: 0)
-            DispatchQueue.global().async {
-                usleep(10_000)
+            DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(10)) {
                 engine.incrementEpoch()
                 ticked.signal()
             }
