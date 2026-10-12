@@ -83,20 +83,57 @@ public final class ResumableCall {
         case suspended(Suspension)
     }
 
-    private enum State {
+    /// Where the call is, and who owns its stack: the state while the call is not running, and
+    /// the run itself while it is.
+    private enum State: ~Copyable {
         /// Not started; holds the arguments.
-        case ready([Value])
+        case ready([Value], ExecutionStack)
         case running
-        case suspended(SuspensionSignal)
-        case finished
+        case suspended(SuspensionSignal, ExecutionStack)
+        /// Holds the stack until ``takeStack()`` takes it.
+        case finished(ExecutionStack?)
+
+        /// Returns this state, leaving `.running` in its place.
+        mutating func take() -> State {
+            let current = self
+            self = .running
+            return current
+        }
+
+        /// Takes the stack of a finished call.
+        mutating func takeStack() -> ExecutionStack? {
+            switch consume self {
+            case .finished(let stack):
+                self = .finished(nil)
+                return stack
+            case let other:
+                self = other
+                return nil
+            }
+        }
+
+        /// Finishes a call that is not running, returning where it was suspended, if it was.
+        mutating func finish() throws(ResumableCallError) -> SuspensionSignal? {
+            switch consume self {
+            case .ready(_, let stack):
+                self = .finished(stack)
+                return nil
+            case .suspended(let signal, let stack):
+                self = .finished(stack)
+                return signal
+            case .running:
+                self = .running
+                throw .alreadyRunning
+            case .finished(let stack):
+                self = .finished(stack)
+                throw .finished
+            }
+        }
     }
 
     /// The function this call runs.
     public let function: Function
     private let type: FunctionType
-    private var stack: ExecutionStack?
-    /// The start of `stack`, kept apart so that reading it does not need the stack.
-    private let stackBase: Sp
     private var execution: Execution
     /// The code the called function returns to.
     private let rootCode: Execution.RootCode
@@ -125,32 +162,33 @@ public final class ResumableCall {
         let store = function.store
         self.function = function
         self.type = type
-        self.stackBase = stack.slots
         // `StoreRef` does not retain the store, so it must not outlive it. It cannot: the
         // execution lives as long as this call, which retains `function`, which retains its store.
         self.execution = Execution(store: StoreRef(store), stackEnd: stack.slots.advanced(by: stack.count))
-        self.stack = consume stack
         self.rootCode = Execution.RootCode(threadingModel: store.engine.configuration.threadingModel)
-        self.state = .ready(arguments)
+        self.state = .ready(arguments, stack)
     }
 
     /// Whether the function has returned, or the call failed.
     public var isFinished: Bool {
-        if case .finished = state { return true }
-        return false
+        switch state {
+        case .finished: return true
+        default: return false
+        }
     }
 
     /// Why the call is suspended, or `nil` when it is not.
     public var suspension: Suspension? {
-        guard case .suspended(let signal) = state else { return nil }
-        return signal.suspension
+        switch state {
+        case .suspended(let signal, _): return signal.suspension
+        default: return nil
+        }
     }
 
     /// Takes the call's stack back, to use it again. `nil` until the call has finished, and once
     /// the stack has been taken.
     public func takeStack() -> ExecutionStack? {
-        guard case .finished = state else { return nil }
-        return stack.take()
+        state.takeStack()
     }
 
     /// Starts the call, or continues it after a suspension.
@@ -159,16 +197,17 @@ public final class ResumableCall {
     /// - Throws: A trap, or another error the guest raised, which finishes the call; or a
     ///   ``ResumableCallError`` if the call cannot be resumed, which leaves it as it was.
     public func resume() throws -> Status {
-        switch state {
-        case .ready(let arguments):
-            return try start(arguments: arguments)
-        case .suspended(let signal):
-            return try run { execution in
+        switch state.take() {
+        case .ready(let arguments, let stack):
+            return try start(arguments: arguments, on: stack)
+        case .suspended(let signal, let stack):
+            return try run(on: stack) { execution, _ in
                 try execution.resume(sp: signal.sp, pc: signal.resumePC)
             }
         case .running:
             throw ResumableCallError.alreadyRunning
-        case .finished:
+        case .finished(let stack):
+            state = .finished(stack)
             throw ResumableCallError.finished
         }
     }
@@ -181,22 +220,10 @@ public final class ResumableCall {
     /// - Throws: `error`, which finishes the call; or a ``ResumableCallError`` if the call is
     ///   running or finished, or `error` is a ``WasmKitException``, which leaves it as it was.
     public func resume(throwing error: any Error) throws -> Never {
-        let signal: SuspensionSignal?
-        switch state {
-        case .ready:
-            signal = nil
-        case .suspended(let suspended):
-            signal = suspended
-        case .running:
-            throw ResumableCallError.alreadyRunning
-        case .finished:
-            throw ResumableCallError.finished
-        }
         if error is WasmKitException {
             throw ResumableCallError.exceptionNotThrowable
         }
-        state = .finished
-        if let signal, let trap = error as? Trap {
+        if let signal = try state.finish(), let trap = error as? Trap {
             // A trap site is just past the head slot of the instruction that raised it.
             throw trap.withBacktrace(
                 Execution.captureBacktrace(sp: signal.sp, pc: signal.resumePC + 1, store: function.store))
@@ -204,40 +231,47 @@ public final class ResumableCall {
         throw error
     }
 
-    private func start(arguments: [Value]) throws -> Status {
+    private func start(arguments: [Value], on stack: consuming ExecutionStack) throws -> Status {
         let handle = function.handle
         guard handle.isWasm else {
             // A host function has no guest frames to suspend.
-            state = .running
-            defer { state = .finished }
-            return .returned(try handle.invokeHost(arguments, store: function.store))
+            let results: [Value]
+            do {
+                results = try handle.invokeHost(arguments, store: function.store)
+            } catch {
+                state = .finished(stack)
+                throw error
+            }
+            state = .finished(stack)
+            return .returned(results)
         }
-        let sp = try Execution.layOutRootFrame(at: stackBase, type: type, arguments: arguments)
         let type = self.type
         let rootPC = self.rootCode.pc
-        return try run { execution in
+        return try run(on: stack) { execution, base in
+            let sp = try Execution.layOutRootFrame(at: base, type: type, arguments: arguments)
             try execution.execute(sp: sp, pc: rootPC, handle: handle, type: type)
         }
     }
 
-    /// Runs `body` as this call, marking the store as running a suspendable execution, and
-    /// records how it stopped.
-    private func run(_ body: (inout Execution) throws -> Void) throws -> Status {
+    /// Runs `body` as this call on `stack`, whose start it is given, marking the store as running
+    /// a suspendable execution, and records how it stopped.
+    private func run(on stack: consuming ExecutionStack, _ body: (inout Execution, Sp) throws -> Void) throws -> Status {
         let store = function.store
         let wasSuspendable = store.isSuspendable
         store.isSuspendable = true
         defer { store.isSuspendable = wasSuspendable }
-        state = .running
+        let base = stack.slots
         do {
-            try body(&execution)
+            try body(&execution, base)
         } catch let signal as SuspensionSignal {
-            state = .suspended(signal)
+            state = .suspended(signal, stack)
             return .suspended(signal.suspension)
         } catch {
-            state = .finished
+            state = .finished(stack)
             throw error
         }
-        state = .finished
-        return .returned(Execution.readRootResults(sp: stackBase.advanced(by: StackLayout.numberOfSavingSlots), type: type))
+        let results = Execution.readRootResults(sp: base.advanced(by: StackLayout.numberOfSavingSlots), type: type)
+        state = .finished(stack)
+        return .returned(results)
     }
 }
