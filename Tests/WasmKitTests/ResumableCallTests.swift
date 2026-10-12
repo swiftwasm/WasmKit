@@ -4,8 +4,8 @@ import WasmParser
 
 @testable import WasmKit
 
-#if canImport(Dispatch)
-    import Dispatch
+#if canImport(Foundation)
+    import Foundation
 #endif
 
 @Suite
@@ -556,7 +556,7 @@ struct ResumableCallTests {
         #expect(try spin([.i32(10)]) == [.i32(10)])
     }
 
-    #if canImport(Dispatch)
+    #if canImport(Foundation)
         @Test(arguments: testedThreadingModels)
         func anotherThreadInterruptsAnInfiniteLoop(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Self.epochStore(threadingModel: threadingModel)
@@ -566,7 +566,10 @@ struct ResumableCallTests {
             store.setEpochDeadline(ticksBeyondCurrent: 1)
             let ticker = store.engine.epochTicker
             let ticked = DispatchSemaphore(value: 0)
-            DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(10)) {
+            // A thread of its own: on platforms where Swift concurrency runs on Dispatch's
+            // global queues, a block queued there can wait behind the spinning guests.
+            Thread.detachNewThread {
+                Thread.sleep(forTimeInterval: 0.01)
                 ticker.increment()
                 ticked.signal()
             }
