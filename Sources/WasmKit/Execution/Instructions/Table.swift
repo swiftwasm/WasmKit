@@ -45,11 +45,11 @@ extension Execution {
         let fillValue = sp.getReference(immediate.value, type: table.tableType)
         let startIndex = sp[immediate.destOffset].asAddressOffset(table.limits.isMemory64)
 
+        try reserveElementsCopied(fillCounter, sp: sp, pc: pc, for: Instruction.TableFillOperand.self)
         // A table64 index or count beyond `Int` cannot be in bounds for any table.
         guard let start = Int(exactly: startIndex), let count = Int(exactly: fillCounter) else {
             throw Trap(.tableOutOfBounds(Int(clamping: startIndex)))
         }
-        try reserveElementsCopied(fillCounter, sp: sp, pc: pc, for: Instruction.TableFillOperand.self)
         try table.withValue { try $0.fill(repeating: fillValue, from: start, count: count) }
         try chargeElementsCopied(fillCounter)
     }
@@ -66,12 +66,12 @@ extension Execution {
         let sourceIndex = sp[immediate.sourceOffset].asAddressOffset(sourceTable.limits.isMemory64)
         let destinationIndex = sp[immediate.destOffset].asAddressOffset(destinationTable.limits.isMemory64)
 
+        try reserveElementsCopied(size, sp: sp, pc: pc, for: Instruction.TableCopyOperand.self)
         guard let source = Int(exactly: sourceIndex), let destination = Int(exactly: destinationIndex),
             let count = Int(exactly: size)
         else {
             throw Trap(.tableOutOfBounds(Int(clamping: destinationIndex)))
         }
-        try reserveElementsCopied(size, sp: sp, pc: pc, for: Instruction.TableCopyOperand.self)
         try destinationTable.copy(sourceTable, from: source, to: destination, count: count)
         try chargeElementsCopied(size)
     }
@@ -85,10 +85,10 @@ extension Execution {
         let sourceIndex = UInt64(sp[immediate.sourceOffset].i32)
         let destinationIndex = sp[immediate.destOffset].asAddressOffset(destinationTable.limits.isMemory64)
 
+        try reserveElementsCopied(copyCounter, sp: sp, pc: pc, for: Instruction.TableInitOperand.self)
         guard let destination = Int(exactly: destinationIndex) else {
             throw Trap(.tableOutOfBounds(Int(clamping: destinationIndex)))
         }
-        try reserveElementsCopied(copyCounter, sp: sp, pc: pc, for: Instruction.TableInitOperand.self)
         try destinationTable.withValue {
             try $0.initialize(
                 sourceElement,

@@ -13,12 +13,12 @@ struct ResumableCallTests {
             engine: Engine(
                 configuration: EngineConfiguration(
                     threadingModel: threadingModel, compilationMode: .eager,
-                    features: [.referenceTypes, .exceptionHandling, .tailCall],
+                    features: [.referenceTypes, .exceptionHandling, .tailCall, .memory64],
                     fuelMetering: fuelMetering)))
     }
 
     private static func instantiate(_ wat: String, store: Store, imports: Imports = Imports()) throws -> Instance {
-        let features: WasmFeatureSet = [.referenceTypes, .exceptionHandling, .tailCall]
+        let features: WasmFeatureSet = [.referenceTypes, .exceptionHandling, .tailCall, .memory64]
         return try parseWasm(bytes: wat2wasm(wat, features: features), features: features)
             .instantiate(store: store, imports: imports)
     }
@@ -280,6 +280,33 @@ struct ResumableCallTests {
         let store = Self.makeStore(threadingModel: threadingModel)
         let instance = try Self.instantiate(Self.fill, store: store)
         let call = try ResumableCall(function: try #require(instance.exports[function: "fill"]), arguments: [.i32(65536 + 64)])
+        store.fuel = Fuel(remaining: 100)
+        guard case .suspended(let suspension) = try call.resume(),
+            case .outOfFuel(let required) = suspension.reason
+        else {
+            Issue.record("expected a suspension")
+            return
+        }
+        store.fuel = Fuel(remaining: required)
+        #expect(throws: Trap.self) { try call.resume() }
+        #expect(call.isFinished)
+    }
+
+    static let wide = """
+        (module
+          (memory i64 1)
+          (table $t i64 1 funcref)
+          (func (export "memory.fill") (memory.fill (i64.const 0) (i32.const 0) (i64.const -1)))
+          (func (export "table.fill") (table.fill $t (i64.const 0) (ref.null func) (i64.const -1)))
+          (func (export "table.copy") (table.copy $t $t (i64.const 0) (i64.const 0) (i64.const -1))))
+        """
+
+    /// An offset or count no `Int` can hold is out of bounds too: it suspends first.
+    @Test(arguments: testedThreadingModels, ["memory.fill", "table.fill", "table.copy"])
+    func unrepresentableBulkOperationTrapsOnceResumed(threadingModel: EngineConfiguration.ThreadingModel, name: String) throws {
+        let store = Self.makeStore(threadingModel: threadingModel)
+        let instance = try Self.instantiate(Self.wide, store: store)
+        let call = try ResumableCall(function: try #require(instance.exports[function: name]))
         store.fuel = Fuel(remaining: 100)
         guard case .suspended(let suspension) = try call.resume(),
             case .outOfFuel(let required) = suspension.reason

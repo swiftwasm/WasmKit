@@ -405,13 +405,13 @@ extension Execution {
             let value = sp[immediate.value].i32
             let rawDestination = sp[immediate.destOffset].asAddressOffset(isMemory64)
 
+            try reserveBytesCopied(rawCount, sp: sp, pc: pc, for: Instruction.MemoryFillOperand.self)
             // A memory64 offset or count beyond `Int` cannot be in bounds.
             guard let copyCounter = Int(exactly: rawCount), let destinationIndex = Int(exactly: rawDestination),
                 !destinationIndex.addingReportingOverflow(copyCounter).overflow
             else {
                 throw Trap(.memoryOutOfBounds)
             }
-            try reserveBytesCopied(UInt64(copyCounter), sp: sp, pc: pc, for: Instruction.MemoryFillOperand.self)
             try memoryInstance.fill(offset: destinationIndex, value: UInt8(truncatingIfNeeded: value), count: copyCounter)
             try chargeBytesCopied(UInt64(copyCounter))
         }
