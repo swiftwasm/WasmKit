@@ -37,6 +37,9 @@ struct Options {
     /// Run with fuel metering enabled and an effectively unlimited budget, to measure what
     /// metering costs rather than to bound anything.
     var fuelMetering: Bool = false
+    /// Run with epoch interruption enabled and a deadline that is never reached, to measure what
+    /// the checks cost.
+    var epochInterruption: Bool = false
 
     /// `<repo>/Vendor/wasmi-benchmarks`, derived from this source file's location
     /// (`<repo>/Benchmarks/Sources/WasmiBenchmarks/`).
@@ -60,6 +63,7 @@ struct Options {
           --token              Use token-threaded dispatch instead of direct threading.
           --software-bounds    Use software memory bounds checking.
           --fuel               Enable fuel metering with an unlimited budget.
+          --epoch              Enable epoch interruption with a deadline never reached.
         """
 
     static func parse(_ arguments: [String]) throws -> Options {
@@ -76,6 +80,7 @@ struct Options {
             case "--token": options.threadingModel = .token
             case "--software-bounds": options.memoryBoundsChecking = .software
             case "--fuel": options.fuelMetering = true
+            case "--epoch": options.epochInterruption = true
             case "-h", "--help":
                 print(usage)
                 exit(EXIT_SUCCESS)
@@ -234,7 +239,8 @@ final class Runner {
                 // The deeply recursive cases (fibonacci-rec) need more than the default.
                 stackSize: 8 << 20,
                 memoryBoundsChecking: options.memoryBoundsChecking,
-                fuelMetering: options.fuelMetering
+                fuelMetering: options.fuelMetering,
+                epochInterruption: options.epochInterruption
             ))
         let store = Store(engine: engine)
         if options.fuelMetering {

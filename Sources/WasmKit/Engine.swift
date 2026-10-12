@@ -83,8 +83,9 @@ public final class Engine {
 }
 
 // `configuration` is immutable, `funcTypeInterner` synchronizes its mutable
-// state, and `epochCounter` is only accessed atomically. Concurrent clients must reject engines with interceptors, whose
-// implementations are not currently Sendable.
+// state, and `epochCounter` is only accessed atomically. Concurrent clients
+// must reject engines with interceptors, whose implementations are not
+// currently Sendable.
 extension Engine: @unchecked Sendable {}
 
 /// The configuration for the WebAssembly execution engine.
