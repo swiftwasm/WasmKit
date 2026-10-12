@@ -31,7 +31,10 @@ extension Execution {
         let growthValue = sp.getReference(immediate.value, type: table.tableType)
 
         let oldSize = table.elementCount
-        try reserveElementsCopied(growthSize, sp: sp, pc: pc, for: Instruction.TableGrowOperand.self)
+        // A growth the limits refuse does no work and costs nothing, so it must not suspend for fuel.
+        if !table.withValue({ $0.refusesGrowth(by: growthSize) }) {
+            try reserveElementsCopied(growthSize, sp: sp, pc: pc, for: Instruction.TableGrowOperand.self)
+        }
         guard try table.withValue({ try $0.grow(by: growthSize, value: growthValue, resourceLimiter: store.value.resourceLimiter) }) else {
             sp[immediate.result] = UntypedValue(.i32(Int32(-1).unsigned))
             return

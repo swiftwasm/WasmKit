@@ -323,6 +323,29 @@ struct ResumableCallTests {
         #expect(call.isFinished)
     }
 
+    /// A growth the limits refuse does no work, so a resumable call must not suspend for the fuel
+    /// it would have cost: with the same budget, a plain call returns -1.
+    @Test(arguments: testedThreadingModels, ["memory", "table"])
+    func refusedGrowthDoesNotSuspend(threadingModel: EngineConfiguration.ThreadingModel, kind: String) throws {
+        let store = Self.makeStore(threadingModel: threadingModel)
+        let f = try #require(
+            try Self.instantiate(
+                """
+                (module
+                  (memory 1 1)
+                  (table 1 1 funcref)
+                  (func (export "memory") (result i32) (memory.grow (i32.const 1)))
+                  (func (export "table") (result i32) (table.grow (ref.null func) (i32.const 1000))))
+                """, store: store
+            ).exports[function: kind])
+        store.fuel = Fuel(remaining: 10)
+        guard case .returned(let results) = try ResumableCall(function: f).resume() else {
+            Issue.record("expected the refused growth to return without suspending")
+            return
+        }
+        #expect(results == [.i32(UInt32(bitPattern: -1))])
+    }
+
     // MARK: Nesting
 
     static let spin = """
