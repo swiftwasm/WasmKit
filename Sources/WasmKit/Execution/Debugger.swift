@@ -52,7 +52,8 @@
             case linearMemoryOOB(address: UInt, length: UInt)
         }
 
-        private let valueStack: Sp
+        /// The stack the guest runs on, kept alive for as long as the guest can be resumed.
+        private let stack: ExecutionStack
         private var execution: Execution
         private let store: Store
 
@@ -103,7 +104,6 @@
         ///   - store: Store that instantiates the module.
         ///   - imports: Imports required by `module` for instantiation.
         package init(module: Module, store: Store, imports: Imports) throws {
-            let limit = store.engine.configuration.stackSize / MemoryLayout<StackSlot>.stride
             let instance = try module.instantiate(store: store, imports: imports, isDebuggable: true)
 
             guard case .function(let entrypointFunction) = instance.exports["_start"] else {
@@ -122,12 +122,13 @@
             }
             self.module = module
             self.entrypointFunction = entrypointFunction
-            self.valueStack = UnsafeMutablePointer<StackSlot>.allocate(capacity: limit)
+            let stack = ExecutionStack(engine: store.engine)
             self.store = store
             self.execution = Execution(
                 store: StoreRef(store),
-                stackEnd: valueStack.advanced(by: limit)
+                stackEnd: stack.slots.advanced(by: stack.count)
             )
+            self.stack = stack
             self.threadingModel = store.engine.configuration.threadingModel
             self.rootCode = Execution.RootCode(threadingModel: threadingModel)
             self.breakpointHeadSlot = Instruction.breakpoint(.init()).headSlot(threadingModel: threadingModel)
@@ -311,29 +312,19 @@
             do {
                 switch resumption {
                 case .entrypoint:
+                    let type = self.entrypointFunction.type
+                    let sp = try Execution.layOutRootFrame(at: self.stack.slots, type: type, arguments: [])
                     // The entrypoint returns to `endOfExecution`, so its frame keeps this address.
-                    let result = try self.execution.executeWasm(
-                        threadingModel: self.threadingModel,
-                        function: self.entrypointFunction.handle,
-                        type: self.entrypointFunction.type,
-                        arguments: [],
-                        sp: self.valueStack,
-                        pc: self.rootCode.pc
-                    )
-                    self.state = .entrypointReturned(result)
+                    try self.execution.execute(sp: sp, pc: self.rootCode.pc, handle: self.entrypointFunction.handle, type: type)
+                    self.recordEntrypointReturn()
                 case .runLoop(let sp, let pc):
-                    try self.runNative(sp: sp, pc: pc)
+                    try self.continueGuest(sp: sp, pc: pc)
                 case .singleStep(let breakpoint, let reportingBreakpoint):
                     try self.singleStep(from: breakpoint, reportingBreakpoint: reportingBreakpoint)
                 }
-            } catch let end as Execution.EndOfExecution {
-                // The module successfully executed till the "end of execution" instruction.
-                let type = self.entrypointFunction.type
-                self.state = .entrypointReturned(
-                    type.results.enumerated().map { (i, type) in
-                        end.sp[VReg(slotIndex: i)].cast(to: type)
-                    }
-                )
+            } catch is Execution.EndOfExecution {
+                // A single step ran the root frame's `endOfExecution`.
+                self.recordEntrypointReturn()
             } catch let breakpoint as Execution.Breakpoint {
                 try self.stop(at: breakpoint, reportingBreakpoint: true)
             } catch let trap as Trap {
@@ -389,15 +380,16 @@
         }
 
         /// Runs the guest from the head slot `pc` with the threading model's own run loop until it
-        /// stops.
-        private mutating func runNative(sp: Sp, pc: Pc) throws {
-            self.execution.resetError()
-            switch self.threadingModel {
-            case .direct:
-                try self.execution.runDirectThreaded(sp: sp, pc: pc, md: self.md, ms: self.ms)
-            case .token:
-                try self.execution.startTokenThreaded(sp: sp, pc: pc, md: self.md, ms: self.ms)
-            }
+        /// stops, recording a return from the entrypoint if it runs to the end.
+        private mutating func continueGuest(sp: Sp, pc: Pc) throws {
+            try self.execution.resume(sp: sp, pc: pc)
+            self.recordEntrypointReturn()
+        }
+
+        /// Records the entrypoint's results, which it left in the root frame.
+        private mutating func recordEntrypointReturn() {
+            let rootSp = self.stack.slots.advanced(by: StackLayout.numberOfSavingSlots)
+            self.state = .entrypointReturned(Execution.readRootResults(sp: rootSp, type: self.entrypointFunction.type))
         }
 
         /// Steps by a single Wasm instruction in the module instantiated by the debugger stopped at a breakpoint.
@@ -685,7 +677,7 @@
             }
             guard !exits.isEmpty else {
                 // Execution doesn't come back into this instance, so the step becomes a continue.
-                try self.runNative(sp: sp, pc: pc.advanced(by: -1))
+                try self.continueGuest(sp: sp, pc: pc.advanced(by: -1))
                 return nil
             }
 
@@ -705,7 +697,7 @@
             var pc = pc.advanced(by: -1)
             while true {
                 do {
-                    try self.runNative(sp: sp, pc: pc)
+                    try self.continueGuest(sp: sp, pc: pc)
                     return nil
                 } catch let hit as Execution.Breakpoint where savedHeads[hit.pc] != nil {
                     let savedHead = savedHeads[hit.pc].unsafelyUnwrapped
@@ -725,10 +717,6 @@
                     pc = next.advanced(by: -1)
                 }
             }
-        }
-
-        deinit {
-            self.valueStack.deallocate()
         }
     }
 
