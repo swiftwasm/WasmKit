@@ -24,13 +24,14 @@ extension Execution {
         let elementsCount = table.elementCount
         sp[immediate.result] = UntypedValue(table.limits.isMemory64 ? .i64(UInt64(elementsCount)) : .i32(UInt32(elementsCount)))
     }
-    mutating func tableGrow(sp: Sp, immediate: Instruction.TableGrowOperand) throws {
+    mutating func tableGrow(sp: Sp, pc: Pc, immediate: Instruction.TableGrowOperand) throws {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
 
         let growthSize = sp[immediate.delta].asAddressOffset(table.limits.isMemory64)
         let growthValue = sp.getReference(immediate.value, type: table.tableType)
 
         let oldSize = table.elementCount
+        try reserveElementsCopied(growthSize, sp: sp, pc: pc, for: Instruction.TableGrowOperand.self)
         guard try table.withValue({ try $0.grow(by: growthSize, value: growthValue, resourceLimiter: store.value.resourceLimiter) }) else {
             sp[immediate.result] = UntypedValue(.i32(Int32(-1).unsigned))
             return
@@ -38,12 +39,13 @@ extension Execution {
         try chargeElementsCopied(growthSize)
         sp[immediate.result] = UntypedValue(table.limits.isMemory64 ? .i64(UInt64(oldSize)) : .i32(UInt32(oldSize)))
     }
-    mutating func tableFill(sp: Sp, immediate: Instruction.TableFillOperand) throws {
+    mutating func tableFill(sp: Sp, pc: Pc, immediate: Instruction.TableFillOperand) throws {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
         let fillCounter = sp[immediate.size].asAddressOffset(table.limits.isMemory64)
         let fillValue = sp.getReference(immediate.value, type: table.tableType)
         let startIndex = sp[immediate.destOffset].asAddressOffset(table.limits.isMemory64)
 
+        try reserveElementsCopied(fillCounter, sp: sp, pc: pc, for: Instruction.TableFillOperand.self)
         // A table64 index or count beyond `Int` cannot be in bounds for any table.
         guard let start = Int(exactly: startIndex), let count = Int(exactly: fillCounter) else {
             throw Trap(.tableOutOfBounds(Int(clamping: startIndex)))
@@ -51,7 +53,7 @@ extension Execution {
         try table.withValue { try $0.fill(repeating: fillValue, from: start, count: count) }
         try chargeElementsCopied(fillCounter)
     }
-    mutating func tableCopy(sp: Sp, immediate: Instruction.TableCopyOperand) throws {
+    mutating func tableCopy(sp: Sp, pc: Pc, immediate: Instruction.TableCopyOperand) throws {
         let sourceTableIndex = immediate.sourceIndex
         let destinationTableIndex = immediate.destIndex
         let store = self.store.value
@@ -64,6 +66,7 @@ extension Execution {
         let sourceIndex = sp[immediate.sourceOffset].asAddressOffset(sourceTable.limits.isMemory64)
         let destinationIndex = sp[immediate.destOffset].asAddressOffset(destinationTable.limits.isMemory64)
 
+        try reserveElementsCopied(size, sp: sp, pc: pc, for: Instruction.TableCopyOperand.self)
         guard let source = Int(exactly: sourceIndex), let destination = Int(exactly: destinationIndex),
             let count = Int(exactly: size)
         else {
@@ -72,7 +75,7 @@ extension Execution {
         try destinationTable.copy(sourceTable, from: source, to: destination, count: count)
         try chargeElementsCopied(size)
     }
-    mutating func tableInit(sp: Sp, immediate: Instruction.TableInitOperand) throws {
+    mutating func tableInit(sp: Sp, pc: Pc, immediate: Instruction.TableInitOperand) throws {
         let tableIndex = immediate.tableIndex
         let segmentIndex = immediate.segmentIndex
         let destinationTable = getTable(tableIndex, sp: sp, store: store.value)
@@ -82,6 +85,7 @@ extension Execution {
         let sourceIndex = UInt64(sp[immediate.sourceOffset].i32)
         let destinationIndex = sp[immediate.destOffset].asAddressOffset(destinationTable.limits.isMemory64)
 
+        try reserveElementsCopied(copyCounter, sp: sp, pc: pc, for: Instruction.TableInitOperand.self)
         guard let destination = Int(exactly: destinationIndex) else {
             throw Trap(.tableOutOfBounds(Int(clamping: destinationIndex)))
         }

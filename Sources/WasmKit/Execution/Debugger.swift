@@ -80,8 +80,8 @@
 
         package private(set) var state: State
 
-        /// Pc of the final instruction that a successful program will execute, initialized with `Instruction.endofExecution`
-        private var endOfExecution: CodeSlot
+        /// The final instruction that a successful program will execute.
+        private let rootCode: Execution.RootCode
 
         private var md: Md = nil
         private var ms: Ms = 0
@@ -129,7 +129,7 @@
                 stackEnd: valueStack.advanced(by: limit)
             )
             self.threadingModel = store.engine.configuration.threadingModel
-            self.endOfExecution = Instruction.endOfExecution(.init()).headSlot(threadingModel: threadingModel)
+            self.rootCode = Execution.RootCode(threadingModel: threadingModel)
             self.breakpointHeadSlot = Instruction.breakpoint(.init()).headSlot(threadingModel: threadingModel)
 
             self.state = .instantiated
@@ -318,7 +318,7 @@
                         type: self.entrypointFunction.type,
                         arguments: [],
                         sp: self.valueStack,
-                        pc: &self.endOfExecution
+                        pc: self.rootCode.pc
                     )
                     self.state = .entrypointReturned(result)
                 case .runLoop(let sp, let pc):

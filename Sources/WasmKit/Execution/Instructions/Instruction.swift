@@ -2376,10 +2376,11 @@ enum Instruction {
     /// runs. Exhaustion dispatches to `outOfFuelTrap` rather than throwing, so that a
     /// loop's per-iteration charge stays a straight-line handler.
     case consumeFuel(Instruction.ConsumeFuelOperand)
-    /// Raise `Trap(.outOfFuel)`. Dispatched to by `consumeFuel`; never emitted.
+    /// Suspend a resumable call at the failed `consumeFuel`, or raise `Trap(.outOfFuel)`.
+    /// Dispatched to by `consumeFuel`; never emitted.
     /// 
-    /// Control-shaped so that it receives the program counter, which it records for a
-    /// future resumable-call API before throwing.
+    /// Control-shaped so that it receives the program counter, from which it finds the
+    /// `consumeFuel` to retry when the call resumes.
     case outOfFuelTrap(NoOperand)
     /// WebAssembly Core Instruction `call_ref`
     case callRef(Instruction.CallRefOperand)

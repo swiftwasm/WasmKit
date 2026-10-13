@@ -308,7 +308,7 @@ extension Execution {
         }
     }
 
-    mutating func memoryGrow(sp: Sp, md: inout Md, ms: inout Ms, immediate: Instruction.MemoryGrowOperand) throws {
+    mutating func memoryGrow(sp: Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.MemoryGrowOperand) throws {
         let instance = currentInstance(sp: sp)
         let memory = instance.memories[Int(immediate.memory)]
         try memory.withValue { memory in
@@ -322,13 +322,14 @@ extension Execution {
                 sp[immediate.result] = UntypedValue(isMemory64 ? .i64(UInt64(bitPattern: -1)) : .i32(UInt32(bitPattern: -1)))
                 return
             }
+            let (growthBytes, growthOverflow) = pageCount.multipliedReportingOverflow(by: UInt64(MemoryEntity.pageSize))
+            try reserveBytesCopied(growthOverflow ? .max : growthBytes, sp: sp, pc: pc, for: Instruction.MemoryGrowOperand.self)
             let oldPageCount = try memory.grow(by: delta, resourceLimiter: store.value.resourceLimiter)
             // Charge only for a growth that happened: a refused one did no work. `grow` reports
             // refusal as -1 rather than throwing, hence the check against the old page count.
             let grew = memory.limit.isMemory64 ? oldPageCount.i64 != (-1 as Int64).unsigned : oldPageCount.i32 != (-1 as Int32).unsigned
             if grew {
-                let (bytes, overflow) = pageCount.multipliedReportingOverflow(by: UInt64(MemoryEntity.pageSize))
-                try chargeBytesCopied(overflow ? .max : bytes)
+                try chargeBytesCopied(growthOverflow ? .max : growthBytes)
             }
             // The current memory registers hold memory 0 (see `selectMemory`).
             if immediate.memory == 0 {
@@ -361,7 +362,7 @@ extension Execution {
         let memory = currentInstance(sp: sp).memories[Int(immediate.memory)]
         memory.withValue { CurrentMemory.assign(md: &md, ms: &ms, memory: &$0) }
     }
-    mutating func memoryInit(sp: Sp, immediate: Instruction.MemoryInitOperand) throws {
+    mutating func memoryInit(sp: Sp, pc: Pc, immediate: Instruction.MemoryInitOperand) throws {
         let instance = currentInstance(sp: sp)
         let memory = instance.memories[Int(immediate.memory)]
         // Read the segment's bytes before opening the memory's access. Reaching
@@ -373,6 +374,7 @@ extension Execution {
             let size = sp[immediate.size].i32
             let source = sp[immediate.sourceOffset].i32
             let destination = sp[immediate.destOffset].asAddressOffset(memory.limit.isMemory64)
+            try reserveBytesCopied(UInt64(size), sp: sp, pc: pc, for: Instruction.MemoryInitOperand.self)
             try memory.initialize(segmentBytes, from: source, to: destination, count: size)
             try chargeBytesCopied(UInt64(size))
         }
@@ -381,7 +383,7 @@ extension Execution {
         let segment = currentInstance(sp: sp).dataSegments[Int(immediate.segmentIndex)]
         segment.withValue { $0.drop() }
     }
-    mutating func memoryCopy(sp: Sp, immediate: Instruction.MemoryCopyOperand) throws {
+    mutating func memoryCopy(sp: Sp, pc: Pc, immediate: Instruction.MemoryCopyOperand) throws {
         let instance = currentInstance(sp: sp)
         let destinationMemory = instance.memories[Int(immediate.destMemory)]
         let sourceMemory = instance.memories[Int(immediate.sourceMemory)]
@@ -391,10 +393,11 @@ extension Execution {
         let size = sp[immediate.size].asAddressOffset(destIsMemory64 && sourceIsMemory64)
         let source = sp[immediate.sourceOffset].asAddressOffset(sourceIsMemory64)
         let destination = sp[immediate.destOffset].asAddressOffset(destIsMemory64)
+        try reserveBytesCopied(size, sp: sp, pc: pc, for: Instruction.MemoryCopyOperand.self)
         try destinationMemory.copy(from: sourceMemory, sourceOffset: source, destOffset: destination, count: size)
         try chargeBytesCopied(size)
     }
-    mutating func memoryFill(sp: Sp, immediate: Instruction.MemoryFillOperand) throws {
+    mutating func memoryFill(sp: Sp, pc: Pc, immediate: Instruction.MemoryFillOperand) throws {
         let memory = currentInstance(sp: sp).memories[Int(immediate.memory)]
         try memory.withValue { memoryInstance in
             let isMemory64 = memoryInstance.limit.isMemory64
@@ -402,6 +405,7 @@ extension Execution {
             let value = sp[immediate.value].i32
             let rawDestination = sp[immediate.destOffset].asAddressOffset(isMemory64)
 
+            try reserveBytesCopied(rawCount, sp: sp, pc: pc, for: Instruction.MemoryFillOperand.self)
             // A memory64 offset or count beyond `Int` cannot be in bounds.
             guard let copyCounter = Int(exactly: rawCount), let destinationIndex = Int(exactly: rawDestination),
                 !destinationIndex.addingReportingOverflow(copyCounter).overflow

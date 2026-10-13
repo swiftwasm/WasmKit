@@ -248,7 +248,7 @@ extension InternalFunction {
         }
     }
 
-    private func invokeHost(_ arguments: [Value], store: Store) throws -> [Value] {
+    func invokeHost(_ arguments: [Value], store: Store) throws -> [Value] {
         let entity = host
         let resolvedType = store.engine.resolveType(entity.type)
         try check(functionType: resolvedType, parameters: arguments)

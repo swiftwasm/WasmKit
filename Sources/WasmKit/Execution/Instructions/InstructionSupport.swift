@@ -149,6 +149,15 @@ struct LLVReg: Equatable, ShiftedVReg, CustomStringConvertible {
 // MARK: - Immediate load/emit support
 
 /// A protocol that represents an immediate associated with an instruction.
+extension InstructionImmediate {
+    /// The number of code slots the immediate takes up.
+    static var slotCount: Int {
+        var count = 0
+        emit { _ in count += 1 }
+        return count
+    }
+}
+
 protocol InstructionImmediate {
     /// Loads an immediate from the instruction sequence.
     ///

@@ -107,6 +107,11 @@ extension VMGen {
         /// handler's cold path can reach it without materialising an `Instruction`.
         var isTrapPseudoInstruction: Bool = false
 
+        /// Whether the handler is given `pc`, just past its immediate, without being able to
+        /// move it. For a handler that can suspend a resumable call, which resumes at the
+        /// handler's head slot.
+        var receivesPc: Bool = false
+
         /// How this instruction's handler uses the integer accumulator.
         ///
         /// A handler that does not use it hands an indeterminate value to the
@@ -186,6 +191,7 @@ extension VMGen {
             isControl: Bool = false,
             mayThrow: Bool = false, mayUpdateFrame: Bool = false,
             useCurrentMemory: RegisterUse = .none,
+            receivesPc: Bool = false,
             layout: (inout ImmediateLayout) -> Void
         ) {
             let immediateName = pascalCase(camelCase: name) + "Operand"
@@ -199,6 +205,7 @@ extension VMGen {
                 immediate: Immediate(type: "Instruction." + immediateName),
                 immediateLayout: building
             )
+            self.receivesPc = receivesPc
         }
 
         init(
@@ -229,7 +236,7 @@ extension VMGen {
             } else {
                 vregs += [(.sp, false)]
             }
-            if self.mayUpdatePc {
+            if self.mayUpdatePc || self.receivesPc {
                 vregs += [(.pc, false)]
             }
             switch useCurrentMemory {
@@ -812,12 +819,12 @@ extension VMGen {
             $0.field(name: "memoryIndex", type: .MemoryIndex)
             $0.field(name: "result", type: .LVReg)
         },
-        Instruction(name: "memoryGrow", documentation: "WebAssembly Core Instruction `memory.grow`", mayThrow: true, useCurrentMemory: .write) {
+        Instruction(name: "memoryGrow", documentation: "WebAssembly Core Instruction `memory.grow`", mayThrow: true, useCurrentMemory: .write, receivesPc: true) {
             $0.field(name: "result", type: .VReg)
             $0.field(name: "delta", type: .VReg)
             $0.field(name: "memory", type: .MemoryIndex)
         },
-        Instruction(name: "memoryInit", documentation: "WebAssembly Core Instruction `memory.init`", mayThrow: true) {
+        Instruction(name: "memoryInit", documentation: "WebAssembly Core Instruction `memory.init`", mayThrow: true, receivesPc: true) {
             $0.field(name: "segmentIndex", type: .UInt32)
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "sourceOffset", type: .VReg)
@@ -827,14 +834,14 @@ extension VMGen {
         Instruction(name: "memoryDataDrop", documentation: "WebAssembly Core Instruction `memory.drop`") {
             $0.field(name: "segmentIndex", type: .UInt32)
         },
-        Instruction(name: "memoryCopy", documentation: "WebAssembly Core Instruction `memory.copy`", mayThrow: true) {
+        Instruction(name: "memoryCopy", documentation: "WebAssembly Core Instruction `memory.copy`", mayThrow: true, receivesPc: true) {
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "sourceOffset", type: .VReg)
             $0.field(name: "size", type: .LVReg)
             $0.field(name: "destMemory", type: .MemoryIndex)
             $0.field(name: "sourceMemory", type: .MemoryIndex)
         },
-        Instruction(name: "memoryFill", documentation: "WebAssembly Core Instruction `memory.fill`", mayThrow: true) {
+        Instruction(name: "memoryFill", documentation: "WebAssembly Core Instruction `memory.fill`", mayThrow: true, receivesPc: true) {
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "value", type: .VReg)
             $0.field(name: "size", type: .LVReg)
@@ -880,26 +887,26 @@ extension VMGen {
             $0.field(name: "tableIndex", type: .UInt32)
             $0.field(name: "result", type: .LVReg)
         },
-        Instruction(name: "tableGrow", documentation: "WebAssembly Core Instruction `table.grow`", mayThrow: true) {
+        Instruction(name: "tableGrow", documentation: "WebAssembly Core Instruction `table.grow`", mayThrow: true, receivesPc: true) {
             $0.field(name: "tableIndex", type: .UInt32)
             $0.field(name: "result", type: .VReg)
             $0.field(name: "delta", type: .VReg)
             $0.field(name: "value", type: .VReg)
         },
-        Instruction(name: "tableFill", documentation: "WebAssembly Core Instruction `table.fill`", mayThrow: true) {
+        Instruction(name: "tableFill", documentation: "WebAssembly Core Instruction `table.fill`", mayThrow: true, receivesPc: true) {
             $0.field(name: "tableIndex", type: .UInt32)
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "value", type: .VReg)
             $0.field(name: "size", type: .VReg)
         },
-        Instruction(name: "tableCopy", documentation: "WebAssembly Core Instruction `table.copy`", mayThrow: true) {
+        Instruction(name: "tableCopy", documentation: "WebAssembly Core Instruction `table.copy`", mayThrow: true, receivesPc: true) {
             $0.field(name: "sourceIndex", type: .UInt32)
             $0.field(name: "destIndex", type: .UInt32)
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "sourceOffset", type: .VReg)
             $0.field(name: "size", type: .VReg)
         },
-        Instruction(name: "tableInit", documentation: "WebAssembly Core Instruction `table.init`", mayThrow: true) {
+        Instruction(name: "tableInit", documentation: "WebAssembly Core Instruction `table.init`", mayThrow: true, receivesPc: true) {
             $0.field(name: "tableIndex", type: .UInt32)
             $0.field(name: "segmentIndex", type: .UInt32)
             $0.field(name: "destOffset", type: .VReg)
@@ -1795,10 +1802,11 @@ extension VMGen {
         var outOfFuelTrap = Instruction(
             name: "outOfFuelTrap",
             documentation: """
-                Raise `Trap(.outOfFuel)`. Dispatched to by `consumeFuel`; never emitted.
+                Suspend a resumable call at the failed `consumeFuel`, or raise `Trap(.outOfFuel)`.
+                Dispatched to by `consumeFuel`; never emitted.
 
-                Control-shaped so that it receives the program counter, which it records for a
-                future resumable-call API before throwing.
+                Control-shaped so that it receives the program counter, from which it finds the
+                `consumeFuel` to retry when the call resumes.
                 """,
             isControl: true, mayThrow: true
         )
