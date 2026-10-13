@@ -402,20 +402,24 @@ struct TableEntity: ~Copyable {
 
     /// > Note: https://webassembly.github.io/spec/core/exec/modules.html#grow-table
     /// Returns true if gorwth succeeds, otherwise returns false
-    mutating func grow(by growthSize: UInt64, value: Reference, resourceLimiter: any ResourceLimiter) throws -> Bool {
-        let oldSize = UInt64(elements.count)
-        guard !UInt64(elements.count).addingReportingOverflow(growthSize).overflow else {
-            return false
-        }
+    /// Whether the table's limits refuse growing it by `growthSize` elements, which
+    /// ``grow(by:value:resourceLimiter:)`` would report as `false` without asking the resource
+    /// limiter.
+    func refusesGrowth(by growthSize: UInt64) -> Bool {
+        newElementCount(growingBy: growthSize) == nil
+    }
 
+    /// The element count after growing by `growthSize`, or `nil` when the limits refuse it.
+    private func newElementCount(growingBy growthSize: UInt64) -> Int? {
+        let (newSize, overflow) = UInt64(elements.count).addingReportingOverflow(growthSize)
         let maxLimit = limits.max ?? (limits.isMemory64 ? UInt64.max : UInt64(UInt32.max))
-
-        let newSize = oldSize + growthSize
-        if newSize > maxLimit {
-            return false
-        }
+        guard !overflow, newSize <= maxLimit else { return nil }
         // A table64 can name more elements than the host can index.
-        guard let newElementCount = Int(exactly: newSize) else {
+        return Int(exactly: newSize)
+    }
+
+    mutating func grow(by growthSize: UInt64, value: Reference, resourceLimiter: any ResourceLimiter) throws -> Bool {
+        guard let newElementCount = newElementCount(growingBy: growthSize) else {
             return false
         }
         guard try resourceLimiter.limitTableGrowth(to: newElementCount) else {
@@ -882,6 +886,14 @@ struct MemoryEntity: ~Copyable {
     var boundsCheckLimit: Int { storage.boundsCheckLimit }
 
     var trapGuardReservationSize: Int { storage.trapGuardReservationSize }
+
+    /// Whether the memory's limits refuse growing it by `pageCount` pages, which ``grow(by:resourceLimiter:)``
+    /// would report as -1 without asking the resource limiter.
+    func refusesGrowth(by pageCount: Int) -> Bool {
+        let (newPageCount, pageOverflow) = (byteCount / MemoryEntity.pageSize).addingReportingOverflow(pageCount)
+        return pageOverflow || UInt64(newPageCount) > maxPageCount
+            || newPageCount.multipliedReportingOverflow(by: MemoryEntity.pageSize).overflow
+    }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#grow-mem>

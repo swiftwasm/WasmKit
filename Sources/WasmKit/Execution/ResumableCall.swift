@@ -13,6 +13,11 @@ public struct Suspension: Sendable {
         /// A bulk memory or table operation suspends before it does anything, and resuming runs
         /// it again from the start. If it is out of bounds, it traps then.
         case outOfFuel(required: UInt64)
+        /// The engine's epoch reached the deadline set by
+        /// ``Store/setEpochDeadline(ticksBeyondCurrent:)``.
+        ///
+        /// Set a new deadline and resume, and the call checks the epoch again where it stopped.
+        case epochDeadlineReached
     }
 
     /// What suspended the call.
@@ -55,7 +60,8 @@ struct SuspensionSignal: Error, @unchecked Sendable {
 ///
 /// A resumable call runs its guest on a stack of its own, which stays alive while the call is
 /// suspended. With ``EngineConfiguration/fuelMetering``, running out of ``Store/fuel`` suspends
-/// the guest instead of trapping.
+/// the guest instead of trapping, and so does reaching the epoch deadline with
+/// ``EngineConfiguration/epochInterruption``.
 ///
 /// ```swift
 /// let call = try ResumableCall(function: run, arguments: [])
@@ -64,6 +70,8 @@ struct SuspensionSignal: Error, @unchecked Sendable {
 ///     switch suspension.reason {
 ///     case .outOfFuel(let required):
 ///         store.fuel = Fuel(remaining: max(required, 10_000))
+///     case .epochDeadlineReached:
+///         store.setEpochDeadline(ticksBeyondCurrent: 1)
 ///     }
 ///     status = try call.resume()
 /// }

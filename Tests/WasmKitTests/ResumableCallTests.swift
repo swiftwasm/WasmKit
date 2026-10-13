@@ -4,17 +4,21 @@ import WasmParser
 
 @testable import WasmKit
 
+#if canImport(Foundation)
+    import Foundation
+#endif
+
 @Suite
 struct ResumableCallTests {
     private static func makeStore(
-        threadingModel: EngineConfiguration.ThreadingModel, fuelMetering: Bool = true
+        threadingModel: EngineConfiguration.ThreadingModel, fuelMetering: Bool = true, epochInterruption: Bool = false
     ) -> Store {
         Store(
             engine: Engine(
                 configuration: EngineConfiguration(
                     threadingModel: threadingModel, compilationMode: .eager,
                     features: [.referenceTypes, .exceptionHandling, .tailCall, .memory64],
-                    fuelMetering: fuelMetering)))
+                    fuelMetering: fuelMetering, epochInterruption: epochInterruption)))
     }
 
     private static func instantiate(_ wat: String, store: Store, imports: Imports = Imports()) throws -> Instance {
@@ -319,6 +323,29 @@ struct ResumableCallTests {
         #expect(call.isFinished)
     }
 
+    /// A growth the limits refuse does no work, so a resumable call must not suspend for the fuel
+    /// it would have cost: with the same budget, a plain call returns -1.
+    @Test(arguments: testedThreadingModels, ["memory", "table"])
+    func refusedGrowthDoesNotSuspend(threadingModel: EngineConfiguration.ThreadingModel, kind: String) throws {
+        let store = Self.makeStore(threadingModel: threadingModel)
+        let f = try #require(
+            try Self.instantiate(
+                """
+                (module
+                  (memory 1 1)
+                  (table 1 1 funcref)
+                  (func (export "memory") (result i32) (memory.grow (i32.const 1)))
+                  (func (export "table") (result i32) (table.grow (ref.null func) (i32.const 1000))))
+                """, store: store
+            ).exports[function: kind])
+        store.fuel = Fuel(remaining: 10)
+        guard case .returned(let results) = try ResumableCall(function: f).resume() else {
+            Issue.record("expected the refused growth to return without suspending")
+            return
+        }
+        #expect(results == [.i32(UInt32(bitPattern: -1))])
+    }
+
     // MARK: Nesting
 
     static let spin = """
@@ -417,6 +444,167 @@ struct ResumableCallTests {
         }
         #expect(results == [0: [.i32(100)], 1: [.i32(200)], 2: [.i32(300)]])
     }
+
+    // MARK: Epoch interruption
+
+    private static func epochStore(threadingModel: EngineConfiguration.ThreadingModel) -> Store {
+        makeStore(threadingModel: threadingModel, fuelMetering: false, epochInterruption: true)
+    }
+
+    @Test(arguments: testedThreadingModels)
+    func epochDeadlineSuspendsUntilItIsMoved(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let store = Self.epochStore(threadingModel: threadingModel)
+        let spin = try #require(try Self.instantiate(Self.spin, store: store).exports[function: "spin"])
+        let call = try ResumableCall(function: spin, arguments: [.i32(1000)])
+        store.setEpochDeadline(ticksBeyondCurrent: 2)
+        guard case .returned(let unexpired) = try ResumableCall(function: spin, arguments: [.i32(10)]).resume() else {
+            Issue.record("expected the call to return before the deadline")
+            return
+        }
+        #expect(unexpired == [.i32(10)])
+
+        store.engine.epochTicker.increment()
+        store.engine.epochTicker.increment()
+        for _ in 0..<2 {
+            // The resumed call checks again where it stopped, so it stays put until the deadline moves.
+            guard case .suspended(let suspension) = try call.resume() else {
+                Issue.record("expected a suspension")
+                return
+            }
+            #expect(suspension.reason == .epochDeadlineReached)
+        }
+        store.setEpochDeadline(ticksBeyondCurrent: 1)
+        guard case .returned(let results) = try call.resume() else {
+            Issue.record("expected the call to return")
+            return
+        }
+        #expect(results == [.i32(1000)])
+    }
+
+    /// A host function ticks the epoch on every iteration, so the call stops at every loop header
+    /// and carries on from the iteration it stopped at.
+    @Test(arguments: testedThreadingModels)
+    func everyLoopHeaderIsACheckpoint(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let store = Self.epochStore(threadingModel: threadingModel)
+        var imports = Imports()
+        imports.define(
+            module: "env", name: "tick",
+            Function(store: store, parameters: [], results: []) { _, _ in
+                store.engine.epochTicker.increment()
+                return []
+            })
+        let f = try #require(
+            try Self.instantiate(
+                """
+                (module
+                  (import "env" "tick" (func $tick))
+                  (func (export "f") (param $n i32) (result i32) (local $i i32) (local $sum i32)
+                    (loop $l
+                      (call $tick)
+                      (local.set $sum (i32.add (local.get $sum) (local.get $i)))
+                      (local.set $i (i32.add (local.get $i) (i32.const 1)))
+                      (br_if $l (i32.lt_u (local.get $i) (local.get $n))))
+                    (local.get $sum)))
+                """, store: store, imports: imports
+            ).exports[function: "f"])
+        let call = try ResumableCall(function: f, arguments: [.i32(100)])
+        var suspensions = 0
+        while true {
+            store.setEpochDeadline(ticksBeyondCurrent: 1)
+            switch try call.resume() {
+            case .returned(let results):
+                #expect(results == [.i32(4950)])
+                #expect(suspensions == 99)
+                return
+            case .suspended(let suspension):
+                #expect(suspension.reason == .epochDeadlineReached)
+                suspensions += 1
+            }
+        }
+    }
+
+    @Test(arguments: testedThreadingModels)
+    func plainCallTrapsAtEpochDeadline(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let store = Self.epochStore(threadingModel: threadingModel)
+        let spin = try #require(try Self.instantiate(Self.spin, store: store).exports[function: "spin"])
+        store.setEpochDeadline(ticksBeyondCurrent: 0)
+        #expect {
+            try spin([.i32(10)])
+        } throws: { error in
+            (error as? Trap)?.reason.description == "epoch deadline reached"
+        }
+        store.setEpochDeadline(ticksBeyondCurrent: 1)
+        #expect(try spin([.i32(10)]) == [.i32(10)])
+    }
+
+    /// The epoch analogue of ``plainCallInsideHostFunctionTrapsInsteadOfSuspending(threadingModel:)``.
+    @Test(arguments: testedThreadingModels)
+    func plainCallInsideHostFunctionTrapsAtEpochDeadline(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let store = Self.epochStore(threadingModel: threadingModel)
+        let spin = try #require(try Self.instantiate(Self.spin, store: store).exports[function: "spin"])
+        var nested = "not reached"
+        var imports = Imports()
+        imports.define(
+            module: "env", name: "h",
+            Function(store: store, parameters: [], results: []) { _, _ in
+                store.setEpochDeadline(ticksBeyondCurrent: 0)
+                defer { store.setEpochDeadline(ticksBeyondCurrent: .max) }
+                do {
+                    _ = try spin([.i32(100)])
+                    nested = "returned"
+                } catch let trap as Trap {
+                    nested = "trapped: \(trap.reason)"
+                }
+                return []
+            })
+        let f = try #require(
+            try Self.instantiate(
+                #"(module (import "env" "h" (func $h)) (func (export "f") (result i32) (call $h) (i32.const 1)))"#,
+                store: store, imports: imports
+            ).exports[function: "f"])
+        let status = try ResumableCall(function: f).resume()
+        #expect(nested == "trapped: epoch deadline reached")
+        guard case .returned(let results) = status else {
+            Issue.record("expected the call to return")
+            return
+        }
+        #expect(results == [.i32(1)])
+    }
+
+    @Test(arguments: testedThreadingModels)
+    func epochDeadlineIsIgnoredWithoutEpochInterruption(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let store = Self.makeStore(threadingModel: threadingModel, fuelMetering: false)
+        let spin = try #require(try Self.instantiate(Self.spin, store: store).exports[function: "spin"])
+        store.setEpochDeadline(ticksBeyondCurrent: 0)
+        #expect(try spin([.i32(10)]) == [.i32(10)])
+    }
+
+    #if canImport(Foundation)
+        @Test(arguments: testedThreadingModels)
+        func anotherThreadInterruptsAnInfiniteLoop(threadingModel: EngineConfiguration.ThreadingModel) throws {
+            let store = Self.epochStore(threadingModel: threadingModel)
+            let f = try #require(
+                try Self.instantiate(#"(module (func (export "f") (loop $l (br $l))))"#, store: store).exports[function: "f"])
+            let call = try ResumableCall(function: f)
+            store.setEpochDeadline(ticksBeyondCurrent: 1)
+            let ticker = store.engine.epochTicker
+            let ticked = DispatchSemaphore(value: 0)
+            // A thread of its own: on platforms where Swift concurrency runs on Dispatch's
+            // global queues, a block queued there can wait behind the spinning guests.
+            Thread.detachNewThread {
+                Thread.sleep(forTimeInterval: 0.01)
+                ticker.increment()
+                ticked.signal()
+            }
+            guard case .suspended(let suspension) = try call.resume() else {
+                Issue.record("expected a suspension")
+                return
+            }
+            ticked.wait()
+            #expect(suspension.reason == .epochDeadlineReached)
+            #expect(throws: Trap.self) { try call.resume(throwing: Trap(.message(.init("cancelled")))) }
+        }
+    #endif
 
     // MARK: API
 

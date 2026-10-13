@@ -18,6 +18,7 @@ add_wasmkit_library(WasmKit
   Component/CanonicalOptions.swift
   Component/ComponentTypes.swift
   Execution/DebuggerInstructionMapping.swift
+  Execution/EpochTicker.swift
   Execution/Instructions/Control.swift
   Execution/Instructions/ControlAccumulator.swift
   Execution/Instructions/ControlAccumulatorFloat.swift
@@ -25,6 +26,7 @@ add_wasmkit_library(WasmKit
   Execution/Instructions/ControlFusedFloat.swift
   Execution/Instructions/ControlFusedImm.swift
   Execution/Instructions/IntegerImmediate.swift
+  Execution/Instructions/Epoch.swift
   Execution/Instructions/ExceptionHandling.swift
   Execution/Instructions/Fuel.swift
   Execution/Instructions/Instruction.swift

@@ -2700,6 +2700,19 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         self.updateInstructionMapping(from: oldPC)
     }
 
+    // MARK: - Epoch interruption
+
+    /// Emits an epoch check, when the engine asks for epoch interruption.
+    ///
+    /// Emitted at function entry and at loop headers, so that every path that can run unboundedly
+    /// passes one. Execution can suspend here and resume by running the check again.
+    private mutating func emitEpochCheck() {
+        guard engineConfiguration.epochInterruption else { return }
+        emit(.checkEpoch(.init()))
+        // Like the fuel meter: a peephole fusion must not rewind past it.
+        iseqBuilder.resetLastEmission()
+    }
+
     // MARK: - Fuel metering
 
     /// Emits the meter for a region starting here and makes it the region being charged.
@@ -3206,6 +3219,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
         // The function body is a region: everything reachable without taking a back-edge or
         // entering an `if` arm is charged once, here, before any of it runs.
+        emitEpochCheck()
         openFuelRegion()
         var parser = ExpressionParser(code: code)
         while let visit = try WasmKitError.wrap({ () throws(WasmParserError) in try parser.parse() }) {
@@ -3283,8 +3297,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 initializedLocalsHeight: initializedLocals.count
             )
         )
-        // After the label, so that the back-edge lands on the meter and every iteration is
-        // charged. This is what bounds a guest that loops without ever calling out.
+        // After the label, so that the back-edge lands on the check and the meter, and every
+        // iteration passes both. This is what bounds a guest that loops without ever calling out.
+        emitEpochCheck()
         openFuelRegion()
     }
 

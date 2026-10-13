@@ -2382,6 +2382,18 @@ enum Instruction {
     /// Control-shaped so that it receives the program counter, from which it finds the
     /// `consumeFuel` to retry when the call resumes.
     case outOfFuelTrap(NoOperand)
+    /// Check the engine's epoch against the store's deadline
+    /// 
+    /// Emitted at function entry and at loop headers, and only when the engine is
+    /// configured with epoch interruption. Reaching the deadline dispatches to
+    /// `epochDeadlineTrap`.
+    case checkEpoch(NoOperand)
+    /// Suspend a resumable call at the `checkEpoch` that reached the deadline, or raise
+    /// `Trap(.epochDeadlineReached)`. Dispatched to by `checkEpoch`; never emitted.
+    /// 
+    /// Control-shaped so that it receives the program counter, from which it finds the
+    /// `checkEpoch` to run again when the call resumes.
+    case epochDeadlineTrap(NoOperand)
     /// WebAssembly Core Instruction `call_ref`
     case callRef(Instruction.CallRefOperand)
     /// WebAssembly Core Instruction `return_call_ref`
@@ -5872,19 +5884,21 @@ extension Instruction {
         case .i64Load32UWithCopy: return 725
         case .consumeFuel: return 726
         case .outOfFuelTrap: return 727
-        case .callRef: return 728
-        case .returnCallRef: return 729
-        case .refAsNonNull: return 730
-        case .brIfNull: return 731
-        case .brIfNotNull: return 732
-        case .selectMemory: return 733
-        default: return 734  // .selectSharedMemory
+        case .checkEpoch: return 728
+        case .epochDeadlineTrap: return 729
+        case .callRef: return 730
+        case .returnCallRef: return 731
+        case .refAsNonNull: return 732
+        case .brIfNull: return 733
+        case .brIfNotNull: return 734
+        case .selectMemory: return 735
+        default: return 736  // .selectSharedMemory
         }
     }
 }
 extension Instruction {
     /// The number of opcodes, trap pseudo-instructions included.
-    static let opcodeCount = 735
+    static let opcodeCount = 737
 
     /// Whether only the direct-threaded dispatcher implements this instruction;
     /// `Execution.doExecute` has no case for it.
@@ -6635,13 +6649,15 @@ extension Instruction {
         case 725: return .i64Load32UWithCopy(Instruction.LoadWithCopyOperand.load(from: &pc))
         case 726: return .consumeFuel(Instruction.ConsumeFuelOperand.load(from: &pc))
         case 727: return .outOfFuelTrap(NoOperand())
-        case 728: return .callRef(Instruction.CallRefOperand.load(from: &pc))
-        case 729: return .returnCallRef(Instruction.ReturnCallRefOperand.load(from: &pc))
-        case 730: return .refAsNonNull(Instruction.RefAsNonNullOperand.load(from: &pc))
-        case 731: return .brIfNull(Instruction.BrIfOperand.load(from: &pc))
-        case 732: return .brIfNotNull(Instruction.BrIfOperand.load(from: &pc))
-        case 733: return .selectMemory(Instruction.SelectMemoryOperand.load(from: &pc))
-        case 734: return .selectSharedMemory(Instruction.SelectSharedMemoryOperand.load(from: &pc))
+        case 728: return .checkEpoch(NoOperand())
+        case 729: return .epochDeadlineTrap(NoOperand())
+        case 730: return .callRef(Instruction.CallRefOperand.load(from: &pc))
+        case 731: return .returnCallRef(Instruction.ReturnCallRefOperand.load(from: &pc))
+        case 732: return .refAsNonNull(Instruction.RefAsNonNullOperand.load(from: &pc))
+        case 733: return .brIfNull(Instruction.BrIfOperand.load(from: &pc))
+        case 734: return .brIfNotNull(Instruction.BrIfOperand.load(from: &pc))
+        case 735: return .selectMemory(Instruction.SelectMemoryOperand.load(from: &pc))
+        case 736: return .selectSharedMemory(Instruction.SelectSharedMemoryOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -7384,13 +7400,15 @@ extension Instruction {
         case 725: return "i64Load32UWithCopy"
         case 726: return "consumeFuel"
         case 727: return "outOfFuelTrap"
-        case 728: return "callRef"
-        case 729: return "returnCallRef"
-        case 730: return "refAsNonNull"
-        case 731: return "brIfNull"
-        case 732: return "brIfNotNull"
-        case 733: return "selectMemory"
-        case 734: return "selectSharedMemory"
+        case 728: return "checkEpoch"
+        case 729: return "epochDeadlineTrap"
+        case 730: return "callRef"
+        case 731: return "returnCallRef"
+        case 732: return "refAsNonNull"
+        case 733: return "brIfNull"
+        case 734: return "brIfNotNull"
+        case 735: return "selectMemory"
+        case 736: return "selectSharedMemory"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }

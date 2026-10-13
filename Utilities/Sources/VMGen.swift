@@ -171,6 +171,9 @@ enum VMGen {
         inlineImpls["consumeFuel"] = """
             if let trap = consumeFuel(immediate: immediate, sp: sp.pointee, pc: pc.pointee) { %TRAP% }
             """
+        inlineImpls["checkEpoch"] = """
+            if let trap = checkEpoch(sp: sp.pointee, pc: pc.pointee) { %TRAP% }
+            """
         inlineImpls["selectAcc"] = """
             let onTrue = sp.pointee[immediate.onTrue]
                     let onFalse = sp.pointee[immediate.onFalse]

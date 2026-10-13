@@ -122,6 +122,8 @@ package enum TrapReason: Error, CustomStringConvertible, Sendable {
     case invalidConversionToInteger
     /// Execution consumed all of the fuel budgeted by ``Store/fuel``
     case outOfFuel
+    /// The engine's epoch reached the deadline set by ``Store/setEpochDeadline(ticksBeyondCurrent:)``
+    case epochDeadlineReached
     /// `call_ref` or `return_call_ref` called a null function reference.
     case nullFunctionReference
     /// `ref.as_non_null` was given a null reference.
@@ -148,6 +150,8 @@ package enum TrapReason: Error, CustomStringConvertible, Sendable {
             return "invalid conversion to integer"
         case .outOfFuel:
             return "out of fuel"
+        case .epochDeadlineReached:
+            return "epoch deadline reached"
         case .nullFunctionReference:
             return "null function reference"
         case .nullReference:

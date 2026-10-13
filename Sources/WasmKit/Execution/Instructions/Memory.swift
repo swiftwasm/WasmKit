@@ -323,7 +323,10 @@ extension Execution {
                 return
             }
             let (growthBytes, growthOverflow) = pageCount.multipliedReportingOverflow(by: UInt64(MemoryEntity.pageSize))
-            try reserveBytesCopied(growthOverflow ? .max : growthBytes, sp: sp, pc: pc, for: Instruction.MemoryGrowOperand.self)
+            // A growth the limits refuse does no work and costs nothing, so it must not suspend for fuel.
+            if !memory.refusesGrowth(by: delta) {
+                try reserveBytesCopied(growthOverflow ? .max : growthBytes, sp: sp, pc: pc, for: Instruction.MemoryGrowOperand.self)
+            }
             let oldPageCount = try memory.grow(by: delta, resourceLimiter: store.value.resourceLimiter)
             // Charge only for a growth that happened: a refused one did no work. `grow` reports
             // refusal as -1 rather than throwing, hence the check against the old page count.
