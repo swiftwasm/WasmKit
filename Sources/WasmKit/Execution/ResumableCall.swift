@@ -23,12 +23,25 @@ public struct Suspension: Sendable {
         /// `tag` is the request's tag, and `arguments` is a copy of what the guest passed to the
         /// host function. The host function does not run again. Complete its call with
         /// ``ResumableCall/resume(returning:answering:)`` or
-        /// ``ResumableCall/resume(failing:answering:)``, and the guest continues after it.
+        /// ``ResumableCall/resume(failing:answering:)``, and the guest continues after it. To end
+        /// the call instead, cancel it with ``ResumableCall/resume(throwing:)``.
         ///
         /// A reference among the arguments is the same value a synchronous host function would
-        /// get. A function reference names a function of the call's store and stays valid while
-        /// the store lives. An exception reference names an exception that this call caught, and
-        /// means nothing to another call.
+        /// get. Copying the array copies the references and keeps nothing they name alive. A
+        /// function reference names a function of the call's store. It is valid only in that
+        /// store, while the store lives. An exception reference names an exception that this
+        /// call's guest caught, and it is valid only in this call. The same holds for references
+        /// in an answer. ``ResumableCall/resume(returning:answering:)`` checks the type of each
+        /// result, including whether it may be null, and the suspension it answers. It does not
+        /// check where a reference came from, so keeping each reference within its store and call
+        /// is up to the embedder.
+        ///
+        /// Neither the suspension nor an answer charges ``Store/fuel`` or checks the epoch
+        /// deadline. After an answer the guest runs under the usual rules, and it reaches its next
+        /// fuel charge or epoch check where it would after a synchronous host function. It can
+        /// have side effects before then. A deadline that passed during the suspension stops the
+        /// guest at the next epoch check. If the guest returns before it reaches one, the call
+        /// returns its results although the deadline has passed.
         case hostCall(tag: UInt64, arguments: [Value])
     }
 
@@ -58,6 +71,9 @@ public struct Suspension: Sendable {
 /// suspension keeps none of them, and carries a copy of the arguments instead.
 public struct SuspensionRequest: Error, Sendable, Equatable {
     /// A value the host function chooses, so that the embedder can tell requests apart.
+    ///
+    /// The call passes it on in ``Suspension/Reason/hostCall(tag:arguments:)`` and does not use it
+    /// otherwise. An answer is matched to its suspension by the ``Suspension`` it names.
     public var tag: UInt64
 
     /// Creates a request to suspend, tagged with `tag`.
@@ -66,7 +82,16 @@ public struct SuspensionRequest: Error, Sendable, Equatable {
     }
 }
 
-/// An error raised by misusing a ``ResumableCall``. The call is left as it was.
+/// An error raised by misusing a ``ResumableCall``.
+///
+/// A call raises it when it refuses a request, such as an answer to another suspension. The
+/// refusal comes before anything runs or is written, so the call that refused is left as it was.
+///
+/// An error of this type that comes from elsewhere is not a refusal. A host function that the
+/// guest calls can throw one, for example from a nested call it misused, and it can be the error
+/// given to ``ResumableCall/resume(failing:answering:)`` or ``ResumableCall/resume(throwing:)``.
+/// Such an error finishes the call like any other error. ``ResumableCall/isFinished`` tells
+/// whether a call has ended.
 public struct ResumableCallError: Error, CustomStringConvertible, Sendable {
     /// The description of the error.
     public let description: String
@@ -188,9 +213,10 @@ final class HostCallIdentity: Sendable {}
 /// so does a ``SuspensionRequest``.
 ///
 /// A call suspended at a host call waits for its answer like any other suspended call. Its store
-/// stays usable meanwhile, and the work behind the answer can happen elsewhere, since
-/// ``Suspension`` is `Sendable`. A call and its store still belong to one thread at a time. The
-/// embedder brings each answer back there and resumes the calls of a store one after another.
+/// stays usable meanwhile. ``Suspension`` is `Sendable`, so the work behind an answer can happen
+/// on another thread. That does not let two threads use one store at once. A store and its calls
+/// are used by one thread at a time, and the embedder resumes the calls of a store one after
+/// another.
 public final class ResumableCall {
     /// What a run of the call ended with, when it did not throw.
     public enum Status {
@@ -315,8 +341,11 @@ public final class ResumableCall {
     /// host function returns nothing.
     ///
     /// - Returns: Whether the function returned or the guest was suspended again.
-    /// - Throws: A trap, or another error the guest raised, which finishes the call; or a
-    ///   ``ResumableCallError`` if the call cannot be resumed, which leaves it as it was.
+    /// - Throws: An error that leaves the guest, such as a trap, which finishes the call. That
+    ///   includes an error a host function threw, even a ``ResumableCallError``. The method
+    ///   refuses with a ``ResumableCallError`` of its own when the call is running, has finished,
+    ///   or is suspended at a host call. A refusal comes before anything runs and leaves the call
+    ///   as it was.
     public func resume() throws -> Status {
         switch state.take() {
         case .ready(let arguments, let stack):
@@ -341,7 +370,19 @@ public final class ResumableCall {
     /// guest after it.
     ///
     /// The guest continues as if the host function had returned `results`. The host function
-    /// does not run again. A host function without results is completed with an empty array.
+    /// does not run again. A host function without results is completed with an empty array,
+    /// because ``resume()`` refuses a call suspended at a host call.
+    ///
+    /// Each result is checked against the host function's result type, including whether it may
+    /// be null. Where a reference came from is not checked. A function reference has to name a
+    /// function of the call's store, and an exception reference an exception this call's guest
+    /// caught, as ``Suspension/Reason/hostCall(tag:arguments:)`` describes.
+    ///
+    /// Accepting the answer neither charges ``Store/fuel`` nor checks the epoch deadline. The
+    /// guest then runs under the usual rules, and it reaches its next fuel charge or epoch check
+    /// where it would after a synchronous host function. It can have side effects before then.
+    /// If it returns before it reaches an epoch check, the call returns its results even when
+    /// the deadline passed during the suspension.
     ///
     /// - Parameters:
     ///   - results: The host function's results, matching its result types.
@@ -349,9 +390,12 @@ public final class ResumableCall {
     ///     with. An answer meant for an earlier suspension of this call, or for another call, is
     ///     refused.
     /// - Returns: Whether the function returned or the guest was suspended again.
-    /// - Throws: A trap, or another error the guest raised, which finishes the call; or a
-    ///   ``ResumableCallError`` if the call is not suspended at a host call, `suspension` is not
-    ///   its suspension, or `results` do not match, which leaves it as it was.
+    /// - Throws: An error that leaves the guest, such as a trap, which finishes the call. That
+    ///   includes an error a host function threw after the answer, even a
+    ///   ``ResumableCallError``. The method refuses with a ``ResumableCallError`` of its own when
+    ///   the call is not suspended at a host call, `suspension` is not its suspension, or
+    ///   `results` do not match. A refusal comes before anything is written or runs and leaves the
+    ///   call as it was.
     public func resume(returning results: [Value], answering suspension: Suspension) throws -> Status {
         try completeHostCall(answering: suspension) { hostCall in
             let resultTypes = hostCall.function.resultTypes
@@ -373,9 +417,15 @@ public final class ResumableCall {
     /// Completes the host call that the guest is suspended in by throwing `error` from it.
     ///
     /// The guest sees `error` as if the host function had thrown it. A ``WasmKitException``
-    /// reaches the guest's exception handlers. A ``Trap`` gets the backtrace of the suspended
-    /// guest and finishes the call, as any other error does. To finish a call without letting the
-    /// guest catch anything, use ``resume(throwing:)``.
+    /// reaches the guest's exception handlers, and a handler that catches it continues the call.
+    /// A ``Trap`` gets the backtrace a synchronous trap at that host call would get, and finishes
+    /// the call. Any other error finishes the call as it is. This completes the host call. To
+    /// finish a call without letting the guest catch anything, cancel it with
+    /// ``resume(throwing:)``.
+    ///
+    /// Accepting the error neither charges ``Store/fuel`` nor checks the epoch deadline. A
+    /// handler that catches it runs under the usual rules, as the guest does after
+    /// ``resume(returning:answering:)``.
     ///
     /// - Parameters:
     ///   - error: What the host function throws. It may not be a ``SuspensionRequest``, because
@@ -384,10 +434,11 @@ public final class ResumableCall {
     ///     with.
     /// - Returns: Whether the function returned or the guest was suspended again, after a guest
     ///   exception handler caught `error`.
-    /// - Throws: `error` when the guest does not catch it, or another error the guest raised,
-    ///   which finishes the call; or a ``ResumableCallError`` if the call is not suspended at a
-    ///   host call, `suspension` is not its suspension, or `error` is a ``SuspensionRequest``,
-    ///   which leaves it as it was.
+    /// - Throws: `error` when the guest does not catch it, or another error that leaves the guest,
+    ///   which finishes the call. That holds when `error` is a ``ResumableCallError`` too. The
+    ///   method refuses with a ``ResumableCallError`` of its own when the call is not suspended at
+    ///   a host call, `suspension` is not its suspension, or `error` is a ``SuspensionRequest``. A
+    ///   refusal comes before anything runs and leaves the call as it was.
     public func resume(failing error: any Error, answering suspension: Suspension) throws -> Status {
         let store = function.store
         return try completeHostCall(answering: suspension) { _ in
@@ -414,14 +465,17 @@ public final class ResumableCall {
 
     /// Finishes a call without running any more of it, throwing `error` from where it is.
     ///
-    /// This is how to cancel a call. A ``Trap`` gets the backtrace of the suspended guest. The
-    /// guest cannot catch `error`, so it may not be a ``WasmKitException``. It may not be a
-    /// ``SuspensionRequest`` either, which a host function that cancels a call and rethrows would
-    /// otherwise pass on as a request to suspend its own caller.
+    /// This is how to cancel a call, before it starts or whatever it is suspended for. A ``Trap``
+    /// gets the backtrace of the suspended guest. At a host call, that is the backtrace a
+    /// synchronous trap there would get. The guest cannot catch `error`, so it may not be a
+    /// ``WasmKitException``. It may not be a ``SuspensionRequest`` either, which a host function
+    /// that cancels a call and rethrows would otherwise pass on as a request to suspend its own
+    /// caller.
     ///
-    /// - Throws: `error`, which finishes the call; or a ``ResumableCallError`` if the call is
-    ///   running or finished, or `error` is a ``WasmKitException`` or a ``SuspensionRequest``,
-    ///   which leaves it as it was.
+    /// - Throws: `error`, which finishes the call, even when it is a ``ResumableCallError``. The
+    ///   method refuses with a ``ResumableCallError`` of its own when the call is running or
+    ///   finished, or `error` is a ``WasmKitException`` or a ``SuspensionRequest``. A refusal
+    ///   leaves the call as it was.
     public func resume(throwing error: any Error) throws -> Never {
         if error is WasmKitException {
             throw ResumableCallError.exceptionNotThrowable
