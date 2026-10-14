@@ -1084,11 +1084,12 @@ struct ResumableHostCallTests {
         let fixture = try Fixture(
             Self.reentry, threadingModel: threadingModel, memoryBoundsChecking: memoryBoundsChecking,
             hosts: ["suspend": Self.suspend, "reenter": { _, _ in [.i32(0)] }])
-        // The engine may settle on software checks, for example with token threading.
-        let settled = fixture.store.engine.configuration.memoryBoundsChecking
         let call = try ResumableCall(function: try fixture.export("mem"))
         let suspension = try Self.suspension(try call.resume())
         let memory = try #require(fixture.instance.exports[memory: "memory"])
+        // Only a memory in a reserved region keeps its base when it grows. The engine can keep
+        // `.mprotect` and still place the memory in one allocation, as it does on Android.
+        let reserved = memory.handle.withValue { $0.trapGuardReservationSize } > 0
         func base() -> UInt {
             memory.withUnsafeMutableBufferPointer(offset: 0, count: 1) { UInt(bitPattern: $0.baseAddress) }
         }
@@ -1096,10 +1097,10 @@ struct ResumableHostCallTests {
         memory.withUnsafeMutableBufferPointer(offset: 20, count: 4) { bytes in
             bytes.storeBytes(of: UInt32(100).littleEndian, as: UInt32.self)
         }
-        // A plain call grows the memory while the call is suspended. With software checks the
-        // memory is one allocation, which growing replaces, so the guest has to find it anew.
+        // A plain call grows the memory while the call is suspended. A memory in one allocation
+        // is replaced by growing, so the guest has to find it anew.
         #expect(try fixture.export("grow")() == [.i32(1)])
-        #expect((base() != before) == (settled == .software))
+        #expect((base() != before) == !reserved)
         #expect(try Self.results(try call.resume(returning: [.i32(0)], answering: suspension)) == [.i32(41 + 100 + 2 + 5)])
     }
 
