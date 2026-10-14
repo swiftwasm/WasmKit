@@ -11,6 +11,7 @@ swift run PrintAdd
 swift run Factorial
 swift run StringPassing
 swift run WASI-Hello
+swift run HostCallSuspension
 ```
 
 ## StringPassing
@@ -19,3 +20,11 @@ swift run WASI-Hello
 
 - WebAssembly passes a `(ptr: i32, len: i32)` pair into an imported host function (`printer.print_str`), and the host reads the bytes from the module's exported `memory`.
 - The host allocates space in guest memory by calling an exported `alloc(size: i32) -> i32`, writes UTF-8 bytes into the returned region, then calls an exported `checksum(ptr: i32, len: i32) -> i32`.
+
+## HostCallSuspension
+
+`HostCallSuspension` runs a guest as a `ResumableCall` whose imported host function throws a
+`SuspensionRequest` instead of returning. The embedder answers each host call after an `await`
+with `resume(returning:answering:)`, and the guest continues after the call without running the
+host function again. It also shows the difference between completing a host call with an error,
+which a guest exception handler can catch, and cancelling the call with `resume(throwing:)`.
