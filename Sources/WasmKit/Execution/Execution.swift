@@ -904,7 +904,7 @@ extension Execution {
         function: EntityHandle<HostFunctionEntity>, parameterArea: Sp,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
-        try invokeHostFunction(function: function, sp: sp, parameterArea: parameterArea)
+        try invokeHostFunction(function: function, sp: sp, parameterArea: parameterArea, pc: pc)
         // A host function may re-enter the guest and grow the caller's
         // default memory. A malloc-backed memory moves when it grows, so the
         // cached base and bound would otherwise be left dangling.
@@ -946,12 +946,13 @@ extension Execution {
             Self.moveArguments(from: argumentSlots, to: parameterArea, slotCount: layout.parameterSlotCount)
             saved.store(below: newSp)
             do {
-                try invokeHostFunction(function: host, sp: newSp, parameterArea: parameterArea)
+                try invokeHostFunction(function: host, sp: newSp, parameterArea: parameterArea, pc: pc)
             } catch let trap as Trap {
                 // The dispatch loop still holds this frame's `sp` and builds the trap's backtrace
                 // from it, but the moved arguments may cover the frame's saved slots. A trap ends
                 // the call, so nothing reads the arguments again and the slots can be put back.
                 // Other errors build no backtrace from here and leave the moved frame as it is.
+                // A call suspended at this host call continues in that frame.
                 saved.store(below: sp)
                 throw trap
             }
@@ -1076,12 +1077,62 @@ extension Execution {
         return (iseq.baseAddress, newSp)
     }
 
+    /// Executes the given host function, and suspends the ``ResumableCall`` running this execution
+    /// when the host function throws a ``SuspensionRequest``.
+    ///
+    /// - Parameters:
+    ///   - sp: The frame that continues after the call. For a tail call, the moved frame.
+    ///   - parameterArea: Where the call's arguments are, and its results go.
+    ///   - pc: Where the frame continues after the call, which a suspended call resumes from.
+    @inline(never)
+    private func invokeHostFunction(
+        function: EntityHandle<HostFunctionEntity>, sp: Sp, parameterArea: Sp, pc: Pc
+    ) throws {
+        do {
+            try callHostFunction(function: function, sp: sp, parameterArea: parameterArea)
+        } catch let request as SuspensionRequest {
+            throw Self.suspend(request, function: function, sp: sp, pc: pc, parameterArea: parameterArea, store: store)
+        }
+    }
+
+    /// Suspends the ``ResumableCall`` whose guest made a host call that threw `request`, or traps
+    /// where the guest cannot be suspended.
+    ///
+    /// Only a guest that a resumable call runs can be suspended, with no host function between it
+    /// and the call. A plain call, such as one a host function makes, would lose native frames
+    /// that a suspension cannot keep.
+    ///
+    /// The arguments are copied from the parameter area, which still holds them, because a host
+    /// function's results are stored there only once it returns.
+    ///
+    /// - Parameters:
+    ///   - sp: The frame that continues after the call.
+    ///   - pc: Where that frame continues.
+    ///   - parameterArea: Where the call's arguments are, and its results go.
+    /// - Returns: The ``SuspensionSignal`` to throw, or a trap.
+    @inline(never)
+    private static func suspend(
+        _ request: SuspensionRequest, function: EntityHandle<HostFunctionEntity>,
+        sp: Sp, pc: Pc, parameterArea: Sp, store: StoreRef
+    ) -> any Error {
+        guard store.value.isSuspendable else {
+            return Trap(.suspensionUnavailable)
+        }
+        let layout = function.layout
+        let arguments = function.parameterTypes.enumerated().map { index, type in
+            parameterArea.loadValue(at: layout.paramReg(index), type: type)
+        }
+        return SuspensionSignal(
+            reason: .hostCall(tag: request.tag, arguments: arguments), sp: sp, resumePC: pc,
+            hostCall: SuspendedHostCall(function: function, parameterArea: parameterArea, identity: HostCallIdentity()))
+    }
+
     /// Executes the given host function.
     ///
     /// Note that this function does not modify neither the positions of the
     /// stack pointer nor the program counter.
-    @inline(never)
-    private func invokeHostFunction(
+    @inline(__always)
+    private func callHostFunction(
         function: EntityHandle<HostFunctionEntity>, sp: Sp, parameterArea: Sp
     ) throws {
         let parameterTypes = function.parameterTypes
