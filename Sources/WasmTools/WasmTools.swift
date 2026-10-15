@@ -1,8 +1,11 @@
 import Foundation
-import SystemPackage
 import WASI
 import WasmKit
 import WasmKitWASI
+
+#if os(Windows)
+    import ucrt
+#endif
 
 /// Default path to wasm-tools.wasm in the Vendor directory
 package let defaultWasmToolsPath: String = {
@@ -120,18 +123,22 @@ package func runWasmTools(
         throw WasmToolsError.wasmToolsNotFound(path: wasmToolsPath)
     }
 
-    let stdoutPipes = try FileDescriptor.pipe()
-    let stderrPipes = try FileDescriptor.pipe()
+    let stdoutPipe = try CapturePipe()
+    let stderrPipe = try CapturePipe()
 
     defer {
-        try? stdoutPipes.readEnd.close()
-        try? stdoutPipes.writeEnd.close()
-        try? stderrPipes.readEnd.close()
-        try? stderrPipes.writeEnd.close()
+        stdoutPipe.closeRead()
+        stdoutPipe.closeWrite()
+        stderrPipe.closeRead()
+        stderrPipe.closeWrite()
     }
 
     let fileSystemOptions = WASIBridgeToHost.FileSystemOptions.memory(context.memoryFS)
-        .withStdio(stdin: .standardInput, stdout: stdoutPipes.writeEnd, stderr: stderrPipes.writeEnd)
+        .withStdio(
+            stdin: 0,
+            stdout: stdoutPipe.writeDescriptor,
+            stderr: stderrPipe.writeDescriptor
+        )
         .withPreopens([.init(guestPath: "/", hostPath: "/")])
 
     let wasi = try WASIBridgeToHost(
@@ -146,33 +153,16 @@ package func runWasmTools(
         var imports = Imports()
         wasi.link(to: &imports, store: store)
 
-        let module = try parseWasm(filePath: FilePath(wasmToolsPath))
+        let module = try parseWasm(filePath: wasmToolsPath)
         let instance = try module.instantiate(store: store, imports: imports)
         return try wasi.start(instance)
     }
 
-    try stdoutPipes.writeEnd.close()
-    try stderrPipes.writeEnd.close()
+    stdoutPipe.closeWrite()
+    stderrPipe.closeWrite()
 
-    var stdoutBytes = [UInt8]()
-    var stdoutBuffer = [UInt8](repeating: 0, count: 4096)
-    while true {
-        let bytesRead = try stdoutBuffer.withUnsafeMutableBytes {
-            try stdoutPipes.readEnd.read(into: $0)
-        }
-        if bytesRead == 0 { break }
-        stdoutBytes.append(contentsOf: stdoutBuffer.prefix(bytesRead))
-    }
-
-    var stderrBytes = [UInt8]()
-    var stderrBuffer = [UInt8](repeating: 0, count: 4096)
-    while true {
-        let bytesRead = try stderrBuffer.withUnsafeMutableBytes {
-            try stderrPipes.readEnd.read(into: $0)
-        }
-        if bytesRead == 0 { break }
-        stderrBytes.append(contentsOf: stderrBuffer.prefix(bytesRead))
-    }
+    let stdoutBytes = try stdoutPipe.readToEnd()
+    let stderrBytes = try stderrPipe.readToEnd()
 
     var outputFiles: [WasmToolsOutputFile] = []
     for path in outputPaths {
@@ -189,11 +179,84 @@ package func runWasmTools(
     )
 }
 
+/// A host pipe used to capture the guest's stdout/stderr as a raw file
+/// descriptor. Foundation's `Pipe` is not usable for this on Windows, where
+/// `FileHandle.fileDescriptor` is unavailable; use the CRT's `_pipe` there.
+private final class CapturePipe {
+    #if os(Windows)
+        private let readEnd: CInt
+        private let writeEnd: CInt
+        private var readClosed = false
+        private var writeClosed = false
+
+        init() throws {
+            var fds: [CInt] = [-1, -1]
+            guard _pipe(&fds, 4096, _O_BINARY) == 0 else {
+                throw WasmToolsError.pipeCreationFailed
+            }
+            self.readEnd = fds[0]
+            self.writeEnd = fds[1]
+        }
+
+        var writeDescriptor: CInt { writeEnd }
+
+        func closeRead() {
+            guard !readClosed else { return }
+            readClosed = true
+            _ = _close(readEnd)
+        }
+
+        func closeWrite() {
+            guard !writeClosed else { return }
+            writeClosed = true
+            _ = _close(writeEnd)
+        }
+
+        func readToEnd() throws -> [UInt8] {
+            var bytes: [UInt8] = []
+            var buffer = [UInt8](repeating: 0, count: 4096)
+            while true {
+                let count = buffer.withUnsafeMutableBytes {
+                    _read(readEnd, $0.baseAddress, 4096)
+                }
+                guard count > 0 else { break }
+                bytes.append(contentsOf: buffer.prefix(Int(count)))
+            }
+            return bytes
+        }
+    #else
+        private let pipe = Pipe()
+        private var readClosed = false
+        private var writeClosed = false
+
+        init() throws {}
+
+        var writeDescriptor: CInt { pipe.fileHandleForWriting.fileDescriptor }
+
+        func closeRead() {
+            guard !readClosed else { return }
+            readClosed = true
+            try? pipe.fileHandleForReading.close()
+        }
+
+        func closeWrite() {
+            guard !writeClosed else { return }
+            writeClosed = true
+            try? pipe.fileHandleForWriting.close()
+        }
+
+        func readToEnd() throws -> [UInt8] {
+            [UInt8](try pipe.fileHandleForReading.readToEnd() ?? Data())
+        }
+    #endif
+}
+
 /// Errors that can occur when running wasm-tools
 package enum WasmToolsError: Error, CustomStringConvertible {
     case wasmToolsNotFound(path: String)
     case executionFailed(exitCode: Int32, stderr: String)
     case fileNotFound(path: String)
+    case pipeCreationFailed
 
     package var description: String {
         switch self {
@@ -203,15 +266,17 @@ package enum WasmToolsError: Error, CustomStringConvertible {
             return "wasm-tools failed with exit code \(exitCode): \(stderr)"
         case .fileNotFound(let path):
             return "File not found at \(path)"
+        case .pipeCreationFailed:
+            return "Failed to create a pipe for capturing wasm-tools output"
         }
     }
 }
 
 // MARK: - JSON Types for wast2json output
 
-package struct Wast2JSONOutput: Codable {
+package struct WAST2JSONOutput: Codable {
     package let sourceFilename: String
-    package let commands: [Wast2JSONCommand]
+    package let commands: [WAST2JSONCommand]
 
     enum CodingKeys: String, CodingKey {
         case sourceFilename = "source_filename"
@@ -220,7 +285,7 @@ package struct Wast2JSONOutput: Codable {
 }
 
 /// A command from the wast2json output
-package struct Wast2JSONCommand: Codable {
+package struct WAST2JSONCommand: Codable {
     package let type: String
     package let line: Int
     package let filename: String?
@@ -242,17 +307,19 @@ package func wast2json(
     wasmToolsPath: String = defaultWasmToolsPath,
     wastContent: [UInt8],
     wastFileName: String = "input.wast"
-) throws -> (json: Wast2JSONOutput, wasmFiles: [String: [UInt8]]) {
+) throws -> (json: WAST2JSONOutput, wasmFiles: [String: [UInt8]]) {
     let inputPath = "/input/\(wastFileName)"
     let outputDir = "/output"
+    let jsonPath = "\(outputDir)/output.json"
 
     let context = try WasmToolsContext()
     try context.addInputFile(WasmToolsInputFile(guestPath: inputPath, content: wastContent))
     try context.memoryFS.ensureDirectory(at: outputDir)
 
+    // A large JSON on stdout deadlocks runWasmTools.
     let result = try runWasmTools(
         wasmToolsPath: wasmToolsPath,
-        args: ["json-from-wast", inputPath, "--wasm-dir", outputDir],
+        args: ["json-from-wast", inputPath, "--output", jsonPath, "--wasm-dir", outputDir],
         context: context,
         outputPaths: []
     )
@@ -261,7 +328,7 @@ package func wast2json(
         throw WasmToolsError.executionFailed(exitCode: result.exitCode, stderr: result.stderrString)
     }
 
-    let jsonOutput = try JSONDecoder().decode(Wast2JSONOutput.self, from: Data(result.stdout))
+    let jsonOutput = try JSONDecoder().decode(WAST2JSONOutput.self, from: Data(context.getFile(at: jsonPath)))
 
     var wasmFiles: [String: [UInt8]] = [:]
     for command in jsonOutput.commands {

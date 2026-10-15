@@ -1,4 +1,19 @@
 import WasmParser
+import _CWasmKit
+
+/// A budget for WebAssembly execution, measured in fuel.
+///
+/// One unit of fuel is roughly one executed WebAssembly operator; bulk memory and table
+/// operations additionally cost one unit per 64 bytes they move.
+public struct Fuel: Sendable {
+    /// The fuel remaining in this budget.
+    public var remaining: UInt64
+
+    /// Creates a budget with the given amount of fuel remaining.
+    public init(remaining: UInt64) {
+        self.remaining = remaining
+    }
+}
 
 /// A container to manage WebAssembly object space.
 /// > Note:
@@ -7,6 +22,66 @@ public final class Store {
     var nameRegistry = NameRegistry()
     @_spi(Fuzzing)  // Consider making this public
     public var resourceLimiter: ResourceLimiter = DefaultResourceLimiter()
+
+    /// The remaining fuel. `UInt64.max` means "unlimited".
+    ///
+    /// In a ``Cell`` so that the interpreter can charge it through its address. Unsynchronized: a
+    /// `Store` is thread-confined, and each wasi thread gets its own.
+    let remainingFuel = Cell<UInt64>(.max)
+    /// Whether this store's engine meters fuel.
+    ///
+    /// Bulk memory and table handlers exist whether or not fuel is metered, so they have to ask.
+    /// Resolved once here rather than per operation, because reaching the engine's configuration
+    /// from a handler is a chain of loads that a copy-heavy guest pays for on every copy, metered
+    /// or not.
+    let isFuelMetered: Bool
+    /// Whether a budget was ever set. Distinguishes "unlimited" from a budget that happens to
+    /// hold `UInt64.max`.
+    private var hasFuel: Bool = false
+    /// Whether the innermost guest execution on this store can be suspended: it runs as a
+    /// ``ResumableCall``, and no host function lies between it and the code asking.
+    ///
+    /// Every entry into the guest sets it for its own duration and restores it on the way out, so
+    /// a plain call made by a host function inside a resumable call reads `false`. Only the cold
+    /// paths that would suspend read it. It lives here rather than in `Execution` because adding a
+    /// stored property there grows the call and throw handlers, even though they never read it.
+    var isSuspendable: Bool = false
+
+    /// The epoch at which guest code running on this store stops. `UInt64.max` means "never".
+    ///
+    /// In a ``Cell`` so that the `checkEpoch` handler reads it without an exclusivity check.
+    let epochDeadline = Cell<UInt64>(.max)
+    /// The engine's epoch, cached so that `checkEpoch` reaches it in one load.
+    let epochCounter: UnsafePointer<UInt64>
+
+    /// The remaining execution budget of this store, or `nil` when execution is unlimited.
+    /// (Default: `nil`)
+    ///
+    /// Execution traps with an out-of-fuel trap once the budget is exhausted. The remaining fuel
+    /// is left untouched by the failed charge, and the store stays usable: assign a new budget and
+    /// call again.
+    ///
+    /// - Note: This has no effect unless the store's engine was configured with
+    ///   ``EngineConfiguration/fuelMetering``. Setting a budget on an engine without fuel metering
+    ///   is accepted, but nothing consumes it, so the value never decreases.
+    public var fuel: Fuel? {
+        get {
+            hasFuel ? Fuel(remaining: remainingFuel.value) : nil
+        }
+        set {
+            assign(fuel: newValue)
+        }
+        _modify {
+            var value = hasFuel ? Fuel(remaining: remainingFuel.value) : nil
+            defer { assign(fuel: value) }
+            yield &value
+        }
+    }
+
+    private func assign(fuel newValue: Fuel?) {
+        hasFuel = newValue != nil
+        remainingFuel.value = newValue?.remaining ?? .max
+    }
 
     @available(*, unavailable)
     public var namedModuleInstances: [String: Any] {
@@ -22,6 +97,23 @@ public final class Store {
     public init(engine: Engine) {
         self.engine = engine
         self.allocator = StoreAllocator(funcTypeInterner: engine.funcTypeInterner)
+        self.isFuelMetered = engine.configuration.fuelMetering
+        self.epochCounter = UnsafePointer(engine.epochTicker.counter.address)
+    }
+
+    /// Stops guest code once the engine's epoch has advanced `ticks` times from now.
+    /// (Default: never)
+    ///
+    /// Guest code checks the epoch at function entries and loop headers. At the deadline, a
+    /// ``ResumableCall`` suspends with ``Suspension/Reason/epochDeadlineReached`` and any other
+    /// call traps. Zero stops at the next check. Set a new deadline before resuming, or the call
+    /// suspends again at once.
+    ///
+    /// - Note: This has no effect unless the store's engine was configured with
+    ///   ``EngineConfiguration/epochInterruption``.
+    public func setEpochDeadline(ticksBeyondCurrent ticks: UInt64) {
+        let (deadline, overflow) = wasmkit_epoch_load(epochCounter).addingReportingOverflow(ticks)
+        epochDeadline.value = overflow ? .max : deadline
     }
 }
 
@@ -73,7 +165,18 @@ public struct Caller: ~Copyable {
 
 struct HostFunctionEntity {
     let type: InternedFuncType
-    let implementation: Function.Implementation
+    /// The signature, resolved once here rather than looked up through the
+    /// engine's interner on every call. On a small device the lookup and the
+    /// retain traffic on the type's arrays cost more than the call they
+    /// preface.
+    let parameterTypes: [ValueType]
+    let resultTypes: [ValueType]
+    let layout: ParameterAreaLayout
+    /// Always the buffer-based form. A host function written against the
+    /// array-based API is wrapped in one of these when it is created, so the
+    /// engine has a single shape to call and only the functions that want
+    /// arrays pay for them.
+    let implementation: Function.RawImplementation
 }
 
 extension Store {

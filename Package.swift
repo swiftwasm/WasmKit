@@ -6,22 +6,47 @@ import class Foundation.ProcessInfo
 
 let DarwinPlatforms: [Platform] = [.macOS, .iOS, .watchOS, .tvOS, .visionOS]
 
-let swiftSettings: [SwiftSetting] = [
-    .treatAllWarnings(as: .error, .when(platforms: DarwinPlatforms + [.linux, .wasi, .android, .openbsd]))
-]
+// Warnings are promoted to errors only when `WASMKIT_WARNINGS_AS_ERRORS` is set, which WasmKit's
+// own CI does. Enabling it unconditionally breaks packages that depend on WasmKit: Xcode and the
+// `swiftbuild` build system compile dependencies with `-suppress-warnings`, and the Swift driver
+// rejects that flag in combination with `-warnings-as-errors`
+// (https://github.com/swiftlang/swift-package-manager/issues/9517).
+let swiftSettings: [SwiftSetting] =
+    Context.environment["WASMKIT_WARNINGS_AS_ERRORS"] != nil
+    ? [.treatAllWarnings(as: .error, .when(platforms: DarwinPlatforms + [.linux, .wasi, .android, .openbsd]))]
+    : []
+
+/// Settings for the engine itself, which stores a few values inline with `Cell` (see
+/// `Sources/WasmKit/Platform/Cell.swift`).
+let engineSwiftSettings: [SwiftSetting] = swiftSettings + [.enableExperimentalFeature("RawLayout")]
 
 let cliCommandsTarget = Target.target(
     name: "CLICommands",
     dependencies: [
-        "SystemExtras",
+        "WASI",
+        "WASTRunner",
         "WAT",
         "WasmKit",
         "WasmKitWASI",
+        "WasmKitWASIThreads",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
-        .product(name: "SystemPackage", package: "swift-system"),
     ],
     exclude: ["CMakeLists.txt"],
     swiftSettings: swiftSettings
+)
+
+let cliCommandsTestTarget = Target.testTarget(
+    name: "CLICommandsTests",
+    dependencies: [
+        "CLICommands",
+        "WasmTypes",
+        "WAT",
+        "WASI",
+        "WasmKit",
+        "WasmKitWASI",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+    ],
+    exclude: ["Fixtures"]
 )
 
 let package = Package(
@@ -31,6 +56,7 @@ let package = Package(
         .executable(name: "wasmkit-cli", targets: ["CLI"]),
         .library(name: "WasmKit", targets: ["WasmKit"]),
         .library(name: "WasmKitWASI", targets: ["WasmKitWASI"]),
+        .library(name: "WasmKitWASIThreads", targets: ["WasmKitWASIThreads"]),
         .library(name: "WASI", targets: ["WASI"]),
         .library(name: "WasmParser", targets: ["WasmParser"]),
         .library(name: "WAT", targets: ["WAT"]),
@@ -39,16 +65,23 @@ let package = Package(
         .library(name: "_CabiShims", targets: ["_CabiShims"]),
     ],
     traits: [
-        .default(enabledTraits: ["FileSystem"]),
+        .default(enabledTraits: ["FileSystem", "MultiThread", "Disassembler"]),
         "FileSystem",
         "ComponentModel",
         "WasmDebuggingSupport",
         // Collects instruction-trigram statistics during execution and dumps
         // them to stderr on exit. Development-only diagnostics.
         "EngineStats",
+        // Serializes shared engine state with real locks. Disable only for
+        // single-threaded environments (e.g. bare-metal Embedded Swift) where
+        // the Synchronization module provides no Mutex.
+        "MultiThread",
+        // Textual instruction dumping (`wasmkit explore`).
+        "Disassembler",
     ],
     targets: [
         cliCommandsTarget,
+        cliCommandsTestTarget,
         .executableTarget(
             name: "CLI",
             dependencies: ["CLICommands"],
@@ -61,8 +94,6 @@ let package = Package(
                 "_CWasmKit",
                 "WasmParser",
                 "WasmTypes",
-                "SystemExtras",
-                .product(name: "SystemPackage", package: "swift-system"),
                 .target(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
@@ -73,7 +104,7 @@ let package = Package(
                 ),
             ],
             exclude: ["CMakeLists.txt"],
-            swiftSettings: swiftSettings
+            swiftSettings: engineSwiftSettings
         ),
         .target(name: "_CWasmKit"),
         .target(
@@ -82,10 +113,16 @@ let package = Package(
             path: "FuzzTesting/Sources/WasmKitFuzzing",
             swiftSettings: swiftSettings
         ),
+        .target(
+            name: "WASTRunner",
+            dependencies: ["WasmKit", "WAT", "WasmParser"],
+            exclude: ["CMakeLists.txt"],
+            swiftSettings: swiftSettings
+        ),
         .testTarget(
             name: "WasmKitTests",
-            dependencies: ["WasmKit", "WAT", "WasmKitFuzzing"],
-            exclude: ["ExtraSuite", "CMakeLists.txt"],
+            dependencies: ["WasmKit", "WAT", "WasmKitFuzzing", "WASTRunner"],
+            exclude: ["ExtraSuite"],
             swiftSettings: swiftSettings
         ),
 
@@ -109,6 +146,7 @@ let package = Package(
                     condition: .when(traits: ["ComponentModel"])
                 ),
                 "WAT",
+                "WASTRunner",
             ],
             swiftSettings: swiftSettings
         ),
@@ -117,10 +155,6 @@ let package = Package(
             name: "WasmParser",
             dependencies: [
                 "WasmTypes",
-                .product(
-                    name: "SystemPackage", package: "swift-system",
-                    condition: .when(traits: ["FileSystem"])
-                ),
                 .target(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
@@ -149,27 +183,30 @@ let package = Package(
             exclude: ["CMakeLists.txt"],
             swiftSettings: swiftSettings
         ),
+        .target(name: "CWasmKitWASIThreads"),
         .target(
-            name: "WASI",
-            dependencies: ["WasmTypes", "SystemExtras"],
+            name: "WasmKitWASIThreads",
+            dependencies: ["WasmKit", "CWasmKitWASIThreads"],
             exclude: ["CMakeLists.txt"],
             swiftSettings: swiftSettings
         ),
-        .testTarget(name: "WASITests", dependencies: ["WASI", "WasmKitWASI"], swiftSettings: swiftSettings),
-
+        .testTarget(
+            name: "WasmKitWASIThreadsTests",
+            dependencies: ["WasmKitWASIThreads", "WasmKit", "WAT", "CLICommands"],
+            exclude: ["Fixtures"],
+            swiftSettings: swiftSettings
+        ),
         .target(
-            name: "SystemExtras",
+            name: "WASI",
             dependencies: [
-                .product(name: "SystemPackage", package: "swift-system"),
-                .target(name: "CSystemExtras", condition: .when(platforms: [.wasi])),
+                "WasmTypes",
+                .target(name: "CWASIPlatform", condition: .when(platforms: [.wasi])),
             ],
             exclude: ["CMakeLists.txt"],
-            swiftSettings: swiftSettings + [
-                .define("SYSTEM_PACKAGE_DARWIN", .when(platforms: DarwinPlatforms))
-            ]
+            swiftSettings: swiftSettings
         ),
-
-        .target(name: "CSystemExtras"),
+        .target(name: "CWASIPlatform"),
+        .testTarget(name: "WASITests", dependencies: ["WASI", "WasmKitWASI"], swiftSettings: swiftSettings),
 
         // Component Model (CM)
 
@@ -179,7 +216,6 @@ let package = Package(
             dependencies: [
                 "WasmKit",
                 "WasmKitWASI",
-                .product(name: "SystemPackage", package: "swift-system"),
             ],
             swiftSettings: swiftSettings
         ),
@@ -280,10 +316,6 @@ let package = Package(
 
         .target(
             name: "GDBRemoteProtocol",
-            dependencies: [
-                .product(name: "Logging", package: "swift-log"),
-                .product(name: "NIOCore", package: "swift-nio"),
-            ],
             exclude: ["LICENSE.txt"],
             swiftSettings: swiftSettings
         ),
@@ -293,23 +325,34 @@ let package = Package(
             exclude: ["LICENSE.txt"],
             swiftSettings: swiftSettings
         ),
+
+        .target(
+            name: "WasmKitGDBHandler",
+            dependencies: [
+                "WASI",
+                "WasmKit",
+                "WasmKitWASI",
+                "GDBRemoteProtocol",
+            ],
+            exclude: ["LICENSE.txt"],
+            swiftSettings: swiftSettings
+        ),
+        .testTarget(
+            name: "WasmKitGDBHandlerTests",
+            dependencies: ["WasmKitGDBHandler", "WAT"],
+            swiftSettings: swiftSettings
+        ),
     ]
 )
 
 if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
     package.dependencies += [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.1"),
-        .package(url: "https://github.com/apple/swift-system", from: "1.7.2"),
-        .package(url: "https://github.com/apple/swift-nio", from: "2.90.0"),
-        .package(url: "https://github.com/apple/swift-log", from: "1.7.1"),
-        .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"604.0.0"),
+        .package(url: "https://github.com/swiftlang/swift-syntax", "600.0.0"..<"605.0.0"),
     ]
 } else {
     package.dependencies += [
         .package(path: "../swift-argument-parser"),
-        .package(path: "../swift-system"),
-        .package(path: "../swift-nio"),
-        .package(path: "../swift-log"),
         .package(path: "../swift-syntax"),
     ]
 }
@@ -345,26 +388,15 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
             swiftSettings: swiftSettings
         ),
 
-        .target(
-            name: "WasmKitGDBHandler",
-            dependencies: [
-                .product(name: "_NIOFileSystem", package: "swift-nio"),
-                .product(name: "NIOCore", package: "swift-nio"),
-                .product(name: "SystemPackage", package: "swift-system"),
-                "WasmKit",
-                "WasmKitWASI",
-                "GDBRemoteProtocol",
-            ],
-            exclude: ["LICENSE.txt"],
-            swiftSettings: swiftSettings
-        ),
     ])
 
-    cliCommandsTarget.dependencies.append(contentsOf: [
-        .product(name: "Logging", package: "swift-log", condition: .when(traits: ["WasmDebuggingSupport"])),
-        .product(name: "NIOCore", package: "swift-nio", condition: .when(traits: ["WasmDebuggingSupport"])),
-        .product(name: "NIOPosix", package: "swift-nio", condition: .when(traits: ["WasmDebuggingSupport"])),
+    cliCommandsTestTarget.dependencies.append(contentsOf: [
         .target(name: "GDBRemoteProtocol", condition: .when(traits: ["WasmDebuggingSupport"])),
         .target(name: "WasmKitGDBHandler", condition: .when(traits: ["WasmDebuggingSupport"])),
     ])
 #endif
+
+cliCommandsTarget.dependencies.append(contentsOf: [
+    .target(name: "GDBRemoteProtocol", condition: .when(traits: ["WasmDebuggingSupport"])),
+    .target(name: "WasmKitGDBHandler", condition: .when(traits: ["WasmDebuggingSupport"])),
+])

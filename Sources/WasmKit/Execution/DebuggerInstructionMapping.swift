@@ -7,53 +7,72 @@ struct DebuggerInstructionMapping {
         /// Used for handling current call stack requests issued by a ``Debugger`` instance.
         private var iseqToWasm = [Pc: Int]()
 
+        /// Map from iseq Pc to the start of its instruction run.
+        private var iseqToCanonicalWasm = [Pc: Int]()
+
         /// Mapping from Wasm instruction addresses in the original binary to iseq instruction addresses.
         /// Used for handling breakpoint requests issued by a ``Debugger`` instance.
         private var wasmToIseq = [Int: Pc]()
 
-        /// Last iseq slot per wasm address. A call with args lowers to prep slots then the call, all
-        /// sharing one wasm address; `wasmToIseq` keeps the first (a prep slot), this keeps the call.
-        private var lastWasmToIseq = [Int: Pc]()
-
-        /// Wasm addresses sorted in ascending order for binary search when of the next closest mapped
-        /// instruction, when no key is found in `wasmToIseqMapping`.
+        /// Sorted emitting Wasm addresses for binary search when an address has no direct mapping.
         private var wasmMappings = [Int]()
 
-        mutating func add(wasm: Int, iseq: Pc) {
+        /// Addresses of every Wasm instruction in the compiled functions, including those that
+        /// emitted no bytecode of their own: one sorted run per function, ordered by its first
+        /// address. Kept per function so that compiling one inserts a single element, wherever its
+        /// code lies among the functions compiled before it.
+        private var instructionAddresses = [[Int]]()
+
+        /// Mapped head slots of the compiled functions: one sorted run per function, ordered by its
+        /// first slot, with the end of the function's bytecode, just past its last slot.
+        private var headSlots = [(slots: [UInt], end: UInt)]()
+
+        mutating func add(canonical: Int, emitting: Int, iseq: Pc) {
             // Don't override the existing mapping, only store a new pair if there's no mapping for a given key.
             if self.iseqToWasm[iseq] == nil {
-                self.iseqToWasm[iseq] = wasm
+                self.iseqToWasm[iseq] = emitting
             }
-            if self.wasmToIseq[wasm] == nil {
-                self.wasmToIseq[wasm] = iseq
+            if self.iseqToCanonicalWasm[iseq] == nil {
+                self.iseqToCanonicalWasm[iseq] = canonical
             }
-            self.lastWasmToIseq[wasm] = iseq
+            if self.wasmToIseq[emitting] == nil {
+                self.wasmToIseq[emitting] = iseq
+            }
             // Insert in sorted order to maintain the binary search invariant.
             // With lazy compilation, functions may be compiled out of address order,
             // so simple append would break the sorted invariant.
-            if let last = self.wasmMappings.last, wasm > last {
+            if let last = self.wasmMappings.last, emitting > last {
                 // Fast path: appending in order (common within a single function)
-                self.wasmMappings.append(wasm)
-            } else if self.wasmMappings.last == wasm {
+                self.wasmMappings.append(emitting)
+            } else if self.wasmMappings.last == emitting {
                 // Duplicate of last entry, skip
             } else if self.wasmMappings.isEmpty {
-                self.wasmMappings.append(wasm)
+                self.wasmMappings.append(emitting)
             } else {
                 // Out-of-order insertion: find the sorted position
-                let insertionIndex = self.wasmMappings.firstIndex(where: { $0 >= wasm }) ?? self.wasmMappings.endIndex
-                if insertionIndex < self.wasmMappings.endIndex, self.wasmMappings[insertionIndex] == wasm {
+                let insertionIndex = self.wasmMappings.firstIndex(where: { $0 >= emitting }) ?? self.wasmMappings.endIndex
+                if insertionIndex < self.wasmMappings.endIndex, self.wasmMappings[insertionIndex] == emitting {
                     // Already present, skip
                 } else {
-                    self.wasmMappings.insert(wasm, at: insertionIndex)
+                    self.wasmMappings.insert(emitting, at: insertionIndex)
                 }
             }
         }
 
+        /// The bytecode slot for the Wasm instruction at exactly `address`, if it emitted any.
+        func iseq(forWasmAddress address: Int) -> Pc? {
+            self.wasmToIseq[address]
+        }
+
         /// Computes an address of WasmKit's iseq bytecode instruction that matches a given Wasm instruction address.
-        /// - Parameter address: the Wasm instruction to find a mapping for.
+        /// - Parameters:
+        ///   - address: the Wasm instruction to find a mapping for.
+        ///   - bound: Exclusive upper bound. Prevents resolving into a neighboring function.
         /// - Returns: A tuple with an address of found iseq instruction and the original Wasm instruction or next
         /// closest match if no direct match was found.
-        func findIseq(forWasmAddress address: Int) -> (iseq: Pc, wasm: Int)? {
+        func findIseq(forWasmAddress address: Int, before bound: Int) -> (iseq: Pc, wasm: Int)? {
+            guard address < bound else { return nil }
+
             // Look in the main mapping
             if let iseq = self.wasmToIseq[address] {
                 return (iseq, address)
@@ -61,6 +80,7 @@ struct DebuggerInstructionMapping {
 
             // If nothing found, find the closest Wasm address using binary search
             guard let nextAddress = self.wasmMappings.binarySearch(nextClosestTo: address),
+                nextAddress < bound,
                 // Look in the main mapping again with the next closest address if binary search produced anything
                 let iseq = self.wasmToIseq[nextAddress]
             else {
@@ -74,44 +94,93 @@ struct DebuggerInstructionMapping {
             self.iseqToWasm[pc]
         }
 
-        func lastIseq(forWasmAddress address: Int) -> Pc? {
-            self.lastWasmToIseq[address]
+        /// Start of the Wasm instruction run sharing this slot.
+        func firstWasm(forIseqAddress pc: Pc) -> Int? {
+            self.iseqToCanonicalWasm[pc]
+        }
+
+        /// Whether `pc` is the first head slot emitted for some Wasm address: where a breakpoint for
+        /// that address goes, and where a single step stops.
+        func isStopPoint(_ pc: Pc) -> Bool {
+            guard let wasm = self.iseqToWasm[pc] else { return false }
+            return self.wasmToIseq[wasm] == pc
+        }
+
+        /// Records the addresses of a function's Wasm instructions, in ascending order.
+        mutating func addInstructionAddresses(_ addresses: [Int]) {
+            guard let first = addresses.first else { return }
+            // Functions compile lazily, in any order, but never overlap.
+            let index = self.instructionAddresses.partitioningIndex { $0[0] >= first }
+            guard index == self.instructionAddresses.endIndex || self.instructionAddresses[index][0] != first else { return }
+            self.instructionAddresses.insert(addresses, at: index)
+        }
+
+        /// The address of the Wasm instruction that follows the one at `address`.
+        func instructionAddress(after address: Int) -> Int? {
+            let next = address + 1
+            let index = self.instructionAddresses.partitioningIndex { $0[0] > next }
+            if index > self.instructionAddresses.startIndex,
+                let found = self.instructionAddresses[index - 1].binarySearch(nextClosestTo: next)
+            {
+                return found
+            }
+            return index < self.instructionAddresses.endIndex ? self.instructionAddresses[index][0] : nil
+        }
+
+        /// Records the head slots of a function's bytecode, which ends just before `end`.
+        mutating func addHeadSlots(_ pcs: [Pc], end: Pc) {
+            let slots = pcs.map { UInt(bitPattern: $0) }.sorted()
+            guard let first = slots.first else { return }
+            // Functions compile lazily, in any order, into buffers that never overlap.
+            let index = self.headSlots.partitioningIndex { $0.slots[0] >= first }
+            guard index == self.headSlots.endIndex || self.headSlots[index].slots[0] != first else { return }
+            self.headSlots.insert((slots, UInt(bitPattern: end)), at: index)
+        }
+
+        /// The Wasm address that emitted the instruction `pc` lies in, or just past: the one whose
+        /// head slot is the last before `pc` in the same function. `nil` for code outside the compiled
+        /// functions, such as another instance's.
+        func findWasm(forIseqAddressWithin pc: Pc) -> Int? {
+            let pc = UInt(bitPattern: pc)
+            let function = self.headSlots.partitioningIndex { $0.slots[0] >= pc }
+            guard function > self.headSlots.startIndex else { return nil }
+            let (slots, end) = self.headSlots[function - 1]
+            // Just past the last slot still counts as the function's.
+            guard pc <= end else { return nil }
+            let head = slots[slots.partitioningIndex { $0 >= pc } - 1]
+            guard let head = Pc(bitPattern: head) else { return nil }
+            return self.iseqToWasm[head]
         }
     #endif
 }
 
 #if WasmDebuggingSupport
+    extension RandomAccessCollection {
+        /// Index of the first element for which `belongsInSecondPartition` is true, assuming
+        /// the collection is partitioned by that predicate.
+        func partitioningIndex(where belongsInSecondPartition: (Element) -> Bool) -> Index {
+            var low = self.startIndex
+            var high = self.endIndex
+            while low < high {
+                let middle = self.index(low, offsetBy: self.distance(from: low, to: high) / 2)
+                if belongsInSecondPartition(self[middle]) {
+                    high = middle
+                } else {
+                    low = self.index(after: middle)
+                }
+            }
+            return low
+        }
+    }
+
     extension [Int] {
         /// Uses binary search to find an element in `self` that's next closest to a given value.
         /// - Parameter value: the array element to search for or to use as a baseline when searching.
         /// - Returns: array element `result`, where `result - value` is the smallest possible, while
-        /// `result > value` also holds.
+        /// `result >= value` also holds.
         package func binarySearch(nextClosestTo value: Int) -> Int? {
-            switch self.count {
-            case 0:
-                return nil
-            default:
-                var slice = self[0..<self.count]
-                while let last = slice.last {
-                    guard last >= value else { return nil }
-
-                    let middle = slice.startIndex + (slice.endIndex - slice.startIndex) / 2
-                    guard middle > 0 else { break }
-
-                    if self[middle] < value {
-                        // Not found anything in the lower half, assigning higher half to `slice`.
-                        slice = slice[(middle + 1)..<slice.endIndex]
-                    } else if self[middle] > value && self[middle - 1] > value {
-                        // Not found anything in the higher half, assigning lower half to `slice`.
-                        slice = slice[slice.startIndex..<middle]
-                    } else {
-                        return self[middle]
-                    }
-                }
-
-                return self[slice.startIndex]
-            }
+            let index = self.partitioningIndex { $0 >= value }
+            return index < self.endIndex ? self[index] : nil
         }
     }
-
 #endif

@@ -1,150 +1,150 @@
-import Foundation
 import WasmParser
 import WasmTypes
 
 /// A visitor that emits WAT text for each WebAssembly instruction.
-/// Conforms to `AnyInstructionVisitor` to handle all instructions via a single switch.
 struct TextInstructionVisitor: AnyInstructionVisitor {
-    typealias VisitorError = Never
+    typealias VisitorError = WasmParserError
 
     var binaryOffset: Int = 0
 
     // MARK: - Context
 
-    /// Module-wide function names (function index → name).
-    let functionNames: [UInt32: String]
-    /// Module-wide global names (global index → name).
-    let globalNames: [UInt32: String]
-    /// Local variable names for the current function (local index → name).
-    let localNames: [UInt32: String]
+    let names: ModuleNames
+    let locals: IdentifierTable
+    /// Label ids by name-section label index, which numbers block, loop, if and
+    /// try_table in order of appearance.
+    let labelIds: [UInt32: String]
 
     // MARK: - Output
 
-    private var indentLevel: Int
+    private var indent: String
     private let append: (String) -> Void
 
     // MARK: - Label stack
 
-    /// Stack of labels pushed by block/loop/if. Empty at function body start.
-    private var labelStack: [String] = []
+    private struct OpenLabel {
+        let id: String?
+        /// Whether this is an `if` that has not had its `else` yet.
+        var acceptsElse: Bool
+    }
+
+    /// The labels in scope, innermost last.
+    private var labelStack: [OpenLabel] = []
+    private var nextLabelIndex: UInt32 = 0
 
     init(
-        functionNames: [UInt32: String],
-        globalNames: [UInt32: String],
-        localNames: [UInt32: String],
+        names: ModuleNames,
+        locals: IdentifierTable,
+        labelIds: [UInt32: String],
         indentLevel: Int,
         append: @escaping (String) -> Void
     ) {
-        self.functionNames = functionNames
-        self.globalNames = globalNames
-        self.localNames = localNames
-        self.indentLevel = indentLevel
+        self.names = names
+        self.locals = locals
+        self.labelIds = labelIds
+        self.indent = String(repeating: "  ", count: indentLevel)
         self.append = append
     }
 
     // MARK: - AnyInstructionVisitor
 
-    mutating func visit(_ instruction: Instruction) {
+    mutating func visit(_ instruction: Instruction) throws(WasmParserError) {
         switch instruction {
-        // ── Control ──────────────────────────────────────────────────────────
         case .unreachable:
             emit("unreachable")
         case .nop:
             emit("nop")
         case .block(let blockType):
-            let blockLabel = "block_\(labelStack.count)"
-            labelStack.append(blockLabel)
-            emit("block $\(blockLabel)\(blockTypeSuffix(blockType))")
-            indentLevel += 1
+            let label = pushLabel()
+            emit("block\(label)\(blockTypeSuffix(blockType))")
+            indent += "  "
         case .loop(let blockType):
-            let loopLabel = "loop_\(labelStack.count)"
-            labelStack.append(loopLabel)
-            emit("loop $\(loopLabel)\(blockTypeSuffix(blockType))")
-            indentLevel += 1
+            let label = pushLabel()
+            emit("loop\(label)\(blockTypeSuffix(blockType))")
+            indent += "  "
         case .if(let blockType):
-            let ifLabel = "if_\(labelStack.count)"
-            labelStack.append(ifLabel)
-            emit("if $\(ifLabel)\(blockTypeSuffix(blockType))")
-            indentLevel += 1
+            let label = pushLabel(acceptsElse: true)
+            emit("if\(label)\(blockTypeSuffix(blockType))")
+            indent += "  "
         case .else:
-            indentLevel -= 1
+            guard labelStack.last?.acceptsElse == true else {
+                throw WasmParserError("else outside an if", offset: binaryOffset)
+            }
+            labelStack[labelStack.count - 1].acceptsElse = false
+            indent.removeLast(2)
             emit("else")
-            indentLevel += 1
+            indent += "  "
         case .end:
             if labelStack.isEmpty {
-                // Function body end, represented by closing ')' in (func ...), skip.
+                // The function's own `end` is the closing paren of `(func ...)`.
                 return
             }
             labelStack.removeLast()
-            indentLevel -= 1
+            indent.removeLast(2)
             emit("end")
         case .br(let d):
-            emit("br \(labelText(d))")
+            emit("br \(labelReference(d))")
         case .brIf(let d):
-            emit("br_if \(labelText(d))")
+            emit("br_if \(labelReference(d))")
         case .brTable(let tbl):
-            var parts = tbl.labelIndices.map { labelText($0) }
-            parts.append(labelText(tbl.defaultIndex))
+            var parts = tbl.labelIndices.map { labelReference($0) }
+            parts.append(labelReference(tbl.defaultIndex))
             emit("br_table \(parts.joined(separator: " "))")
         case .return:
             emit("return")
         case .call(let fi):
-            emit("call \(funcRef(fi))")
+            emit("call \(names.functions.reference(fi))")
         case .callIndirect(let ti, let tbl):
-            emit("call_indirect \(tbl == 0 ? "" : "\(tbl) ")(type \(ti))")
+            emit("call_indirect\(tableSuffix(tbl)) (type \(names.types.reference(ti)))")
         case .returnCall(let fi):
-            emit("return_call \(funcRef(fi))")
+            emit("return_call \(names.functions.reference(fi))")
         case .returnCallIndirect(let ti, let tbl):
-            emit("return_call_indirect \(tbl == 0 ? "" : "\(tbl) ")(type \(ti))")
+            emit("return_call_indirect\(tableSuffix(tbl)) (type \(names.types.reference(ti)))")
         case .callRef(let ti):
-            emit("call_ref (type \(ti))")
+            emit("call_ref \(names.types.reference(ti))")
         case .returnCallRef(let ti):
-            emit("return_call_ref (type \(ti))")
+            emit("return_call_ref \(names.types.reference(ti))")
         case .drop:
             emit("drop")
         case .select:
             emit("select")
         case .typedSelect(let t):
-            emit("select (result \(valueTypeName(t)))")
+            emit("select (result \(names.valueType(t)))")
 
-        // ── Exception handling ─────────────────────────────────────────────────
         case .throw(let tagIndex):
-            emit("throw \(tagIndex)")
+            emit("throw \(names.tags.reference(tagIndex))")
         case .throwRef:
             emit("throw_ref")
         case .tryTable(let blockType, let tryCatch):
-            let label = "try_\(labelStack.count)"
-            // Format clauses before pushing the label: catch labels resolve in the
-            // enclosing scope (inverse of ExpressionParser.visitTryTable).
-            let clauses = tryCatch.catches.map { catchClauseText($0) }
-            let clausesSuffix = clauses.isEmpty ? "" : " " + clauses.joined(separator: " ")
-            emit("try_table $\(label)\(blockTypeSuffix(blockType))\(clausesSuffix)")
-            labelStack.append(label)
-            indentLevel += 1
+            // Catch labels resolve outside the try_table's own label, so format
+            // them before pushing it.
+            let clauses = tryCatch.catches.map { " " + catchClauseText($0) }.joined()
+            let label = pushLabel()
+            emit("try_table\(label)\(blockTypeSuffix(blockType))\(clauses)")
+            indent += "  "
 
-        // ── Variables ────────────────────────────────────────────────────────
         case .localGet(let i):
-            emit("local.get \(localRef(i))")
+            emit("local.get \(locals.reference(i))")
         case .localSet(let i):
-            emit("local.set \(localRef(i))")
+            emit("local.set \(locals.reference(i))")
         case .localTee(let i):
-            emit("local.tee \(localRef(i))")
+            emit("local.tee \(locals.reference(i))")
         case .globalGet(let i):
-            emit("global.get \(globalRef(i))")
+            emit("global.get \(names.globals.reference(i))")
         case .globalSet(let i):
-            emit("global.set \(globalRef(i))")
+            emit("global.set \(names.globals.reference(i))")
 
-        // ── Memory ───────────────────────────────────────────────────────────
         case .load(let kind, let m):
-            emit("\(generatedMnemonic(for: kind))\(memargText(m, defaultAlign: generatedDefaultAlign(for: kind)))")
+            let memarg = try memargText(m, defaultAlign: generatedDefaultAlign(for: kind))
+            emit("\(generatedMnemonic(for: kind))\(memarg)")
         case .store(let kind, let m):
-            emit("\(generatedMnemonic(for: kind))\(memargText(m, defaultAlign: generatedDefaultAlign(for: kind)))")
+            let memarg = try memargText(m, defaultAlign: generatedDefaultAlign(for: kind))
+            emit("\(generatedMnemonic(for: kind))\(memarg)")
         case .memorySize(let mem):
-            emit(mem == 0 ? "memory.size" : "memory.size \(mem)")
+            emit("memory.size\(memorySuffix(mem))")
         case .memoryGrow(let mem):
-            emit(mem == 0 ? "memory.grow" : "memory.grow \(mem)")
+            emit("memory.grow\(memorySuffix(mem))")
 
-        // ── Constants ────────────────────────────────────────────────────────
         case .i32Const(let v):
             emit("i32.const \(v)")
         case .i64Const(let v):
@@ -154,61 +154,63 @@ struct TextInstructionVisitor: AnyInstructionVisitor {
         case .f64Const(let v):
             emit("f64.const \(formatF64(v))")
 
-        // ── References ───────────────────────────────────────────────────────
         case .refNull(let ht):
-            emit("ref.null \(heapTypeName(ht))")
+            emit("ref.null \(names.heapType(ht))")
         case .refIsNull:
             emit("ref.is_null")
         case .refFunc(let fi):
-            emit("ref.func \(funcRef(fi))")
+            emit("ref.func \(names.functions.reference(fi))")
         case .refAsNonNull:
             emit("ref.as_non_null")
         case .brOnNull(let d):
-            emit("br_on_null \(labelText(d))")
+            emit("br_on_null \(labelReference(d))")
         case .brOnNonNull(let d):
-            emit("br_on_non_null \(labelText(d))")
+            emit("br_on_non_null \(labelReference(d))")
 
-        // ── Comparison ───────────────────────────────────────────────────────
         case .i32Eqz: emit("i32.eqz")
         case .i64Eqz: emit("i64.eqz")
         case .cmp(let op): emit(generatedMnemonic(for: op))
 
-        // ── Numeric ──────────────────────────────────────────────────────────
         case .unary(let op): emit(generatedMnemonic(for: op))
         case .binary(let op): emit(generatedMnemonic(for: op))
         case .conversion(let op): emit(generatedMnemonic(for: op))
 
-        // ── Bulk memory / table ──────────────────────────────────────────────
-        case .memoryInit(let di):
-            emit("memory.init \(di)")
+        case .memoryInit(let di, let mem):
+            emit("memory.init\(memorySuffix(mem)) \(names.data.reference(di))")
         case .dataDrop(let di):
-            emit("data.drop \(di)")
+            emit("data.drop \(names.data.reference(di))")
         case .memoryCopy(let dst, let src):
-            if dst == 0 && src == 0 { emit("memory.copy") } else { emit("memory.copy \(dst) \(src)") }
+            if dst == 0 && src == 0 {
+                emit("memory.copy")
+            } else {
+                emit("memory.copy \(names.memories.reference(dst)) \(names.memories.reference(src))")
+            }
         case .memoryFill(let mem):
-            emit(mem == 0 ? "memory.fill" : "memory.fill \(mem)")
+            emit("memory.fill\(memorySuffix(mem))")
         case .tableInit(let ei, let tbl):
-            emit("table.init \(tbl) \(ei)")
+            emit("table.init \(names.tables.reference(tbl)) \(names.elements.reference(ei))")
         case .elemDrop(let ei):
-            emit("elem.drop \(ei)")
+            emit("elem.drop \(names.elements.reference(ei))")
         case .tableCopy(let dst, let src):
-            if dst == 0 && src == 0 { emit("table.copy") } else { emit("table.copy \(dst) \(src)") }
+            if dst == 0 && src == 0 {
+                emit("table.copy")
+            } else {
+                emit("table.copy \(names.tables.reference(dst)) \(names.tables.reference(src))")
+            }
         case .tableFill(let tbl):
-            emit(tbl == 0 ? "table.fill" : "table.fill \(tbl)")
+            emit("table.fill\(tableSuffix(tbl))")
         case .tableGet(let tbl):
-            emit(tbl == 0 ? "table.get" : "table.get \(tbl)")
+            emit("table.get\(tableSuffix(tbl))")
         case .tableSet(let tbl):
-            emit(tbl == 0 ? "table.set" : "table.set \(tbl)")
+            emit("table.set\(tableSuffix(tbl))")
         case .tableGrow(let tbl):
-            emit(tbl == 0 ? "table.grow" : "table.grow \(tbl)")
+            emit("table.grow\(tableSuffix(tbl))")
         case .tableSize(let tbl):
-            emit(tbl == 0 ? "table.size" : "table.size \(tbl)")
+            emit("table.size\(tableSuffix(tbl))")
 
-        // ── Atomics ──────────────────────────────────────────────────────────
         case .atomicFence:
             emit("atomic.fence")
 
-        // ── SIMD ─────────────────────────────────────────────────────────────
         case .v128Const(let v):
             let bytes = v.bytes.map { String($0) }.joined(separator: " ")
             emit("v128.const i8x16 \(bytes)")
@@ -218,196 +220,87 @@ struct TextInstructionVisitor: AnyInstructionVisitor {
         case .simd(let op): emit(generatedMnemonic(for: op))
         case .simdLane(let op, let lane): emit("\(generatedMnemonic(for: op)) \(lane)")
         case .simdMemLane(let op, let m, let lane):
-            emit("\(generatedMnemonic(for: op))\(memargText(m, defaultAlign: generatedDefaultAlign(for: op))) \(lane)")
+            let memarg = try memargText(m, defaultAlign: generatedDefaultAlign(for: op))
+            emit("\(generatedMnemonic(for: op))\(memarg) \(lane)")
 
-        // ── Non-categorized memarg instructions ──────────────
+        // Atomic memory instructions; GC instructions have no printer.
         default:
-            if let (mnemonic, m, align) = generatedMemargInstruction(instruction) {
-                emit("\(mnemonic)\(memargText(m, defaultAlign: align))")
+            guard let (mnemonic, m, align) = generatedMemargInstruction(instruction) else {
+                throw WasmParserError("instruction not supported by wasm2wat", offset: binaryOffset)
             }
+            let memarg = try memargText(m, defaultAlign: align)
+            emit("\(mnemonic)\(memarg)")
         }
     }
 
     // MARK: - Emit helper
 
     private func emit(_ text: String) {
-        let indent = String(repeating: "  ", count: indentLevel)
-        append(indent + text + "\n")
+        append(indent)
+        append(text)
+        append("\n")
     }
 
     // MARK: - Label helpers
 
-    private func labelText(_ relativeDepth: UInt32) -> String {
-        let idx = Int(relativeDepth)
-        let stackIdx = labelStack.count - 1 - idx
-        if stackIdx >= 0 {
-            return "$\(labelStack[stackIdx])"
+    private mutating func pushLabel(acceptsElse: Bool = false) -> String {
+        let id = labelIds[nextLabelIndex]
+        nextLabelIndex += 1
+        labelStack.append(OpenLabel(id: id, acceptsElse: acceptsElse))
+        return id.map { " " + $0 } ?? ""
+    }
+
+    /// Uses the depth when the target has no id or an inner label shadows it.
+    private func labelReference(_ relativeDepth: UInt32) -> String {
+        guard relativeDepth < labelStack.count else { return String(relativeDepth) }
+        let position = labelStack.count - 1 - Int(relativeDepth)
+        guard let id = labelStack[position].id, !labelStack[(position + 1)...].contains(where: { $0.id == id }) else {
+            return String(relativeDepth)
         }
-        return "\(relativeDepth)"
+        return id
     }
 
     private func catchClauseText(_ clause: CatchClause) -> String {
         switch clause {
         case .catch(let tagIndex, let labelIndex):
-            return "(catch \(tagIndex) \(labelText(labelIndex)))"
+            return "(catch \(names.tags.reference(tagIndex)) \(labelReference(labelIndex)))"
         case .catchRef(let tagIndex, let labelIndex):
-            return "(catch_ref \(tagIndex) \(labelText(labelIndex)))"
+            return "(catch_ref \(names.tags.reference(tagIndex)) \(labelReference(labelIndex)))"
         case .catchAll(let labelIndex):
-            return "(catch_all \(labelText(labelIndex)))"
+            return "(catch_all \(labelReference(labelIndex)))"
         case .catchAllRef(let labelIndex):
-            return "(catch_all_ref \(labelText(labelIndex)))"
+            return "(catch_all_ref \(labelReference(labelIndex)))"
         }
     }
 
-    // MARK: - Name helpers
+    // MARK: - Operand helpers
 
-    private func funcRef(_ idx: UInt32) -> String {
-        if let name = functionNames[idx] { return "$\(name)" }
-        return "\(idx)"
+    private func memorySuffix(_ index: UInt32) -> String {
+        index == 0 ? "" : " " + names.memories.reference(index)
     }
 
-    private func globalRef(_ idx: UInt32) -> String {
-        if let name = globalNames[idx] { return "$\(name)" }
-        return "\(idx)"
+    private func tableSuffix(_ index: UInt32) -> String {
+        index == 0 ? "" : " " + names.tables.reference(index)
     }
-
-    private func localRef(_ idx: UInt32) -> String {
-        if let name = localNames[idx] { return "$\(name)" }
-        return "\(idx)"
-    }
-
-    // MARK: - BlockType suffix
 
     private func blockTypeSuffix(_ bt: BlockType) -> String {
         switch bt {
         case .empty: return ""
-        case .type(let vt): return " (result \(valueTypeName(vt)))"
-        case .funcType(let ti): return " (type \(ti))"
+        case .type(let vt): return " (result \(names.valueType(vt)))"
+        case .funcType(let ti): return " (type \(names.types.reference(ti)))"
         }
     }
 
-    // MARK: - MemArg
-
-    private func memargText(_ m: MemArg, defaultAlign: UInt32) -> String {
+    private func memargText(_ m: MemArg, defaultAlign: UInt32) throws(WasmParserError) -> String {
+        // `align=` takes a u32.
+        guard m.align < 32 else {
+            throw WasmParserError("alignment 2^\(m.align) has no text form", offset: binaryOffset)
+        }
         var parts: [String] = []
+        if m.memory != 0 { parts.append(names.memories.reference(m.memory)) }
         if m.offset != 0 { parts.append("offset=\(m.offset)") }
-        if m.align != defaultAlign { parts.append("align=\(1 << m.align)") }
+        if m.align != defaultAlign { parts.append("align=\(UInt32(1) << m.align)") }
         if parts.isEmpty { return "" }
         return " " + parts.joined(separator: " ")
     }
-
-}
-
-// MARK: - Module-level formatting helpers (used by both WatPrinter and TextInstructionVisitor)
-
-func valueTypeName(_ vt: ValueType) -> String {
-    switch vt {
-    case .i32: return "i32"
-    case .i64: return "i64"
-    case .f32: return "f32"
-    case .f64: return "f64"
-    case .v128: return "v128"
-    case .ref(let rt):
-        return refTypeName(rt)
-    }
-}
-
-func refTypeName(_ rt: ReferenceType) -> String {
-    let base = heapTypeName(rt.heapType)
-    if rt.isNullable {
-        // funcref and externref are canonical shorthands
-        if rt.heapType == .funcRef { return "funcref" }
-        if rt.heapType == .externRef { return "externref" }
-        return "(ref null \(base))"
-    }
-    return "(ref \(base))"
-}
-
-func heapTypeName(_ ht: HeapType) -> String {
-    switch ht {
-    case .abstract(let abs):
-        switch abs {
-        case .funcRef: return "func"
-        case .externRef: return "extern"
-        case .exnRef: return "exn"
-        }
-    case .concrete(let ti):
-        return "\(ti)"
-    }
-}
-
-func formatF32(_ v: IEEE754.Float32) -> String {
-    let f = Float32(bitPattern: v.bitPattern)
-    if f.isNaN {
-        // Preserve NaN payload for exact round-trip.
-        let payload = v.bitPattern & 0x7FFFFF
-        let signStr = (v.bitPattern & 0x8000_0000) != 0 ? "-" : ""
-        if payload == 0x400000 {
-            return "\(signStr)nan"  // canonical NaN
-        }
-        return "\(signStr)nan:0x\(String(payload, radix: 16))"
-    }
-    if f.isInfinite { return f > 0 ? "inf" : "-inf" }
-    // Use hex float for exact round-trip.
-    return hexFloat32(v.bitPattern)
-}
-
-func formatF64(_ v: IEEE754.Float64) -> String {
-    let f = Double(bitPattern: v.bitPattern)
-    if f.isNaN {
-        let payload = v.bitPattern & 0x000F_FFFF_FFFF_FFFF
-        let signStr = (v.bitPattern & 0x8000_0000_0000_0000) != 0 ? "-" : ""
-        if payload == 0x0008_0000_0000_0000 {
-            return "\(signStr)nan"  // canonical NaN
-        }
-        return "\(signStr)nan:0x\(String(payload, radix: 16))"
-    }
-    if f.isInfinite { return f > 0 ? "inf" : "-inf" }
-    return hexFloat64(v.bitPattern)
-}
-
-/// Formats a 32-bit float bit pattern as a WAT hex float string.
-private func hexFloat32(_ bits: UInt32) -> String {
-    let sign = (bits >> 31) != 0 ? "-" : ""
-    let exp = Int((bits >> 23) & 0xFF)
-    let mantissa = bits & 0x7FFFFF
-
-    if exp == 0 {
-        // Subnormal or zero
-        if mantissa == 0 { return "\(sign)0x0p+0" }
-        // Subnormal: no implicit leading 1
-        return "\(sign)0x\(String(mantissa, radix: 16))p-149"
-    }
-    // Normal: exponent biased by 127, implicit leading 1
-    let e = exp - 127
-    // f32 mantissa is 23 bits; shift left by 1 to fill 24 bits (6 hex digits).
-    let mantHex = String(format: "%06x", mantissa << 1)
-    // Trim trailing zeros
-    let trimmed =
-        mantHex.hasSuffix("000000")
-        ? String(mantHex.dropLast(6))
-        : mantHex.hasSuffix("0000") ? String(mantHex.dropLast(4)) : mantHex.hasSuffix("00") ? String(mantHex.dropLast(2)) : mantHex.hasSuffix("0") ? String(mantHex.dropLast(1)) : mantHex
-    let mant = trimmed.isEmpty ? "" : ".\(trimmed)"
-    let eSign = e >= 0 ? "+" : ""
-    return "\(sign)0x1\(mant)p\(eSign)\(e)"
-}
-
-/// Formats a 64-bit float bit pattern as a WAT hex float string.
-private func hexFloat64(_ bits: UInt64) -> String {
-    let sign = (bits >> 63) != 0 ? "-" : ""
-    let exp = Int((bits >> 52) & 0x7FF)
-    let mantissa = bits & 0x000F_FFFF_FFFF_FFFF
-
-    if exp == 0 {
-        if mantissa == 0 { return "\(sign)0x0p+0" }
-        return "\(sign)0x\(String(mantissa, radix: 16))p-1074"
-    }
-    let e = exp - 1023
-    // Use Swift's native radix formatting to avoid %x truncating UInt64 to 32 bits.
-    let rawHex = String(mantissa, radix: 16)
-    let mantHex = String(repeating: "0", count: max(0, 13 - rawHex.count)) + rawHex
-    let trimmed = String(mantHex.reversed().drop(while: { $0 == "0" }).reversed())
-    let mant = trimmed.isEmpty ? "" : ".\(trimmed)"
-    let eSign = e >= 0 ? "+" : ""
-    return "\(sign)0x1\(mant)p\(eSign)\(e)"
 }

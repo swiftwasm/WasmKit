@@ -27,6 +27,7 @@ package struct GDBHostCommand: Equatable {
         case vContSupportedActions
         case isVAttachOrWaitSupported
         case enableErrorStrings
+        case setDetachOnError
         case processInfo
         case currentThreadID
         case firstThreadInfo
@@ -37,6 +38,7 @@ package struct GDBHostCommand: Equatable {
         case transfer
         case readMemoryBinaryData
         case readMemory
+        case writeMemory
         case wasmCallStack
         case threadStopInfo
         case symbolLookup
@@ -76,6 +78,8 @@ package struct GDBHostCommand: Equatable {
                 self = .isVAttachOrWaitSupported
             case "QEnableErrorStrings":
                 self = .enableErrorStrings
+            case "QSetDetachOnError":
+                self = .setDetachOnError
             case "qProcessInfo":
                 self = .processInfo
             case "qC":
@@ -145,6 +149,11 @@ package struct GDBHostCommand: Equatable {
         .init(
             kind: .readMemory,
             prefix: "m"
+        ),
+        .init(
+            kind: .writeMemory,
+            prefix: "M",
+            argumentsContainColonDelimiter: true
         ),
         .init(
             kind: .insertSoftwareBreakpoint,

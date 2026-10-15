@@ -1,7 +1,8 @@
 import ArgumentParser
-import SystemExtras
-import SystemPackage
+import Foundation
+import WASI
 import WAT
+import WasmTypes
 
 #if ComponentModel
     private let wat2wasmDiscussion = """
@@ -79,52 +80,29 @@ package struct Wat2wasm: ParsableCommand {
     package init() {}
 
     package func run() throws {
-        let filePath = FilePath(path)
-        guard filePath.extension == "wat" else { throw Error.unknownFileExtension(filePath.extension) }
-        let fileHandle = try FileDescriptor.open(filePath, .readOnly)
+        let fileURL = URL(fileURLWithPath: path)
+        guard fileURL.pathExtension == "wat" else { throw Error.unknownFileExtension(fileURL.pathExtension) }
+        let wat = try String(contentsOfFile: path, encoding: .utf8)
+
+        let wasm = try wat2wasm(wat, options: EncodeOptions(nameSection: nameSection))
+
+        let outputPath: String
+
+        if let output {
+            outputPath = output
+        } else {
+            outputPath = fileURL.deletingPathExtension().appendingPathExtension("wasm").path
+
+            guard !FileManager.default.fileExists(atPath: outputPath) else {
+                throw Error.fileAlreadyExists(outputPath)
+            }
+        }
+
+        let outputHandle = try CLIFile.createWrite(outputPath)
         try withThrowing {
-            let size = try fileHandle.seek(offset: 0, from: .end)
-
-            let wat: String
-            if #available(macOS 11.0, iOS 14.0, macCatalyst 14.0, tvOS 14.0, visionOS 1.0, watchOS 7.0, *) {
-                wat = try String(unsafeUninitializedCapacity: Int(size)) {
-                    try fileHandle.read(fromAbsoluteOffset: 0, into: .init($0))
-                }
-            } else {
-                let watBuffer = try [UInt8](unsafeUninitializedCapacity: Int(size)) { buffer, count in
-                    count = try fileHandle.read(fromAbsoluteOffset: 0, into: .init(buffer))
-                }
-                wat = String(decoding: watBuffer, as: UTF8.self)
-            }
-
-            let wasm = try wat2wasm(wat, options: EncodeOptions(nameSection: nameSection))
-
-            var outputPath: FilePath
-
-            if let output {
-                outputPath = FilePath(output)
-            } else {
-                outputPath = filePath
-                outputPath.extension = "wasm"
-
-                guard (try? FileDescriptor.open(outputPath, .readOnly)) == nil else {
-                    throw Error.fileAlreadyExists(outputPath.string)
-                }
-            }
-
-            let outputHandle = try FileDescriptor.open(
-                outputPath,
-                .writeOnly,
-                options: [.create],
-                permissions: [.ownerReadWrite, .groupRead, .otherRead]
-            )
-            try withThrowing {
-                try outputHandle.writeAll(wasm)
-            } defer: {
-                try outputHandle.close()
-            }
+            try outputHandle.writeAll(wasm)
         } defer: {
-            try fileHandle.close()
+            try outputHandle.close()
         }
     }
 }

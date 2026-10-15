@@ -503,9 +503,11 @@
             let byteCount = UInt32(utf8Bytes.count)
 
             // Allocate memory: realloc(old_ptr=0, old_size=0, align=1, new_size)
+            var stack = ExecutionStack(engine: store.engine)
             let allocResult = try realloc.invoke(
                 [.i32(0), .i32(0), .i32(1), .i32(byteCount)],
-                store: store
+                store: store,
+                stack: &stack
             )
             guard case .i32(let pointer) = allocResult.first else {
                 throw CanonicalABIError(description: "realloc did not return i32 pointer")
@@ -526,9 +528,11 @@
             let byteCount = codeUnitCount * 2
 
             // Allocate memory: realloc(old_ptr=0, old_size=0, align=2, new_size)
+            var stack = ExecutionStack(engine: store.engine)
             let allocResult = try realloc.invoke(
                 [.i32(0), .i32(0), .i32(2), .i32(byteCount)],
-                store: store
+                store: store,
+                stack: &stack
             )
             guard case .i32(let pointer) = allocResult.first else {
                 throw CanonicalABIError(description: "realloc did not return i32 pointer")
@@ -549,9 +553,11 @@
                 let byteCount = UInt32(latin1Bytes.count)
 
                 // Allocate memory: realloc(old_ptr=0, old_size=0, align=2, new_size)
+                var stack = ExecutionStack(engine: store.engine)
                 let allocResult = try realloc.invoke(
                     [.i32(0), .i32(0), .i32(2), .i32(byteCount)],
-                    store: store
+                    store: store,
+                    stack: &stack
                 )
                 guard case .i32(let pointer) = allocResult.first else {
                     throw CanonicalABIError(description: "realloc did not return i32 pointer")
@@ -572,9 +578,11 @@
                 let byteCount = codeUnitCount * 2
 
                 // Allocate memory: realloc(old_ptr=0, old_size=0, align=2, new_size)
+                var stack = ExecutionStack(engine: store.engine)
                 let allocResult = try realloc.invoke(
                     [.i32(0), .i32(0), .i32(2), .i32(byteCount)],
-                    store: store
+                    store: store,
+                    stack: &stack
                 )
                 guard case .i32(let pointer) = allocResult.first else {
                     throw CanonicalABIError(description: "realloc did not return i32 pointer")
@@ -614,9 +622,11 @@
         let totalBytes = elementSize * Int(elementCount)
 
         // Allocate memory: realloc(old_ptr=0, old_size=0, align, new_size)
+        var stack = ExecutionStack(engine: store.engine)
         let allocResult = try realloc.invoke(
             [.i32(0), .i32(0), .i32(UInt32(alignment)), .i32(UInt32(totalBytes))],
-            store: store
+            store: store,
+            stack: &stack
         )
         guard case .i32(let pointer) = allocResult.first else {
             throw CanonicalABIError(description: "realloc did not return i32 pointer")

@@ -1,5 +1,4 @@
-import Synchronization
-import SystemPackage
+import WasmTypes
 
 /// A bridge that connects WebAssembly System Interface (WASI) calls to the host system.
 ///
@@ -21,7 +20,8 @@ import SystemPackage
 /// ```
 public final class WASIBridgeToHost: Sendable {
     internal let underlying: WASIImplementation
-    private let isClosed = Mutex(false)
+    // See `WASIImplementation.fdTable` for why this is a `nonisolated(unsafe) var`.
+    nonisolated(unsafe) private var isClosed = PlatformMutex(false)
 
     /// A preopened directory mapping from a guest path to a host path.
     ///
@@ -60,26 +60,67 @@ public final class WASIBridgeToHost: Sendable {
             return FileSystemOptions(factory: { fileSystem })
         }
 
+        /// Creates file system options backed by a custom ``FileSystemImplementation``.
+        ///
+        /// Use this to run WASI guests on platforms where the built-in host
+        /// file system is unavailable (e.g. embedded systems), by providing
+        /// your own implementation of the platform-independent
+        /// ``FileSystemImplementation`` protocol.
+        ///
+        /// - Parameter factory: A closure creating the file system implementation.
+        /// - Returns: A configured `FileSystemOptions` instance using the custom file system.
+        @_spi(WASIPlatform) public static func custom(_ factory: @escaping () throws -> any FileSystemImplementation) -> FileSystemOptions {
+            return FileSystemOptions(factory: factory)
+        }
+
         /// Configures the file system options with custom standard I/O streams.
         ///
         /// This method allows you to redirect stdin, stdout, and stderr to different
         /// file descriptors than the system defaults.
         ///
         /// - Parameters:
-        ///   - stdin: The file descriptor to use for standard input. Defaults to `.standardInput`.
-        ///   - stdout: The file descriptor to use for standard output. Defaults to `.standardOutput`.
-        ///   - stderr: The file descriptor to use for standard error. Defaults to `.standardError`.
+        ///   - stdin: A caller-owned platform file descriptor for standard input.
+        ///     Defaults to `0`. Stdio descriptors are borrowed: WASI never closes them.
+        ///   - stdout: A caller-owned platform file descriptor for standard output. Defaults to `1`.
+        ///   - stderr: A caller-owned platform file descriptor for standard error. Defaults to `2`.
         /// - Returns: A new `FileSystemOptions` instance with the configured standard I/O streams.
         public func withStdio(
-            stdin: FileDescriptor = .standardInput,
-            stdout: FileDescriptor = .standardOutput,
-            stderr: FileDescriptor = .standardError
+            stdin: CInt = 0,
+            stdout: CInt = 1,
+            stderr: CInt = 2
         ) -> FileSystemOptions {
             var options = self
             options.initializeStdio = { fdTable in
-                fdTable[0] = .file(StdioFileEntry(fd: stdin, accessMode: .read))
-                fdTable[1] = .file(StdioFileEntry(fd: stdout, accessMode: .write))
-                fdTable[2] = .file(StdioFileEntry(fd: stderr, accessMode: .write))
+                fdTable[0] = .file(StdioFileEntry(fd: FileDescriptor(rawValue: stdin), accessMode: .read))
+                fdTable[1] = .file(StdioFileEntry(fd: FileDescriptor(rawValue: stdout), accessMode: .write))
+                fdTable[2] = .file(StdioFileEntry(fd: FileDescriptor(rawValue: stderr), accessMode: .write))
+            }
+            return options
+        }
+
+        /// Configures the file system options with custom standard I/O resources.
+        ///
+        /// Unlike the file-descriptor-based overload, this accepts arbitrary
+        /// ``WASIFile`` implementations, so standard I/O can be routed to
+        /// anything (e.g. a UART on an embedded system). The entries are
+        /// treated as borrowed and are not closed by WASI unless their
+        /// `isBorrowed` returns `false`.
+        ///
+        /// - Parameters:
+        ///   - stdin: The resource serving file descriptor 0.
+        ///   - stdout: The resource serving file descriptor 1.
+        ///   - stderr: The resource serving file descriptor 2.
+        /// - Returns: A new `FileSystemOptions` instance with the configured standard I/O streams.
+        @_spi(WASIPlatform) public func withStdio(
+            stdin: any WASIFile,
+            stdout: any WASIFile,
+            stderr: any WASIFile
+        ) -> FileSystemOptions {
+            var options = self
+            options.initializeStdio = { fdTable in
+                fdTable[0] = .file(stdin)
+                fdTable[1] = .file(stdout)
+                fdTable[2] = .file(stderr)
             }
             return options
         }
@@ -105,7 +146,25 @@ public final class WASIBridgeToHost: Sendable {
     ///
     /// This property provides access to the underlying host module implementations,
     /// which can be used to register with a WebAssembly runtime.
-    public var wasiHostModules: [String: WASIHostModule] { underlying._hostModules }
+    public func wasiHostModules<M: GuestMemory & SendableMetatype>(_: M.Type = M.self) -> [String: WASIHostModule<M>] {
+        [
+            "wasi_snapshot_preview1": WASIHostModule(
+                functions: hostFunctions(capabilities: WASICapability<M>.all)
+            )
+        ]
+    }
+
+    /// The `wasi_snapshot_preview1` functions provided by `capabilities`.
+    ///
+    /// - Parameter stubUnlinked: When true (the default), preview1 functions no
+    ///   linked capability provides are defined as stubs returning `ENOSYS`, so
+    ///   a guest that merely imports them still instantiates.
+    public func hostFunctions<M: GuestMemory & SendableMetatype>(
+        capabilities: [WASICapability<M>],
+        stubUnlinked: Bool = true
+    ) -> [String: WASIHostFunction<M>] {
+        underlying.functions(for: capabilities, stubUnlinked: stubUnlinked)
+    }
 
     /// Closes all owned file descriptors (preopened directories and any
     /// guest-opened files that were not closed by the WASI program).
@@ -125,14 +184,13 @@ public final class WASIBridgeToHost: Sendable {
     ///
     /// - Parameter body: A closure that receives the bridge and returns a value.
     /// - Returns: The value returned by `body`.
+    /// - Throws: `body`'s error, or the error from closing when `body` succeeded. When both fail, the
+    ///   error carries both failures.
     public func runAndClose<R>(_ body: (WASIBridgeToHost) throws -> R) throws -> R {
-        do {
-            let result = try body(self)
+        try withThrowing {
+            try body(self)
+        } defer: {
             try close()
-            return result
-        } catch {
-            try close()
-            throw error
         }
     }
 
@@ -150,9 +208,10 @@ public final class WASIBridgeToHost: Sendable {
     ///   - args: Command-line arguments to pass to the WASI module. Defaults to an empty array.
     ///   - environment: Environment variables to expose to the WASI module. Defaults to an empty dictionary.
     ///   - preopens: Pre-opened directories mapping guest paths to host paths. Defaults to an empty dictionary.
-    ///   - stdin: File descriptor for standard input. Defaults to `.standardInput`.
-    ///   - stdout: File descriptor for standard output. Defaults to `.standardOutput`.
-    ///   - stderr: File descriptor for standard error. Defaults to `.standardError`.
+    ///   - stdin: Caller-owned platform file descriptor for standard input. Defaults to `0`.
+    ///     Stdio descriptors are borrowed: WASI never closes them.
+    ///   - stdout: Caller-owned platform file descriptor for standard output. Defaults to `1`.
+    ///   - stderr: Caller-owned platform file descriptor for standard error. Defaults to `2`.
     ///   - wallClock: Clock for wall-clock time queries. Defaults to `SystemWallClock()`.
     ///   - monotonicClock: Clock for monotonic time queries. Defaults to `SystemMonotonicClock()`.
     ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
@@ -163,9 +222,9 @@ public final class WASIBridgeToHost: Sendable {
         args: [String] = [],
         environment: [String: String] = [:],
         preopens: [String: String] = [:],
-        stdin: FileDescriptor = .standardInput,
-        stdout: FileDescriptor = .standardOutput,
-        stderr: FileDescriptor = .standardError,
+        stdin: CInt = 0,
+        stdout: CInt = 1,
+        stderr: CInt = 2,
         wallClock: WallClock = SystemWallClock(),
         monotonicClock: MonotonicClock = SystemMonotonicClock(),
         randomGenerator: RandomBufferGenerator = SystemRandomNumberGenerator()
@@ -193,9 +252,10 @@ public final class WASIBridgeToHost: Sendable {
     ///   - args: Command-line arguments to pass to the WASI module. Defaults to an empty array.
     ///   - environment: Environment variables to expose to the WASI module. Defaults to an empty dictionary.
     ///   - preopens: Pre-opened directories mapping guest paths to host paths. Defaults to an empty array.
-    ///   - stdin: File descriptor for standard input. Defaults to `.standardInput`.
-    ///   - stdout: File descriptor for standard output. Defaults to `.standardOutput`.
-    ///   - stderr: File descriptor for standard error. Defaults to `.standardError`.
+    ///   - stdin: Caller-owned platform file descriptor for standard input. Defaults to `0`.
+    ///     Stdio descriptors are borrowed: WASI never closes them.
+    ///   - stdout: Caller-owned platform file descriptor for standard output. Defaults to `1`.
+    ///   - stderr: Caller-owned platform file descriptor for standard error. Defaults to `2`.
     ///   - wallClock: Clock for wall-clock time queries. Defaults to `SystemWallClock()`.
     ///   - monotonicClock: Clock for monotonic time queries. Defaults to `SystemMonotonicClock()`.
     ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
@@ -204,9 +264,9 @@ public final class WASIBridgeToHost: Sendable {
         args: [String] = [],
         environment: [String: String] = [:],
         preopens: [Preopen] = [],
-        stdin: FileDescriptor = .standardInput,
-        stdout: FileDescriptor = .standardOutput,
-        stderr: FileDescriptor = .standardError,
+        stdin: CInt = 0,
+        stdout: CInt = 1,
+        stderr: CInt = 2,
         wallClock: WallClock = SystemWallClock(),
         monotonicClock: MonotonicClock = SystemMonotonicClock(),
         randomGenerator: RandomBufferGenerator = SystemRandomNumberGenerator()
@@ -240,9 +300,14 @@ public final class WASIBridgeToHost: Sendable {
             monotonicClock: monotonicClock,
             randomGenerator: randomGenerator
         )
-        try underlying.fdTable.withLock { table in
-            try fileSystemOptions.initializeStdio?(&table)
-            try fileSystemOptions.initializePreopens?(fileSystem, &table)
+        do {
+            try underlying.fdTable.withLock { table in
+                try fileSystemOptions.initializeStdio?(&table)
+                try fileSystemOptions.initializePreopens?(fileSystem, &table)
+            }
+        } catch {
+            // A throw here runs `deinit`, whose precondition requires `close()`, so release what was opened.
+            throw CleanupFailure.preserving(error, cleanup: close)
         }
     }
 

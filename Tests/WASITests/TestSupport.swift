@@ -1,6 +1,6 @@
 import Foundation
 
-@testable import WASI
+@_spi(WASIPlatform) @testable import WASI
 @testable import WasmKit
 
 #if canImport(Darwin)
@@ -9,12 +9,65 @@ import Foundation
     import Glibc
 #elseif canImport(Musl)
     import Musl
+#elseif os(Windows)
+    import ucrt
 #endif
 
-#if canImport(System)
-    import SystemPackage
-#endif
 enum TestSupport {
+    /// Opening a host directory as a preopen returns `EACCES` on Windows, so
+    /// tests that need one run against the in-memory filesystem only there.
+    static var hostPreopensUnavailable: Bool {
+        #if os(Windows)
+            return true
+        #else
+            return false
+        #endif
+    }
+
+    /// `poll_oneoff` is `ENOTSUP` on Windows.
+    static var pollUnavailable: Bool { hostPreopensUnavailable }
+
+    /// `true` selects a host-backed filesystem, `false` the in-memory one.
+    static var fileSystemBackings: [Bool] {
+        hostPreopensUnavailable ? [false] : [true, false]
+    }
+
+    #if os(macOS) || os(Linux)
+        /// Comparing paths rather than descriptor counts keeps assertions immune to whatever tests
+        /// run in parallel.
+        static func openDescriptorPaths() throws -> Set<String> {
+            #if os(macOS)
+                let fdDirectory = "/dev/fd"
+            #else
+                let fdDirectory = "/proc/self/fd"
+            #endif
+            var paths: Set<String> = []
+            for entry in try FileManager.default.contentsOfDirectory(atPath: fdDirectory) {
+                var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+                #if os(macOS)
+                    guard let fd = Int32(entry), fcntl(fd, F_GETPATH, &buffer) != -1 else { continue }
+                #else
+                    let length = readlink("\(fdDirectory)/\(entry)", &buffer, buffer.count - 1)
+                    guard length > 0 else { continue }
+                    buffer[length] = 0
+                #endif
+                paths.insert(string(fromCString: buffer))
+            }
+            return paths
+        }
+
+        /// `realpath`, not `URL.resolvingSymlinksInPath()`: the latter leaves a macOS temp path under
+        /// `/var/folders`, while the kernel reports descriptors under `/private/var/folders`.
+        static func realPath(_ path: String) throws -> String {
+            var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+            guard realpath(path, &buffer) != nil else { throw Error(errno: errno) }
+            return string(fromCString: buffer)
+        }
+
+        private static func string(fromCString buffer: [CChar]) -> String {
+            String(decoding: buffer.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        }
+    #endif
 
     struct Error: Swift.Error, CustomStringConvertible {
         let description: String
@@ -52,6 +105,10 @@ enum TestSupport {
 
         func write(_ bytes: [UInt8], at offset: UInt) {
             data.replaceSubrange(Int(offset)..<Int(offset) + bytes.count, with: bytes)
+        }
+
+        func read(count: Int, at offset: UInt = 0) -> [UInt8] {
+            Array(data[Int(offset)..<Int(offset) + count])
         }
 
         func writeIOVecs(_ buffers: [[UInt8]]) -> UnsafeGuestBufferPointer<WASIAbi.IOVec> {
@@ -180,10 +237,32 @@ enum TestSupport {
             )
         }
 
-        #if canImport(System)
-            func openFile(at relativePath: String, _ mode: FileDescriptor.AccessMode) throws -> FileDescriptor {
+        #if !os(WASI)
+            /// An opened host file exposing a raw platform file descriptor for
+            /// descriptor-based APIs, opened through the WASI module's own
+            /// platform layer so tests share its cross-platform open path.
+            struct OpenedFile {
+                private let fd: WASI.FileDescriptor
+                var fileDescriptor: CInt { fd.rawValue }
+
+                init(fd: WASI.FileDescriptor) {
+                    self.fd = fd
+                }
+
+                func close() throws {
+                    try fd.close()
+                }
+            }
+
+            /// Opens a file and returns an ``OpenedFile`` carrying a raw
+            /// platform file descriptor.
+            func openFile(at relativePath: String, _ mode: WASI.FileDescriptor.AccessMode) throws -> OpenedFile {
                 let fileURL = url.appendingPathComponent(relativePath)
-                return try FileDescriptor.open(fileURL.path, mode)
+                do {
+                    return OpenedFile(fd: try WASI.FileDescriptor.open(fileURL.path, mode))
+                } catch {
+                    throw Error(description: "Failed to open \(fileURL.path): \(error)")
+                }
             }
         #endif
 

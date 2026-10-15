@@ -1,6 +1,3 @@
-import Synchronization
-import SystemExtras
-import SystemPackage
 import WasmTypes
 
 /// A `WASIFile` for regular files.
@@ -12,19 +9,20 @@ final class MemoryFileEntry: WASIFile {
     let fileNode: MemoryFileNode
     let fileSystem: MemoryFileSystem
     let accessMode: FileAccessMode
-    let position: Mutex<Int>
+    // See `WASIImplementation.fdTable` for why this is a `nonisolated(unsafe) var`.
+    nonisolated(unsafe) var position: PlatformMutex<Int>
 
     init(fileNode: MemoryFileNode, fileSystem: MemoryFileSystem, accessMode: FileAccessMode, position: Int = 0) {
         self.fileNode = fileNode
         self.fileSystem = fileSystem
         self.accessMode = accessMode
-        self.position = Mutex(position)
+        self.position = PlatformMutex(position)
     }
 
     // MARK: - WASIEntry
 
     func attributes() throws -> WASIAbi.Filestat {
-        let timestamps = try fileNode.timestamps
+        let timestamps = fileNode.timestamps
         return WASIAbi.Filestat(
             dev: 0, ino: 0, filetype: .REGULAR_FILE,
             nlink: 1, size: WASIAbi.FileSize(try fileNode.size),
@@ -63,31 +61,7 @@ final class MemoryFileEntry: WASIFile {
             newMtim = nil
         }
 
-        // nil means the times were applied in memory; a non-nil handle is a host
-        // fd whose times we set below.
-        guard let handle = fileNode.setTimesInMemory(atim: newAtim, mtim: newMtim) else {
-            return
-        }
-
-        let accessTime: FileTime
-        if fstFlags.contains(.ATIM) {
-            accessTime = FileTime(seconds: Int(atim / 1_000_000_000), nanoseconds: Int(atim % 1_000_000_000))
-        } else if fstFlags.contains(.ATIM_NOW) {
-            accessTime = .now
-        } else {
-            accessTime = .omit
-        }
-
-        let modTime: FileTime
-        if fstFlags.contains(.MTIM) {
-            modTime = FileTime(seconds: Int(mtim / 1_000_000_000), nanoseconds: Int(mtim % 1_000_000_000))
-        } else if fstFlags.contains(.MTIM_NOW) {
-            modTime = .now
-        } else {
-            modTime = .omit
-        }
-
-        try handle.setTimes(access: accessTime, modification: modTime)
+        fileNode.setTimes(atim: newAtim, mtim: newMtim)
     }
 
     func advise(
@@ -161,13 +135,19 @@ final class MemoryFileEntry: WASIFile {
                 return WASIAbi.FileSize(result)
             }
 
-            let newPosition: Int
+            let base: Int
             switch whence {
-            case .SET: newPosition = Int(offset)
-            case .CUR: newPosition = pos + Int(offset)
-            case .END: newPosition = prep.byteCount + Int(offset)
+            case .SET: base = 0
+            case .CUR: base = pos
+            case .END: base = prep.byteCount
             }
-            guard newPosition >= 0 else {
+            // The delta is signed and guest-chosen, so the sum can run off
+            // either end of the range a position is expressed in.
+            guard let delta = Int(exactly: offset) else {
+                throw WASIAbi.Errno.EINVAL
+            }
+            let (newPosition, overflow) = base.addingReportingOverflow(delta)
+            guard !overflow, newPosition >= 0 else {
                 throw WASIAbi.Errno.EINVAL
             }
             pos = newPosition
@@ -175,39 +155,45 @@ final class MemoryFileEntry: WASIFile {
         }
     }
 
-    func write<M: GuestMemory, Buffer: Sequence>(vectored buffer: Buffer, memory: M) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func write(vectored buffers: GuestBuffers) throws -> WASIAbi.Size {
         guard accessMode.contains(.write) else {
             throw WASIAbi.Errno.EBADF
         }
         return try position.withLock { pos in
-            let result = try fileNode.write(vectored: buffer, memory: memory, position: pos)
+            let result = try fileNode.write(vectored: buffers, position: pos)
             pos = result.newPosition
             return result.count
         }
     }
 
-    func pwrite<M: GuestMemory, Buffer: Sequence>(vectored buffer: Buffer, memory: M, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func pwrite(vectored buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size {
         guard accessMode.contains(.write) else {
             throw WASIAbi.Errno.EBADF
         }
-        return try fileNode.pwrite(vectored: buffer, memory: memory, offset: Int(offset))
+        guard let offset = Int(exactly: offset) else {
+            throw WASIAbi.Errno.EINVAL
+        }
+        return try fileNode.pwrite(vectored: buffers, offset: offset)
     }
 
-    func read<M: GuestMemory, Buffer: Sequence>(into buffer: Buffer, memory: M) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func read(into buffers: GuestBuffers) throws -> WASIAbi.Size {
         guard accessMode.contains(.read) else {
             throw WASIAbi.Errno.EBADF
         }
         return try position.withLock { pos in
-            let result = try fileNode.read(into: buffer, memory: memory, position: pos)
+            let result = try fileNode.read(into: buffers, position: pos)
             pos = result.newPosition
             return result.count
         }
     }
 
-    func pread<M: GuestMemory, Buffer: Sequence>(into buffer: Buffer, memory: M, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func pread(into buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size {
         guard accessMode.contains(.read) else {
             throw WASIAbi.Errno.EBADF
         }
-        return try fileNode.pread(into: buffer, memory: memory, offset: Int(offset))
+        guard let offset = Int(exactly: offset) else {
+            throw WASIAbi.Errno.EINVAL
+        }
+        return try fileNode.pread(into: buffers, offset: offset)
     }
 }

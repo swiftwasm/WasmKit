@@ -37,17 +37,55 @@ extension Execution {
         }
         return pc.advanced(by: Int(immediate.offset)).next()
     }
+    /// Inlined into its handler, which otherwise calls it out of line with a
+    /// stack frame. The clamp is a data select, not a branch to predict.
+    @inline(__always)
     mutating func brTable(sp: Sp, pc: Pc, immediate: Instruction.BrTableOperand) -> (Pc, CodeSlot) {
         let index = sp[i32: immediate.index]
-        let normalizedOffset = min(Int(index), Int(immediate.count - 1))
+        let normalizedOffset = min(Int(index), Int(immediate.lastIndex))
         let entry = immediate.baseAddress[normalizedOffset]
         return pc.advanced(by: Int(entry.offset)).next()
     }
 
+    /// Returns to the caller.
+    ///
+    /// This handler covers only the case where the caller runs in the same
+    /// instance as the frame being popped, which is every return inside a module
+    /// and therefore almost every return. `md`/`ms` still describe the right
+    /// memory, so the whole instruction is: load the two saved slots, check the
+    /// flag the call recorded in the saved PC, dispatch.
+    ///
+    /// The cross-instance case is handed off to ``returnCrossInstance`` instead of
+    /// being handled here, so that this handler contains no call at all. A single
+    /// call instruction anywhere in it (`bl` on arm64, `call` on x86-64) -- and
+    /// switching `md`/`ms` needs one, for `wasmkit_trap_guard_set_current_memory`
+    /// -- would cost a stack frame's worth of prologue and epilogue on *every*
+    /// return. As it stands the handler is 6 instructions on arm64 and 8 on
+    /// x86-64, with no frame, ending in an indirect branch to the next handler.
     @inline(__always)
     mutating func _return(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms) -> (Pc, CodeSlot) {
+        let oldSp = sp
+        let rawReturnPC = oldSp.rawReturnPC
+        guard _fastPath(rawReturnPC & Sp.returnPCNeedsMemoryRestore == 0) else {
+            // Re-dispatch with `sp`/`pc` untouched; `returnCrossInstance` pops.
+            // The slot is read through the engine: loads only, no call.
+            return (pc, store.value.engine.crossInstanceReturnSlot)
+        }
+        sp = oldSp.previousSP.unsafelyUnwrapped
+        // The flag bit is clear, so the slot is the return `Pc` as it stands.
+        let pc = Pc(bitPattern: UInt(rawReturnPC)).unsafelyUnwrapped
+        return pc.next()
+    }
+
+    /// Returns to a caller in a different instance, switching `md`/`ms` back.
+    ///
+    /// Never emitted by the translator: ``_return`` dispatches here when the frame
+    /// it is about to pop was entered across an instance boundary, so `sp` and `pc`
+    /// are still exactly what that `_return` was given.
+    @inline(__always)
+    mutating func returnCrossInstance(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms) -> (Pc, CodeSlot) {
         var pc = pc
-        popFrame(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        popFrameRestoringCurrentMemory(sp: &sp, pc: &pc, md: &md, ms: &ms)
         return pc.next()
     }
 
@@ -62,7 +100,7 @@ extension Execution {
         (pc, sp) = try invoke(
             function: immediate.callee,
             callerInstance: currentInstance(sp: sp),
-            spAddend: immediate.spAddend,
+            arguments: immediate.arguments, spAddend: immediate.spAddend,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()
@@ -76,14 +114,14 @@ extension Execution {
         internalCallOperand: Instruction.CallOperand
     ) throws {
         // The callee is known to be a function defined within the same module, so we can
-        // skip updating the current instance.
-        let (iseq, locals, instance) = internalCallOperand.callee.assumeCompiled()
+        // skip updating the current instance -- and, by recording that in the frame,
+        // the matching `_return` can skip checking for it too.
+        let (iseq, instance) = internalCallOperand.callee.assumeCompiled()
         sp = try pushFrame(
             iseq: iseq,
             function: instance,
-            numberOfNonParameterLocalSlots: locals,
-            sp: sp, returnPC: pc,
-            spAddend: internalCallOperand.spAddend
+            sp: sp, newSp: sp.advanced(by: internalCallOperand.spAddend), returnPC: pc,
+            needsMemoryRestoreOnReturn: false
         )
         pc = iseq.baseAddress
     }
@@ -104,7 +142,8 @@ extension Execution {
         let callee = immediate.callee
         try callee.wasm.ensureCompiled(store: store)
         let replaced = Instruction.internalCall(immediate)
-        headSlotPc.pointee = replaced.headSlot(threadingModel: store.value.engine.configuration.threadingModel)
+        headSlotPc.pointee = replaced.headSlotInline(
+            threadingModel: store.value.engine.configuration.threadingModel)
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)
         return pc.next()
     }
@@ -117,12 +156,14 @@ extension Execution {
         let callerInstance = currentInstance(sp: sp)
         let table = callerInstance.tables[Int(tableIndex)]
         let value = sp[address].asAddressOffset(table.limits.isMemory64)
-        let elementIndex = Int(value)
-        guard elementIndex < table.elements.count else {
-            throw Trap(.tableOutOfBounds(elementIndex))
+        // A table64 index beyond `Int` is out of bounds for any table; converting
+        // it before the check below would trap the host instead.
+        guard let elementIndex = Int(exactly: value), elementIndex < table.elementCount else {
+            throw Trap(.tableOutOfBounds(Int(clamping: value)))
         }
-        guard case .function(let rawBitPattern?) = table.elements[elementIndex]
-        else {
+        // A slot holds the bare address; `0` is the null reference.
+        let rawBitPattern = table.rawElement(at: elementIndex)
+        guard rawBitPattern != 0 else {
             throw Trap(.indirectCallToNull(elementIndex))
         }
         let function = InternalFunction(bitPattern: rawBitPattern)
@@ -146,7 +187,7 @@ extension Execution {
         (pc, sp) = try invoke(
             function: function,
             callerInstance: callerInstance,
-            spAddend: immediate.spAddend,
+            arguments: immediate.arguments,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()
@@ -157,6 +198,7 @@ extension Execution {
         (pc, sp) = try tailInvoke(
             function: immediate.callee,
             callerInstance: currentInstance(sp: sp),
+            arguments: immediate.arguments, frameBase: immediate.frameBase,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()
@@ -171,44 +213,62 @@ extension Execution {
         (pc, sp) = try tailInvoke(
             function: function,
             callerInstance: callerInstance,
+            arguments: immediate.arguments, frameBase: immediate.frameBase,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()
     }
 
-    mutating func resizeFrameHeader(sp: inout Sp, immediate: Instruction.ResizeFrameHeaderOperand) throws {
-        // The params/results space are resized by `delta` slots and the rest of the
-        // frame is copied to the new location. See the following diagram for the
-        // layout of the frame before and after the resize operation:
-        //
-        //
-        //              |--------BEFORE-------|   |--------AFTER--------|
-        //              |  Params  | Results  |   |  Params  | Results  |
-        //              |  ...     |   ...    |   |  ...     |   ...    |
-        // Old Header ->|---------------------|\  |  ...     |   ...    |              -+
-        //              |         Sp          | \ |  ...     |   ...    |               | delta
-        //              |---------------------|  \|---------------------|<- New Header -+  -+
-        //              |         Pc          |   |         Sp          |                   |
-        //              |---------------------|   |---------------------|                   |
-        //              |     Current Func    | C |         Pc          |                   |
-        //     Old Sp ->|---------------------| O |---------------------|                   |
-        //              |       Locals        | P |     Current Func    |                   |
-        //              |        ...          | Y |---------------------|<- New Sp          |
-        //              |---------------------|   |       Locals        |                   | sizeToCopy
-        //              |        Consts       |   |        ...          |                   |
-        //              |        ...          |   |---------------------|                   |
-        //              |---------------------|   |        Consts       |                   |
-        //              |     Value Stack     |   |        ...          |                   |
-        //              |        ...          |   |---------------------|                   |
-        //              |---------------------|\  |     Value Stack     |                   |
-        //                                      \ |        ...          |                   |
-        //                                       \|---------------------|                  -+
-        let newSp = sp.advanced(by: Int(immediate.delta))
-        try checkStackBoundary(newSp)
-        let oldFrameHeader = sp.advanced(by: -FrameHeaderLayout.numberOfSavingSlots)
-        let newFrameHeader = newSp.advanced(by: -FrameHeaderLayout.numberOfSavingSlots)
-        newFrameHeader.update(from: oldFrameHeader, count: Int(immediate.sizeToCopy))
-        sp = newSp
+    /// The function a `call_ref`/`return_call_ref` operand refers to.
+    ///
+    /// Read before the call sets up the callee's frame, whose header may overlap
+    /// the operand's slot.
+    @inline(__always)
+    private func functionReference(sp: Sp, callee: VReg) throws -> InternalFunction {
+        let value = sp[callee]
+        guard !value.isNullRef else {
+            throw Trap(.nullFunctionReference)
+        }
+        return InternalFunction(bitPattern: Int(value.storage))
+    }
+
+    mutating func callRef(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CallRefOperand) throws -> (Pc, CodeSlot) {
+        var pc = pc
+        let function = try functionReference(sp: sp, callee: immediate.callee)
+        (pc, sp) = try invoke(
+            function: function,
+            callerInstance: currentInstance(sp: sp),
+            arguments: immediate.arguments,
+            sp: sp, pc: pc, md: &md, ms: &ms
+        )
+        return pc.next()
+    }
+
+    mutating func returnCallRef(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.ReturnCallRefOperand) throws -> (Pc, CodeSlot) {
+        var pc = pc
+        let function = try functionReference(sp: sp, callee: immediate.callee)
+        (pc, sp) = try tailInvoke(
+            function: function,
+            callerInstance: currentInstance(sp: sp),
+            arguments: immediate.arguments, frameBase: immediate.frameBase,
+            sp: sp, pc: pc, md: &md, ms: &ms
+        )
+        return pc.next()
+    }
+
+    mutating func brIfNull(sp: Sp, pc: Pc, immediate: Instruction.BrIfOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for the rationale.
+        guard _fastPath(sp[immediate.condition].isNullRef) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    mutating func brIfNotNull(sp: Sp, pc: Pc, immediate: Instruction.BrIfOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for the rationale.
+        guard _fastPath(!sp[immediate.condition].isNullRef) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
     }
 
     mutating func onEnter(sp: Sp, immediate: Instruction.OnEnterOperand) {
@@ -230,5 +290,199 @@ extension Execution {
             // Throw `pc` value before the breakpoint was triggered to allow resumption in same place
             pc: pc - 1
         )
+    }
+}
+
+// MARK: - Fused integer compare + branch
+//
+// These are the fused form of an integer comparison immediately followed by
+// `br_if`/`br_if_not`. The translator emits one of these instead of writing the
+// comparison result into a stack slot and reloading it in `brIf`, which removes
+// one dispatch, one store and one load per loop back-edge.
+//
+// Only integers are fused: the complement of an integer comparison is another
+// integer comparison (Eq<->Ne, LtS<->GeS, LtU<->GeU, GtS<->LeS, GtU<->LeU), so
+// `br_if_not` needs no dedicated opcodes. Float comparisons have no complement
+// because of NaN, so they are left unfused.
+extension Execution {
+    /// Fused `i32.eq` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32Eq(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs] == sp[i32: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.ne` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32Ne(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs] != sp[i32: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.lt_s` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32LtS(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs].signed < sp[i32: immediate.rhs].signed) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.lt_u` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32LtU(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs] < sp[i32: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.gt_s` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32GtS(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs].signed > sp[i32: immediate.rhs].signed) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.gt_u` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32GtU(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs] > sp[i32: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.le_s` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32LeS(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs].signed <= sp[i32: immediate.rhs].signed) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.le_u` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32LeU(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs] <= sp[i32: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.ge_s` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32GeS(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs].signed >= sp[i32: immediate.rhs].signed) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i32.ge_u` + `br_if`.
+    @inline(__always)
+    mutating func brIfI32GeU(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i32: immediate.lhs] >= sp[i32: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.eq` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64Eq(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs] == sp[i64: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.ne` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64Ne(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs] != sp[i64: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.lt_s` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64LtS(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs].signed < sp[i64: immediate.rhs].signed) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.lt_u` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64LtU(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs] < sp[i64: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.gt_s` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64GtS(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs].signed > sp[i64: immediate.rhs].signed) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.gt_u` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64GtU(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs] > sp[i64: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.le_s` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64LeS(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs].signed <= sp[i64: immediate.rhs].signed) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.le_u` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64LeU(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs] <= sp[i64: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.ge_s` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64GeS(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs].signed >= sp[i64: immediate.rhs].signed) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
+    }
+    /// Fused `i64.ge_u` + `br_if`.
+    @inline(__always)
+    mutating func brIfI64GeU(sp: Sp, pc: Pc, immediate: Instruction.BrIfCmpOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for why this must stay a real branch (not a `csel`).
+        guard _fastPath(sp[i64: immediate.lhs] >= sp[i64: immediate.rhs]) else {
+            return pc.next()
+        }
+        return pc.advanced(by: Int(immediate.offset)).next()
     }
 }

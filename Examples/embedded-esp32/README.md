@@ -1,0 +1,101 @@
+# WasmKit on ESP32 (Embedded Swift + ESP-IDF)
+
+Runs a WebAssembly module on an ESP32-C6 (RISC-V). The project compiles the
+WasmKit interpreter with Embedded Swift under ESP-IDF. The demo calls a wasm
+function, lets the guest call back into a Swift host function, and round-trips
+a host-thrown error with its identity.
+
+Each SwiftPM module becomes an ESP-IDF component (`wasmtypes` → `wasmparser` →
+`wasmkit`, plus the C shims in `cwasmkit`), compiled through
+[`espressif/idf_swift`](https://components.espressif.com/components/espressif/idf_swift).
+`main/Main.swift` parses a bundled `add.wasm`, instantiates it, and calls the
+exported `add` function.
+
+## Requirements
+
+- ESP-IDF v5.5+ with tools installed for `esp32c6` (`./install.sh esp32c6`)
+- A Swift development snapshot toolchain that ships the Embedded
+  `riscv32-none-none-eabi` standard library
+- For the QEMU test: Espressif's QEMU (`idf_tools.py install qemu-riscv32`)
+
+## Building and testing
+
+```sh
+./smoke-test.sh          # build for esp32c6
+./smoke-test.sh --qemu   # also boot an esp32c3 build in QEMU and check output
+./smoke-test.sh --lldb   # attach a real lldb to the on-device GDB stub
+```
+
+`--lldb` builds the firmware to serve the GDB stub over UART1 instead of
+running a canned packet session. QEMU exposes UART1 as a socket, so `lldb`
+connects to it with `gdb-remote` and drives the debuggee running on the
+emulated chip:
+
+```
+(lldb) gdb-remote localhost:4445
+Process 1 stopped
+* thread #1, stop reason = trace
+       frame #0: 0x4000000000000063 demo.wasm`
+->  0x4000000000000063: i32.store 0
+(lldb) continue
+Process 1 exited with status = 0 (0x00000000)
+```
+
+Override the port with `GDB_PORT` and the debugger with `LLDB`.
+
+The script locates ESP-IDF (`$IDF_PATH` or `~/esp/esp-idf*`) and a Swift
+toolchain (`$SWIFT_TOOLCHAIN` or the newest snapshot in
+`~/Library/Developer/Toolchains`). It also patches the local ESP-IDF
+linker-script template once to keep `.got`/`.got.plt` in flash: Embedded Swift
+emits a GOT-indirect reference to the Unicode data table symbols, and stock
+ESP-IDF discards those sections.
+
+To flash real hardware after a build:
+
+```sh
+idf.py -B build.c6 -D SDKCONFIG=sdkconfig.c6 -p /dev/cu.usbmodem* flash monitor
+```
+
+## Notes
+
+- The default 512 KiB WasmKit value stack does not fit in on-chip SRAM, so
+  `Main.swift` sets `EngineConfiguration.stackSize` to 64 KiB.
+- Each component is compiled with `-Xfrontend -function-sections`. `swiftc`
+  otherwise emits a single `.text` section per module, and ESP-IDF's
+  `--gc-sections` can only strip whole sections -- so without the flag nothing
+  the firmware does not call can be dropped. Objects grow by roughly a quarter
+  before linking; the linker reclaims it.
+- WASI is available on this target. Link only the parts you use:
+
+  ```swift
+  var imports = Imports()
+  try bridge.link(to: &imports, store: store, capabilities: [.stdio, .clocks, .random])
+  ```
+
+  Unnamed capabilities stay unreferenced and are stripped. Functions the guest
+  imports but no linked capability provides are registered as `ENOSYS` stubs,
+  so the module still instantiates -- pass `stubUnlinked: false` to opt out.
+
+  Measured on this example (esp32c6, `-Osize`), linking `[.stdio, .process]`
+  against the whole surface:
+
+  | Firmware | `.bin` size |
+  | --- | --- |
+  | `[.stdio, .process]` | 672,528 B |
+  | `WASICapability.all` | 699,648 B |
+
+  27 KB smaller. The saving is real stripping, not accounting: the
+  `WASIImplementation.path_open` symbol is absent from the subset image
+  entirely, and only the `PATH_OPEN` rights constant remains. Rebuild the
+  comparison with:
+
+  ```sh
+  WASMKIT_EXAMPLE_SWIFT_FLAGS=-DWASMKIT_LINK_ALL_WASI ./smoke-test.sh
+  ```
+- The guest's linear memory and each engine's value stack are separate
+  allocations, and a failed allocation faults rather than throwing. Budget
+  them together: this example runs a second engine with a 16 KiB stack
+  alongside the 64 KiB one.
+- The QEMU run uses the ESP32-C3 machine because Espressif's QEMU has no
+  ESP32-C6 model; both chips are RV32IMC-class cores running the same code
+  paths.

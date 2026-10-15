@@ -13,11 +13,11 @@ extension Execution {
         let tagType = store.value.engine.resolveType(tag.type)
         var payload: [Value] = []
         payload.reserveCapacity(tagType.parameters.count)
-        var slotOffset: VReg = 0
+        var slotOffset = VReg.zero
         for paramType in tagType.parameters {
             let value = UntypedValue(storage: sp[i64: immediate.payloadBase + slotOffset])
             payload.append(value.cast(to: paramType))
-            slotOffset += VReg(paramType.stackSlotCount)
+            slotOffset += VReg(slotIndex: paramType.stackSlotCount)
         }
         throw WasmKitException(tag: tag, payload: payload)
     }
@@ -37,8 +37,11 @@ extension Execution {
     ///
     /// `pc` points past the `catchHandlers` instruction at this point.
     /// The `pcOffset` in each `CatchTableEntry` is relative to this `pc`.
+    ///
+    /// Clauses are pushed last to first so that `handleException`, which searches
+    /// from the top, tries them in source order as the spec requires.
     mutating func catchHandlers(sp: Sp, pc: Pc, immediate: Instruction.CatchHandlersOperand) -> (Pc, CodeSlot) {
-        for i in 0..<Int(immediate.count) {
+        for i in (0..<Int(immediate.count)).reversed() {
             let entry = immediate.baseAddress[i]
             let targetPC = pc.advanced(by: Int(entry.pcOffset))
             let handler = ExceptionHandler(
@@ -46,7 +49,8 @@ extension Execution {
                 isRef: entry.isRef != 0,
                 sp: sp,
                 targetPC: targetPC,
-                payloadRegBase: entry.payloadRegBase
+                payloadRegBase: entry.payloadRegBase,
+                siblingsBelow: Int(immediate.count) - 1 - i
             )
             exceptionHandlers.append(handler)
         }
@@ -82,6 +86,9 @@ extension Execution {
 
             guard isMatch else { continue }
 
+            // The rest of this handler's try_table is exited along with it.
+            exceptionHandlers.removeLast(handler.siblingsBelow)
+
             // Unwind call stack to the handler's frame
             sp = handler.sp
             pc = handler.targetPC
@@ -97,10 +104,10 @@ extension Execution {
             // Write exception payload to the handler's target stack slots
             if let handlerTag = handler.tag {
                 let tagType = store.value.engine.resolveType(handlerTag.type)
-                var slotOffset: VReg = 0
+                var slotOffset = VReg.zero
                 for (i, paramType) in tagType.parameters.enumerated() {
                     sp[i64: handler.payloadRegBase + slotOffset] = UntypedValue(exception.payload[i]).storage
-                    slotOffset += VReg(paramType.stackSlotCount)
+                    slotOffset += VReg(slotIndex: paramType.stackSlotCount)
                 }
                 // For catch_ref, also write the exnref after the payload
                 if handler.isRef {

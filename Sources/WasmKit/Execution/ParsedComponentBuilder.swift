@@ -598,17 +598,29 @@
 #endif
 
 #if ComponentModel && FileSystem
-    import struct SystemPackage.FileDescriptor
-
-    /// Parse a component binary file from a caller-owned file descriptor.
+    /// Parse a component binary from a caller-owned platform file descriptor.
     ///
-    /// The descriptor is consumed from its current offset and is not closed by
-    /// this function.
+    /// The descriptor must be opened for reading in binary mode. This function
+    /// *borrows* it: ownership stays with the caller, who must close it after
+    /// the call returns. Bytes are consumed starting from the descriptor's
+    /// current offset.
     public func parseComponent(
-        fileHandle: FileDescriptor,
+        fileHandle: CInt,
         features: WasmFeatureSet = .default
     ) throws -> ParsedComponent {
         let stream = try FileHandleStreamSource(fileHandle: fileHandle)
+        return try parseComponent(stream: stream, features: features)
+    }
+
+    /// Parse a component binary from a file path.
+    ///
+    /// The file is opened by the parser and closed when the underlying stream
+    /// source is deallocated.
+    public func parseComponent(
+        filePath: String,
+        features: WasmFeatureSet = .default
+    ) throws -> ParsedComponent {
+        let stream = try FileHandleStreamSource(filePath: filePath)
         return try parseComponent(stream: stream, features: features)
     }
 #endif

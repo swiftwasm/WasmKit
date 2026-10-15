@@ -3,7 +3,7 @@
 @_spi(Fuzzing) import WasmKit
 
 /// A resource limiter that restricts allocations to fuzzer limits.
-public struct FuzzerResourceLimiter: ResourceLimiter {
+public final class FuzzerResourceLimiter: ResourceLimiter {
     public init() {}
 
     public func limitMemoryGrowth(to desired: Int) throws -> Bool {
@@ -18,7 +18,7 @@ public struct FuzzerResourceLimiter: ResourceLimiter {
 ///
 /// - Parameter bytes: The bytes of the Wasm module.
 public func fuzzInstantiation(bytes: [UInt8]) throws {
-    var module = try WasmKit.parseWasm(bytes: bytes)
+    var module = try WasmKit.parseWasm(bytes: bytes, features: .all)
     // To ensure that the module instantiation will stop eventually.
     module.dropStartFunction()
 
@@ -32,11 +32,10 @@ public func fuzzInstantiation(bytes: [UInt8]) throws {
         let value: ExternalValueConvertible
         switch importEntry.descriptor {
         case .function(let typeIndex):
-            guard typeIndex < module.types.count else {
-                // Skip if import type index is out of bounds
+            guard let type = module.functionType(at: typeIndex) else {
+                // Skip if import type index does not name a function type
                 return
             }
-            let type = module.types[Int(typeIndex)]
             value = Function(store: store, type: type) { _, _ in
                 // Provide "start function" with empty results
                 if type.results.isEmpty { return [] }
@@ -49,8 +48,7 @@ public func fuzzInstantiation(bytes: [UInt8]) throws {
         case .table(let tableType):
             value = try Table(store: store, type: tableType)
         case .tag(let typeIndex):
-            guard typeIndex < module.types.count else { return }
-            let type = module.types[Int(typeIndex)]
+            guard let type = module.functionType(at: typeIndex) else { return }
             value = Tag(store: store, type: type)
         }
         imports.define(module: importEntry.module, name: importEntry.name, value.externalValue)

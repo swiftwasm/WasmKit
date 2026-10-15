@@ -1,35 +1,46 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/instructions.html#variable-instructions>
 extension Execution {
+    /// `global.get` on a global whose value fits a single 64-bit stack slot.
+    ///
+    /// The global's shape is fixed by its type, so the translator picks this
+    /// handler for every non-`v128` global and the handler is a plain slot copy:
+    /// no tag test and no type load. See `globalGetV128` for the wide form.
     mutating func globalGet(sp: Sp, immediate: Instruction.GlobalAndVRegOperand) {
         immediate.global.withValue {
-            switch $0.storage {
-            case .scalar(let raw):
-                sp[immediate.reg] = raw
-            case .v128(let v):
-                sp[immediate.reg] = UntypedValue(storage: v.lo)
-                let regHi = LLVReg(storage: immediate.reg.value + Int64(MemoryLayout<StackSlot>.size))
-                sp[regHi] = UntypedValue(storage: v.hi)
-            }
+            sp[immediate.reg] = UntypedValue(storage: $0.rawStorage.lo)
         }
     }
     mutating func globalSet(sp: Sp, immediate: Instruction.GlobalAndVRegOperand) {
         immediate.global.withValue {
-            switch $0.globalType.valueType {
-            case .v128:
-                let lo = sp[immediate.reg].i64
-                let regHi = LLVReg(storage: immediate.reg.value + Int64(MemoryLayout<StackSlot>.size))
-                let hi = sp[regHi].i64
-                $0.storage = .v128(V128Storage(lo: lo, hi: hi))
-            case .i32, .i64, .f32, .f64, .ref:
-                let value = sp[immediate.reg]
-                $0.storage = .scalar(value)
-            }
+            $0.rawStorage.lo = sp[immediate.reg].storage
+        }
+    }
+    mutating func globalGetV128(sp: Sp, immediate: Instruction.GlobalAndVRegOperand) {
+        immediate.global.withValue {
+            let raw = $0.rawStorage
+            sp[immediate.reg] = UntypedValue(storage: raw.lo)
+            sp[immediate.regHi] = UntypedValue(storage: raw.hi)
+        }
+    }
+    mutating func globalSetV128(sp: Sp, immediate: Instruction.GlobalAndVRegOperand) {
+        immediate.global.withValue {
+            $0.rawStorage = V128Storage(lo: sp[immediate.reg].storage, hi: sp[immediate.regHi].storage)
         }
     }
 
     mutating func copyStack(sp: Sp, immediate: Instruction.CopyStackOperand) {
         sp[immediate.dest] = sp[immediate.source]
+    }
+
+    /// Both sources are read before either destination is written, which the
+    /// translator makes equivalent to two copies in order.
+    @inline(__always)
+    mutating func copyStack2(sp: Sp, immediate: Instruction.CopyStack2Operand) {
+        let value0 = sp[immediate.source0]
+        let value1 = sp[immediate.source1]
+        sp[immediate.dest0] = value0
+        sp[immediate.dest1] = value1
     }
 }
 
@@ -45,6 +56,8 @@ extension Execution {
             value = .ref(.function(nil))
         case .exnRef:
             value = .ref(.exception(nil))
+        case .any, .eq, .i31, .structRef, .arrayRef, .noneRef, .noExtern, .noFunc, .noExn:
+            preconditionFailure("ref.null of GC heap type \(immediate.type) is not supported yet")
         }
         sp[immediate.result] = UntypedValue(value)
     }
@@ -58,6 +71,13 @@ extension Execution {
             result = .i32(0)
         }
         sp[immediate.result] = UntypedValue(result)
+    }
+    mutating func refAsNonNull(sp: Sp, immediate: Instruction.RefAsNonNullOperand) throws {
+        let value = sp[immediate.value]
+        guard !value.isNullRef else {
+            throw Trap(.nullReference)
+        }
+        sp[immediate.result] = value
     }
     mutating func refFunc(sp: Sp, immediate: Instruction.RefFuncOperand) {
         let function = currentInstance(sp: sp).functions[Int(immediate.index)]
@@ -81,10 +101,13 @@ extension Execution {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#parametric-instructions>
 extension Execution {
+    /// Loads both candidates and selects the value: selecting the register
+    /// instead makes the load depend on the condition.
+    @inline(__always)
     mutating func select(sp: Sp, immediate: Instruction.SelectOperand) {
         let flag = sp[i32: immediate.condition]
-        let selected = flag != 0 ? immediate.onTrue : immediate.onFalse
-        let value = sp[selected]
-        sp[immediate.result] = value
+        let onTrue = sp[immediate.onTrue]
+        let onFalse = sp[immediate.onFalse]
+        sp[immediate.result] = flag != 0 ? onTrue : onFalse
     }
 }

@@ -1,5 +1,47 @@
 import WasmTypes
 
+extension AbstractHeapType {
+    /// The byte that encodes this heap type in the binary format.
+    ///
+    /// > Note:
+    /// <https://webassembly.github.io/gc/core/binary/types.html#heap-types>
+    package var binaryEncoding: UInt8 {
+        switch self {
+        case .funcRef: 0x70
+        case .externRef: 0x6F
+        case .exnRef: 0x69
+        case .any: 0x6E
+        case .eq: 0x6D
+        case .i31: 0x6C
+        case .structRef: 0x6B
+        case .arrayRef: 0x6A
+        case .noneRef: 0x71
+        case .noExtern: 0x72
+        case .noFunc: 0x73
+        case .noExn: 0x74
+        }
+    }
+
+    @usableFromInline
+    package init?(binaryEncoding: UInt8) {
+        switch binaryEncoding {
+        case 0x70: self = .funcRef
+        case 0x6F: self = .externRef
+        case 0x69: self = .exnRef
+        case 0x6E: self = .any
+        case 0x6D: self = .eq
+        case 0x6C: self = .i31
+        case 0x6B: self = .structRef
+        case 0x6A: self = .arrayRef
+        case 0x71: self = .noneRef
+        case 0x72: self = .noExtern
+        case 0x73: self = .noFunc
+        case 0x74: self = .noExn
+        default: return nil
+        }
+    }
+}
+
 /// Function code in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-code>
@@ -13,17 +55,24 @@ public struct Code: Sendable {
     @usableFromInline
     package let offset: Int
     @usableFromInline
+    internal let bodyOffset: Int
+    @usableFromInline
     internal let features: WasmFeatureSet
 
     #if WasmDebuggingSupport
         package var originalAddress: Int { self.offset }
+
+        /// Start of the function body (locals declaration). DWARF's `DW_AT_low_pc` typically
+        /// points here.
+        package var originalBodyAddress: Int { self.bodyOffset }
     #endif
 
     @inlinable
-    init(locals: [ValueType], expression: ArraySlice<UInt8>, offset: Int, features: WasmFeatureSet) {
+    init(locals: [ValueType], expression: ArraySlice<UInt8>, offset: Int, bodyOffset: Int, features: WasmFeatureSet) {
         self.locals = locals
         self.expression = expression
         self.offset = offset
+        self.bodyOffset = bodyOffset
         self.features = features
     }
 }
@@ -37,10 +86,13 @@ extension Code: Equatable {
 public struct MemArg: Equatable, Sendable {
     public let offset: UInt64
     public let align: UInt32
+    /// The memory the instruction accesses; always 0 without the multi-memory proposal.
+    public let memory: UInt32
 
-    public init(offset: UInt64, align: UInt32) {
+    public init(offset: UInt64, align: UInt32, memory: UInt32 = 0) {
         self.offset = offset
         self.align = align
+        self.memory = memory
     }
 }
 
@@ -170,9 +222,13 @@ public typealias ConstExpression = [Instruction]
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#tables>
 public struct Table: Equatable, Sendable {
     public let type: TableType
+    /// The value every element starts with, or `nil` for null. Only tables of
+    /// the typed function references proposal have one.
+    public let initializer: ConstExpression?
 
-    public init(type: TableType) {
+    public init(type: TableType, initializer: ConstExpression? = nil) {
         self.type = type
+        self.initializer = initializer
     }
 }
 
@@ -492,5 +548,36 @@ extension Instruction.Store {
         case .i64Store16, .i64AtomicStore16: return .i64
         case .i64Store32, .i64AtomicStore32: return .i64
         }
+    }
+}
+
+extension Limits: CustomStringConvertible {
+    public var description: String {
+        var result = "min: \(min)"
+        if let max = max { result += ", max: \(max)" }
+        if shared { result += ", shared" }
+        if isMemory64 { result += ", memory64" }
+        return result
+    }
+}
+
+extension TableType: CustomStringConvertible {
+    public var description: String {
+        "\(elementType) (\(limits))"
+    }
+}
+
+extension Mutability: CustomStringConvertible {
+    public var description: String {
+        switch self {
+        case .constant: return "const"
+        case .variable: return "var"
+        }
+    }
+}
+
+extension GlobalType: CustomStringConvertible {
+    public var description: String {
+        "\(mutability) \(valueType)"
     }
 }

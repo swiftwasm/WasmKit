@@ -1,5 +1,3 @@
-import SystemPackage
-
 /// An in-memory file system implementation for WASI environments.
 ///
 /// This provides a complete file system that exists entirely in memory, useful for
@@ -14,10 +12,10 @@ import SystemPackage
 /// try fs.addFile(at: "/hello.txt", content: "Hello, world!")
 ///
 /// // Or add a file handle
-/// let fd = try FileDescriptor.open("/path/to/file", .readOnly)
+/// let fd = FileHandle(forReadingAtPath: "/path/to/file")!.fileDescriptor
 /// try fs.addFile(at: "/mounted.txt", handle: fd)
 /// ```
-public final class MemoryFileSystem: FileSystemImplementation, Sendable {
+public final class MemoryFileSystem: Sendable {
     private static let rootPath = "/"
 
     /// The directory tree. Synchronization lives in the nodes, so the file system
@@ -58,34 +56,68 @@ public final class MemoryFileSystem: FileSystemImplementation, Sendable {
         return current
     }
 
-    private static func resolveNode(root: MemoryDirectoryNode, from directory: MemoryDirectoryNode, at directoryPath: String, path relativePath: String) -> MemFSNode? {
+    /// Resolves a guest-supplied path within `directory`, which bounds it.
+    ///
+    /// The walk starts at `directory` rather than at the root, an absolute path
+    /// is refused, and `..` only unwinds directories this walk descended.
+    static func resolve(
+        from directory: MemoryDirectoryNode, path relativePath: String
+    ) throws -> MemFSNode? {
         if relativePath.isEmpty {
             return directory
         }
-
-        if relativePath.hasPrefix("/") {
-            return lookupNode(from: root, at: relativePath)
+        guard !relativePath.hasPrefix("/") else {
+            throw WASIAbi.Errno.EPERM
         }
 
-        let fullPath = joinGuestPath(directoryPath, relativePath)
+        var current: MemFSNode = directory
+        // The directories descended through since `directory`, so `..` can only
+        // unwind what this walk did.
+        var descended: [MemoryDirectoryNode] = []
 
-        let components = fullPath.split(separator: "/").map(String.init)
-        var stack: [String] = []
-
-        for component in components {
-            if component == "." {
+        for component in relativePath.split(separator: "/").map(String.init) {
+            switch component {
+            case "", ".":
                 continue
-            } else if component == ".." {
-                if !stack.isEmpty {
-                    stack.removeLast()
+            case "..":
+                guard current is MemoryDirectoryNode else {
+                    throw WASIAbi.Errno.ENOTDIR
                 }
-            } else {
-                stack.append(component)
+                guard let parent = descended.popLast() else {
+                    // Would leave the directory the descriptor refers to.
+                    throw WASIAbi.Errno.EPERM
+                }
+                current = parent
+            default:
+                guard let dir = current as? MemoryDirectoryNode else {
+                    throw WASIAbi.Errno.ENOTDIR
+                }
+                guard let next = dir.getChild(name: component) else {
+                    return nil
+                }
+                descended.append(dir)
+                current = next
             }
         }
 
-        let resolvedPath = stack.isEmpty ? Self.rootPath : Self.rootPath + stack.joined(separator: "/")
-        return lookupNode(from: root, at: resolvedPath)
+        return current
+    }
+
+    /// Resolves the parent directory and final component of a guest path, under
+    /// the same confinement as ``resolve(from:path:)``.
+    static func resolveParent(
+        from directory: MemoryDirectoryNode, path relativePath: String
+    ) throws -> (parent: MemoryDirectoryNode, name: String) {
+        try validateRelativePath(relativePath)
+        var components = relativePath.split(separator: "/").map(String.init).filter { $0 != "." && !$0.isEmpty }
+        guard let name = components.popLast(), name != ".." else {
+            throw WASIAbi.Errno.EINVAL
+        }
+        guard let parent = try resolve(from: directory, path: components.joined(separator: "/")) as? MemoryDirectoryNode
+        else {
+            throw WASIAbi.Errno.ENOENT
+        }
+        return (parent, name)
     }
 
     @discardableResult
@@ -98,21 +130,22 @@ public final class MemoryFileSystem: FileSystemImplementation, Sendable {
         let components = normalized.split(separator: "/").map(String.init)
         var current = root
         for component in components {
+            if component == "." { continue }
+            // A literal ".." entry would be unreachable by resolution and would
+            // give a traversal something to walk onto.
+            guard component != ".." else {
+                throw WASIAbi.Errno.EINVAL
+            }
             current = try current.getOrCreateChildDirectory(name: component)
         }
         return current
     }
 
+    /// Creates the file `relativePath` names within `directory`. Its parent
+    /// directories must already exist, as they must for `openat`.
     @discardableResult
     private static func createFileNode(in directory: MemoryDirectoryNode, at relativePath: String, oflags: WASIAbi.Oflags) throws -> MemoryFileNode {
-        try validateRelativePath(relativePath)
-
-        let components = relativePath.split(separator: "/").map(String.init)
-        guard let fileName = components.last else {
-            throw WASIAbi.Errno.EINVAL
-        }
-
-        let parentDir = try traverseToParent(from: directory, components: Array(components.dropLast()))
+        let (parentDir, fileName) = try resolveParent(from: directory, path: relativePath)
         let fileNode = try parentDir.getOrCreateChildFile(name: fileName)
         if oflags.contains(.TRUNC) {
             fileNode.truncateToEmpty()
@@ -124,14 +157,6 @@ public final class MemoryFileSystem: FileSystemImplementation, Sendable {
         guard !path.isEmpty && !path.hasPrefix("/") else {
             throw WASIAbi.Errno.EINVAL
         }
-    }
-
-    private static func traverseToParent(from directory: MemoryDirectoryNode, components: [String]) throws -> MemoryDirectoryNode {
-        var current = directory
-        for component in components {
-            current = try current.getOrCreateChildDirectory(name: component)
-        }
-        return current
     }
 
     // MARK: - Public API
@@ -149,12 +174,14 @@ public final class MemoryFileSystem: FileSystemImplementation, Sendable {
         try addFile(at: path, content: content.utf8)
     }
 
-    /// Adds a file to the file system backed by a file descriptor.
-    public func addFile(at path: String, handle: FileDescriptor) throws {
+    /// Adds a file to the file system backed by a caller-owned platform file
+    /// descriptor. The file system borrows the descriptor: the caller must
+    /// keep it open while the file system is in use and close it afterwards.
+    public func addFile(at path: String, handle: CInt) throws {
         let normalized = Self.normalizePath(path)
         let (parentPath, fileName) = try Self.splitPath(normalized)
         let parent = try Self.ensureDirectoryNode(from: root, at: parentPath)
-        parent.setChild(name: fileName, node: MemoryFileNode(handle: handle))
+        parent.setChild(name: fileName, node: MemoryFileNode(handle: FileDescriptor(rawValue: handle)))
     }
 
     /// Gets the content of a file at the specified path.
@@ -182,104 +209,6 @@ public final class MemoryFileSystem: FileSystemImplementation, Sendable {
         }
     }
 
-    // MARK: - FileSystemImplementation (WASI API)
-
-    func preopenDirectory(guestPath: String, hostPath: String) throws -> any WASIDir {
-        let node = try ensureDirectory(at: guestPath)
-        return MemoryDirEntry(preopenPath: guestPath, dirNode: node, path: guestPath, fileSystem: self)
-    }
-
-    func openAt(
-        dirFd: any WASIDir,
-        path: String,
-        oflags: WASIAbi.Oflags,
-        fsRightsBase: WASIAbi.Rights,
-        fsRightsInheriting: WASIAbi.Rights,
-        fdflags: WASIAbi.Fdflags,
-        symlinkFollow: Bool
-    ) throws -> FdEntry {
-        guard let memoryDir = dirFd as? MemoryDirEntry else {
-            throw WASIAbi.Errno.EBADF
-        }
-
-        let dirPath = memoryDir.path
-        let fullPath = Self.joinGuestPath(dirPath, path)
-
-        guard let dirNode = Self.lookupNode(from: root, at: dirPath) as? MemoryDirectoryNode else {
-            throw WASIAbi.Errno.EBADF
-        }
-
-        var node = Self.resolveNode(root: root, from: dirNode, at: dirPath, path: path)
-
-        if node != nil {
-            if oflags.contains(.EXCL) && oflags.contains(.CREAT) {
-                throw WASIAbi.Errno.EEXIST
-            }
-        } else {
-            if oflags.contains(.CREAT) {
-                node = try Self.createFileNode(in: dirNode, at: path, oflags: oflags)
-            } else {
-                throw WASIAbi.Errno.ENOENT
-            }
-        }
-
-        guard let resolvedNode = node else {
-            throw WASIAbi.Errno.ENOENT
-        }
-
-        if oflags.contains(.DIRECTORY) {
-            guard resolvedNode.type == .directory else {
-                throw WASIAbi.Errno.ENOTDIR
-            }
-        }
-
-        if resolvedNode.type == .directory {
-            guard let dirNode = resolvedNode as? MemoryDirectoryNode else {
-                throw WASIAbi.Errno.ENOTDIR
-            }
-            return .directory(
-                MemoryDirEntry(preopenPath: nil, dirNode: dirNode, path: fullPath, fileSystem: self))
-        }
-
-        if resolvedNode.type == .file {
-            guard let fileNode = resolvedNode as? MemoryFileNode else {
-                throw WASIAbi.Errno.EBADF
-            }
-
-            if oflags.contains(.TRUNC) && fsRightsBase.contains(.FD_WRITE) {
-                fileNode.truncateToEmpty()
-            }
-
-            var accessMode: FileAccessMode = []
-            if fsRightsBase.contains(.FD_READ) {
-                accessMode.insert(.read)
-            }
-            if fsRightsBase.contains(.FD_WRITE) {
-                accessMode.insert(.write)
-            }
-
-            return .file(MemoryFileEntry(fileNode: fileNode, fileSystem: self, accessMode: accessMode, position: 0))
-        }
-
-        if resolvedNode.type == .characterDevice {
-            guard let deviceNode = resolvedNode as? MemoryCharacterDeviceNode else {
-                throw WASIAbi.Errno.EBADF
-            }
-
-            var accessMode: FileAccessMode = []
-            if fsRightsBase.contains(.FD_READ) {
-                accessMode.insert(.read)
-            }
-            if fsRightsBase.contains(.FD_WRITE) {
-                accessMode.insert(.write)
-            }
-
-            return .file(MemoryCharacterDeviceEntry(deviceNode: deviceNode, accessMode: accessMode))
-        }
-
-        throw WASIAbi.Errno.ENOTSUP
-    }
-
     // MARK: - File Operations
 
     func lookup(at path: String) -> MemFSNode? {
@@ -288,10 +217,25 @@ public final class MemoryFileSystem: FileSystemImplementation, Sendable {
 
     /// The type of the node reached by resolving `relativePath` from `directoryPath`.
     func resolveType(at directoryPath: String, path relativePath: String) -> MemFSNodeType? {
-        guard let directory = Self.lookupNode(from: root, at: directoryPath) as? MemoryDirectoryNode else {
+        guard Self.lookupNode(from: root, at: directoryPath) is MemoryDirectoryNode else {
             return nil
         }
-        return Self.resolveNode(root: root, from: directory, at: directoryPath, path: relativePath)?.type
+        // Resolves across the whole filesystem by design: this is an
+        // embedder-side helper, and no guest entry point reaches it.
+        if relativePath.hasPrefix("/") {
+            return Self.lookupNode(from: root, at: relativePath)?.type
+        }
+        let components = Self.joinGuestPath(directoryPath, relativePath).split(separator: "/").map(String.init)
+        var stack: [String] = []
+        for component in components {
+            switch component {
+            case ".": continue
+            case "..": if !stack.isEmpty { stack.removeLast() }
+            default: stack.append(component)
+            }
+        }
+        let resolvedPath = stack.isEmpty ? Self.rootPath : Self.rootPath + stack.joined(separator: "/")
+        return Self.lookupNode(from: root, at: resolvedPath)?.type
     }
 
     /// The type of the node at `path`, or nil if nothing is there.
@@ -304,26 +248,9 @@ public final class MemoryFileSystem: FileSystemImplementation, Sendable {
         try Self.ensureDirectoryNode(from: root, at: path)
     }
 
-    /// Remove a node relative to the directory at `directoryPath`.
-    func removeNode(at directoryPath: String, relativePath: String, mustBeDirectory: Bool) throws {
-        guard let directory = Self.lookupNode(from: root, at: directoryPath) as? MemoryDirectoryNode else {
-            throw WASIAbi.Errno.ENOENT
-        }
-
-        try Self.validateRelativePath(relativePath)
-
-        let components = relativePath.split(separator: "/").map(String.init)
-        guard let fileName = components.last else {
-            throw WASIAbi.Errno.EINVAL
-        }
-
-        var current = directory
-        for component in components.dropLast() {
-            guard let next = current.getChild(name: component) as? MemoryDirectoryNode else {
-                throw WASIAbi.Errno.ENOENT
-            }
-            current = next
-        }
+    /// Remove a node named by a guest path relative to `directory`.
+    func removeNode(in directory: MemoryDirectoryNode, relativePath: String, mustBeDirectory: Bool) throws {
+        let (current, fileName) = try Self.resolveParent(from: directory, path: relativePath)
 
         guard let node = current.getChild(name: fileName) else {
             throw WASIAbi.Errno.ENOENT
@@ -345,38 +272,14 @@ public final class MemoryFileSystem: FileSystemImplementation, Sendable {
         current.removeChild(name: fileName)
     }
 
-    /// Rename a node from `sourcePath` (relative to `sourceDirectoryPath`) to
-    /// `destPath` (relative to `destDirectoryPath`).
-    func rename(from sourcePath: String, at sourceDirectoryPath: String, to destPath: String, at destDirectoryPath: String) throws {
-        guard let sourceDir = Self.lookupNode(from: root, at: sourceDirectoryPath) as? MemoryDirectoryNode else {
+    /// Rename a node from `sourcePath` (relative to `sourceDirectory`) to
+    /// `destPath` (relative to `destDirectory`).
+    func rename(from sourcePath: String, in sourceDirectory: MemoryDirectoryNode, to destPath: String, in destDirectory: MemoryDirectoryNode) throws {
+        let (sourceParentDir, sourceFileName) = try Self.resolveParent(from: sourceDirectory, path: sourcePath)
+        let (destParentDir, destFileName) = try Self.resolveParent(from: destDirectory, path: destPath)
+
+        guard let sourceNode = sourceParentDir.getChild(name: sourceFileName) else {
             throw WASIAbi.Errno.ENOENT
-        }
-        guard let destDir = Self.lookupNode(from: root, at: destDirectoryPath) as? MemoryDirectoryNode else {
-            throw WASIAbi.Errno.ENOENT
-        }
-
-        guard let sourceNode = Self.resolveNode(root: root, from: sourceDir, at: sourceDirectoryPath, path: sourcePath) else {
-            throw WASIAbi.Errno.ENOENT
-        }
-
-        let destComponents = destPath.split(separator: "/").map(String.init)
-        guard let destFileName = destComponents.last else {
-            throw WASIAbi.Errno.EINVAL
-        }
-
-        let destParentDir = try Self.traverseToParent(from: destDir, components: Array(destComponents.dropLast()))
-
-        let sourceComponents = sourcePath.split(separator: "/").map(String.init)
-        guard let sourceFileName = sourceComponents.last else {
-            throw WASIAbi.Errno.EINVAL
-        }
-
-        var sourceParentDir = sourceDir
-        for component in sourceComponents.dropLast() {
-            guard let next = sourceParentDir.getChild(name: component) as? MemoryDirectoryNode else {
-                throw WASIAbi.Errno.ENOENT
-            }
-            sourceParentDir = next
         }
 
         sourceParentDir.removeChild(name: sourceFileName)
@@ -441,5 +344,103 @@ public final class MemoryFileSystem: FileSystemImplementation, Sendable {
         let parentComponents = components.dropLast()
         let parentPath = Self.rootPath + parentComponents.joined(separator: "/")
         return (parentPath, fileName)
+    }
+}
+
+@_spi(WASIPlatform) extension MemoryFileSystem: FileSystemImplementation {
+    // MARK: - FileSystemImplementation (WASI API)
+
+    public func preopenDirectory(guestPath: String, hostPath: String) throws -> any WASIDir {
+        let node = try ensureDirectory(at: guestPath)
+        return MemoryDirEntry(preopenPath: guestPath, dirNode: node, fileSystem: self)
+    }
+
+    public func openAt(
+        dirFd: any WASIDir,
+        path: String,
+        oflags: WASIAbi.Oflags,
+        fsRightsBase: WASIAbi.Rights,
+        fsRightsInheriting: WASIAbi.Rights,
+        fdflags: WASIAbi.Fdflags,
+        symlinkFollow: Bool
+    ) throws -> FdEntry {
+        guard let memoryDir = dirFd as? MemoryDirEntry else {
+            throw WASIAbi.Errno.EBADF
+        }
+
+        // The descriptor's own directory node, not a fresh lookup by its path:
+        // the path is a name the tree may no longer agree with, while the node
+        // is what the descriptor refers to.
+        let dirNode = memoryDir.dirNode
+
+        var node = try Self.resolve(from: dirNode, path: path)
+
+        if node != nil {
+            if oflags.contains(.EXCL) && oflags.contains(.CREAT) {
+                throw WASIAbi.Errno.EEXIST
+            }
+        } else {
+            if oflags.contains(.CREAT) {
+                node = try Self.createFileNode(in: dirNode, at: path, oflags: oflags)
+            } else {
+                throw WASIAbi.Errno.ENOENT
+            }
+        }
+
+        guard let resolvedNode = node else {
+            throw WASIAbi.Errno.ENOENT
+        }
+
+        if oflags.contains(.DIRECTORY) {
+            guard resolvedNode.type == .directory else {
+                throw WASIAbi.Errno.ENOTDIR
+            }
+        }
+
+        if resolvedNode.type == .directory {
+            guard let dirNode = resolvedNode as? MemoryDirectoryNode else {
+                throw WASIAbi.Errno.ENOTDIR
+            }
+            return .directory(
+                MemoryDirEntry(preopenPath: nil, dirNode: dirNode, fileSystem: self))
+        }
+
+        if resolvedNode.type == .file {
+            guard let fileNode = resolvedNode as? MemoryFileNode else {
+                throw WASIAbi.Errno.EBADF
+            }
+
+            if oflags.contains(.TRUNC) && fsRightsBase.contains(.FD_WRITE) {
+                fileNode.truncateToEmpty()
+            }
+
+            var accessMode: FileAccessMode = []
+            if fsRightsBase.contains(.FD_READ) {
+                accessMode.insert(.read)
+            }
+            if fsRightsBase.contains(.FD_WRITE) {
+                accessMode.insert(.write)
+            }
+
+            return .file(MemoryFileEntry(fileNode: fileNode, fileSystem: self, accessMode: accessMode, position: 0))
+        }
+
+        if resolvedNode.type == .characterDevice {
+            guard let deviceNode = resolvedNode as? MemoryCharacterDeviceNode else {
+                throw WASIAbi.Errno.EBADF
+            }
+
+            var accessMode: FileAccessMode = []
+            if fsRightsBase.contains(.FD_READ) {
+                accessMode.insert(.read)
+            }
+            if fsRightsBase.contains(.FD_WRITE) {
+                accessMode.insert(.write)
+            }
+
+            return .file(MemoryCharacterDeviceEntry(deviceNode: deviceNode, accessMode: accessMode))
+        }
+
+        throw WASIAbi.Errno.ENOTSUP
     }
 }

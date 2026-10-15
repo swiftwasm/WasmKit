@@ -1,6 +1,3 @@
-import Synchronization
-import SystemExtras
-import SystemPackage
 import WasmTypes
 
 /// Base protocol for file system nodes.
@@ -32,11 +29,12 @@ package final class MemoryDirectoryNode: MemFSNode {
         var ctim: WASIAbi.Timestamp
     }
 
-    private let state: Mutex<State>
+    // See `WASIImplementation.fdTable` for why this is a `nonisolated(unsafe) var`.
+    nonisolated(unsafe) private var state: PlatformMutex<State>
 
     init() {
         let now = WASIAbi.Timestamp.currentWallClock()
-        self.state = Mutex(State(atim: now, mtim: now, ctim: now))
+        self.state = PlatformMutex(State(atim: now, mtim: now, ctim: now))
     }
 
     var timestamps: (atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp, ctim: WASIAbi.Timestamp) {
@@ -139,11 +137,12 @@ final class MemoryFileNode: MemFSNode {
         var ctim: WASIAbi.Timestamp
     }
 
-    private let state: Mutex<State>
+    // See `WASIImplementation.fdTable` for why this is a `nonisolated(unsafe) var`.
+    nonisolated(unsafe) private var state: PlatformMutex<State>
 
     init(content: FileContent) {
         let now = WASIAbi.Timestamp.currentWallClock()
-        self.state = Mutex(State(content: content, atim: now, mtim: now, ctim: now))
+        self.state = PlatformMutex(State(content: content, atim: now, mtim: now, ctim: now))
     }
 
     convenience init(bytes: some Sequence<UInt8>) {
@@ -151,7 +150,7 @@ final class MemoryFileNode: MemFSNode {
     }
 
     convenience init(handle: FileDescriptor) {
-        self.init(content: .handle(handle))
+        self.init(content: .handle(handle.rawValue))
     }
 
     /// A snapshot of the current content. `.bytes` copies the array; `.handle`
@@ -163,7 +162,7 @@ final class MemoryFileNode: MemFSNode {
     /// The host descriptor for a `.handle`-backed file, or nil for an in-memory file.
     var handle: FileDescriptor? {
         state.withLock {
-            if case .handle(let fd) = $0.content { return fd }
+            if case .handle(let fd) = $0.content { return FileDescriptor(rawValue: fd) }
             return nil
         }
     }
@@ -175,26 +174,15 @@ final class MemoryFileNode: MemFSNode {
             case .bytes(let bytes):
                 return bytes.count
             case .handle(let fd):
-                return Int(try fd.attributes().size)
+                return Int(try FileDescriptor(rawValue: fd).attributes().size)
             }
         }
     }
 
+    /// The node's own timestamps. A `.handle` file does not report the host
+    /// file's, nor let a guest change them.
     var timestamps: (atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp, ctim: WASIAbi.Timestamp) {
-        get throws {
-            let snapshot = state.withLock { (content: $0.content, atim: $0.atim, mtim: $0.mtim, ctim: $0.ctim) }
-            switch snapshot.content {
-            case .bytes:
-                return (snapshot.atim, snapshot.mtim, snapshot.ctim)
-            case .handle(let fd):
-                let attrs = try fd.attributes()
-                return (
-                    WASIAbi.Timestamp(platformTimeSpec: attrs.accessTime),
-                    WASIAbi.Timestamp(platformTimeSpec: attrs.modificationTime),
-                    WASIAbi.Timestamp(platformTimeSpec: attrs.creationTime)
-                )
-            }
-        }
+        state.withLock { ($0.atim, $0.mtim, $0.ctim) }
     }
 
     /// Resets a `.bytes` file to empty content (used for `O_TRUNC`). No-op for `.handle`.
@@ -208,25 +196,26 @@ final class MemoryFileNode: MemFSNode {
         }
     }
 
-    /// Sets in-memory times on a `.bytes` file; returns the host descriptor for a
-    /// `.handle` file so the caller applies the change with a syscall outside the lock.
-    func setTimesInMemory(atim: WASIAbi.Timestamp?, mtim: WASIAbi.Timestamp?) -> FileDescriptor? {
+    /// Records access and modification times on the node, as
+    /// ``MemoryDirectoryNode/setTimes(atim:mtim:)`` does for a directory.
+    func setTimes(atim: WASIAbi.Timestamp?, mtim: WASIAbi.Timestamp?) {
         state.withLock { s in
-            if case .handle(let fd) = s.content { return fd }
             if let atim { s.atim = atim }
             if let mtim { s.mtim = mtim }
             s.ctim = WASIAbi.Timestamp.currentWallClock()
-            return nil
         }
     }
 
     /// Truncates or extends a `.bytes` file; calls `truncate` on the host descriptor
     /// for a `.handle` file outside the lock.
     func setFilestatSize(_ size: WASIAbi.FileSize) throws {
+        // The size is a `u64` the guest chooses, but a file size is signed.
+        guard let newSize = Int(exactly: size) else {
+            throw WASIAbi.Errno.EINVAL
+        }
         let handle: FileDescriptor? = state.withLock { s in
             switch s.content {
             case .bytes(var bytes):
-                let newSize = Int(size)
                 if newSize < bytes.count {
                     bytes = Array(bytes.prefix(newSize))
                 } else if newSize > bytes.count {
@@ -238,10 +227,10 @@ final class MemoryFileNode: MemFSNode {
                 s.ctim = now
                 return nil
             case .handle(let fd):
-                return fd
+                return FileDescriptor(rawValue: fd)
             }
         }
-        if let handle { try handle.truncate(size: Int64(size)) }
+        if let handle { try handle.truncate(size: Int64(newSize)) }
     }
 
     /// The byte count of a `.bytes` file, or the host descriptor for a `.handle` file
@@ -250,43 +239,44 @@ final class MemoryFileNode: MemFSNode {
         state.withLock { s in
             switch s.content {
             case .bytes(let bytes): return (bytes.count, nil)
-            case .handle(let fd): return (0, fd)
+            case .handle(let fd): return (0, FileDescriptor(rawValue: fd))
             }
         }
     }
 
-    func read<M: GuestMemory, Buffer: Sequence>(
-        into buffer: Buffer, memory: M, position: Int
-    ) throws -> (count: WASIAbi.Size, newPosition: Int) where Buffer.Element == WASIAbi.IOVec {
-        let (count, newPosition, handle): (WASIAbi.Size, Int, FileDescriptor?) = state.withLock { s in
+    func read(
+        into buffers: GuestBuffers, position: Int
+    ) throws -> (count: WASIAbi.Size, newPosition: Int) {
+        let (count, newPosition, handle): (WASIAbi.Size, Int, FileDescriptor?) = try state.withLock { s in
             switch s.content {
             case .bytes(let bytes):
                 var cur = position
                 var total: UInt32 = 0
-                for iovec in buffer {
-                    iovec.withHostBufferPointer(in: memory) { bufferPtr in
+                for index in 0..<buffers.count {
+                    try buffers.withHostBuffer(at: index) { bufferPtr in
                         let available = max(0, bytes.count - cur)
                         let toRead = min(bufferPtr.count, available)
-                        guard toRead > 0 else { return }
+                        guard toRead > 0 else { return 0 }
                         bytes.withUnsafeBytes { contentBytes in
                             bufferPtr.baseAddress!.copyMemory(
                                 from: contentBytes.baseAddress!.advanced(by: cur), byteCount: toRead)
                         }
                         cur += toRead
                         total += UInt32(toRead)
+                        return toRead
                     }
                 }
                 s.atim = WASIAbi.Timestamp.currentWallClock()
                 return (total, cur, nil)
             case .handle(let fd):
-                return (0, position, fd)
+                return (0, position, FileDescriptor(rawValue: fd))
             }
         }
         guard let handle else { return (count, newPosition) }
         var currentOffset = Int64(position)
         var total: UInt32 = 0
-        for iovec in buffer {
-            let nread = try iovec.withHostBufferPointer(in: memory) { bufferPtr in
+        for index in 0..<buffers.count {
+            let nread = try buffers.withHostBuffer(at: index) { bufferPtr in
                 try handle.read(fromAbsoluteOffset: currentOffset, into: bufferPtr)
             }
             currentOffset += Int64(nread)
@@ -295,38 +285,39 @@ final class MemoryFileNode: MemFSNode {
         return (total, Int(currentOffset))
     }
 
-    func pread<M: GuestMemory, Buffer: Sequence>(
-        into buffer: Buffer, memory: M, offset: Int
-    ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
-        let (count, handle): (WASIAbi.Size, FileDescriptor?) = state.withLock { s in
+    func pread(
+        into buffers: GuestBuffers, offset: Int
+    ) throws -> WASIAbi.Size {
+        let (count, handle): (WASIAbi.Size, FileDescriptor?) = try state.withLock { s in
             switch s.content {
             case .bytes(let bytes):
                 var cur = offset
                 var total: UInt32 = 0
-                for iovec in buffer {
-                    iovec.withHostBufferPointer(in: memory) { bufferPtr in
+                for index in 0..<buffers.count {
+                    try buffers.withHostBuffer(at: index) { bufferPtr in
                         let available = max(0, bytes.count - cur)
                         let toRead = min(bufferPtr.count, available)
-                        guard toRead > 0 else { return }
+                        guard toRead > 0 else { return 0 }
                         bytes.withUnsafeBytes { contentBytes in
                             bufferPtr.baseAddress!.copyMemory(
                                 from: contentBytes.baseAddress!.advanced(by: cur), byteCount: toRead)
                         }
                         cur += toRead
                         total += UInt32(toRead)
+                        return toRead
                     }
                 }
                 s.atim = WASIAbi.Timestamp.currentWallClock()
                 return (total, nil)
             case .handle(let fd):
-                return (0, fd)
+                return (0, FileDescriptor(rawValue: fd))
             }
         }
         guard let handle else { return count }
         var currentOffset = Int64(offset)
         var total: UInt32 = 0
-        for iovec in buffer {
-            let nread = try iovec.withHostBufferPointer(in: memory) { bufferPtr in
+        for index in 0..<buffers.count {
+            let nread = try buffers.withHostBuffer(at: index) { bufferPtr in
                 try handle.read(fromAbsoluteOffset: currentOffset, into: bufferPtr)
             }
             currentOffset += Int64(nread)
@@ -335,24 +326,30 @@ final class MemoryFileNode: MemFSNode {
         return total
     }
 
-    func write<M: GuestMemory, Buffer: Sequence>(
-        vectored buffer: Buffer, memory: M, position: Int
-    ) throws -> (count: WASIAbi.Size, newPosition: Int) where Buffer.Element == WASIAbi.IOVec {
-        let (count, newPosition, handle): (WASIAbi.Size, Int, FileDescriptor?) = state.withLock { s in
+    func write(
+        vectored buffers: GuestBuffers, position: Int
+    ) throws -> (count: WASIAbi.Size, newPosition: Int) {
+        let (count, newPosition, handle): (WASIAbi.Size, Int, FileDescriptor?) = try state.withLock { s in
             switch s.content {
             case .bytes(var bytes):
                 var cur = position
                 var total: UInt32 = 0
-                for iovec in buffer {
-                    iovec.withHostBufferPointer(in: memory) { bufferPtr in
+                for index in 0..<buffers.count {
+                    try buffers.withHostBuffer(at: index) { bufferPtr in
                         let bytesToWrite = bufferPtr.count
-                        let requiredSize = cur + bytesToWrite
+                        // The position comes from a guest-chosen seek or pwrite
+                        // offset, so it can sit at the end of the range.
+                        let (requiredSize, overflow) = cur.addingReportingOverflow(bytesToWrite)
+                        guard !overflow else {
+                            throw WASIAbi.Errno.EFBIG
+                        }
                         if requiredSize > bytes.count {
                             bytes.append(contentsOf: Array(repeating: 0, count: requiredSize - bytes.count))
                         }
                         bytes.replaceSubrange(cur..<(cur + bytesToWrite), with: bufferPtr)
                         cur += bytesToWrite
                         total += UInt32(bytesToWrite)
+                        return bytesToWrite
                     }
                 }
                 s.content = .bytes(bytes)
@@ -361,14 +358,14 @@ final class MemoryFileNode: MemFSNode {
                 s.ctim = now
                 return (total, cur, nil)
             case .handle(let fd):
-                return (0, position, fd)
+                return (0, position, FileDescriptor(rawValue: fd))
             }
         }
         guard let handle else { return (count, newPosition) }
         var currentOffset = Int64(position)
         var total: UInt32 = 0
-        for iovec in buffer {
-            let nwritten = try iovec.withHostBufferPointer(in: memory) { bufferPtr in
+        for index in 0..<buffers.count {
+            let nwritten = try buffers.withHostBuffer(at: index) { bufferPtr in
                 try handle.writeAll(toAbsoluteOffset: currentOffset, bufferPtr)
             }
             currentOffset += Int64(nwritten)
@@ -377,24 +374,30 @@ final class MemoryFileNode: MemFSNode {
         return (total, Int(currentOffset))
     }
 
-    func pwrite<M: GuestMemory, Buffer: Sequence>(
-        vectored buffer: Buffer, memory: M, offset: Int
-    ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
-        let (count, handle): (WASIAbi.Size, FileDescriptor?) = state.withLock { s in
+    func pwrite(
+        vectored buffers: GuestBuffers, offset: Int
+    ) throws -> WASIAbi.Size {
+        let (count, handle): (WASIAbi.Size, FileDescriptor?) = try state.withLock { s in
             switch s.content {
             case .bytes(var bytes):
                 var cur = offset
                 var total: UInt32 = 0
-                for iovec in buffer {
-                    iovec.withHostBufferPointer(in: memory) { bufferPtr in
+                for index in 0..<buffers.count {
+                    try buffers.withHostBuffer(at: index) { bufferPtr in
                         let bytesToWrite = bufferPtr.count
-                        let requiredSize = cur + bytesToWrite
+                        // The position comes from a guest-chosen seek or pwrite
+                        // offset, so it can sit at the end of the range.
+                        let (requiredSize, overflow) = cur.addingReportingOverflow(bytesToWrite)
+                        guard !overflow else {
+                            throw WASIAbi.Errno.EFBIG
+                        }
                         if requiredSize > bytes.count {
                             bytes.append(contentsOf: Array(repeating: 0, count: requiredSize - bytes.count))
                         }
                         bytes.replaceSubrange(cur..<(cur + bytesToWrite), with: bufferPtr)
                         cur += bytesToWrite
                         total += UInt32(bytesToWrite)
+                        return bytesToWrite
                     }
                 }
                 s.content = .bytes(bytes)
@@ -403,14 +406,14 @@ final class MemoryFileNode: MemFSNode {
                 s.ctim = now
                 return (total, nil)
             case .handle(let fd):
-                return (0, fd)
+                return (0, FileDescriptor(rawValue: fd))
             }
         }
         guard let handle else { return count }
         var currentOffset = Int64(offset)
         var total: UInt32 = 0
-        for iovec in buffer {
-            let nwritten = try iovec.withHostBufferPointer(in: memory) { bufferPtr in
+        for index in 0..<buffers.count {
+            let nwritten = try buffers.withHostBuffer(at: index) { bufferPtr in
                 try handle.writeAll(toAbsoluteOffset: currentOffset, bufferPtr)
             }
             currentOffset += Int64(nwritten)
@@ -523,7 +526,7 @@ final class MemoryCharacterDeviceEntry: WASIFile {
         throw WASIAbi.Errno.ESPIPE
     }
 
-    func write<M: GuestMemory, Buffer: Sequence>(vectored buffer: Buffer, memory: M) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func write(vectored buffers: GuestBuffers) throws -> WASIAbi.Size {
         guard accessMode.contains(.write) else {
             throw WASIAbi.Errno.EBADF
         }
@@ -531,20 +534,21 @@ final class MemoryCharacterDeviceEntry: WASIFile {
         switch deviceNode.kind {
         case .null:
             var totalBytes: UInt32 = 0
-            for iovec in buffer {
-                iovec.withHostBufferPointer(in: memory) { bufferPtr in
+            for index in 0..<buffers.count {
+                try buffers.withHostBuffer(at: index) { bufferPtr in
                     totalBytes += UInt32(bufferPtr.count)
+                    return bufferPtr.count
                 }
             }
             return totalBytes
         }
     }
 
-    func pwrite<M: GuestMemory, Buffer: Sequence>(vectored buffer: Buffer, memory: M, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func pwrite(vectored buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size {
         throw WASIAbi.Errno.ESPIPE
     }
 
-    func read<M: GuestMemory, Buffer: Sequence>(into buffer: Buffer, memory: M) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func read(into buffers: GuestBuffers) throws -> WASIAbi.Size {
         guard accessMode.contains(.read) else {
             throw WASIAbi.Errno.EBADF
         }
@@ -555,7 +559,7 @@ final class MemoryCharacterDeviceEntry: WASIFile {
         }
     }
 
-    func pread<M: GuestMemory, Buffer: Sequence>(into buffer: Buffer, memory: M, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func pread(into buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size {
         throw WASIAbi.Errno.ESPIPE
     }
 }

@@ -1,12 +1,17 @@
 {
   "testsuite": {
     "repository": "https://github.com/WebAssembly/testsuite.git",
-    "revision": "53da17c0936a23f68f97cde4f9346a0a374dc35f",
+    "revision": "b464a4cd100d98175ae6e3890db89a2e6c8302f7",
     "categories": ["default"]
   },
   "wasi-testsuite": {
     "repository": "https://github.com/WebAssembly/wasi-testsuite.git",
     "revision": "f442fae1a214263aeeddb5395c0c50dc9403b7f8",
+    "categories": ["default"]
+  },
+  "wasi-threads": {
+    "repository": "https://github.com/WebAssembly/wasi-threads.git",
+    "revision": "f8ea03cc0ffbde143415e945497de112f6f9fd53",
     "categories": ["default"]
   },
   "wasm-c-api": {
@@ -43,6 +48,12 @@
   "swift-stringify-macro.wasm": {
     "repository": "https://github.com/kateinoigakukun/swift-stringify-macro.wasm.git",
     "revision": "576ef7ff3b9713d75519eab0cb1f2b738220b636",
+    "categories": ["benchmark"]
+  },
+  "wasmi-benchmarks": {
+    "repository": "https://github.com/wasmi-labs/wasmi-benchmarks.git",
+    "revision": "b361a36b09340781db6681582804e0e61f35f9af",
+    "submodules": true,
     "categories": ["benchmark"]
   },
   "coremark": {

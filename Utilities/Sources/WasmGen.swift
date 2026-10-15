@@ -127,6 +127,12 @@ enum WasmGen {
 
             extension InstructionVisitor where Self: ~Copyable {
                 /// Visits an instruction.
+                ///
+                /// Inlinable so that each concrete visitor gets its own specialized copy:
+                /// the generic one returns the visitor's error type indirectly from every
+                /// case, which allocates and probes a stack slot per case on each call.
+                @inlinable
+                @inline(never)
                 public mutating func visit(_ instruction: Instruction) throws(VisitorError) {
                     switch instruction {
 
@@ -474,7 +480,7 @@ enum WasmGen {
 
             /// An instruction encoder that is responsible for encoding opcodes and immediates
             /// in Wasm binary format.
-            public protocol BinaryInstructionEncoder: InstructionVisitor {
+            protocol BinaryInstructionEncoder: InstructionVisitor {
                 /// Encodes an instruction opcode.
                 mutating func encodeInstruction(_ opcode: [UInt8]) throws(VisitorError)
 
@@ -518,7 +524,7 @@ enum WasmGen {
             """
 
         for instruction in instructions.categorized {
-            code += "    public mutating func \(instruction.visitMethodName)("
+            code += "    mutating func \(instruction.visitMethodName)("
             code += instruction.associatedValues.map { i in
                 if i.argumentName == i.parameterName {
                     return "\(i.parameterName): \(i.type)"

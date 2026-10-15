@@ -9,6 +9,10 @@ This subdirectory contains some [libFuzzer](https://www.llvm.org/docs/LibFuzzer.
 
 - [Open Source Swift Toolchain](https://swift.org/install) - Xcode toolchain does not contain fuzzing support, so you need to install the open source toolchain.
 - [wasm-tools](https://github.com/bytecodealliance/wasm-tools) - Required to generate random seed corpora
+- The `wasm-c-api` vendored dependency - `FuzzDifferential` links against it, so check it out first:
+    ```sh
+    ../Vendor/checkout-dependency wasm-c-api
+    ```
 
 ## libFuzzer-based Fuzzing Targets
 
@@ -38,12 +42,38 @@ To reproduce a crash found by the fuzzer
     ./.build/debug/<target> <testcase>
     ```
 
+## Resumable Call Fuzzing
+
+`FuzzResumable` generates modules whose control flow crosses every place a `ResumableCall` can
+suspend, then runs each export twice: once with a plain call, and once as a resumable call that is
+suspended by tiny fuel slices and epoch deadlines and resumed until it finishes. Both runs must
+agree on results, traps, memory, globals, tables and the fuel each call consumed. It needs no seed
+corpus:
+
+```sh
+./fuzz.py build FuzzResumable --release
+mkdir -p corpus && ./.build/release/FuzzResumable corpus -fork=8 -timeout=20
+```
+
+`FuzzResumableDriver` runs the same oracle without libFuzzer, so it also works on macOS. With
+`--race`, another thread ticks the epoch while the guests run; build it with
+`-Xswiftc -sanitize=thread` to check that for data races.
+
+```sh
+swift build -c release --product FuzzResumableDriver
+./.build/release/FuzzResumableDriver --count 100000
+./.build/release/FuzzResumableDriver --race
+./.build/release/FuzzResumableDriver --replay FailCases/FuzzResumableDriver/finding-<seed>-<n> --trace
+```
+
 ## Differential Testing
 
 Generate a Wasm module with termination ensured by `wasm-tools smith` and check if WasmKit and another reference engine (e.g. Wasmtime) agree on the same result and the same memory state.
 
 1. Build the differential testing tool:
     ```sh
+    # Check out the `wasm.h` header that the `WasmCAPI` target wraps
+    ../Vendor/checkout-dependency wasm-c-api
     # Download and extract the Wasmtime C API library
     mkdir -p .build/libwasmtime && \
       curl -L https://github.com/bytecodealliance/wasmtime/releases/download/v23.0.2/wasmtime-v23.0.2-x86_64-linux-c-api.tar.xz -o - | \

@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import WASTRunner
 import WAT
 import WasmParser
 
@@ -14,41 +15,45 @@ struct ParseOnlyTests {
                 includingPropertiesForKeys: nil
             ).filter { url in
                 url.pathExtension == "wast" && url.lastPathComponent.starts(with: "simd_")
+                    && !UnsupportedSpectests.affectedFiles.contains(url.lastPathComponent)
             }
         #endif
     }
 
-    private func parseAllModulesInWast(_ source: String, features: WasmFeatureSet) throws {
+    /// Files at the top level of the testsuite with directives WasmKit cannot run yet. The spec
+    /// tests skip those directives, so this decodes their modules instead.
+    private static var unsupportedWastFiles: [URL] {
+        #if os(Android)
+            return []
+        #else
+            return UnsupportedSpectests.affectedFiles.filter { !$0.contains("/") }.map(Spectest.path)
+        #endif
+    }
+
+    private func parseAllModulesInWast(_ source: String, features: WasmFeatureSet, skip: [Int: String] = [:]) throws {
         var wast = try parseWAST(source, features: features)
-        while let (directive, _) = try wast.nextDirective() {
-            switch directive {
+        while let (result, location) = wast.nextDirectiveResult() {
+            if !skip.isEmpty, skip[location.computeLineAndColumn().line] != nil { continue }
+            switch try result.get() {
             case .module(let module):
-                try parseModuleSource(module.source, features: features)
+                try parseWasmBytes(TestSupport.encode(module.source, features: features), features: features)
             case .assertUnlinkable(let wat, _):
-                let bytes = try wat.encode(options: .default)
-                try parseWasmBytes(bytes, features: features)
+                try parseWasmBytes(TestSupport.encode(.text(wat), features: features), features: features)
             default:
                 break
             }
         }
     }
 
-    private func parseModuleSource(_ moduleSource: ModuleSource, features: WasmFeatureSet) throws {
-        let bytes: [UInt8]
-        switch moduleSource {
-        case .binary(let b):
-            bytes = b
-        case .quote(let text):
-            bytes = try wat2wasm(String(decoding: text, as: UTF8.self), features: features)
-        case .text(let wat):
-            bytes = try wat.encode(options: .default)
-        }
-        try parseWasmBytes(bytes, features: features)
-    }
-
     private func parseWasmBytes(_ bytes: [UInt8], features: WasmFeatureSet) throws {
         var parser = WasmParser.Parser(bytes: bytes, features: features)
-        while (try parser.parseNext()) != nil {}
+        while let payload = try parser.parseNext() {
+            guard case .codeSection(let codes) = payload else { continue }
+            for code in codes {
+                var expression = ExpressionParser(code: code)
+                while try expression.parse() != nil {}
+            }
+        }
     }
 
     @Test(arguments: try ParseOnlyTests.simdWastFiles())
@@ -57,5 +62,15 @@ struct ParseOnlyTests {
         var features = Spectest.deriveFeatureSet(wast: wastFile)
         features.insert(.simd)
         try parseAllModulesInWast(source, features: features)
+    }
+
+    @Test(arguments: ParseOnlyTests.unsupportedWastFiles)
+    func parseOnlyUnsupportedSpec(wastFile: URL) throws {
+        let source = try String(contentsOf: wastFile, encoding: .utf8)
+        let skip = Spectest.skippedDirectives[wastFile.lastPathComponent] ?? [:]
+        var features = Spectest.deriveFeatureSet(wast: wastFile)
+        // Wasm 3.0 includes typed function references, which only some files get for wast2json.
+        features.insert(.functionReferences)
+        try parseAllModulesInWast(source, features: features, skip: skip)
     }
 }

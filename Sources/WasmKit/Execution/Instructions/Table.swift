@@ -7,45 +7,56 @@ extension Execution {
     mutating func tableGet(sp: Sp, immediate: Instruction.TableGetOperand) throws {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
 
-        let elementIndex = try getElementIndex(sp: sp, VReg(immediate.index), table)
+        let elementIndex = try getElementIndex(sp: sp, immediate.index, table)
 
-        let reference = table.elements[Int(elementIndex)]
+        let reference = table.reference(at: Int(elementIndex))
         sp[immediate.result] = UntypedValue(.ref(reference))
     }
     mutating func tableSet(sp: Sp, immediate: Instruction.TableSetOperand) throws {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
 
-        let reference = sp.getReference(VReg(immediate.value), type: table.tableType)
-        let elementIndex = try getElementIndex(sp: sp, VReg(immediate.index), table)
+        let reference = sp.getReference(immediate.value, type: table.tableType)
+        let elementIndex = try getElementIndex(sp: sp, immediate.index, table)
         setTableElement(table: table, Int(elementIndex), reference)
     }
     mutating func tableSize(sp: Sp, immediate: Instruction.TableSizeOperand) {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
-        let elementsCount = table.elements.count
+        let elementsCount = table.elementCount
         sp[immediate.result] = UntypedValue(table.limits.isMemory64 ? .i64(UInt64(elementsCount)) : .i32(UInt32(elementsCount)))
     }
-    mutating func tableGrow(sp: Sp, immediate: Instruction.TableGrowOperand) throws {
+    mutating func tableGrow(sp: Sp, pc: Pc, immediate: Instruction.TableGrowOperand) throws {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
 
         let growthSize = sp[immediate.delta].asAddressOffset(table.limits.isMemory64)
-        let growthValue = sp.getReference(VReg(immediate.value), type: table.tableType)
+        let growthValue = sp.getReference(immediate.value, type: table.tableType)
 
-        let oldSize = table.elements.count
+        let oldSize = table.elementCount
+        // A growth the limits refuse does no work and costs nothing, so it must not suspend for fuel.
+        if !table.withValue({ $0.refusesGrowth(by: growthSize) }) {
+            try reserveElementsCopied(growthSize, sp: sp, pc: pc, for: Instruction.TableGrowOperand.self)
+        }
         guard try table.withValue({ try $0.grow(by: growthSize, value: growthValue, resourceLimiter: store.value.resourceLimiter) }) else {
             sp[immediate.result] = UntypedValue(.i32(Int32(-1).unsigned))
             return
         }
+        try chargeElementsCopied(growthSize)
         sp[immediate.result] = UntypedValue(table.limits.isMemory64 ? .i64(UInt64(oldSize)) : .i32(UInt32(oldSize)))
     }
-    mutating func tableFill(sp: Sp, immediate: Instruction.TableFillOperand) throws {
+    mutating func tableFill(sp: Sp, pc: Pc, immediate: Instruction.TableFillOperand) throws {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
         let fillCounter = sp[immediate.size].asAddressOffset(table.limits.isMemory64)
         let fillValue = sp.getReference(immediate.value, type: table.tableType)
         let startIndex = sp[immediate.destOffset].asAddressOffset(table.limits.isMemory64)
 
-        try table.withValue { try $0.fill(repeating: fillValue, from: Int(startIndex), count: Int(fillCounter)) }
+        try reserveElementsCopied(fillCounter, sp: sp, pc: pc, for: Instruction.TableFillOperand.self)
+        // A table64 index or count beyond `Int` cannot be in bounds for any table.
+        guard let start = Int(exactly: startIndex), let count = Int(exactly: fillCounter) else {
+            throw Trap(.tableOutOfBounds(Int(clamping: startIndex)))
+        }
+        try table.withValue { try $0.fill(repeating: fillValue, from: start, count: count) }
+        try chargeElementsCopied(fillCounter)
     }
-    mutating func tableCopy(sp: Sp, immediate: Instruction.TableCopyOperand) throws {
+    mutating func tableCopy(sp: Sp, pc: Pc, immediate: Instruction.TableCopyOperand) throws {
         let sourceTableIndex = immediate.sourceIndex
         let destinationTableIndex = immediate.destIndex
         let store = self.store.value
@@ -58,9 +69,16 @@ extension Execution {
         let sourceIndex = sp[immediate.sourceOffset].asAddressOffset(sourceTable.limits.isMemory64)
         let destinationIndex = sp[immediate.destOffset].asAddressOffset(destinationTable.limits.isMemory64)
 
-        try destinationTable.copy(sourceTable, from: Int(sourceIndex), to: Int(destinationIndex), count: Int(size))
+        try reserveElementsCopied(size, sp: sp, pc: pc, for: Instruction.TableCopyOperand.self)
+        guard let source = Int(exactly: sourceIndex), let destination = Int(exactly: destinationIndex),
+            let count = Int(exactly: size)
+        else {
+            throw Trap(.tableOutOfBounds(Int(clamping: destinationIndex)))
+        }
+        try destinationTable.copy(sourceTable, from: source, to: destination, count: count)
+        try chargeElementsCopied(size)
     }
-    mutating func tableInit(sp: Sp, immediate: Instruction.TableInitOperand) throws {
+    mutating func tableInit(sp: Sp, pc: Pc, immediate: Instruction.TableInitOperand) throws {
         let tableIndex = immediate.tableIndex
         let segmentIndex = immediate.segmentIndex
         let destinationTable = getTable(tableIndex, sp: sp, store: store.value)
@@ -70,13 +88,18 @@ extension Execution {
         let sourceIndex = UInt64(sp[immediate.sourceOffset].i32)
         let destinationIndex = sp[immediate.destOffset].asAddressOffset(destinationTable.limits.isMemory64)
 
+        try reserveElementsCopied(copyCounter, sp: sp, pc: pc, for: Instruction.TableInitOperand.self)
+        guard let destination = Int(exactly: destinationIndex) else {
+            throw Trap(.tableOutOfBounds(Int(clamping: destinationIndex)))
+        }
         try destinationTable.withValue {
             try $0.initialize(
                 sourceElement,
-                from: Int(sourceIndex), to: Int(destinationIndex),
+                from: Int(sourceIndex), to: destination,
                 count: Int(copyCounter)
             )
         }
+        try chargeElementsCopied(copyCounter)
     }
     mutating func tableElementDrop(sp: Sp, immediate: Instruction.TableElementDropOperand) {
         let segment = currentInstance(sp: sp).elementSegments[Int(immediate.index)]
@@ -89,7 +112,7 @@ extension Execution {
         _ reference: Reference
     ) {
         table.withValue {
-            $0.elements[elementIndex] = reference
+            $0.elements[elementIndex] = TableEntity.rawValue(reference)
         }
     }
 }
@@ -105,8 +128,8 @@ extension Execution {
     ) throws -> ElementIndex {
         let elementIndex = sp[register].asAddressOffset(table.limits.isMemory64)
 
-        guard elementIndex < table.elements.count else {
-            throw Trap(.tableOutOfBounds(Int(elementIndex)))
+        guard elementIndex < table.elementCount else {
+            throw Trap(.tableOutOfBounds(Int(clamping: elementIndex)))
         }
 
         return ElementIndex(elementIndex)

@@ -15,6 +15,28 @@ public final class Engine {
     let interceptor: EngineInterceptor?
     let funcTypeInterner: Interner<FunctionType>
 
+    /// The head slot of the `returnCrossInstance` handler under this engine's
+    /// threading model.
+    ///
+    /// `_return` hands a cross-instance return off by re-dispatching to that
+    /// handler. Looking the slot up from a handler would mean a call (the
+    /// handler table is a lazily initialised global), and a call means a
+    /// stack frame on the hottest return path, so it is computed once here
+    /// and read through the execution state instead.
+    let crossInstanceReturnSlot: CodeSlot
+
+    /// Advances this engine's epoch. Send it to the thread that should stop guest code, such as
+    /// a timer.
+    ///
+    /// With ``EngineConfiguration/epochInterruption``, guest code checks the epoch at every
+    /// function entry and loop header, and stops once it reaches the deadline set by
+    /// ``Store/setEpochDeadline(ticksBeyondCurrent:)``.
+    public let epochTicker = EpochTicker()
+
+    /// Whether this engine has an interceptor which is unsafe to share with
+    /// concurrently executing stores.
+    package var hasInterceptor: Bool { interceptor != nil }
+
     /// Create a new execution engine.
     ///
     /// - Parameters:
@@ -39,12 +61,20 @@ public final class Engine {
         self.configuration = configuration
         self.interceptor = interceptor
         self.funcTypeInterner = Interner()
+        self.crossInstanceReturnSlot = Instruction.returnCrossInstance(.init()).headSlot(
+            threadingModel: configuration.threadingModel
+        )
     }
 
     /// Migration aid for the old ``Runtime/instantiate(module:)``
     @available(*, unavailable, message: "Use ``Module/instantiate(store:imports:)`` instead")
     public func instantiate(module: Module) -> Instance { fatalError() }
 }
+
+// `configuration` is immutable and `funcTypeInterner` synchronizes its mutable
+// state. Concurrent clients must reject engines with interceptors, whose
+// implementations are not currently Sendable.
+extension Engine: @unchecked Sendable {}
 
 /// The configuration for the WebAssembly execution engine.
 public struct EngineConfiguration: Sendable {
@@ -65,10 +95,17 @@ public struct EngineConfiguration: Sendable {
         }
 
         static var defaultForCurrentPlatform: ThreadingModel {
-            #if os(WASI)
+            #if $Embedded
+                // Direct threading is available on an embedded target but not
+                // chosen for it: whether the convention it is built with really
+                // tail calls is a property of the target, and a wrong guess
+                // there exhausts the stack rather than running slowly. An
+                // embedded host asks for `.direct` deliberately.
                 return .token
-            #else
+            #elseif arch(i386) || arch(x86_64) || arch(arm) || arch(arm64) || arch(arm64_32)
                 return useDirectThreadedCode ? .direct : .token
+            #else
+                return .token
             #endif
         }
     }
@@ -138,6 +175,25 @@ public struct EngineConfiguration: Sendable {
     /// example threading model), or otherwise not applicable.
     public var memoryBoundsChecking: MemoryBoundsChecking
 
+    /// Whether the engine instruments translated code to consume fuel as it runs. (Default: `false`)
+    ///
+    /// When enabled, give a store a budget with ``Store/fuel``. Execution traps once the budget
+    /// is exhausted, and the store stays usable: set a new budget and call again.
+    ///
+    /// This is a translation-time property. Code translated by an engine without fuel metering is
+    /// never metered, which is why this lives on the engine rather than on the store.
+    public var fuelMetering: Bool
+
+    /// Whether the engine instruments translated code to check the engine's epoch. (Default: `false`)
+    ///
+    /// When enabled, every function entry and loop header compares the epoch advanced by
+    /// ``EpochTicker/increment()`` with the store's deadline, set with
+    /// ``Store/setEpochDeadline(ticksBeyondCurrent:)``. Another thread can then stop a running
+    /// guest: a ``ResumableCall`` suspends, and any other call traps.
+    ///
+    /// Like ``fuelMetering``, this is a translation-time property.
+    public var epochInterruption: Bool
+
     /// FIXME: Make it public once we add mprotect-based bounds checking with JIT.
     /// Extra reserved bytes after the 4 GiB wasm32 address space for future
     /// unchecked constant-offset accesses in JIT code.
@@ -154,18 +210,26 @@ public struct EngineConfiguration: Sendable {
     /// interpreter. If `nil`, the default stack size (512KB) will be used.
     /// - Parameter features: The WebAssembly features that can be used by Wasm
     /// modules running on this engine.
+    /// - Parameter fuelMetering: Whether translated code consumes fuel as it
+    /// runs, so that execution can be bounded with ``Store/fuel``.
+    /// - Parameter epochInterruption: Whether translated code checks the engine's epoch, so that
+    /// another thread can stop execution with ``Engine/epochTicker``.
     public init(
         threadingModel: ThreadingModel? = nil,
         compilationMode: CompilationMode? = nil,
         stackSize: Int? = nil,
         features: WasmFeatureSet = .default,
         memoryBoundsChecking: MemoryBoundsChecking? = nil,
+        fuelMetering: Bool = false,
+        epochInterruption: Bool = false,
     ) {
         self.threadingModel = threadingModel ?? .defaultForCurrentPlatform
         self.compilationMode = compilationMode ?? .lazy
         self.stackSize = stackSize ?? (1 << 19)
         self.features = features
         self.memoryBoundsChecking = memoryBoundsChecking ?? .defaultForCurrentPlatform
+        self.fuelMetering = fuelMetering
+        self.epochInterruption = epochInterruption
     }
 }
 

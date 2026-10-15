@@ -82,4 +82,18 @@ enum TestSupport {
         }
         return nil
     }
+
+    /// The binary module that `source` describes. `features` applies to a quoted module.
+    static func encode(
+        _ source: ModuleSource, features: WasmFeatureSet = .default, options: EncodeOptions = .default
+    ) throws -> [UInt8] {
+        switch source {
+        case .text(let wat):
+            return try wat.encode(options: options)
+        case .quote(let text):
+            return try wat2wasm(String(decoding: text, as: UTF8.self), features: features, options: options)
+        case .binary(let bytes):
+            return bytes
+        }
+    }
 }

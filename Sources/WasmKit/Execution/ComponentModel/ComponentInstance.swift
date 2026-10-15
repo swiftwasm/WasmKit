@@ -33,6 +33,10 @@
     /// Type-safe handle to a component instance entity.
     typealias InternalComponentInstance = EntityHandle<ComponentInstanceEntity>
 
+    extension InternalComponentInstance {
+        var exports: [String: InternalComponentExternalValue] { withValue { $0.exports } }
+    }
+
     /// A stateful instance of a WebAssembly component.
     /// Created by instantiating a component with resolved imports.
     public struct ComponentInstance {
@@ -177,6 +181,13 @@
     /// Type-safe handle to a component function entity.
     typealias InternalComponentFunction = EntityHandle<ComponentFunctionEntity>
 
+    extension InternalComponentFunction {
+        var type: ComponentFuncType { withValue { $0.type } }
+        var coreFunction: InternalFunction { withValue { $0.coreFunction } }
+        var canonOptions: CanonOptions { withValue { $0.canonOptions } }
+        var resolveType: (ComponentTypeIndex) throws -> ComponentDefValType { withValue { $0.resolveType } }
+    }
+
     /// A component function that can be invoked with component-level values.
     /// Component functions lift core Wasm values to component values on return
     /// and lower component values to core Wasm values on call.
@@ -221,7 +232,8 @@
             }
 
             // 2. Call underlying core function
-            let coreResults = try handle.coreFunction.invoke(coreArgs, store: store)
+            var stack = ExecutionStack(engine: store.engine)
+            let coreResults = try handle.coreFunction.invoke(coreArgs, store: store, stack: &stack)
 
             // 3. Lift return values to component values
             let results: [ComponentValue]
@@ -265,7 +277,7 @@
 
             // 4. Execute post-return if specified
             if let postReturn = handle.canonOptions.postReturn {
-                _ = try postReturn.invoke(coreResults, store: store)
+                _ = try postReturn.invoke(coreResults, store: store, stack: &stack)
             }
 
             return results

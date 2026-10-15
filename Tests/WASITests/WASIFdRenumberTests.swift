@@ -1,6 +1,6 @@
 import Testing
 
-@testable import WASI
+@_spi(WASIPlatform) @testable import WASI
 
 @Suite struct WASIFdRenumberTests {
     /// Helper: run `body` with a WASI implementation backed by a MemoryFileSystem
@@ -111,14 +111,13 @@ import Testing
                 fsRightsBase: [.FD_READ], fsRightsInheriting: [], fdflags: []
             )
 
-            // Renumber fd to itself — fd_renumber sets source to nil after
-            // overwriting target with the same entry, so the slot is cleared
+            // Renumbering a descriptor onto itself changes nothing
             try wasi.fd_renumber(fd: fd, to: fd)
 
-            // The fd should be gone
-            #expect(throws: WASIAbi.Errno.EBADF) {
-                _ = try wasi.fd_filestat_get(fd: fd)
-            }
+            // The fd is still usable
+            #expect(try wasi.fd_filestat_get(fd: fd).filetype == .REGULAR_FILE)
+
+            try wasi.fd_close(fd: fd)
         }
     }
 }

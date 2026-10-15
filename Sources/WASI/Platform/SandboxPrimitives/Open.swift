@@ -1,40 +1,17 @@
-import SystemExtras
-import SystemPackage
-
-#if canImport(Darwin)
-    import Darwin
-#elseif canImport(Glibc)
-    import CSystem
-    import Glibc
-#elseif canImport(Musl)
-    import CSystem
-    import Musl
-#elseif canImport(Android)
-    import CSystem
-    import Android
-#elseif os(Windows)
-    import CSystem
-    import ucrt
-#elseif os(WASI)
-    import WASILibc
-#else
-    #error("Unsupported Platform")
-#endif
-
 struct PathResolution {
     private let mode: FileDescriptor.AccessMode
     private let options: FileDescriptor.OpenOptions
-    private let permissions: FilePermissions
+    private let permissions: FileDescriptor.FilePermissions
 
     private let startFd: FileDescriptor
     private var baseFd: FileDescriptor
-    private let path: FilePath
+    private let path: GuestPath
     private var openDirectories: [FileDescriptor]
     /// Reverse-ordered remaining path components
     /// File name appears first, then parent directories.
     ///   e.g. `a/b/c` -> ["c", "b", "a"]
     /// This ordering is just to avoid dropFirst() on Array.
-    private var components: FilePath.ComponentView
+    private var components: [GuestPath.Component]
     private var resolvedSymlinks: Int = 0
 
     private static var MAX_SYMLINKS: Int {
@@ -50,8 +27,8 @@ struct PathResolution {
         baseDirFd: FileDescriptor,
         mode: FileDescriptor.AccessMode,
         options: FileDescriptor.OpenOptions,
-        permissions: FilePermissions,
-        path: FilePath
+        permissions: FileDescriptor.FilePermissions,
+        path: GuestPath
     ) {
         self.startFd = baseDirFd
         self.baseFd = baseDirFd
@@ -60,7 +37,7 @@ struct PathResolution {
         self.permissions = permissions
         self.path = path
         self.openDirectories = []
-        self.components = FilePath.ComponentView(path.components.reversed())
+        self.components = path.components.reversed()
     }
 
     mutating func cleanup(keeping keptFd: FileDescriptor?) {
@@ -95,118 +72,84 @@ struct PathResolution {
         self.baseFd = lastDirectory
     }
 
-    mutating func regular(component: FilePath.Component) throws {
+    mutating func regular(component: String) throws {
         var options: FileDescriptor.OpenOptions = []
-        #if !os(Windows)
-            // First, try without following symlinks as a fast path.
-            // If it's actually a symlink and options don't have O_NOFOLLOW,
-            // we'll try again with interpreting resolved symlink.
-            options.insert(.noFollow)
-        #endif
+        // First, try without following symlinks as a fast path.
+        // If it's actually a symlink and options don't have O_NOFOLLOW,
+        // we'll try again with interpreting resolved symlink.
+        options.insert(.noFollow)
         let mode: FileDescriptor.AccessMode
 
         if !self.components.isEmpty {
-            #if !os(Windows)
-                // When trying to open an intermediate directory,
-                // we can assume it's directory.
-                options.insert(.directory)
-            #endif
+            // When trying to open an intermediate directory,
+            // we can assume it's directory.
+            options.insert(.directory)
             mode = .readOnly
         } else {
             options.formUnion(self.options)
             mode = self.mode
         }
 
-        try WASIAbi.Errno.translatingPlatformErrno {
-            do {
-                let newFd = try self.baseFd.open(
-                    at: FilePath(root: nil, components: component),
-                    mode, options: options, permissions: permissions
-                )
-                self.openDirectories.append(self.baseFd)
-                self.baseFd = newFd
-                return
-            } catch let openErrno as Errno {
-                #if os(Windows)
-                    // Windows doesn't have O_NOFOLLOW, so we can't retry with following symlink.
-                    throw openErrno
-                #else
-                    if self.options.contains(.noFollow) {
-                        // If "open" failed with O_NOFOLLOW, no need to retry.
-                        throw openErrno
-                    }
-
-                    // If "open" failed and it might be a symlink, try again with following symlink.
-
-                    // Check if it's a symlink by fstatat(2).
-                    //
-                    // NOTE: `errno` has enough information to check if the component is a symlink,
-                    // but the value is platform-specific (e.g. ELOOP on POSIX standards, but EMLINK
-                    // on BSD family), so we conservatively check it by fstatat(2).
-                    let attrs = try self.baseFd.attributes(
-                        at: FilePath(root: nil, components: component), options: [.noFollow]
-                    )
-                    guard attrs.fileType.isSymlink else {
-                        // openat(2) failed, fstatat(2) succeeded, and it said it's not a symlink.
-                        // If it's not a symlink, the error is not due to symlink following
-                        // but other reasons, so just throw the error.
-                        // e.g. open with O_DIRECTORY on a regular file.
-                        throw openErrno
-                    }
-
-                    #if os(WASI)
-                        throw Errno.notSupported
-                    #else
-                        try self.symlink(component: component)
-                    #endif
-                #endif
+        do {
+            let newFd = try self.baseFd.open(
+                at: component,
+                mode, options: options, permissions: permissions
+            )
+            self.openDirectories.append(self.baseFd)
+            self.baseFd = newFd
+            return
+        } catch let openErrno as WASIAbi.Errno {
+            if self.options.contains(.noFollow) {
+                // If "open" failed with O_NOFOLLOW, no need to retry.
+                throw openErrno
             }
+
+            // If "open" failed and it might be a symlink, try again with interpreting resolved symlink.
+
+            // Check if it's a symlink by fstatat(2).
+            //
+            // NOTE: `errno` has enough information to check if the component is a symlink,
+            // but the value is platform-specific (e.g. ELOOP on POSIX standards, but EMLINK
+            // on BSD family), so we conservatively check it by fstatat(2).
+            let attrs = try self.baseFd.attributes(at: component, options: [.noFollow])
+            guard attrs.fileType.isSymlink else {
+                // openat(2) failed, fstatat(2) succeeded, and it said it's not a symlink.
+                // If it's not a symlink, the error is not due to symlink following
+                // but other reasons, so just throw the error.
+                // e.g. open with O_DIRECTORY on a regular file.
+                throw openErrno
+            }
+
+            try self.symlink(component: component)
         }
     }
 
-    #if !os(Windows) && !os(WASI)
-        mutating func symlink(component: FilePath.Component) throws {
-            /// Thin wrapper around readlinkat(2)
-            func _readlinkat(_ fd: CInt, _ path: UnsafePointer<CChar>) throws -> FilePath {
-                var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
-                let length = try buffer.withUnsafeMutableBufferPointer { buffer in
-                    try buffer.withMemoryRebound(to: Int8.self) { buffer in
-                        guard let bufferBase = buffer.baseAddress else {
-                            throw WASIAbi.Errno.EINVAL
-                        }
-                        return readlinkat(fd, path, bufferBase, buffer.count)
-                    }
-                }
-                guard length >= 0 else {
-                    throw try WASIAbi.Errno(platformErrno: errno)
-                }
-                // Ensure null termination for platformString initializer
-                buffer[length] = 0
-                return buffer.withUnsafeBufferPointer { FilePath(platformString: $0.baseAddress!) }
-            }
-
-            guard resolvedSymlinks < Self.MAX_SYMLINKS else {
-                throw WASIAbi.Errno.ELOOP
-            }
-
-            // If it's a symlink, readlink(2) and check it doesn't escape sandbox.
-            let linkPath = try component.withPlatformString {
-                return try _readlinkat(self.baseFd.rawValue, $0)
-            }
-
-            guard !linkPath.isAbsolute else {
-                // Ban absolute symlink to avoid sandbox-escaping.
-                throw WASIAbi.Errno.EPERM
-            }
-
-            // Increment the number of resolved symlinks to prevent infinite
-            // link loop.
-            resolvedSymlinks += 1
-
-            // Add resolved path to the worklist.
-            self.components.append(contentsOf: linkPath.components.reversed())
+    mutating func symlink(component: String) throws {
+        guard resolvedSymlinks < Self.MAX_SYMLINKS else {
+            throw WASIAbi.Errno.ELOOP
         }
-    #endif
+
+        // If it's a symlink, readlink(2) and check it doesn't escape sandbox.
+        var buffer = [UInt8](repeating: 0, count: FileDescriptor.maximumPathLength)
+        let length = try buffer.withUnsafeMutableBytes { rawBuffer in
+            try self.baseFd.readSymlink(at: component, into: rawBuffer)
+        }
+        // Symlink contents are interpreted with WASI guest path semantics
+        // ('/'-separated, UTF-8), which POSIX hosts share.
+        let linkPath = GuestPath(String(decoding: buffer[..<length], as: UTF8.self))
+
+        guard !linkPath.isAbsolute else {
+            // Ban absolute symlink to avoid sandbox-escaping.
+            throw WASIAbi.Errno.EPERM
+        }
+
+        // Increment the number of resolved symlinks to prevent infinite
+        // link loop.
+        resolvedSymlinks += 1
+
+        // Add resolved path to the worklist.
+        self.components.append(contentsOf: linkPath.components.reversed())
+    }
 
     mutating func resolve() throws -> FileDescriptor {
         var resultFd: FileDescriptor? = nil
@@ -219,21 +162,19 @@ struct PathResolution {
         }
 
         while let component = components.popLast() {
-            switch component.kind {
+            switch component {
             case .currentDirectory:
                 break  // no-op
             case .parentDirectory:
                 try parentDirectory()
-            case .regular: try regular(component: component)
+            case .regular(let name): try regular(component: name)
             }
         }
 
         // If the path resolved without opening any new fd (e.g. "."),
         // dup to avoid returning an aliased fd to the caller.
         if baseFd.rawValue == startFd.rawValue {
-            baseFd = try startFd.open(
-                at: ".", mode, options: options, permissions: permissions
-            )
+            baseFd = try startFd.open(at: ".", mode, options: options, permissions: permissions)
         }
 
         resultFd = self.baseFd
@@ -244,10 +185,10 @@ struct PathResolution {
 extension SandboxPrimitives {
     static func openAt(
         start startFd: FileDescriptor,
-        path: FilePath,
+        path: GuestPath,
         mode: FileDescriptor.AccessMode,
         options: FileDescriptor.OpenOptions,
-        permissions: FilePermissions
+        permissions: FileDescriptor.FilePermissions
     ) throws -> FileDescriptor {
         var resolution = PathResolution(
             baseDirFd: startFd, mode: mode, options: options,

@@ -1,5 +1,4 @@
 import ArgumentParser
-import SystemPackage
 @_spi(OnlyForCLI) import WasmKit
 
 package struct Explore: ParsableCommand {
@@ -25,17 +24,16 @@ package struct Explore: ParsableCommand {
     package init() {}
 
     package func run() throws {
-        let module = try parseWasm(filePath: FilePath(path))
-        // Instruction dumping requires token threading model for now
-        let configuration = EngineConfiguration(threadingModel: .token)
-        let engine = Engine(configuration: configuration)
-        let store = Store(engine: engine)
+        let module = try parseWasm(filePath: path)
+        let store = Store(engine: Engine())
 
         var imports: Imports = [:]
         for importEntry in module.imports {
             switch importEntry.descriptor {
             case .function(let typeIndex):
-                let type = module.types[Int(typeIndex)]
+                guard let type = module.functionType(at: typeIndex) else {
+                    fatalError("Import \(importEntry) has no function type")
+                }
                 imports.define(
                     module: importEntry.module,
                     name: importEntry.name,

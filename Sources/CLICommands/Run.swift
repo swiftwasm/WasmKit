@@ -1,10 +1,20 @@
 import ArgumentParser
-import SystemExtras
-import SystemPackage
+import Foundation
+import WASI
 import WAT
 import WasmKit
 import WasmKitWASI
+import WasmKitWASIThreads
 import WasmParser
+import WasmTypes
+
+#if os(macOS)
+    import Darwin
+#elseif canImport(Glibc)
+    import Glibc
+#elseif canImport(Musl)
+    import Musl
+#endif
 
 #if ComponentModel
     import ComponentModel
@@ -43,12 +53,53 @@ package struct Run: AsyncParsableCommand {
     )
     var signpost: Bool = false
 
+    @Flag(name: .customLong("wasi-threads"), help: "Enable WASI Threads (implies --feature threads)")
+    package var wasiThreads = false
+
+    @Option(
+        name: .customLong("wasi-threads-max"),
+        help: "Maximum concurrently live WASI guest threads"
+    )
+    var wasiThreadsMax = 64
+
+    /// A single WebAssembly proposal accepted by `--feature`.
+    struct Feature: ExpressibleByArgument {
+        let feature: WasmFeatureSet.Feature
+
+        var wasmFeature: WasmFeatureSet { WasmFeatureSet(feature) }
+
+        init?(argument: String) {
+            guard let feature = WasmFeatureSet.Feature.allCases.first(where: { $0.commandLineName == argument }) else {
+                return nil
+            }
+            self.feature = feature
+        }
+
+        static var allValueStrings: [String] {
+            WasmFeatureSet.Feature.allCases.map(\.commandLineName)
+        }
+
+        /// The proposals already enabled without any `--feature` option.
+        static var enabledByDefault: [WasmFeatureSet.Feature] {
+            WasmFeatureSet.Feature.allCases.filter { WasmFeatureSet.default.contains(WasmFeatureSet($0)) }
+        }
+    }
+
+    @Option(
+        name: .customLong("feature"),
+        help: """
+            Enable a WebAssembly proposal feature in addition to those enabled by default \
+            (\(Feature.enabledByDefault.map(\.commandLineName).joined(separator: ", ")))
+            """
+    )
+    var features: [Feature] = []
+
     struct EnvOption: ExpressibleByArgument {
         let key: String
         let value: String
         init?(argument: String) {
-            var parts = argument.split(separator: "=", maxSplits: 2).makeIterator()
-            guard let key = parts.next(), let value = parts.next() else { return nil }
+            var parts = argument.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false).makeIterator()
+            guard let key = parts.next(), !key.isEmpty, let value = parts.next() else { return nil }
             self.key = String(key)
             self.value = String(value)
         }
@@ -62,8 +113,39 @@ package struct Run: AsyncParsableCommand {
         ))
     var environment: [EnvOption] = []
 
-    @Option(name: .customLong("dir"), help: "Grant access to the given host directory")
-    var directories: [String] = []
+    struct DirOption: ExpressibleByArgument {
+        let argument: String
+
+        /// nil when the value has more than one `::`. Rejecting it from `init?` instead would replace
+        /// the message `derivePreopens()` throws with ArgumentParser's generic one.
+        let paths: (hostPath: String, guestPath: String)?
+
+        init?(argument: String) {
+            self.argument = argument
+            let components = argument.split(separator: "::", omittingEmptySubsequences: false)
+            switch components.count {
+            case 1: self.paths = (argument, argument)
+            case 2: self.paths = (String(components[0]), String(components[1]))
+            default: self.paths = nil
+            }
+        }
+    }
+
+    @Option(
+        name: .customLong("dir"),
+        help: ArgumentHelp(
+            "Grant access to the given host directory, optionally under a different guest path",
+            valueName: "host[::guest]"
+        ))
+    var directories: [DirOption] = []
+
+    @Option(
+        name: .customLong("argv0"),
+        help: ArgumentHelp(
+            "Override argv[0] passed to the WASI program",
+            valueName: "value"
+        ))
+    var argv0: String?
 
     enum ThreadingModel: String, ExpressibleByArgument, CaseIterable {
         #if !os(WASI)
@@ -112,6 +194,15 @@ package struct Run: AsyncParsableCommand {
     )
     var stackSize: Int?
 
+    @Option(
+        help: ArgumentHelp(
+            "Limit the execution to N units of fuel, roughly one per WebAssembly operator. "
+                + "The execution traps once the budget is exhausted.",
+            valueName: "N"
+        )
+    )
+    var fuel: UInt64?
+
     #if WasmDebuggingSupport
 
         @Option(
@@ -138,18 +229,15 @@ package struct Run: AsyncParsableCommand {
     package init() {}
 
     package func run() async throws {
-        #if WasmDebuggingSupport
+        #if WasmDebuggingSupport && !os(Windows)
 
             if let debuggerPort {
-                guard !self.signpost && self.profileOutput == nil else {
-                    fatalError("Signpost logging and profiling are currently not supported while debugging Wasm modules.")
-                }
-
                 let debuggerServer = DebuggerServer(
                     port: debuggerPort,
                     logLevel: self.verbose ? .trace : .info,
-                    wasmModulePath: FilePath(self.path),
-                    engineConfiguration: self.deriveRuntimeConfiguration()
+                    wasmModulePath: self.path,
+                    engineConfiguration: self.deriveRuntimeConfiguration(),
+                    wasiConfiguration: try self.deriveWASIConfiguration()
                 )
                 try await debuggerServer.run()
                 return
@@ -159,69 +247,50 @@ package struct Run: AsyncParsableCommand {
 
         log("Started parsing module", verbose: true)
 
-        let filePath = FilePath(path)
         let module: Module
+        let moduleFeatures = deriveRuntimeConfiguration().features
 
-        if filePath.extension == "wat" {
-            let fileHandle: FileDescriptor = try FileDescriptor.open(filePath, Platform.readOnlyTextAccessMode)
-            module = try withThrowing {
-                let size = try fileHandle.seek(offset: 0, from: .end)
-                _ = try fileHandle.seek(offset: 0, from: .start)
-                let wat = try String(unsafeUninitializedCapacity: Int(size)) {
-                    try fileHandle.read(into: UnsafeMutableRawBufferPointer($0))
-                }
-                return try WasmKit.parseWasm(bytes: wat2wasm(wat))
-            } defer: {
-                try fileHandle.close()
-            }
+        if URL(fileURLWithPath: path).pathExtension == "wat" {
+            let wat = try String(contentsOfFile: path, encoding: .utf8)
+            module = try WasmKit.parseWasm(bytes: wat2wasm(wat, features: moduleFeatures), features: moduleFeatures)
         } else {
-            let fileHandle: FileDescriptor = try FileDescriptor.open(filePath, Platform.readOnlyBinaryAccessMode)
-            #if ComponentModel
-                var parsedComponent: ParsedComponent?
-            #endif
-            let parsedModule: Module? = try withThrowing { () throws -> Module? in
-                var magic: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0)
-                let bytesRead = try withUnsafeMutableBytes(of: &magic) { buffer in
-                    try fileHandle.read(into: buffer)
-                }
-
-                // Detect file type (component vs module)
-                let fileType: WasmFileType
-                if bytesRead == MemoryLayout.size(ofValue: magic) {
-                    fileType = detectWasmFileType(magic)
-                } else {
-                    fileType = .unknown
-                }
-
-                #if ComponentModel
-                    if fileType == .component {
-                        log("Detected component binary, parsing component...", verbose: true)
-                        _ = try fileHandle.seek(offset: 0, from: .start)
-                        parsedComponent = try parseComponent(fileHandle: fileHandle)
-                        return nil
-                    }
-                #endif
-
-                guard fileType == .coreModule else {
-                    fatalError("Unsupported WebAssembly file type: \(fileType)")
-                }
-
-                _ = try fileHandle.seek(offset: 0, from: .start)
-                let (parsedModule, parseTime) = try measure {
-                    try WasmKit.parseWasm(fileHandle: fileHandle)
-                }
-                log("Finished parsing module: \(parseTime)", verbose: true)
-                return parsedModule
+            // Sniff the magic bytes to detect the file type (component vs
+            // module), then let the parser re-open the file by path.
+            var magic: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0)
+            let fileHandle = try CLIFile.openRead(path)
+            let magicData = try withThrowing {
+                try fileHandle.read(upToCount: MemoryLayout.size(ofValue: magic))
             } defer: {
                 try fileHandle.close()
             }
+            withUnsafeMutableBytes(of: &magic) { buffer in
+                buffer.copyBytes(from: magicData)
+            }
+
+            let fileType: WasmFileType
+            if magicData.count == MemoryLayout.size(ofValue: magic) {
+                fileType = detectWasmFileType(magic)
+            } else {
+                fileType = .unknown
+            }
+
             #if ComponentModel
-                if let parsedComponent {
+                if fileType == .component {
+                    log("Detected component binary, parsing component...", verbose: true)
+                    let parsedComponent = try parseComponent(filePath: path)
                     try runComponent(component: parsedComponent)
                     return
                 }
             #endif
-            guard let parsedModule else { return }
+
+            guard fileType == .coreModule else {
+                fatalError("Unsupported WebAssembly file type: \(fileType)")
+            }
+
+            let (parsedModule, parseTime) = try measure {
+                try WasmKit.parseWasm(filePath: path, features: moduleFeatures)
+            }
+            log("Finished parsing module: \(parseTime)", verbose: true)
             module = parsedModule
         }
 
@@ -229,14 +298,21 @@ package struct Run: AsyncParsableCommand {
         defer { finalize() }
 
         let invoke: () throws -> Void
+        let store: Store
         if module.exports.contains(where: { $0.name == "_start" }) {
-            invoke = try instantiateWASI(module: module, interceptor: interceptor)
+            (store, invoke) = try instantiateWASI(module: module, interceptor: interceptor)
         } else {
+            if wasiThreads {
+                throw ValidationError("--wasi-threads requires a WASI command module exporting _start.")
+            }
             guard let entry = try instantiateNonWASI(module: module, interceptor: interceptor) else {
                 return
             }
-            invoke = entry
+            (store, invoke) = entry
         }
+        // Reported even when the guest traps or exits: knowing what a run consumed before it
+        // stopped is the point of asking for a budget in the first place.
+        defer { reportFuelConsumption(of: store) }
 
         if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
             let (_, invokeTime) = try measure(execution: invoke)
@@ -286,13 +362,9 @@ package struct Run: AsyncParsableCommand {
             }
         }
         if let outputPath = self.profileOutput {
-            let fileHandle = try FileDescriptor.open(
-                FilePath(outputPath), .writeOnly, options: .create,
-                permissions: [.ownerReadWrite, .groupRead, .otherRead]
-            )
+            let fileHandle = try CLIFile.createWrite(outputPath)
             let profiler = GuestTimeProfiler { data in
-                var data = data
-                _ = data.withUTF8 { try! fileHandle.writeAll($0) }
+                try? fileHandle.writeAll(Array(data.utf8))
             }
             interceptors.append(profiler)
             finalizers.append {
@@ -321,35 +393,136 @@ package struct Run: AsyncParsableCommand {
         return nil
     }
 
-    private func deriveRuntimeConfiguration() -> EngineConfiguration {
+    package func deriveRuntimeConfiguration() -> EngineConfiguration {
+        // Start from the parser's default set so that `--feature` only ever adds
+        // to what the CLI already accepts without any flag.
+        var enabledFeatures = features.reduce(into: WasmFeatureSet.default) { $0.insert($1.wasmFeature) }
+        if wasiThreads {
+            // wasi-threads builds on the core threads proposal, so opting into
+            // the former implies the latter. The reverse does not hold.
+            enabledFeatures.insert(.threads)
+        }
         return EngineConfiguration(
             threadingModel: self.threadingModel?.resolve(),
             compilationMode: self.compilationMode?.resolve(),
-            stackSize: self.stackSize
+            stackSize: self.stackSize,
+            features: enabledFeatures,
+            fuelMetering: self.fuel != nil
         )
     }
 
-    func instantiateWASI(module: Module, interceptor: EngineInterceptor?) throws -> () throws -> Void {
-        // Flatten environment variables into a dictionary (Respect the last value if a key is duplicated)
-        let environment = environment.reduce(into: [String: String]()) {
+    package func deriveEnvironment() -> [String: String] {
+        environment.reduce(into: [String: String]()) {
             $0[$1.key] = $1.value
-        }
-        let preopens = directories.map { WASIBridgeToHost.Preopen(guestPath: $0, hostPath: $0) }
-        let wasi = try WASIBridgeToHost(args: [path] + arguments, environment: environment, preopens: preopens)
-        let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
-        let store = Store(engine: engine)
-        return {
-            try wasi.runAndClose { wasi in
-                var imports = Imports()
-                wasi.link(to: &imports, store: store)
-                let moduleInstance = try module.instantiate(store: store, imports: imports)
-                let exitCode = try wasi.start(moduleInstance)
-                throw ExitCode(Int32(exitCode))
-            }
         }
     }
 
-    func instantiateNonWASI(module: Module, interceptor: EngineInterceptor?) throws -> (() throws -> Void)? {
+    package func derivePreopens() throws -> [WASIBridgeToHost.Preopen] {
+        try directories.map { directory in
+            guard let paths = directory.paths else {
+                throw ValidationError(
+                    """
+                    The value '\(directory.argument)' for '--dir' contains more than one '::'. \
+                    Use at most one separator, as in 'host::guest'.
+                    """
+                )
+            }
+            return WASIBridgeToHost.Preopen(guestPath: paths.guestPath, hostPath: paths.hostPath)
+        }
+    }
+
+    package mutating func validate() throws {
+        _ = try derivePreopens()
+
+        if wasiThreadsMax < 1 {
+            throw ValidationError("--wasi-threads-max must be at least 1.")
+        }
+        if wasiThreads && (signpost || profileOutput != nil) {
+            throw ValidationError("Signpost logging and profiling are not supported with --wasi-threads.")
+        }
+        if wasiThreads, threadingModel == .token {
+            throw ValidationError("--wasi-threads requires direct threading and cannot be combined with --threading-model token.")
+        }
+
+        #if WasmDebuggingSupport
+            if debuggerPort != nil, signpost || profileOutput != nil {
+                throw ValidationError(
+                    "Signpost logging and profiling are not supported while debugging Wasm modules."
+                )
+            }
+        #endif
+    }
+
+    package func deriveWASIArguments() -> [String] {
+        [argv0 ?? path] + arguments
+    }
+
+    package func deriveWASIConfiguration() throws -> WASIConfiguration {
+        WASIConfiguration(
+            arguments: deriveWASIArguments(),
+            environment: deriveEnvironment(),
+            preopens: try derivePreopens()
+        )
+    }
+
+    func instantiateWASI(module: Module, interceptor: EngineInterceptor?) throws -> (Store, () throws -> Void) {
+        let wasi = try WASIBridgeToHost(configuration: deriveWASIConfiguration())
+        let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
+        if wasiThreads {
+            let processControl = WASIThreadsProcessControl(
+                terminateAfterMainReturn: { code in
+                    wasiThreadsTerminateProcess(Int32(truncatingIfNeeded: code))
+                },
+                terminateAfterWorkerFailure: { error in
+                    if let exitCode = error as? WASIExitCode {
+                        wasiThreadsTerminateProcess(Int32(truncatingIfNeeded: exitCode.code))
+                    }
+                    FileHandle.standardError.write(Data(("WASI thread failed: \(error)\n").utf8))
+                    wasiThreadsTerminateProcess(1)
+                }
+            )
+            let threads = try WASIThreads(
+                module: module,
+                engine: engine,
+                configuration: .init(maximumThreads: wasiThreadsMax),
+                processControl: processControl,
+                childImports: { store in
+                    var imports = Imports()
+                    wasi.link(to: &imports, store: store)
+                    return imports
+                }
+            )
+            let store = Store(engine: engine)
+            applyFuelBudget(to: store)
+            return (
+                store,
+                {
+                    try wasi.runAndClose { wasi in
+                        let imports = try threads.makeImports(store: store)
+                        let moduleInstance = try module.instantiate(store: store, imports: imports)
+                        let exitCode = try wasi.start(moduleInstance)
+                        threads.mainThreadDidExit(code: exitCode)
+                    }
+                }
+            )
+        }
+        let store = Store(engine: engine)
+        applyFuelBudget(to: store)
+        return (
+            store,
+            {
+                try wasi.runAndClose { wasi in
+                    var imports = Imports()
+                    wasi.link(to: &imports, store: store)
+                    let moduleInstance = try module.instantiate(store: store, imports: imports)
+                    let exitCode = try wasi.start(moduleInstance)
+                    throw ExitCode(Int32(exitCode))
+                }
+            }
+        )
+    }
+
+    func instantiateNonWASI(module: Module, interceptor: EngineInterceptor?) throws -> (Store, () throws -> Void)? {
         let (functionName, parameters) = Run.parseInvocation(arguments: self.arguments)
         guard let functionName else {
             log("Error: No function specified to run in a given module.")
@@ -358,16 +531,32 @@ package struct Run: AsyncParsableCommand {
 
         let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
         let store = Store(engine: engine)
+        applyFuelBudget(to: store)
         let instance = try module.instantiate(store: store)
-        return {
-            log("Started invoking function \"\(functionName)\" with parameters: \(parameters)", verbose: true)
-            guard let toInvoke = instance.exports[function: functionName] else {
-                log("Error: Function \"\(functionName)\" not found in the module.")
-                return
+        return (
+            store,
+            {
+                log("Started invoking function \"\(functionName)\" with parameters: \(parameters)", verbose: true)
+                guard let toInvoke = instance.exports[function: functionName] else {
+                    log("Error: Function \"\(functionName)\" not found in the module.")
+                    return
+                }
+                let results = try toInvoke.invoke(parameters)
+                print(results.description)
             }
-            let results = try toInvoke.invoke(parameters)
-            print(results.description)
-        }
+        )
+    }
+
+    /// Gives the store the budget requested with `--fuel`, if any.
+    func applyFuelBudget(to store: Store) {
+        guard let fuel else { return }
+        store.fuel = Fuel(remaining: fuel)
+    }
+
+    /// Reports what the run consumed, so that `--fuel` also answers "how much would it need?".
+    func reportFuelConsumption(of store: Store) {
+        guard let budget = fuel, let remaining = store.fuel?.remaining else { return }
+        print("fuel consumed: \(budget - remaining), fuel remaining: \(remaining)")
     }
 
     @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
@@ -384,7 +573,7 @@ package struct Run: AsyncParsableCommand {
 
     @Sendable func log(_ message: String, verbose: Bool = false) {
         if !verbose || self.verbose {
-            try! FileDescriptor.standardError.writeAll((message + "\n").utf8)
+            FileHandle.standardError.write(Data((message + "\n").utf8))
         }
     }
 }
@@ -411,4 +600,35 @@ extension Run {
 
         return (functionName, parameters)
     }
+}
+
+extension WasmFeatureSet.Feature {
+    /// The name this proposal is spelled with on the command line. The switch is
+    /// exhaustive on purpose: a proposal added to `WasmFeatureSet` has to be
+    /// given a command-line name here before the CLI builds again.
+    var commandLineName: String {
+        switch self {
+        case .memory64: "memory64"
+        case .referenceTypes: "reference-types"
+        case .threads: "threads"
+        case .tailCall: "tail-call"
+        case .simd: "simd"
+        case .exceptionHandling: "exception-handling"
+        case .functionReferences: "function-references"
+        case .multiMemory: "multi-memory"
+        case .gc: "gc"
+        }
+    }
+}
+
+private func wasiThreadsTerminateProcess(_ code: Int32) -> Never {
+    #if os(macOS)
+        Darwin.exit(code)
+    #elseif canImport(Glibc)
+        Glibc.exit(code)
+    #elseif canImport(Musl)
+        Musl.exit(code)
+    #else
+        fatalError("WASI Threads is unavailable on this platform")
+    #endif
 }

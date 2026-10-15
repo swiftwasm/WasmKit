@@ -63,18 +63,21 @@ public struct Module: Sendable {
     public let imports: [Import]
     public let exports: [Export]
     public let customSections: [CustomSection]
-    public let types: [FunctionType]
+    let types: TypeSection
 
     let moduleImports: ModuleImports
     let importedFunctionTypes: [TypeIndex]
     let memoryTypes: [MemoryType]
     let tableTypes: [TableType]
+    /// The initializer of each table defined in the module, `nil` for a table
+    /// whose elements start out null.
+    let tableInitializers: [ConstExpression?]
     let tagTypes: [TypeIndex]
     let features: WasmFeatureSet
     let dataCount: UInt32?
 
     init(
-        types: [FunctionType],
+        types: TypeSection,
         functions: [GuestFunction],
         elements: [ElementSegment],
         data: [DataSegment],
@@ -83,7 +86,7 @@ public struct Module: Sendable {
         exports: [Export],
         globals: [WasmParser.Global],
         memories: [MemoryType],
-        tables: [TableType],
+        tables: [WasmParser.Table],
         tags: [WasmParser.Tag] = [],
         customSections: [CustomSection],
         features: WasmFeatureSet,
@@ -118,15 +121,16 @@ public struct Module: Sendable {
         self.types = types
         self.importedFunctionTypes = importedFunctionTypes
         self.memoryTypes = memoryTypes + memories
-        self.tableTypes = tableTypes + tables
-        self.tagTypes = tagTypes + tags.map(\.type)
+        self.tableTypes = tableTypes + tables.map(\.type)
+        self.tableInitializers = tables.map(\.initializer)
+        self.tagTypes = tagTypes + tags.map { $0.type }
     }
 
-    static func resolveType(_ index: TypeIndex, typeSection: [FunctionType]) throws(WasmKitError) -> FunctionType {
-        guard Int(index) < typeSection.count else {
-            throw WasmKitError("Type index \(index) is out of range")
-        }
-        return typeSection[Int(index)]
+    /// Returns the function type that the given type index defines, or `nil` if the index is out of
+    /// range or defines a non-function type.
+    @_spi(Fuzzing) @_spi(OnlyForCLI)
+    public func functionType(at index: UInt32) -> FunctionType? {
+        try? types.functionType(at: index)
     }
 
     internal func resolveFunctionType(_ index: FunctionIndex) throws(WasmKitError) -> FunctionType {
@@ -134,10 +138,7 @@ public struct Module: Sendable {
             throw WasmKitError("Function index \(index) is out of range")
         }
         if Int(index) < self.moduleImports.numberOfFunctions {
-            return try Self.resolveType(
-                importedFunctionTypes[Int(index)],
-                typeSection: types
-            )
+            return try types.functionType(at: importedFunctionTypes[Int(index)])
         }
         return functions[Int(index) - self.moduleImports.numberOfFunctions].type
     }
@@ -159,6 +160,17 @@ public struct Module: Sendable {
     ///     must be allocated in the given store.
     public func instantiate(store: Store, imports: Imports = [:]) throws -> Instance {
         Instance(handle: try self.instantiateHandle(store: store, imports: imports), store: store)
+    }
+
+    /// Returns the type of an exported function, if it exists.
+    ///
+    /// This is metadata only; it does not instantiate the module.
+    /// TODO(yuta): Revisit Module API
+    package func exportedFunctionType(named name: String) -> FunctionType? {
+        guard let export = exports.first(where: { $0.name == name }),
+            case .function(let index) = export.descriptor
+        else { return nil }
+        return try? resolveFunctionType(index)
     }
 
     #if WasmDebuggingSupport
@@ -199,7 +211,7 @@ public struct Module: Sendable {
             try? store.nameRegistry.register(instance: instance, nameSection: nameSection)
         }
 
-        let constEvalContext = ConstEvaluationContext(instance: instance, moduleImports: moduleImports)
+        let constEvalContext = ConstEvaluationContext(instance: instance)
         // Step 12-13.
 
         // Steps 14-15.
@@ -211,7 +223,8 @@ public struct Module: Sendable {
         // Step 17.
         if let startIndex = start {
             let startFunction = try instance.functions[validating: Int(startIndex)]
-            _ = try startFunction.invoke([], store: store)
+            var stack = ExecutionStack(engine: store.engine)
+            _ = try startFunction.invoke([], store: store, stack: &stack)
         }
 
         // Compile all functions eagerly if the engine is in eager compilation mode
@@ -252,19 +265,25 @@ public struct Module: Sendable {
                         )
                     )
                 }
-                guard table.tableType.elementType == element.type else {
+                let elementType = try instance.typeCanonicalizer.canonicalize(element.type)
+                guard elementType.isSubtype(of: table.tableType.elementType) else {
                     throw WasmKitError(
                         kind: .message(
                             .elementSegmentTypeMismatch(
-                                elementType: element.type,
+                                elementType: elementType,
                                 tableElementType: table.tableType.elementType
                             )
                         )
                     )
                 }
-                let references = try element.evaluateInits(context: constEvalContext)
+                // A 64-bit offset that does not fit in `Int` cannot address any
+                // table, so report it as out-of-bounds instead of trapping the host.
+                guard let destination = Int(exactly: offset) else {
+                    throw Trap(.tableOutOfBounds(Int(clamping: offset)))
+                }
+                let references = try element.evaluateInits(context: constEvalContext, type: elementType)
                 try table.initialize(
-                    references, from: 0, to: Int(offset), count: references.count
+                    references, from: 0, to: destination, count: references.count
                 )
             }
         }
@@ -292,7 +311,11 @@ public struct Module: Sendable {
                         )
                     )
                 }
-                try memory.write(offset: Int(offset), bytes: data.initializer)
+                // Ditto: an offset beyond `Int.max` is out of bounds for any memory.
+                guard let destination = Int(exactly: offset) else {
+                    throw Trap(.memoryOutOfBounds)
+                }
+                try memory.write(offset: destination, bytes: data.initializer)
             }
         }
     }
@@ -330,6 +353,36 @@ typealias LocalIndex = UInt32
 typealias LabelIndex = UInt32
 
 // MARK: - Module Entities
+
+/// The type definitions of a module.
+///
+/// This hides how the definitions are stored from the rest of the runtime, so that the storage only GC
+/// types need can be opted out later.
+struct TypeSection: Sendable {
+    /// The recursive groups in the order the type section declares them.
+    let recursiveGroups: [RecursiveGroup]
+    /// The definitions of every group in order, so that a type index addresses one directly.
+    private let definitions: [SubType]
+
+    init(_ recursiveGroups: [RecursiveGroup]) {
+        self.recursiveGroups = recursiveGroups
+        self.definitions = recursiveGroups.flatMap(\.types)
+    }
+
+    /// The number of type indices the section defines.
+    var count: Int { definitions.count }
+
+    /// Resolves a type index that must name a function type.
+    func functionType(at index: TypeIndex) throws(WasmKitError) -> FunctionType {
+        guard Int(index) < definitions.count else {
+            throw WasmKitError("Type index \(index) is out of range")
+        }
+        guard case .function(let type) = definitions[Int(index)].body else {
+            throw WasmKitError("Type index \(index) does not define a function type")
+        }
+        return type
+    }
+}
 
 /// An executable function representation in a module
 /// > Note:

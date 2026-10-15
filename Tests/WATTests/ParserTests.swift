@@ -6,9 +6,9 @@ import WasmParser
 
 @Suite
 struct ParserTests {
-    func parseWast(_ source: String, features: WasmFeatureSet = .default) throws -> [WastDirective] {
-        var parser = WastParser(source, features: features)
-        var directives: [WastDirective] = []
+    func parseWast(_ source: String, features: WasmFeatureSet = .default) throws -> [WASTDirective] {
+        var parser = WASTParser(source, features: features)
+        var directives: [WASTDirective] = []
         while let directive = try parser.nextDirective() {
             directives.append(directive)
         }
@@ -55,7 +55,7 @@ struct ParserTests {
 
     @Test
     func parseWastModule() throws {
-        var parser = WastParser(
+        var parser = WASTParser(
             #"""
             (module
               ;; comment here
@@ -179,6 +179,12 @@ struct ParserTests {
         let table = wat.tables[0]
         #expect(table.type == TableType(elementType: .funcRef, limits: Limits(min: 10, max: nil)))
         #expect(wat.elementsMap.count == 14)
+    }
+
+    @Test(arguments: [#"(invoke "f" (nop))"#, #"(assert_return (invoke "f") (nop))"#])
+    func wastValueIsAValueInstruction(script: String) {
+        let error = #expect(throws: WatParserError.self) { try parseWast(script) }
+        #expect(error?.message == "unexpected instruction nop in a WAST value")
     }
 
     // NOTE: We do the same check as a part of the EncoderTests, so it's

@@ -60,22 +60,33 @@ extension VMGen {
             return slots
         }
 
+        /// The expression that extracts `field`, placed `byteOffset` bytes into its
+        /// code slot, out of the slot read as the 64-bit word `word` on a
+        /// little-endian host.
+        private static func wordExtraction(of field: ImmediateField, at byteOffset: Int, from word: String) -> String {
+            let shifted = byteOffset == 0 ? word : "\(word) >> \(byteOffset * 8)"
+            switch field.type.name {
+            case "VReg": return "VReg(byteOffset: Int16(truncatingIfNeeded: \(shifted)))"
+            case "LVReg": return "LVReg(storage: Int32(truncatingIfNeeded: \(shifted)))"
+            case "LLVReg": return "LLVReg(storage: Int64(truncatingIfNeeded: \(shifted)))"
+            case "UntypedValue": return "UntypedValue(storage: \(shifted))"
+            default: return "\(field.type.name)(truncatingIfNeeded: \(shifted))"
+            }
+        }
+
         /// Builds the type declaration derived from the layout.
-        func buildDeclaration() -> String {
+        ///
+        /// With `decodesAsWords`, `load(from:)` reads each code slot as one 64-bit
+        /// word and extracts the fields with shifts instead of reading every field
+        /// separately. A handler that reads the next handler pointer right after its
+        /// immediate can then have both loads combined into one.
+        func buildDeclaration(decodesAsWords: Bool) -> String {
             let fieldDeclarations = fields.map { field in
                 "    var \(field.name): \(field.type.name)"
             }.joined(separator: "\n")
             var output = """
-            struct \(name): Equatable, InstructionImmediate {
+            struct \(name): InstructionImmediate {
             \(fieldDeclarations)
-
-            """
-
-            // Emit `load` method
-
-            output += """
-
-                @inline(__always) static func load(from pc: inout Pc) -> Self {
 
             """
 
@@ -94,18 +105,52 @@ extension VMGen {
                 return ("(" + elemenets.map { $0.type }.joined(separator: ", ") + ")", elemenets)
             }
 
-            for slot in slots {
-                let (tupleTy, elements) = makeSlotTupleType(slot: slot)
-                output += """
-                        let (\(elements.map { $0.name ?? "_" }.joined(separator: ", "))) = pc.read(\(tupleTy).self)
-
-                """
+            func typedReads(indent: String) -> String {
+                slots.map { slot in
+                    let (tupleTy, elements) = makeSlotTupleType(slot: slot)
+                    return "\(indent)let (\(elements.map { $0.name ?? "_" }.joined(separator: ", "))) = pc.read(\(tupleTy).self)\n"
+                }.joined()
             }
 
-            output += """
-                    return Self(\(fields.map { "\($0.name): \($0.name)" }.joined(separator: ", ")))
-                }
-            """
+            func wordReads(indent: String) -> String {
+                slots.enumerated().map { index, slot in
+                    if slot.count == 1, slot[0].type.size == VMGen.CodeSlotSize {
+                        return "\(indent)let \(slot[0].name) = pc.read(\(slot[0].type.name).self)\n"
+                    }
+                    let word = "word\(index)"
+                    var output = "\(indent)let \(word) = pc.read(UInt64.self)\n"
+                    var byteOffset = 0
+                    for field in slot {
+                        byteOffset = VMGen.alignUp(byteOffset, to: field.type.alignment)
+                        output += "\(indent)let \(field.name) = \(Self.wordExtraction(of: field, at: byteOffset, from: word))\n"
+                        byteOffset += field.type.size
+                    }
+                    return output
+                }.joined()
+            }
+
+            // Emit `load` method
+
+            let construct = "return Self(\(fields.map { "\($0.name): \($0.name)" }.joined(separator: ", ")))"
+            if decodesAsWords {
+                output += """
+
+                    @inline(__always) static func load(from pc: inout Pc) -> Self {
+                        #if _endian(little)
+                \(wordReads(indent: "            "))            \(construct)
+                        #else
+                \(typedReads(indent: "            "))            \(construct)
+                        #endif
+                    }
+                """
+            } else {
+                output += """
+
+                    @inline(__always) static func load(from pc: inout Pc) -> Self {
+                \(typedReads(indent: "        "))        \(construct)
+                    }
+                """
+            }
 
             // Emit `emit` method
 
@@ -155,9 +200,11 @@ extension VMGen {
 
 extension VMGen.ImmediateLayout {
     static let binary = Self(name: "BinaryOperand") {
-        $0.field(name: "result", type: .LVReg)
+        // `result` is kept away from byte 0: decoded from there, its sign extension
+        // folds into the store address, which slows down serial float chains.
         $0.field(name: "lhs", type: .VReg)
         $0.field(name: "rhs", type: .VReg)
+        $0.field(name: "result", type: .LVReg)
     }
 
     static let unary = Self(name: "UnaryOperand") {
@@ -187,9 +234,158 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "offset", type: .Int32)
     }
 
+    /// Immediate layout of the fused integer compare + branch instructions
+    /// (`brIf{I32,I64}{Eq,Ne,...}`). Fits in a single 8-byte code slot.
+    static let brIfCmpOperand = Self(name: "BrIfCmpOperand") {
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "rhs", type: .VReg)
+        $0.field(name: "offset", type: .Int32)
+    }
+
+    /// Immediate layout of the two-operation superinstructions (`f64MulAdd`,
+    /// `i32ShlAdd` and friends): `result = (x <op1> y) <op2> z`, or
+    /// `result = z <op2> (x <op1> y)` for the reversed forms.
+    ///
+    /// Four registers at two bytes each fill one 8-byte code slot exactly, so
+    /// the superinstruction is two code slots where the two instructions it
+    /// replaces are four. `result` is a plain pre-shifted ``VReg`` rather than
+    /// an ``LVReg``; nothing is lost, since a store into a 64-bit slot folds
+    /// the scale into its addressing mode either way.
+    static let binBin = Self(name: "BinBinOperand") {
+        $0.field(name: "result", type: .VReg)
+        $0.field(name: "x", type: .VReg)
+        $0.field(name: "y", type: .VReg)
+        $0.field(name: "z", type: .VReg)
+    }
+
+    /// `ireg = sp[lhs] <op> sp[rhs]`.
+    static let accBinary = Self(name: "AccBinaryOperand") {
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "rhs", type: .VReg)
+    }
+
+    /// `sp[result] = ireg <op> sp[operand]`.
+    static let accUnary = Self(name: "AccUnaryOperand") {
+        $0.field(name: "operand", type: .VReg)
+        $0.field(name: "result", type: .LVReg)
+    }
+
+    /// `ireg = ireg <op> sp[operand]`.
+    static let acc = Self(name: "AccOperand") {
+        $0.field(name: "operand", type: .VReg)
+    }
+
+    /// `result = lhs <op> imm`, the right operand being a constant carried in
+    /// the instruction. Two `VReg`s and a 32-bit immediate fill one code slot.
+    static let binaryImm = Self(name: "BinaryImmOperand") {
+        $0.field(name: "result", type: .VReg)
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "imm", type: .Int32)
+    }
+
+    /// `ireg = lhs <op> imm`.
+    static let accBinaryImm = Self(name: "AccBinaryImmOperand") {
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "imm", type: .Int32)
+    }
+
+    /// A fused compare against a constant and branch. The offset does not fit
+    /// next to the 32-bit immediate, so this takes two code slots.
+    static let brIfCmpImmOperand = Self(name: "BrIfCmpImmOperand") {
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "imm", type: .Int32)
+        $0.field(name: "offset", type: .Int32)
+    }
+
+    /// `sp[result] = (sp[lhs] <cmp> sp[rhs]) ? sp[onTrue] : sp[onFalse]`.
+    static let selectCmp = Self(name: "SelectCmpOperand") {
+        $0.field(name: "result", type: .VReg)
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "rhs", type: .VReg)
+        $0.field(name: "onTrue", type: .VReg)
+        $0.field(name: "onFalse", type: .VReg)
+    }
+
+    /// `sp[result] = (sp[lhs] <cmp> imm) ? sp[onTrue] : sp[onFalse]`.
+    static let selectCmpImm = Self(name: "SelectCmpImmOperand") {
+        $0.field(name: "result", type: .VReg)
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "imm", type: .Int32)
+        $0.field(name: "onTrue", type: .VReg)
+        $0.field(name: "onFalse", type: .VReg)
+    }
+
+    /// `freg = (sp[x] <op1> sp[y]) <op2> sp[z]`.
+    static let accBinBin = Self(name: "AccBinBinOperand") {
+        $0.field(name: "x", type: .VReg)
+        $0.field(name: "y", type: .VReg)
+        $0.field(name: "z", type: .VReg)
+    }
+
+    /// `ireg = load(sp[pointer] + offset)` and `store(sp[pointer] + offset) = ireg`,
+    /// on a 32-bit memory.
+    static let accMemoryPointer = Self(name: "AccMemoryPointerOperand") {
+        $0.field(name: "pointer", type: .VReg)
+        $0.field(name: "offset", type: .UInt32)
+    }
+
+    /// `sp[result] = ireg = load(sp[pointer] + offset)`, on a 32-bit memory.
+    static let accMemoryPointerResult = Self(name: "AccMemoryPointerResultOperand") {
+        $0.field(name: "pointer", type: .VReg)
+        $0.field(name: "result", type: .VReg)
+        $0.field(name: "offset", type: .UInt32)
+    }
+
+    /// `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`,
+    /// on a 32-bit memory.
+    static let loadWithCopy = Self(name: "LoadWithCopyOperand") {
+        $0.field(name: "pointer", type: .VReg)
+        $0.field(name: "result", type: .VReg)
+        $0.field(name: "offset", type: .UInt32)
+        $0.field(name: "copyDest", type: .VReg)
+    }
+
+    /// `sp[result] = load(ireg + offset)`, on a 32-bit memory.
+    static let accMemoryResult = Self(name: "AccMemoryResultOperand") {
+        $0.field(name: "result", type: .VReg)
+        $0.field(name: "offset", type: .UInt32)
+    }
+
+    /// `store(ireg + offset) = sp[value]`, on a 32-bit memory.
+    static let accMemoryValue = Self(name: "AccMemoryValueOperand") {
+        $0.field(name: "value", type: .VReg)
+        $0.field(name: "offset", type: .UInt32)
+    }
+
+    /// `ireg = load(ireg + offset)`, on a 32-bit memory.
+    static let accMemoryOffset = Self(name: "AccMemoryOffsetOperand") {
+        $0.field(name: "offset", type: .UInt32)
+    }
+
+    static let brIfAccCmpOperand = Self(name: "BrIfAccCmpOperand") {
+        $0.field(name: "rhs", type: .VReg)
+        $0.field(name: "offset", type: .Int32)
+    }
+
+    static let brIfAccOperand = Self(name: "BrIfAccOperand") {
+        $0.field(name: "offset", type: .Int32)
+    }
+
+    static let globalOperand = Self(name: "GlobalOperand") {
+        $0.field(name: "rawGlobal", type: .UInt64)
+    }
+
+    static let consumeFuel = Self(name: "ConsumeFuelOperand") {
+        $0.field(name: "raw", type: .UInt64)
+    }
+
+    // `arguments` is the slot of the first argument, i.e. the start of the
+    // callee's parameter area, and `spAddend` is the callee's `sp` when it is
+    // a Wasm function: `arguments` plus its `StackLayout.entryOffset`.
     static let call = Self(name: "CallOperand") {
         $0.field(name: "rawCallee", type: .UInt64)
-        $0.field(name: "spAddend", type: .VReg)
+        $0.field(name: "arguments", type: .VReg)
+        $0.field(name: "spAddend", type: .LVReg)
     }
 
     static let v128Const = Self(name: "V128ConstOperand") {
@@ -250,6 +446,17 @@ extension VMGen.ImmediateLayout {
 }
 
 extension VMGen.PrimitiveType {
+    /// An expression that produces the zero value of this type, used for the
+    /// dummy instruction values the generator builds.
+    var zeroLiteral: String {
+        switch name {
+        // Register types are wrappers around a pre-shifted byte offset and take
+        // no integer literal.
+        case "VReg", "LVReg", "LLVReg": return "\(name).zero"
+        default: return "\(name)(0)"
+        }
+    }
+
     static let VReg = Self(name: "VReg", size: 2)
     static let LVReg = Self(name: "LVReg", size: 4)
     static let LLVReg = Self(name: "LLVReg", size: 8)

@@ -141,29 +141,88 @@ public struct WasmFeatureSet: OptionSet, Sendable {
         self.rawValue = rawValue
     }
 
+    /// An individual WebAssembly proposal that a feature set can enable.
+    ///
+    /// This is the single source of truth for the proposals WasmKit knows
+    /// about: the flags below and ``WasmFeatureSet/all`` are derived from it,
+    /// and clients that present the proposals to users can enumerate them
+    /// without repeating the list.
+    public enum Feature: CaseIterable, Sendable {
+        /// The WebAssembly memory64 proposal
+        case memory64
+        /// The WebAssembly reference types proposal
+        case referenceTypes
+        /// The WebAssembly threads proposal
+        case threads
+        /// The WebAssembly tail-call proposal
+        case tailCall
+        /// The WebAssembly SIMD proposal
+        case simd
+        /// The WebAssembly exception handling proposal
+        case exceptionHandling
+        /// The WebAssembly typed function references proposal
+        case functionReferences
+        /// The WebAssembly multi-memory proposal
+        case multiMemory
+        /// The WebAssembly garbage collection proposal
+        case gc
+
+        /// The bit this proposal occupies in a feature set. The values are part
+        /// of the stored representation, so they must stay stable.
+        @usableFromInline
+        var bit: Int {
+            switch self {
+            case .memory64: 0
+            case .referenceTypes: 1
+            case .threads: 2
+            case .tailCall: 3
+            case .simd: 4
+            case .exceptionHandling: 5
+            case .functionReferences: 6
+            case .multiMemory: 7
+            case .gc: 8
+            }
+        }
+    }
+
+    /// Initialize a feature set enabling exactly one proposal
+    @_alwaysEmitIntoClient
+    public init(_ feature: Feature) {
+        self.init(rawValue: 1 << feature.bit)
+    }
+
     /// The WebAssembly memory64 proposal
     @_alwaysEmitIntoClient
-    public static var memory64: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 0) }
+    public static var memory64: WasmFeatureSet { WasmFeatureSet(.memory64) }
     /// The WebAssembly reference types proposal
     @_alwaysEmitIntoClient
-    public static var referenceTypes: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 1) }
+    public static var referenceTypes: WasmFeatureSet { WasmFeatureSet(.referenceTypes) }
     /// The WebAssembly threads proposal
     @_alwaysEmitIntoClient
-    public static var threads: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 2) }
+    public static var threads: WasmFeatureSet { WasmFeatureSet(.threads) }
     /// The WebAssembly tail-call proposal
     @_alwaysEmitIntoClient
-    public static var tailCall: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 3) }
+    public static var tailCall: WasmFeatureSet { WasmFeatureSet(.tailCall) }
     /// The WebAssembly SIMD proposal
     @_alwaysEmitIntoClient
-    public static var simd: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 4) }
+    public static var simd: WasmFeatureSet { WasmFeatureSet(.simd) }
     /// The WebAssembly exception handling proposal
     @_alwaysEmitIntoClient
-    public static var exceptionHandling: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 5) }
+    public static var exceptionHandling: WasmFeatureSet { WasmFeatureSet(.exceptionHandling) }
+    /// The WebAssembly typed function references proposal
+    @_alwaysEmitIntoClient
+    public static var functionReferences: WasmFeatureSet { WasmFeatureSet(.functionReferences) }
+    /// The WebAssembly multi-memory proposal
+    @_alwaysEmitIntoClient
+    public static var multiMemory: WasmFeatureSet { WasmFeatureSet(.multiMemory) }
+    /// The WebAssembly garbage collection proposal
+    @_alwaysEmitIntoClient
+    public static var gc: WasmFeatureSet { WasmFeatureSet(.gc) }
 
     /// The default feature set
     public static let `default`: WasmFeatureSet = [.referenceTypes, .exceptionHandling]
     /// The feature set with all features enabled
-    public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads, .tailCall, .simd, .exceptionHandling]
+    public static let all: WasmFeatureSet = Feature.allCases.reduce(into: WasmFeatureSet()) { $0.insert(WasmFeatureSet($1)) }
 }
 
 /// > Note:
@@ -305,11 +364,35 @@ extension ByteStream {
     @usableFromInline
     mutating func parseReferenceType(byte: UInt8, features: WasmFeatureSet) throws(WasmParserError) -> ReferenceType? {
         switch byte {
-        case 0x63: return try ReferenceType(isNullable: true, heapType: parseHeapType())
-        case 0x64: return try ReferenceType(isNullable: false, heapType: parseHeapType())
+        case 0x63:
+            let heapType = try parseHeapType(features: features)
+            // Without typed function references or GC, `0x63` only spells out a
+            // nullable abstract type such as `funcref`.
+            if case .concrete = heapType, !features.contains(.functionReferences), !features.contains(.gc) { return nil }
+            return ReferenceType(isNullable: true, heapType: heapType)
+        case 0x64:
+            if features.contains(.functionReferences) {
+                return try ReferenceType(isNullable: false, heapType: parseHeapType(features: features))
+            }
+            guard features.contains(.gc) else { return nil }
+            let heapType = try parseHeapType(features: features)
+            switch heapType {
+            // As in wasm-tools, a non-nullable func or extern needs typed function references even with GC.
+            case .abstract(.funcRef), .abstract(.externRef): return nil
+            case .abstract(.exnRef) where !features.contains(.exceptionHandling): return nil
+            default: return ReferenceType(isNullable: false, heapType: heapType)
+            }
         case 0x69:
             guard features.contains(.exceptionHandling) else { return nil }
             return .exnRef
+        case 0x74:
+            // `noexn` is part of exception handling, but WasmKit runs none of the bottom heap types
+            // yet, so it also needs the opt-in GC feature, unlike in wasm-tools.
+            guard features.contains(.exceptionHandling), features.contains(.gc) else { return nil }
+            return ReferenceType(isNullable: true, heapType: .abstract(.noExn))
+        case 0x6A...0x6E, 0x71...0x73:
+            guard features.contains(.gc), let heapType = AbstractHeapType(binaryEncoding: byte) else { return nil }
+            return ReferenceType(isNullable: true, heapType: .abstract(heapType))
         case 0x6F: return .externRef
         case 0x70: return .funcRef
         default: return nil  // invalid discriminator
@@ -319,7 +402,7 @@ extension ByteStream {
     /// > Note:
     /// <https://webassembly.github.io/function-references/core/binary/types.html#heap-types>
     @usableFromInline
-    mutating func parseHeapType() throws(WasmParserError) -> HeapType {
+    mutating func parseHeapType(features: WasmFeatureSet) throws(WasmParserError) -> HeapType {
         let b = try peek()
         switch b {
         case 0x69:
@@ -331,13 +414,21 @@ extension ByteStream {
         case 0x70:
             _ = try consumeAny()
             return .funcRef
-        default:
-            let rawIndex = try parseVarSigned33()
-            guard let index = TypeIndex(exactly: rawIndex) else {
-                throw makeError(.invalidFunctionType(rawIndex))
+        case 0x74 where features.contains(.exceptionHandling) && features.contains(.gc),
+            .some(0x6A...0x6E) where features.contains(.gc),
+            .some(0x71...0x73) where features.contains(.gc):
+            if let b, let heapType = AbstractHeapType(binaryEncoding: b) {
+                _ = try consumeAny()
+                return .abstract(heapType)
             }
-            return .concrete(typeIndex: index)
+        default:
+            break
         }
+        let rawIndex = try parseVarSigned33()
+        guard let index = TypeIndex(exactly: rawIndex) else {
+            throw makeError(.invalidFunctionType(rawIndex))
+        }
+        return .concrete(typeIndex: index)
     }
 
     /// > Note:
@@ -354,10 +445,81 @@ extension ByteStream {
         guard opcode == 0x60 else {
             throw makeError(.malformedFunctionType(opcode))
         }
+        return try parseFunctionTypeBody(features: features)
+    }
 
+    @inlinable
+    mutating func parseFunctionTypeBody(features: WasmFeatureSet) throws(WasmParserError) -> FunctionType {
         let parameters = try parseVector { (s) throws(WasmParserError) in try s.parseValueType(features: features) }
         let results = try parseVector { (s) throws(WasmParserError) in try s.parseValueType(features: features) }
         return FunctionType(parameters: parameters, results: results)
+    }
+
+    /// > Note:
+    /// <https://webassembly.github.io/gc/core/binary/types.html#recursive-types>
+    @usableFromInline
+    mutating func parseRecursiveGroup(features: WasmFeatureSet) throws(WasmParserError) -> RecursiveGroup {
+        switch try peek() {
+        case 0x4E:
+            _ = try consumeAny()
+            let types = try parseVector { (s) throws(WasmParserError) in try s.parseSubType(features: features) }
+            return RecursiveGroup(types: types)
+        default:
+            return RecursiveGroup(types: [try parseSubType(features: features)])
+        }
+    }
+
+    @usableFromInline
+    mutating func parseSubType(features: WasmFeatureSet) throws(WasmParserError) -> SubType {
+        switch try peek() {
+        case 0x50, 0x4F:
+            let isFinal = try consumeAny() == 0x4F
+            let supertypes = try parseVector { (s) throws(WasmParserError) -> UInt32 in try s.parseUnsigned() }
+            return SubType(isFinal: isFinal, supertypes: supertypes, body: try parseCompositeType(features: features))
+        default:
+            return SubType(isFinal: true, supertypes: [], body: try parseCompositeType(features: features))
+        }
+    }
+
+    /// > Note:
+    /// <https://webassembly.github.io/gc/core/binary/types.html#composite-types>
+    @usableFromInline
+    mutating func parseCompositeType(features: WasmFeatureSet) throws(WasmParserError) -> CompositeType {
+        let opcode = try consumeAny()
+        guard opcode & 0b10000000 == 0 else {
+            throw makeError(.integerRepresentationTooLong)
+        }
+        switch opcode {
+        case 0x60:
+            return .function(try parseFunctionTypeBody(features: features))
+        case 0x5F:
+            let fields = try parseVector { (s) throws(WasmParserError) in try s.parseFieldType(features: features) }
+            return .structType(StructType(fields: fields))
+        case 0x5E:
+            return .arrayType(ArrayType(element: try parseFieldType(features: features)))
+        default:
+            throw makeError(.malformedCompositeType(opcode))
+        }
+    }
+
+    @usableFromInline
+    mutating func parseFieldType(features: WasmFeatureSet) throws(WasmParserError) -> FieldType {
+        let storage = try parseStorageType(features: features)
+        return FieldType(storage: storage, isMutable: try parseMutability() == .variable)
+    }
+
+    @usableFromInline
+    mutating func parseStorageType(features: WasmFeatureSet) throws(WasmParserError) -> StorageType {
+        switch try peek() {
+        case 0x78:
+            _ = try consumeAny()
+            return .packed(.i8)
+        case 0x77:
+            _ = try consumeAny()
+            return .packed(.i16)
+        default:
+            return .value(try parseValueType(features: features))
+        }
     }
 
     /// > Note:
@@ -410,15 +572,8 @@ extension ByteStream {
     /// <https://webassembly.github.io/spec/core/binary/types.html#table-types>
     @inlinable
     mutating func parseTableType(features: WasmFeatureSet) throws(WasmParserError) -> TableType {
-        let elementType: ReferenceType
         let b = try consumeAny()
-
-        switch b {
-        case 0x70:
-            elementType = .funcRef
-        case 0x6F:
-            elementType = .externRef
-        default:
+        guard let elementType = try parseReferenceType(byte: b, features: features) else {
             throw WasmParserError(
                 kind: .parserUnexpectedByte(b, expected: [0x6F, 0x70]),
                 offset: currentIndex
@@ -506,7 +661,10 @@ extension Parser {
         case 0x40:
             _ = try stream.consumeAny()
             return .empty
-        case 0x7B...0x7F, 0x70, 0x6F, 0x69, 0x63, 0x64:
+        case 0x7B...0x7F, 0x70, 0x6F, 0x69, 0x63, 0x64,
+            0x6A...0x6E where features.contains(.gc),
+            0x71...0x73 where features.contains(.gc),
+            0x74 where features.contains(.exceptionHandling) && features.contains(.gc):
             return try .type(stream.parseValueType(features: features))
         default:
             let rawIndex = try stream.parseVarSigned33()
@@ -521,9 +679,18 @@ extension Parser {
     /// <https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions>
     @inlinable
     mutating func parseMemarg() throws(WasmParserError) -> MemArg {
-        let align: UInt32 = try parseUnsigned()
+        var flags: UInt32 = try parseUnsigned()
+        var memory: UInt32 = 0
+        // With multi-memory, bit 6 of the flags says a memory index follows them.
+        if features.contains(.multiMemory), flags & 0x40 != 0 {
+            guard flags < 0x80 else {
+                throw makeError(.malformedMemArgFlags(flags))
+            }
+            flags &= ~0x40
+            memory = try parseUnsigned()
+        }
         let offset: UInt64 = try features.contains(.memory64) ? parseUnsigned(UInt64.self) : UInt64(parseUnsigned(UInt32.self))
-        return MemArg(offset: offset, align: align)
+        return MemArg(offset: offset, align: flags, memory: memory)
     }
 }
 
@@ -531,6 +698,10 @@ extension Parser {
 /// <https://webassembly.github.io/spec/core/binary/instructions.html>
 extension Parser: BinaryInstructionDecoder {
     @inlinable mutating func parseMemoryIndex() throws(WasmParserError) -> UInt32 {
+        // Pre-multi-memory, the spec encodes this as a reserved zero byte, not a memory index.
+        if features.contains(.multiMemory) {
+            return try parseUnsigned()
+        }
         let zero = try stream.consumeAny()
         guard zero == 0x00 else {
             throw makeError(.zeroExpected(actual: zero))
@@ -584,11 +755,7 @@ extension Parser: BinaryInstructionDecoder {
         return (blockType, TryCatch(catches: catches))
     }
     @inlinable mutating func visitCall() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
-    @inlinable mutating func visitCallRef() throws(WasmParserError) -> UInt32 {
-        // TODO reference types checks
-        // traps on nil
-        try parseUnsigned()
-    }
+    @inlinable mutating func visitCallRef() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
 
     @inlinable mutating func visitCallIndirect() throws(WasmParserError) -> (typeIndex: UInt32, tableIndex: UInt32) {
         let typeIndex: TypeIndex = try parseUnsigned()
@@ -613,7 +780,7 @@ extension Parser: BinaryInstructionDecoder {
     }
 
     @inlinable mutating func visitReturnCallRef() throws(WasmParserError) -> UInt32 {
-        return 0
+        try parseUnsigned()
     }
 
     @inlinable mutating func visitTypedSelect() throws(WasmParserError) -> WasmTypes.ValueType {
@@ -655,20 +822,98 @@ extension Parser: BinaryInstructionDecoder {
         return IEEE754.Float64(bitPattern: n)
     }
     @inlinable mutating func visitRefNull() throws(WasmParserError) -> WasmTypes.HeapType {
-        return try stream.parseHeapType()
+        return try stream.parseHeapType(features: features)
     }
-    @inlinable mutating func visitBrOnNull() throws(WasmParserError) -> UInt32 {
-        return 0
+    @inlinable mutating func visitBrOnNull() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitBrOnNonNull() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+
+    @inlinable mutating func visitStructNew() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitStructNewDefault() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitStructGet() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let fieldIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, fieldIndex)
     }
-    @inlinable mutating func visitBrOnNonNull() throws(WasmParserError) -> UInt32 {
-        return 0
+    @inlinable mutating func visitStructGetS() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let fieldIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, fieldIndex)
+    }
+    @inlinable mutating func visitStructGetU() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let fieldIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, fieldIndex)
+    }
+    @inlinable mutating func visitStructSet() throws(WasmParserError) -> (typeIndex: UInt32, fieldIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let fieldIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, fieldIndex)
+    }
+    @inlinable mutating func visitArrayNew() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayNewDefault() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayNewFixed() throws(WasmParserError) -> (typeIndex: UInt32, size: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let size: UInt32 = try parseUnsigned()
+        return (typeIndex, size)
+    }
+    @inlinable mutating func visitArrayGet() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayGetS() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayGetU() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArraySet() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayNewData() throws(WasmParserError) -> (typeIndex: UInt32, dataIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let dataIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, dataIndex)
+    }
+    @inlinable mutating func visitArrayNewElem() throws(WasmParserError) -> (typeIndex: UInt32, elemIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let elemIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, elemIndex)
+    }
+    @inlinable mutating func visitArrayFill() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitArrayCopy() throws(WasmParserError) -> (destType: UInt32, srcType: UInt32) {
+        let destType: UInt32 = try parseUnsigned()
+        let srcType: UInt32 = try parseUnsigned()
+        return (destType, srcType)
+    }
+    @inlinable mutating func visitArrayInitData() throws(WasmParserError) -> (typeIndex: UInt32, dataIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let dataIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, dataIndex)
+    }
+    @inlinable mutating func visitArrayInitElem() throws(WasmParserError) -> (typeIndex: UInt32, elemIndex: UInt32) {
+        let typeIndex: UInt32 = try parseUnsigned()
+        let elemIndex: UInt32 = try parseUnsigned()
+        return (typeIndex, elemIndex)
+    }
+    @inlinable mutating func visitRefTest(_: Instruction.RefTest) throws(WasmParserError) -> HeapType {
+        try stream.parseHeapType(features: features)
+    }
+    @inlinable mutating func visitRefCast(_: Instruction.RefCast) throws(WasmParserError) -> HeapType {
+        try stream.parseHeapType(features: features)
+    }
+    @inlinable mutating func visitBrOnCast() throws(WasmParserError) -> (relativeDepth: UInt32, castFrom: ReferenceType, castTo: ReferenceType) {
+        try parseBrOnCastImmediates()
+    }
+    @inlinable mutating func visitBrOnCastFail() throws(WasmParserError) -> (relativeDepth: UInt32, castFrom: ReferenceType, castTo: ReferenceType) {
+        try parseBrOnCastImmediates()
+    }
+    @inlinable mutating func parseBrOnCastImmediates() throws(WasmParserError) -> (relativeDepth: UInt32, castFrom: ReferenceType, castTo: ReferenceType) {
+        let flags = try stream.consumeAny()
+        guard flags <= 0b11 else {
+            throw makeError(.invalidCastFlags(flags))
+        }
+        let relativeDepth: UInt32 = try parseUnsigned()
+        let castFrom = ReferenceType(isNullable: flags & 0b01 != 0, heapType: try stream.parseHeapType(features: features))
+        let castTo = ReferenceType(isNullable: flags & 0b10 != 0, heapType: try stream.parseHeapType(features: features))
+        return (relativeDepth, castFrom, castTo)
     }
 
     @inlinable mutating func visitRefFunc() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
-    @inlinable mutating func visitMemoryInit() throws(WasmParserError) -> UInt32 {
+    @inlinable mutating func visitMemoryInit() throws(WasmParserError) -> (dataIndex: UInt32, memory: UInt32) {
         let dataIndex: DataIndex = try parseUnsigned()
-        _ = try parseMemoryIndex()
-        return dataIndex
+        let memory = try parseMemoryIndex()
+        return (dataIndex, memory)
     }
 
     @inlinable mutating func visitDataDrop() throws(WasmParserError) -> UInt32 {
@@ -676,17 +921,13 @@ extension Parser: BinaryInstructionDecoder {
     }
 
     @inlinable mutating func visitMemoryCopy() throws(WasmParserError) -> (dstMem: UInt32, srcMem: UInt32) {
-        _ = try parseMemoryIndex()
-        _ = try parseMemoryIndex()
-        return (0, 0)
+        let destination = try parseMemoryIndex()
+        let source = try parseMemoryIndex()
+        return (destination, source)
     }
 
     @inlinable mutating func visitMemoryFill() throws(WasmParserError) -> UInt32 {
-        let zero = try stream.consumeAny()
-        guard zero == 0x00 else {
-            throw makeError(.zeroExpected(actual: zero))
-        }
-        return 0
+        try parseMemoryIndex()
     }
 
     @inlinable mutating func visitTableInit() throws(WasmParserError) -> (elemIndex: UInt32, table: UInt32) {
@@ -791,6 +1032,9 @@ extension Parser: BinaryInstructionDecoder {
     @inline(__always)
     @inlinable
     mutating func parseInstruction() throws(WasmParserError) -> Instruction {
+        if !features.contains(.gc), let opcode = try stream.peek(), opcode == 0xFB || opcode == 0xD3 {
+            throw makeError(.illegalOpcode([opcode]))
+        }
         return try parseBinaryInstruction(decoder: &self)
     }
 
@@ -830,9 +1074,14 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#type-section>
     @inlinable
-    package mutating func parseTypeSection() throws(WasmParserError) -> [FunctionType] {
+    package mutating func parseTypeSection() throws(WasmParserError) -> [RecursiveGroup] {
         let features = self.features
-        return try parseVector { (s) throws(WasmParserError) in try s.parseFunctionType(features: features) }
+        guard features.contains(.gc) else {
+            return try parseVector { (s) throws(WasmParserError) in
+                RecursiveGroup(types: [SubType(isFinal: true, supertypes: [], body: .function(try s.parseFunctionType(features: features)))])
+            }
+        }
+        return try parseVector { (s) throws(WasmParserError) in try s.parseRecursiveGroup(features: features) }
     }
 
     /// > Note:
@@ -859,8 +1108,25 @@ extension Parser {
     /// <https://webassembly.github.io/spec/core/binary/modules.html#table-section>
     @usableFromInline
     package mutating func parseTableSection() throws(WasmParserError) -> [Table] {
-        let features = self.features
-        return try parseVector { (s) throws(WasmParserError) in try Table(type: s.parseTableType(features: features)) }
+        let count: UInt32 = try parseUnsigned()
+        var tables: [Table] = []
+        for _ in 0..<count {
+            // A table type starts with a reference type, which is never 0x40, so
+            // 0x40 introduces a table with an initializer (typed function references).
+            guard features.contains(.functionReferences), try stream.peek() == 0x40 else {
+                tables.append(Table(type: try stream.parseTableType(features: features)))
+                continue
+            }
+            _ = try stream.consumeAny()
+            let reserved = try stream.consumeAny()
+            guard reserved == 0x00 else {
+                throw makeError(.zeroExpected(actual: reserved))
+            }
+            let type = try stream.parseTableType(features: features)
+            let initializer = try parseConstExpression()
+            tables.append(Table(type: type, initializer: initializer))
+        }
+        return tables
     }
 
     /// > Note:
@@ -963,7 +1229,7 @@ extension Parser {
 public enum ParsingPayload {
     case header(version: [UInt8])
     case customSection(CustomSection)
-    case typeSection([FunctionType])
+    case typeSection([RecursiveGroup])
     case importSection([Import])
     case functionSection([TypeIndex])
     case tableSection([Table])
@@ -1034,6 +1300,29 @@ extension Parser {
         }
     }
 
+    /// The order slot of section `id`, or `nil` for a custom section. Throws for an
+    /// unknown ID, and for the tag section without exception handling.
+    @inlinable
+    func sectionOrder(id: UInt8) throws(WasmParserError) -> OrderTracking.Order? {
+        switch id {
+        case 0: return nil
+        case 1: return .type
+        case 2: return ._import
+        case 3: return .function
+        case 4: return .table
+        case 5: return .memory
+        case 6: return .global
+        case 7: return .export
+        case 8: return .start
+        case 9: return .element
+        case 10: return .code
+        case 11: return .data
+        case 12: return .dataCount
+        case 13 where features.contains(.exceptionHandling): return .tag
+        default: throw makeError(.malformedSectionID(id))
+        }
+    }
+
     /// Attempts to parse a chunk of the Wasm binary stream.
     ///
     /// - Returns: A `ParsingPayload` if the parsing was successful, otherwise `nil`.
@@ -1078,55 +1367,26 @@ extension Parser {
             let sectionSize: UInt32 = try parseUnsigned()
             let sectionStart = stream.currentIndex
 
+            let order = try sectionOrder(id: sectionID)
             let payload: ParsingPayload
-            let order: OrderTracking.Order?
             switch sectionID {
-            case 0:
-                order = nil
-                payload = .customSection(try parseCustomSection(size: sectionSize))
-            case 1:
-                order = .type
-                payload = .typeSection(try parseTypeSection())
-            case 2:
-                order = ._import
-                payload = .importSection(try parseImportSection())
-            case 3:
-                order = .function
-                payload = .functionSection(try parseFunctionSection())
-            case 4:
-                order = .table
-                payload = .tableSection(try parseTableSection())
-            case 5:
-                order = .memory
-                payload = .memorySection(try parseMemorySection())
-            case 6:
-                order = .global
-                payload = .globalSection(try parseGlobalSection())
-            case 7:
-                order = .export
-                payload = .exportSection(try parseExportSection())
-            case 8:
-                order = .start
-                payload = .startSection(try parseStartSection())
-            case 9:
-                order = .element
-                payload = .elementSection(try parseElementSection())
-            case 10:
-                order = .code
-                payload = .codeSection(try parseCodeSection())
-            case 11:
-                order = .data
-                payload = .dataSection(try parseDataSection())
-            case 12:
-                order = .dataCount
-                payload = .dataCount(try parseDataCountSection())
-            case 13 where features.contains(.exceptionHandling):
-                order = .tag
-                payload = .tagSection(try parseTagSection())
-            default:
-                throw makeError(.malformedSectionID(sectionID))
+            case 0: payload = .customSection(try parseCustomSection(size: sectionSize))
+            case 1: payload = .typeSection(try parseTypeSection())
+            case 2: payload = .importSection(try parseImportSection())
+            case 3: payload = .functionSection(try parseFunctionSection())
+            case 4: payload = .tableSection(try parseTableSection())
+            case 5: payload = .memorySection(try parseMemorySection())
+            case 6: payload = .globalSection(try parseGlobalSection())
+            case 7: payload = .exportSection(try parseExportSection())
+            case 8: payload = .startSection(try parseStartSection())
+            case 9: payload = .elementSection(try parseElementSection())
+            case 10: payload = .codeSection(try parseCodeSection())
+            case 11: payload = .dataSection(try parseDataSection())
+            case 12: payload = .dataCount(try parseDataCountSection())
+            case 13: payload = .tagSection(try parseTagSection())
+            default: throw makeError(.malformedSectionID(sectionID))
             }
-            if let order = order {
+            if let order {
                 try orderTracking.track(order: order, parser: self)
             }
             let expectedSectionEnd = sectionStart + Int(sectionSize)
@@ -1195,6 +1455,26 @@ public struct NameSectionParser<Source: ByteStreamSource> {
             results.append(result)
         }
         return results
+    }
+
+    /// Parses the entire name section like ``parseAll()``, and also returns the tag names
+    /// subsection (ID 11), which ``ParsedNames`` has no case for.
+    package mutating func parseAllIncludingTagNames() throws(WasmParserError) -> (names: [ParsedNames], tagNames: NameMap) {
+        var results: [ParsedNames] = []
+        var tagNames: NameMap = [:]
+        while try !stream.hasReachedEnd() {
+            let id = try stream.consumeAny()
+            if id == 11 {
+                _ = try stream.parseUnsigned(UInt32.self)
+                tagNames = try Self.parseNameMap(stream: &stream)
+                continue
+            }
+            guard let result = try Self.parseNameSubsection(type: id, stream: &stream) else {
+                continue
+            }
+            results.append(result)
+        }
+        return (results, tagNames)
     }
 
     static func parseNameSubsection(type: UInt8, stream: inout ByteStream<Source>) throws(WasmParserError) -> ParsedNames? {

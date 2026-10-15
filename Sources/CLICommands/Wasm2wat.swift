@@ -1,13 +1,13 @@
 import ArgumentParser
-import SystemExtras
-import SystemPackage
+import WASI
 import WAT
 import WasmParser
 
 package struct Wasm2wat: ParsableCommand {
     package static let configuration = CommandConfiguration(
         commandName: "wasm2wat",
-        abstract: "Disassemble a WebAssembly binary into WebAssembly text format"
+        abstract: "Disassemble a WebAssembly binary into WebAssembly text format",
+        discussion: "Every WebAssembly proposal WasmKit can decode is enabled."
     )
 
     @Argument(help: "Path to a WebAssembly binary (`.wasm`) file to disassemble.")
@@ -25,30 +25,19 @@ package struct Wasm2wat: ParsableCommand {
     package init() {}
 
     package func run() throws {
-        let filePath = FilePath(path)
-        let fileHandle = try FileDescriptor.open(filePath, .readOnly)
-        try withThrowing {
-            let stream = try FileHandleStreamSource(fileHandle: fileHandle)
-            let wat = try wasm2wat(stream)
-
-            if let outputPath = output {
-                let outPath = FilePath(outputPath)
-                let outHandle = try FileDescriptor.open(
-                    outPath,
-                    .writeOnly,
-                    options: [.create, .truncate],
-                    permissions: [.ownerReadWrite, .groupRead, .otherRead]
-                )
-                try withThrowing {
-                    try outHandle.writeAll(Array(wat.utf8))
-                } defer: {
-                    try outHandle.close()
-                }
-            } else {
-                print(wat)
+        let source = try FileHandleStreamSource(filePath: path)
+        if let outputPath = output {
+            var outputHandle = try CLIFile.createWrite(outputPath)
+            try withThrowing {
+                try wasm2wat(source, features: .all, to: &outputHandle)
+                try outputHandle.flush()
+            } defer: {
+                try outputHandle.close()
             }
-        } defer: {
-            try fileHandle.close()
+        } else {
+            var standardOutput = CLIFile.standardOutput
+            try wasm2wat(source, features: .all, to: &standardOutput)
+            try standardOutput.flush()
         }
     }
 }

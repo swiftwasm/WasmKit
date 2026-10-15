@@ -1,13 +1,22 @@
-import SystemPackage
 import WasmTypes
 
-struct FileAccessMode: OptionSet {
-    let rawValue: UInt32
-    static let read = FileAccessMode(rawValue: 1)
-    static let write = FileAccessMode(rawValue: 1 << 1)
+/// The requested access mode for an opened file.
+@_spi(WASIPlatform) public struct FileAccessMode: OptionSet, Sendable {
+    public let rawValue: UInt32
+    public init(rawValue: UInt32) { self.rawValue = rawValue }
+    public static let read = FileAccessMode(rawValue: 1)
+    public static let write = FileAccessMode(rawValue: 1 << 1)
 }
 
-protocol WASIEntry: Sendable {
+/// A resource installed in the WASI file descriptor table.
+///
+/// This protocol (and its refinements ``WASIFile``/``WASIDir``) is the
+/// platform-independent boundary of the WASI host implementation: all
+/// requirements are expressed in `WASIAbi` types, so implementations can be
+/// backed by anything from host file descriptors to in-memory data or
+/// device drivers on embedded systems. Implementations report failures by
+/// throwing `WASIAbi.Errno`.
+@_spi(WASIPlatform) public protocol WASIEntry: Sendable {
     /// Whether this entry wraps a borrowed file descriptor that should not be
     /// closed when the WASI instance is torn down (e.g. process stdio).
     var isBorrowed: Bool { get }
@@ -22,13 +31,22 @@ protocol WASIEntry: Sendable {
         offset: WASIAbi.FileSize, length: WASIAbi.FileSize, advice: WASIAbi.Advice
     ) throws
     func close() throws
+
+    /// The host file descriptor backing this entry, if it has one.
+    ///
+    /// `poll_oneoff` can only wait on real descriptors; entries without one
+    /// (in-memory files, devices) report `nil`.
+    var hostFileDescriptor: CInt? { get }
 }
 
 extension WASIEntry {
-    var isBorrowed: Bool { false }
+    @_spi(WASIPlatform) public var isBorrowed: Bool { false }
+    @_spi(WASIPlatform) public var hostFileDescriptor: CInt? { nil }
 }
 
-protocol WASIFile: WASIEntry {
+/// A file-like resource (regular file, stdio stream, device, ...) exposed
+/// to WASI guests.
+@_spi(WASIPlatform) public protocol WASIFile: WASIEntry {
     func fdStat() throws -> WASIAbi.FdStat
     func setFdStatFlags(_ flags: WASIAbi.Fdflags) throws
     func setFilestatSize(_ size: WASIAbi.FileSize) throws
@@ -38,42 +56,26 @@ protocol WASIFile: WASIEntry {
     func tell() throws -> WASIAbi.FileSize
     func seek(offset: WASIAbi.FileDelta, whence: WASIAbi.Whence) throws -> WASIAbi.FileSize
 
-    func write<M: GuestMemory, Buffer: Sequence>(
-        vectored buffer: Buffer, memory: M
-    ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec
-    func pwrite<M: GuestMemory, Buffer: Sequence>(
-        vectored buffer: Buffer, memory: M, offset: WASIAbi.FileSize
-    ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec
-    func read<M: GuestMemory, Buffer: Sequence>(
-        into buffer: Buffer, memory: M
-    ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec
-    func pread<M: GuestMemory, Buffer: Sequence>(
-        into buffer: Buffer, memory: M, offset: WASIAbi.FileSize
-    ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec
+    func write(vectored buffers: GuestBuffers) throws -> WASIAbi.Size
+    func pwrite(vectored buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size
+    func read(into buffers: GuestBuffers) throws -> WASIAbi.Size
+    func pread(into buffers: GuestBuffers, offset: WASIAbi.FileSize) throws -> WASIAbi.Size
 }
 
-protocol WASIDir: WASIEntry {
-    typealias ReaddirElement = (dirent: WASIAbi.Dirent, name: String)
-    associatedtype ReadEntriesResult: WASIReaddirIterator where ReadEntriesResult.Element == ReaddirElement
+/// A directory-like resource exposed to WASI guests.
+@_spi(WASIPlatform) public protocol WASIDir: WASIEntry {
+    typealias ReaddirElement = WASIReaddirElement
 
     var preopenPath: String? { get }
 
     func readlink(atPath path: String) throws -> [UInt8]
-
-    func openFile(
-        symlinkFollow: Bool,
-        path: String,
-        oflags: WASIAbi.Oflags,
-        accessMode: FileAccessMode,
-        fdflags: WASIAbi.Fdflags
-    ) throws -> FileDescriptor
 
     func createDirectory(atPath path: String) throws
     func removeDirectory(atPath path: String) throws
     func removeFile(atPath path: String) throws
     func symlink(from sourcePath: String, to destPath: String) throws
     func rename(from sourcePath: String, toDir newDir: any WASIDir, to destPath: String) throws
-    func readEntries(cookie: WASIAbi.DirCookie) throws -> ReadEntriesResult
+    func readEntries(cookie: WASIAbi.DirCookie) throws -> WASIReaddirEntries
     func attributes(path: String, symlinkFollow: Bool) throws -> WASIAbi.Filestat
     func setFilestatTimes(
         path: String,
@@ -82,7 +84,40 @@ protocol WASIDir: WASIEntry {
     ) throws
 }
 
-protocol WASIReaddirIterator {
+/// A single directory entry.
+@_spi(WASIPlatform) public typealias WASIReaddirElement = (dirent: WASIAbi.Dirent, name: String)
+
+/// A type-erased iterator over directory entries.
+///
+/// Concrete rather than an associated type so that ``WASIDir`` carries no
+/// generic requirements. ``FdEntry`` stores directories as `any WASIDir`, and
+/// Embedded Swift cannot specialise a generic method reached through an
+/// existential.
+@_spi(WASIPlatform) public struct WASIReaddirEntries {
+    private final class Box<I: WASIReaddirIterator> where I.Element == WASIReaddirElement {
+        var iterator: I
+        init(_ iterator: I) { self.iterator = iterator }
+    }
+
+    private let nextEntry: () -> Result<WASIReaddirElement, any Error>?
+    private let closeIterator: () -> Void
+
+    public init<I: WASIReaddirIterator>(_ iterator: I) where I.Element == WASIReaddirElement {
+        let box = Box(iterator)
+        self.nextEntry = { box.iterator.next() }
+        self.closeIterator = { box.iterator.close() }
+    }
+
+    public mutating func next() -> Result<WASIReaddirElement, any Error>? { nextEntry() }
+
+    /// Closes the iterator and releases any owned resources.
+    ///
+    /// Callers must invoke this exactly once after iteration completes.
+    public mutating func close() { closeIterator() }
+}
+
+/// An iterator over directory entries produced by ``WASIDir/readEntries(cookie:)``.
+@_spi(WASIPlatform) public protocol WASIReaddirIterator {
     associatedtype Element
     mutating func next() -> Result<Element, any Error>?
     /// Closes the iterator and releases any owned resources.
@@ -91,7 +126,8 @@ protocol WASIReaddirIterator {
     mutating func close()
 }
 
-enum FdEntry {
+/// A file descriptor table entry: either a file or a directory resource.
+@_spi(WASIPlatform) public enum FdEntry: Sendable {
     case file(any WASIFile)
     case directory(any WASIDir)
 
@@ -172,13 +208,20 @@ struct FdTable {
 /// Content of a file that can be retrieved from the file system.
 public enum FileContent: Sendable {
     case bytes([UInt8])
-    case handle(FileDescriptor)
+    /// A caller-owned platform file descriptor. The file system borrows it:
+    /// the caller is responsible for keeping it valid and closing it.
+    case handle(CInt)
 }
 
 /// Protocol for file system implementations used by WASI.
 ///
-/// This protocol contains WASI-specific implementation details.
-protocol FileSystemImplementation: ~Copyable, Sendable {
+/// The built-in implementations are ``MemoryFileSystem`` and the host file
+/// system used by `FileSystemOptions.host()`. Custom implementations can be
+/// injected with `FileSystemOptions.custom(_:)` to run WASI guests on
+/// platforms without a usable host file system (e.g. embedded targets).
+/// All requirements are expressed in `WASIAbi` and standard Swift types;
+/// implementations report failures by throwing `WASIAbi.Errno`.
+@_spi(WASIPlatform) public protocol FileSystemImplementation: ~Copyable, Sendable {
     /// Preopens a directory and returns a WASIDir implementation.
     func preopenDirectory(guestPath: String, hostPath: String) throws -> any WASIDir
 

@@ -12,14 +12,28 @@ extension VMGen {
         let label: String
         /// The type of the parameter.
         let type: String
+        /// The type of the parameter in the generated C trampoline.
+        let cType: String
+
+        init(label: String, type: String, cType: String? = nil) {
+            self.label = label
+            self.type = type
+            self.cType = cType ?? type
+        }
 
         static let sp = Self(label: "sp", type: "Sp")
         static let pc = Self(label: "pc", type: "Pc")
         static let md = Self(label: "md", type: "Md")
         static let ms = Self(label: "ms", type: "Ms")
+        /// The integer accumulator: a value handed from the instruction that
+        /// produces it straight to the instruction right after it, instead of
+        /// through a frame slot. It is dead everywhere else.
+        static let ireg = Self(label: "ireg", type: "UInt64", cType: "uint64_t")
+        /// The float accumulator, the `f64` counterpart of ``ireg``.
+        static let freg = Self(label: "freg", type: "Double", cType: "double")
 
         /// All cases of `ExecParam`.
-        static var allCases = [sp, pc, md, ms]
+        static var allCases = [sp, pc, md, ms, ireg, freg]
     }
 
     /// An immediate operand of an instruction.
@@ -62,9 +76,74 @@ extension VMGen {
         var immediate: Immediate?
         /// The layout of the immediate operand.
         var immediateLayout: ImmediateLayout?
+        /// A key identifying the machine code of this instruction's direct-threaded handler.
+        ///
+        /// Several instructions differ only in the *static* WebAssembly type they
+        /// operate on and compile to bit-identical handler bodies (`i32.load` and
+        /// `f32.load` both zero-extend a 32-bit load into the 64-bit stack slot, for
+        /// example). Instructions sharing a non-nil identity get a single
+        /// `wasmkit_tc_*` handler; every opcode in the group points its handler-table
+        /// entry at it. Without this the compiler's function merging pass folds the
+        /// duplicates anyway and leaves a `b <canonical>` thunk behind, which costs an
+        /// extra taken branch on every dispatch to the duplicated opcode.
+        ///
+        /// The identity must describe the *raw* slot-to-slot behaviour of the handler,
+        /// so it has to be derived from the same fields that generate the body.
+        var handlerIdentity: String? = nil
+
+        /// Whether the handler body can return the head slot of a trap pseudo-instruction
+        /// instead of falling through to the next instruction (see `memoryTrapInsts`).
+        ///
+        /// Such a handler has two exits, so the generated wrapper loads the next
+        /// instruction's head slot and bumps `pc` *before* running the body: otherwise the
+        /// two exits get tail-merged and the fast path pays an extra address computation
+        /// and a branch to reach the shared load. Only valid for a body that neither reads
+        /// `pc` nor throws.
+        var mayDispatchToTrap: Bool = false
+
+        /// Whether this is a trap pseudo-instruction (see `memoryTrapInsts`): never
+        /// emitted by the translator, only dispatched to by another handler. The
+        /// generator gives each one a constant-foldable head-slot accessor so that a
+        /// handler's cold path can reach it without materialising an `Instruction`.
+        var isTrapPseudoInstruction: Bool = false
+
+        /// Whether the handler is given `pc`, just past its immediate, without being able to
+        /// move it. For a handler that can suspend a resumable call, which resumes at the
+        /// handler's head slot.
+        var receivesPc: Bool = false
+
+        /// How this instruction's handler uses the integer accumulator.
+        ///
+        /// A handler that does not use it hands an indeterminate value to the
+        /// next handler, which never reads it.
+        var useIreg: RegisterUse = .none
+        /// How this instruction's handler uses the float accumulator.
+        var useFreg: RegisterUse = .none
+
+        /// Whether the handler uses either accumulator.
+        var usesAccumulator: Bool { useIreg != .none || useFreg != .none }
+
+        /// Whether the translator emits this instruction only under direct
+        /// threading. The token-threaded dispatcher has no case for it.
+        var isDirectThreadedOnly: Bool {
+            get { usesAccumulator || _isDirectThreadedOnly }
+            set { _isDirectThreadedOnly = newValue }
+        }
+        private var _isDirectThreadedOnly = false
 
         var mayUpdatePc: Bool {
             self.isControl
+        }
+
+        /// Whether the generated handler reads the next instruction's head slot right
+        /// after its immediate instead of after its body, so that the two loads from
+        /// `pc` sit next to each other.
+        ///
+        /// Control and throwing handlers, and memory handlers (which already read it
+        /// up front), are left alone. The immediate layout of a handler that does this
+        /// is decoded as whole words; see `ImmediateLayout.buildDeclaration`.
+        var readsNextHandlerUpFront: Bool {
+            immediate != nil && !mayUpdatePc && !mayDispatchToTrap && !mayThrow
         }
 
         private init(
@@ -112,6 +191,7 @@ extension VMGen {
             isControl: Bool = false,
             mayThrow: Bool = false, mayUpdateFrame: Bool = false,
             useCurrentMemory: RegisterUse = .none,
+            receivesPc: Bool = false,
             layout: (inout ImmediateLayout) -> Void
         ) {
             let immediateName = pascalCase(camelCase: name) + "Operand"
@@ -125,6 +205,7 @@ extension VMGen {
                 immediate: Immediate(type: "Instruction." + immediateName),
                 immediateLayout: building
             )
+            self.receivesPc = receivesPc
         }
 
         init(
@@ -155,7 +236,7 @@ extension VMGen {
             } else {
                 vregs += [(.sp, false)]
             }
-            if self.mayUpdatePc {
+            if self.mayUpdatePc || self.receivesPc {
                 vregs += [(.pc, false)]
             }
             switch useCurrentMemory {
@@ -164,6 +245,16 @@ extension VMGen {
                 vregs += [(.md, false), (.ms, false)]
             case .write:
                 vregs += [(.md, true), (.ms, true)]
+            }
+            switch useIreg {
+            case .none: break
+            case .read: vregs += [(.ireg, false)]
+            case .write: vregs += [(.ireg, true)]
+            }
+            switch useFreg {
+            case .none: break
+            case .read: vregs += [(.freg, false)]
+            case .write: vregs += [(.freg, true)]
             }
             var parameters: [Parameter] = vregs.map { ($0.reg.label, $0.reg.type, $0.isInout) }
             if let immediate = self.immediate {
@@ -180,7 +271,31 @@ extension VMGen {
         let lhsType: String
         let rhsType: String
         let resultType: String
-        var mayThrow: Bool = false
+        let mayThrow: Bool
+        /// The `Sp` accessor the left operand is read through: ``lhsType``,
+        /// unless the operation runs on a whole slot at once.
+        let lhsSlot: String
+        /// The `Sp` accessor the right operand is read through. See ``lhsSlot``.
+        let rhsSlot: String
+        /// The `Sp` accessor the result is written through. See ``lhsSlot``.
+        let resultSlot: String
+
+        /// - Parameter slot: the `Sp` accessor of both operands and the result,
+        ///   when the operation runs on whole slots rather than on the values.
+        init(
+            op: String, name: String, lhsType: String, rhsType: String, resultType: String,
+            mayThrow: Bool = false, slot: String? = nil
+        ) {
+            self.op = op
+            self.name = name
+            self.lhsType = lhsType
+            self.rhsType = rhsType
+            self.resultType = resultType
+            self.mayThrow = mayThrow
+            self.lhsSlot = slot ?? lhsType
+            self.rhsSlot = slot ?? rhsType
+            self.resultSlot = slot ?? resultType
+        }
 
         /// The instruction definition of this binary operation.
         var instruction: Instruction {
@@ -191,16 +306,46 @@ extension VMGen {
 
     /// A unary operation information.
     struct UnOpInfo {
-        var op: String
-        var name: String
-        var inputType: String
-        var resultType: String
-        var mayThrow: Bool = false
+        let op: String
+        let name: String
+        let inputType: String
+        let resultType: String
+        let mayThrow: Bool
+        /// See `Instruction.handlerIdentity`.
+        let handlerIdentity: String?
+        /// The `Sp` accessor the operand is read through: ``inputType``, unless
+        /// the operation runs on a whole slot at once.
+        let inputSlot: String
+        /// The `Sp` accessor the result is written through: ``resultType``,
+        /// unless the operation writes a whole slot at once.
+        let resultSlot: String
+
+        /// - Parameters:
+        ///   - inputSlot: the `Sp` accessor of the operand, when it is not
+        ///     `inputType`.
+        ///   - resultSlot: the `Sp` accessor of the result, when it is not
+        ///     `resultType`.
+        init(
+            op: String, name: String, inputType: String, resultType: String,
+            mayThrow: Bool = false, handlerIdentity: String? = nil,
+            inputSlot: String? = nil, resultSlot: String? = nil
+        ) {
+            self.op = op
+            self.name = name
+            self.inputType = inputType
+            self.resultType = resultType
+            self.mayThrow = mayThrow
+            self.handlerIdentity = handlerIdentity
+            self.inputSlot = inputSlot ?? inputType
+            self.resultSlot = resultSlot ?? resultType
+        }
 
         /// The instruction definition of this unary operation.
         var instruction: Instruction {
-            Instruction(name: name, documentation: "WebAssembly Core Instruction `\(inputType).\(VMGen.snakeCase(pascalCase: op))`",
+            var inst = Instruction(name: name, documentation: "WebAssembly Core Instruction `\(inputType).\(VMGen.snakeCase(pascalCase: op))`",
                         mayThrow: mayThrow, immediateLayout: .unary)
+            inst.handlerIdentity = handlerIdentity
+            return inst
         }
     }
 
@@ -247,7 +392,10 @@ extension VMGen {
         results += [UnOpInfo(op: "Wrap", name: "i32WrapI64", inputType: "i64", resultType: "i32")]
         // (i32) -> i64
         results += ["ExtendI32S", "ExtendI32U"].map { op -> UnOpInfo in
-            UnOpInfo(op: op, name: "i64\(op)", inputType: "i32", resultType: "i64")
+            // `i64.extend_i32_u` reads the low 32 bits of the slot and zero-extends
+            // them back into it, which is exactly a 32-bit slot move.
+            let identity = op == "ExtendI32U" ? "move(32)" : nil
+            return UnOpInfo(op: op, name: "i64\(op)", inputType: "i32", resultType: "i64", handlerIdentity: identity)
         }
         // (T) -> T for all T in int types
         results += ["Extend8S", "Extend16S"].flatMap { op -> [UnOpInfo] in
@@ -265,18 +413,23 @@ extension VMGen {
             [
                 UnOpInfo(op: "TruncTo\(result.uppercased())S", name: "\(result)Trunc\(source.uppercased())S", inputType: source, resultType: result, mayThrow: true),
                 UnOpInfo(op: "TruncTo\(result.uppercased())U", name: "\(result)Trunc\(source.uppercased())U", inputType: source, resultType: result, mayThrow: true),
-                UnOpInfo(op: "TruncSatTo\(result.uppercased())S", name: "\(result)TruncSat\(source.uppercased())S", inputType: source, resultType: result, mayThrow: true),
-                UnOpInfo(op: "TruncSatTo\(result.uppercased())U", name: "\(result)TruncSat\(source.uppercased())U", inputType: source, resultType: result, mayThrow: true)
+                UnOpInfo(op: "TruncSatTo\(result.uppercased())S", name: "\(result)TruncSat\(source.uppercased())S", inputType: source, resultType: result),
+                UnOpInfo(op: "TruncSatTo\(result.uppercased())U", name: "\(result)TruncSat\(source.uppercased())U", inputType: source, resultType: result)
             ]
         }
         // Conversion
-        let convInOut: [(source: String, result: String)] = [
-            ("i32", "f32"), ("i64", "f32"), ("i32", "f64"), ("i64", "f64")
+        // An `i32` slot's high half is zero too, so `i32 -> f32` converts both
+        // halves; an `i64` source writes its result with an explicit zero half.
+        let convInOut: [(source: String, result: String, inputSlot: String?, resultSlot: String?)] = [
+            ("i32", "f32", "i32x2", "f32x2"),
+            ("i64", "f32", nil, "f32v"),
+            ("i32", "f64", nil, nil),
+            ("i64", "f64", nil, nil),
         ]
-        results += convInOut.flatMap { source, result in
+        results += convInOut.flatMap { source, result, inputSlot, resultSlot in
             [
-                UnOpInfo(op: "ConvertTo\(result.uppercased())S", name: "\(result)Convert\(source.uppercased())S", inputType: source, resultType: result),
-                UnOpInfo(op: "ConvertTo\(result.uppercased())U", name: "\(result)Convert\(source.uppercased())U", inputType: source, resultType: result),
+                UnOpInfo(op: "ConvertTo\(result.uppercased())S", name: "\(result)Convert\(source.uppercased())S", inputType: source, resultType: result, inputSlot: inputSlot, resultSlot: resultSlot),
+                UnOpInfo(op: "ConvertTo\(result.uppercased())U", name: "\(result)Convert\(source.uppercased())U", inputType: source, resultType: result, inputSlot: inputSlot, resultSlot: resultSlot),
             ]
         }
         // Reinterpret
@@ -284,8 +437,10 @@ extension VMGen {
             ("i32", "f32"), ("i64", "f64"), ("f32", "i32"), ("f64", "i64")
         ]
         results += reinterpretInOut.flatMap { source, result in
-            [
-                UnOpInfo(op: "ReinterpretTo\(result.uppercased())", name: "\(result)Reinterpret\(source.uppercased())", inputType: source, resultType: result),
+            // A reinterpret is a pure slot move of the value's bit width.
+            let width = source.hasSuffix("32") ? 32 : 64
+            return [
+                UnOpInfo(op: "ReinterpretTo\(result.uppercased())", name: "\(result)Reinterpret\(source.uppercased())", inputType: source, resultType: result, handlerIdentity: "move(\(width))"),
             ]
         }
         return results
@@ -298,11 +453,18 @@ extension VMGen {
     static func buildFloatBinOps() -> [BinOpInfo] {
         var results: [BinOpInfo] = []
         // (T, T) -> T for all T in float types
-        results += [
-            "Add", "Sub", "Mul", "Div",
-            "Min", "Max", "CopySign",
-        ].flatMap { op -> [BinOpInfo] in
-            floatValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0) }
+        // `add`, `sub` and `mul` map `+0.0` to `+0.0`, so on `f32` they run on the
+        // whole slot -- the value and its zero high half -- through `f32x2`.
+        // `div` cannot, and writes its result with an explicit zero half through
+        // `f32v`; `min`, `max` and `copysign` stay on the value alone.
+        let sameTypeOps: [(op: String, f32Slot: String?)] = [
+            ("Add", "f32x2"), ("Sub", "f32x2"), ("Mul", "f32x2"), ("Div", "f32v"),
+            ("Min", nil), ("Max", nil), ("CopySign", nil),
+        ]
+        results += sameTypeOps.flatMap { op, f32Slot -> [BinOpInfo] in
+            [("f32", f32Slot), ("f64", nil)].map { type, slot in
+                BinOpInfo(op: op, name: "\(type)\(op)", lhsType: type, rhsType: type, resultType: type, slot: slot)
+            }
         }
         // (T, T) -> i32 for all T in float types
         results += [
@@ -317,8 +479,16 @@ extension VMGen {
     static func buildFloatUnaryOps() -> [UnOpInfo] {
         var results: [UnOpInfo] = []
         // (T) -> T for all T in float types
-        results += ["Abs", "Neg", "Ceil", "Floor", "Trunc", "Nearest", "Sqrt"].flatMap { op -> [UnOpInfo] in
-            floatValueTypes.map { UnOpInfo(op: op, name: "\($0)\(op)", inputType: $0, resultType: $0) }
+        // See `buildFloatBinOps` for the `f32x2` slot; `abs` and `neg` act on the
+        // sign bit of the value alone.
+        let sameTypeOps: [(op: String, f32Slot: String?)] = [
+            ("Abs", nil), ("Neg", nil), ("Ceil", "f32x2"), ("Floor", "f32x2"),
+            ("Trunc", "f32x2"), ("Nearest", "f32x2"), ("Sqrt", "f32x2"),
+        ]
+        results += sameTypeOps.flatMap { op, f32Slot -> [UnOpInfo] in
+            [("f32", f32Slot), ("f64", nil)].map { type, slot in
+                UnOpInfo(op: op, name: "\(type)\(op)", inputType: type, resultType: type, inputSlot: slot, resultSlot: slot)
+            }
         }
         // (f32) -> f64
         results += ["PromoteF32"].map { op -> UnOpInfo in
@@ -326,7 +496,7 @@ extension VMGen {
         }
         // (f64) -> f32
         results += ["DemoteF64"].map { op -> UnOpInfo in
-            UnOpInfo(op: op, name: "f32\(op)", inputType: "f64", resultType: "f32")
+            UnOpInfo(op: op, name: "f32\(op)", inputType: "f64", resultType: "f32", resultSlot: "f32v")
         }
         return results
     }
@@ -355,13 +525,66 @@ extension VMGen {
         let castToValue: String
         let isSigned: Bool
         let isFloatingPoint: Bool
+        /// The raw behaviour of the handler: load `loadAs` from memory and widen it
+        /// into the 64-bit stack slot. Unsigned loads always zero-extend, so the
+        /// result type does not matter (`.i32`, `.i64`, `.rawF32` and `.rawF64` all
+        /// zero-extend); signed loads sign-extend to the width of the result type.
+        private var identitySuffix: String {
+            "\(loadAs),\(isSigned ? "sext\(type)" : "zext")"
+        }
         var instruction: Instruction {
-            Instruction(name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
-                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .load)
+            var inst = Instruction(name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
+                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .load)
+            inst.mayDispatchToTrap = true
+            inst.handlerIdentity = "load(\(identitySuffix))"
+            return inst
         }
         var atomicInstruction: Instruction {
-            Instruction(name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
-                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .load)
+            var inst = Instruction(name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
+                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .load)
+            inst.mayDispatchToTrap = true
+            inst.handlerIdentity = "atomicLoad(\(identitySuffix))"
+            return inst
+        }
+
+        private func accInstruction(_ suffix: String, _ shape: String, _ layout: ImmediateLayout, _ use: RegisterUse) -> Instruction {
+            var inst = Instruction(
+                name: "\(type)\(op)\(suffix)",
+                documentation: """
+                    `\(shape)`, on a 32-bit memory
+
+                    An accumulator form of `\(type).\(VMGen.snakeCase(pascalCase: op))`.
+                    """,
+                mayThrow: false, useCurrentMemory: .read, immediateLayout: layout)
+            inst.mayDispatchToTrap = true
+            inst.handlerIdentity = "load\(suffix)(\(identitySuffix))"
+            inst.useIreg = use
+            return inst
+        }
+        var toAccInstruction: Instruction {
+            accInstruction("ToAcc", "ireg = load(sp[pointer] + offset)", .accMemoryPointer, .write)
+        }
+        var fromAccInstruction: Instruction {
+            accInstruction("FromAcc", "sp[result] = load(ireg + offset)", .accMemoryResult, .read)
+        }
+        var inAccInstruction: Instruction {
+            accInstruction("InAcc", "ireg = load(ireg + offset)", .accMemoryOffset, .write)
+        }
+        var toAccAndSlotInstruction: Instruction {
+            accInstruction("ToAccAndSlot", "sp[result] = ireg = load(sp[pointer] + offset)", .accMemoryPointerResult, .write)
+        }
+        var withCopyInstruction: Instruction {
+            var inst = Instruction(
+                name: "\(type)\(op)WithCopy",
+                documentation: """
+                    `sp[copyDest] = sp[pointer]`, then `sp[result] = load(sp[pointer] + offset)`, on a 32-bit memory
+
+                    `\(type).\(VMGen.snakeCase(pascalCase: op))` with the copy that produced its address.
+                    """,
+                mayThrow: false, useCurrentMemory: .read, immediateLayout: .loadWithCopy)
+            inst.mayDispatchToTrap = true
+            inst.handlerIdentity = "loadWithCopy(\(identitySuffix))"
+            return inst
         }
     }
 
@@ -388,34 +611,72 @@ extension VMGen {
 
     struct StoreOpInfo {
         let type: String
+        /// The number of bits actually written to memory. Every store truncates the
+        /// 64-bit stack slot to this width, so the width alone determines the code
+        /// (`i32.store`, `f32.store` and `i64.store32` all store the low 32 bits).
+        let storeWidth: Int
         let op: String
         let castFromValue: String
         let isFloatingPoint: Bool
+
         var instruction: Instruction {
-            Instruction(name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
-                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .store)
+            var inst = Instruction(name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
+                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .store)
+            inst.mayDispatchToTrap = true
+            inst.handlerIdentity = "store(\(storeWidth))"
+            return inst
         }
         var atomicInstruction: Instruction {
-            Instruction(name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
-                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .store)
+            var inst = Instruction(name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
+                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .store)
+            inst.mayDispatchToTrap = true
+            inst.handlerIdentity = "atomicStore(\(storeWidth))"
+            return inst
+        }
+
+        private func accInstruction(_ suffix: String, _ shape: String, _ layout: ImmediateLayout) -> Instruction {
+            var inst = Instruction(
+                name: "\(type)\(op)\(suffix)",
+                documentation: """
+                    `\(shape)`, on a 32-bit memory
+
+                    An accumulator form of `\(type).\(VMGen.snakeCase(pascalCase: op))`.
+                    """,
+                mayThrow: false, useCurrentMemory: .read, immediateLayout: layout)
+            inst.mayDispatchToTrap = true
+            inst.handlerIdentity = "store\(suffix)(\(storeWidth))"
+            inst.useIreg = .read
+            return inst
+        }
+        var fromAccInstruction: Instruction {
+            accInstruction("FromAcc", "store(sp[pointer] + offset) = ireg", .accMemoryPointer)
+        }
+        var addrFromAccInstruction: Instruction {
+            accInstruction("AddrFromAcc", "store(ireg + offset) = sp[value]", .accMemoryValue)
         }
     }
     static let memoryStoreOps: [StoreOpInfo] = [
-        ("i32", "Store", "$0.i32", false),
-        ("i64", "Store", "$0.i64", false),
-        ("f32", "Store", "$0.rawF32", true),
-        ("f64", "Store", "$0.rawF64", true),
-        ("i32", "Store8", "UInt8(truncatingIfNeeded: $0.i32)", false),
-        ("i32", "Store16", "UInt16(truncatingIfNeeded: $0.i32)", false),
-        ("i64", "Store8", "UInt8(truncatingIfNeeded: $0.i64)", false),
-        ("i64", "Store16", "UInt16(truncatingIfNeeded: $0.i64)", false),
-        ("i64", "Store32", "UInt32(truncatingIfNeeded: $0.i64)", false),
-    ].map { (type, op, castFromValue, isFloatingPoint) in
-        return StoreOpInfo(type: type, op: op, castFromValue: castFromValue, isFloatingPoint: isFloatingPoint)
+        ("i32", 32, "Store", "$0.i32", false),
+        ("i64", 64, "Store", "$0.i64", false),
+        ("f32", 32, "Store", "$0.rawF32", true),
+        ("f64", 64, "Store", "$0.rawF64", true),
+        ("i32", 8, "Store8", "UInt8(truncatingIfNeeded: $0.i32)", false),
+        ("i32", 16, "Store16", "UInt16(truncatingIfNeeded: $0.i32)", false),
+        ("i64", 8, "Store8", "UInt8(truncatingIfNeeded: $0.i64)", false),
+        ("i64", 16, "Store16", "UInt16(truncatingIfNeeded: $0.i64)", false),
+        ("i64", 32, "Store32", "UInt32(truncatingIfNeeded: $0.i64)", false),
+    ].map { (type, storeWidth, op, castFromValue, isFloatingPoint) in
+        return StoreOpInfo(type: type, storeWidth: storeWidth, op: op, castFromValue: castFromValue, isFloatingPoint: isFloatingPoint)
     }
     static let memoryAtomicStoreOps = memoryStoreOps.filter { !$0.isFloatingPoint }
     static let memoryLoadStoreInsts: [Instruction] = memoryLoadOps.map(\.instruction) + memoryStoreOps.map(\.instruction)
     static let memoryAtomicInsts: [Instruction] = memoryAtomicLoadOps.map(\.atomicInstruction) + memoryAtomicStoreOps.map(\.atomicInstruction)
+    static let memoryAccInsts: [Instruction] =
+        memoryLoadOps.map(\.toAccInstruction)
+        + memoryLoadOps.map(\.fromAccInstruction)
+        + memoryLoadOps.map(\.inAccInstruction)
+        + memoryStoreOps.map(\.fromAccInstruction)
+        + memoryStoreOps.map(\.addrFromAccInstruction)
 
     // MARK: - Atomic RMW Operations
 
@@ -438,8 +699,15 @@ extension VMGen {
             } else {
                 doc = "WebAssembly Core Instruction `\(type).atomic.rmw.\(VMGen.snakeCase(pascalCase: op))`"
             }
-            return Instruction(name: name, documentation: doc,
-                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .rmw)
+            var inst = Instruction(name: name, documentation: doc,
+                        mayThrow: false, useCurrentMemory: .read, immediateLayout: .rmw)
+            inst.mayDispatchToTrap = true
+            // The handler truncates the operand to `accessWidth` bits, applies the
+            // atomic operation and zero-extends the old value back into the slot, so
+            // the operation and the access width fully determine the code
+            // (`i32.atomic.rmw.add` and `i64.atomic.rmw32.add_u` are the same).
+            inst.handlerIdentity = "rmw(\(op),\(size ?? (type == "i32" ? "32" : "64")))"
+            return inst
         }
     }
 
@@ -505,22 +773,37 @@ extension VMGen {
         return RmwOpInfo(type: type, op: op, size: size, castFromValue: castFromValue, castToValue: castToValue)
     }
 
+    /// The compare-exchange instructions, as (instruction name, WebAssembly name, accessed width).
+    /// Like the other RMW handlers, the accessed width alone determines the machine code.
     static let atomicCmpxchgOps: [Instruction] = [
-        Instruction(name: "i32AtomicRmwCmpxchg", documentation: "WebAssembly Core Instruction `i32.atomic.rmw.cmpxchg`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
-        Instruction(name: "i64AtomicRmwCmpxchg", documentation: "WebAssembly Core Instruction `i64.atomic.rmw.cmpxchg`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
-        Instruction(name: "i32AtomicRmw8CmpxchgU", documentation: "WebAssembly Core Instruction `i32.atomic.rmw8.cmpxchg_u`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
-        Instruction(name: "i32AtomicRmw16CmpxchgU", documentation: "WebAssembly Core Instruction `i32.atomic.rmw16.cmpxchg_u`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
-        Instruction(name: "i64AtomicRmw8CmpxchgU", documentation: "WebAssembly Core Instruction `i64.atomic.rmw8.cmpxchg_u`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
-        Instruction(name: "i64AtomicRmw16CmpxchgU", documentation: "WebAssembly Core Instruction `i64.atomic.rmw16.cmpxchg_u`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
-        Instruction(name: "i64AtomicRmw32CmpxchgU", documentation: "WebAssembly Core Instruction `i64.atomic.rmw32.cmpxchg_u`",
-                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
-    ]
+        ("i32AtomicRmwCmpxchg", "i32.atomic.rmw.cmpxchg", 32),
+        ("i64AtomicRmwCmpxchg", "i64.atomic.rmw.cmpxchg", 64),
+        ("i32AtomicRmw8CmpxchgU", "i32.atomic.rmw8.cmpxchg_u", 8),
+        ("i32AtomicRmw16CmpxchgU", "i32.atomic.rmw16.cmpxchg_u", 16),
+        ("i64AtomicRmw8CmpxchgU", "i64.atomic.rmw8.cmpxchg_u", 8),
+        ("i64AtomicRmw16CmpxchgU", "i64.atomic.rmw16.cmpxchg_u", 16),
+        ("i64AtomicRmw32CmpxchgU", "i64.atomic.rmw32.cmpxchg_u", 32),
+    ].map { (name, wasmName, width) in
+        var inst = Instruction(name: name, documentation: "WebAssembly Core Instruction `\(wasmName)`",
+                    mayThrow: false, useCurrentMemory: .read, immediateLayout: .cmpxchg)
+        inst.mayDispatchToTrap = true
+        inst.handlerIdentity = "rmw(Cmpxchg,\(width))"
+        return inst
+    }
+
+    /// Pseudo-instructions that raise a memory trap.
+    ///
+    /// They are never emitted into an instruction sequence. The memory load/store and
+    /// atomic handlers dispatch to them instead of throwing. That keeps the out-of-bounds
+    /// path a tail call with no live state, so the fast path needs no native frame at all.
+    static let memoryTrapInsts: [Instruction] = [
+        Instruction(name: "memoryOutOfBoundsTrap", documentation: "Raise `Trap(.memoryOutOfBounds)`. Dispatched to by the memory handlers; never emitted.", mayThrow: true),
+        Instruction(name: "unalignedAtomicTrap", documentation: "Raise `Trap(.unalignedAtomic)`. Dispatched to by the atomic handlers; never emitted.", mayThrow: true),
+    ].map {
+        var inst = $0
+        inst.isTrapPseudoInstruction = true
+        return inst
+    }
 
     static let atomicWaitNotifyInsts: [Instruction] = [
         Instruction(name: "memoryAtomicWait32", documentation: "WebAssembly Core Instruction `memory.atomic.wait32`",
@@ -536,29 +819,33 @@ extension VMGen {
             $0.field(name: "memoryIndex", type: .MemoryIndex)
             $0.field(name: "result", type: .LVReg)
         },
-        Instruction(name: "memoryGrow", documentation: "WebAssembly Core Instruction `memory.grow`", mayThrow: true, useCurrentMemory: .write) {
+        Instruction(name: "memoryGrow", documentation: "WebAssembly Core Instruction `memory.grow`", mayThrow: true, useCurrentMemory: .write, receivesPc: true) {
             $0.field(name: "result", type: .VReg)
             $0.field(name: "delta", type: .VReg)
             $0.field(name: "memory", type: .MemoryIndex)
         },
-        Instruction(name: "memoryInit", documentation: "WebAssembly Core Instruction `memory.init`", mayThrow: true) {
+        Instruction(name: "memoryInit", documentation: "WebAssembly Core Instruction `memory.init`", mayThrow: true, receivesPc: true) {
             $0.field(name: "segmentIndex", type: .UInt32)
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "sourceOffset", type: .VReg)
             $0.field(name: "size", type: .VReg)
+            $0.field(name: "memory", type: .MemoryIndex)
         },
         Instruction(name: "memoryDataDrop", documentation: "WebAssembly Core Instruction `memory.drop`") {
             $0.field(name: "segmentIndex", type: .UInt32)
         },
-        Instruction(name: "memoryCopy", documentation: "WebAssembly Core Instruction `memory.copy`", mayThrow: true) {
+        Instruction(name: "memoryCopy", documentation: "WebAssembly Core Instruction `memory.copy`", mayThrow: true, receivesPc: true) {
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "sourceOffset", type: .VReg)
             $0.field(name: "size", type: .LVReg)
+            $0.field(name: "destMemory", type: .MemoryIndex)
+            $0.field(name: "sourceMemory", type: .MemoryIndex)
         },
-        Instruction(name: "memoryFill", documentation: "WebAssembly Core Instruction `memory.fill`", mayThrow: true) {
+        Instruction(name: "memoryFill", documentation: "WebAssembly Core Instruction `memory.fill`", mayThrow: true, receivesPc: true) {
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "value", type: .VReg)
             $0.field(name: "size", type: .LVReg)
+            $0.field(name: "memory", type: .MemoryIndex)
         },
     ]
 
@@ -600,26 +887,26 @@ extension VMGen {
             $0.field(name: "tableIndex", type: .UInt32)
             $0.field(name: "result", type: .LVReg)
         },
-        Instruction(name: "tableGrow", documentation: "WebAssembly Core Instruction `table.grow`", mayThrow: true) {
+        Instruction(name: "tableGrow", documentation: "WebAssembly Core Instruction `table.grow`", mayThrow: true, receivesPc: true) {
             $0.field(name: "tableIndex", type: .UInt32)
             $0.field(name: "result", type: .VReg)
             $0.field(name: "delta", type: .VReg)
             $0.field(name: "value", type: .VReg)
         },
-        Instruction(name: "tableFill", documentation: "WebAssembly Core Instruction `table.fill`", mayThrow: true) {
+        Instruction(name: "tableFill", documentation: "WebAssembly Core Instruction `table.fill`", mayThrow: true, receivesPc: true) {
             $0.field(name: "tableIndex", type: .UInt32)
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "value", type: .VReg)
             $0.field(name: "size", type: .VReg)
         },
-        Instruction(name: "tableCopy", documentation: "WebAssembly Core Instruction `table.copy`", mayThrow: true) {
+        Instruction(name: "tableCopy", documentation: "WebAssembly Core Instruction `table.copy`", mayThrow: true, receivesPc: true) {
             $0.field(name: "sourceIndex", type: .UInt32)
             $0.field(name: "destIndex", type: .UInt32)
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "sourceOffset", type: .VReg)
             $0.field(name: "size", type: .VReg)
         },
-        Instruction(name: "tableInit", documentation: "WebAssembly Core Instruction `table.init`", mayThrow: true) {
+        Instruction(name: "tableInit", documentation: "WebAssembly Core Instruction `table.init`", mayThrow: true, receivesPc: true) {
             $0.field(name: "tableIndex", type: .UInt32)
             $0.field(name: "segmentIndex", type: .UInt32)
             $0.field(name: "destOffset", type: .VReg)
@@ -666,6 +953,673 @@ extension VMGen {
         },
     ]
 
+    // MARK: - Fused compare + branch instructions
+
+    /// The integer comparison operators that have a fused compare+branch form.
+    ///
+    /// Only integer comparisons are fused: the complement of an integer
+    /// comparison is another integer comparison, so a `br_if_not` on a compare
+    /// can be expressed by flipping the operator. Float comparisons have no such
+    /// complement because of NaN, so they are left unfused.
+    static let brIfCmpOps = [
+        "Eq", "Ne", "LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU",
+    ]
+
+    static func buildBrIfCmpInsts() -> [Instruction] {
+        var results: [Instruction] = []
+        for type in intValueTypes {
+            for op in brIfCmpOps {
+                let typeName = type.uppercased()
+                results.append(
+                    Instruction(
+                        name: "brIf\(typeName)\(op)",
+                        documentation: """
+                            Conditional pc-relative branch if `\(type).\(VMGen.snakeCase(pascalCase: op))` holds
+
+                            Fused form of `\(type).\(VMGen.snakeCase(pascalCase: op))` followed by `br_if`.
+                            """,
+                        isControl: true, mayUpdateFrame: false,
+                        immediateLayout: .brIfCmpOperand
+                    )
+                )
+            }
+        }
+        return results
+    }
+
+    static let brIfCmpInsts: [Instruction] = buildBrIfCmpInsts()
+
+    // MARK: - Fused float compare + branch instructions
+
+    /// The fused float compare+branch opcodes, as `(suffix, predicate)` pairs.
+    ///
+    /// The branch polarity is part of the opcode rather than something the
+    /// translator derives by flipping the predicate: NaN makes `!(a < b)`
+    /// different from `a >= b`, so a `br_if_not` on `f64.lt` cannot be
+    /// expressed as a `br_if` on any float comparison.
+    ///
+    /// Six per float type, not twelve, because two of the twelve are exact
+    /// duplicates of another entry rather than genuinely new predicates:
+    ///
+    /// - `ne` **is** the exact complement of `eq`, NaN included, so the
+    ///   `ifFalse` polarity of `eq` is `brIf*Ne` and the `ifFalse` polarity of
+    ///   `ne` is `brIf*Eq`. Spelling those as separate `brIfNot*Eq` /
+    ///   `brIfNot*Ne` opcodes would give two pairs of bit-identical handler
+    ///   bodies, which LLVM's function merging pass folds into a `b <other>`
+    ///   thunk -- one extra taken branch per dispatch (see
+    ///   ``Instruction/handlerIdentity``). Control instructions
+    ///   must not share a handler, so the duplicates are simply not created.
+    /// - `gt`/`ge` are `lt`/`le` with the operands swapped (`a > b` is `b < a`
+    ///   for IEEE-754, and both are false when either operand is NaN).
+    static let brIfFCmpOps: [(suffix: String, predicate: String)] = [
+        ("Eq", "a == b"),
+        ("Ne", "a != b"),
+        ("Lt", "a < b"),
+        ("Le", "a <= b"),
+        ("NotLt", "!(a < b)"),
+        ("NotLe", "!(a <= b)"),
+    ]
+
+    /// The opcode name of a fused float compare+branch.
+    ///
+    /// `NotLt`/`NotLe` are spelled `brIfNot<T>Lt` / `brIfNot<T>Le` so that the
+    /// name says "branch if not less than" rather than "branch if not-less-than".
+    static func brIfFCmpName(type: String, suffix: String) -> String {
+        let typeName = type.uppercased()
+        if suffix.hasPrefix("Not") {
+            return "brIfNot\(typeName)\(suffix.dropFirst(3))"
+        }
+        return "brIf\(typeName)\(suffix)"
+    }
+
+    static func buildBrIfFCmpInsts() -> [Instruction] {
+        var results: [Instruction] = []
+        for type in floatValueTypes {
+            for (suffix, predicate) in brIfFCmpOps {
+                results.append(
+                    Instruction(
+                        name: brIfFCmpName(type: type, suffix: suffix),
+                        documentation: """
+                            Conditional pc-relative branch if `\(predicate)` holds for `\(type)` operands
+
+                            Fused form of a `\(type)` comparison followed by a conditional
+                            branch. NaN falls on the side the polarity in the opcode name
+                            says: an unordered comparison is false, so `\(predicate)` is
+                            \(predicate.hasPrefix("!") || suffix == "Ne" ? "true" : "false") when either operand is NaN.
+                            """,
+                        isControl: true, mayUpdateFrame: false,
+                        immediateLayout: .brIfCmpOperand
+                    )
+                )
+            }
+        }
+        return results
+    }
+
+    static let brIfFCmpInsts: [Instruction] = buildBrIfFCmpInsts()
+
+    // MARK: - Fused bit-test + branch instructions
+
+    /// The fused `and`+branch opcodes: branch on `(lhs & rhs) != 0` / `== 0`.
+    ///
+    /// Both polarities are opcodes, since the complement of a bit test is not
+    /// another bit test. The 64-bit forms are needed because `brIf`/`brIfNot`
+    /// only read the low 32 bits of the condition slot.
+    static func buildBrIfAndInsts() -> [Instruction] {
+        var results: [Instruction] = []
+        for type in intValueTypes {
+            let typeName = type.uppercased()
+            for negated in [false, true] {
+                let predicate = negated ? "(lhs & rhs) == 0" : "(lhs & rhs) != 0"
+                results.append(
+                    Instruction(
+                        name: negated ? "brIfNot\(typeName)And" : "brIf\(typeName)And",
+                        documentation: """
+                            Conditional pc-relative branch if `\(predicate)` for `\(type)` operands
+
+                            Fused form of `\(type).and` followed by \
+                            `\(negated ? "br_if_not" : "br_if")`.
+                            """,
+                        isControl: true, mayUpdateFrame: false,
+                        immediateLayout: .brIfCmpOperand
+                    )
+                )
+            }
+        }
+        return results
+    }
+
+    static let brIfAndInsts: [Instruction] = buildBrIfAndInsts()
+
+    // MARK: - Two-operation float superinstructions
+
+    /// One of the two-operation float superinstructions: `result = (x op1 y) op2 z`.
+    ///
+    /// A serial float dependency chain (`z = z*z + c`) routes every link
+    /// through a frame slot in a 3-address operand model: each handler ends by
+    /// storing its result to a slot and the next begins by loading the same
+    /// slot, paying a store-to-load-forwarding round trip where a register
+    /// hand-off would pay nothing. These opcodes keep the intermediate of two
+    /// adjacent float operations in a `d` register.
+    ///
+    /// **The two operations must be rounded separately.** WebAssembly forbids
+    /// contracting `(a * b) + c` into a fused multiply-add: `fmadd` keeps the
+    /// product at infinite precision, which gives a different result from
+    /// `fmul` followed by `fadd` for a great many inputs. Swift does not
+    /// contract by default, and the generated body binds the intermediate to a
+    /// `let` and uses the ordinary `+`/`-`/`*`, so the emitted code is a
+    /// separate multiply and add (`fmul` + `fadd` on arm64, never `fmadd`).
+    struct FloatBinBinOpInfo {
+        /// `f32` or `f64`.
+        let type: String
+        /// The first operation, in `Add`/`Sub`/`Mul` spelling.
+        let op1: String
+        /// The second operation.
+        let op2: String
+
+        /// The `Sp` accessor of both operands and the result: ``type``, unless
+        /// the operations run on a whole slot at once.
+        let slot: String
+
+        /// - Parameter slot: the `Sp` accessor of every slot, when it is not
+        ///   `type`.
+        init(type: String, op1: String, op2: String, slot: String? = nil) {
+            self.type = type
+            self.op1 = op1
+            self.op2 = op2
+            self.slot = slot ?? type
+        }
+
+        var name: String { "\(type)\(op1)\(op2)" }
+
+        var instruction: Instruction {
+            Instruction(
+                name: name,
+                documentation: """
+                    `result = (x \(VMGen.snakeCase(pascalCase: op1)) y) \(VMGen.snakeCase(pascalCase: op2)) z`, on `\(type)` operands
+
+                    Superinstruction fusing `\(type).\(VMGen.snakeCase(pascalCase: op1))` with the
+                    `\(type).\(VMGen.snakeCase(pascalCase: op2))` that immediately consumes its result, keeping
+                    the intermediate in a register instead of a frame slot. Each
+                    operation rounds separately -- this is **not** a fused
+                    multiply-add.
+                    """,
+                immediateLayout: .binBin
+            )
+        }
+    }
+
+    /// The nine `(op1, op2)` combinations over `{add, sub, mul}`, for both
+    /// float types.
+    ///
+    /// `div`, `min`, `max` and `copysign` are left out: they do not appear as
+    /// the producer/consumer pair of a serial chain in the suite's float
+    /// workloads, and each one added costs two more handlers.
+    static let floatBinBinOps: [FloatBinBinOpInfo] = {
+        var results: [FloatBinBinOpInfo] = []
+        for (type, slot) in [("f32", "f32x2"), ("f64", nil)] as [(String, String?)] {
+            for op1 in ["Add", "Sub", "Mul"] {
+                for op2 in ["Add", "Sub", "Mul"] {
+                    results.append(FloatBinBinOpInfo(type: type, op1: op1, op2: op2, slot: slot))
+                }
+            }
+        }
+        return results
+    }()
+
+    // MARK: - Two-operation integer superinstructions
+
+    /// `result = (x op1 y) op2 z` on integer operands, or
+    /// `result = z op2 (x op1 y)` when ``reversed`` is set.
+    ///
+    /// Every operation here wraps or is a bit operation, and the generated
+    /// body calls the same helpers as the unfused instructions, so shift
+    /// amounts are masked identically. `div`/`rem` are left out because they
+    /// can trap.
+    struct IntBinBinOpInfo {
+        /// `i32` or `i64`.
+        let type: String
+        /// The producing operation, in `Add`/`ShrU`/... spelling.
+        let op1: String
+        /// The consuming operation.
+        let op2: String
+        /// The intermediate is the right operand of `op2`. Only needed for a
+        /// non-commutative `op2`; a commutative one swaps its operands instead.
+        var reversed: Bool = false
+
+        var name: String { "\(type)\(op1)\(op2)\(reversed ? "Rev" : "")" }
+
+        var instruction: Instruction {
+            let op1Name = VMGen.snakeCase(pascalCase: op1)
+            let op2Name = VMGen.snakeCase(pascalCase: op2)
+            let expression =
+                reversed
+                ? "`result = z \(op2Name) (x \(op1Name) y)`"
+                : "`result = (x \(op1Name) y) \(op2Name) z`"
+            return Instruction(
+                name: name,
+                documentation: """
+                    \(expression), on `\(type)` operands
+
+                    Superinstruction fusing `\(type).\(op1Name)` with the
+                    `\(type).\(op2Name)` that immediately consumes its result, keeping
+                    the intermediate in a register instead of a frame slot.
+                    """,
+                immediateLayout: .binBin
+            )
+        }
+    }
+
+    /// The integer `(op1, op2)` pairs that get a superinstruction: the most
+    /// frequent adjacent producer/consumer pairs in loop bodies of the
+    /// benchmark inputs. The remaining pairs are a long tail.
+    static let intBinBinOps: [IntBinBinOpInfo] = {
+        let i32Pairs = [
+            ("Shl", "Add"), ("Mul", "Add"), ("Add", "Add"), ("And", "Add"),
+            ("ShrU", "And"), ("Or", "And"), ("ShrU", "Add"), ("Sub", "And"),
+            ("Shl", "Or"), ("Add", "And"), ("ShrU", "Or"), ("Xor", "ShrU"),
+            ("Add", "Sub"), ("Xor", "Shl"), ("Sub", "Add"), ("And", "Shl"),
+        ]
+        let i64Pairs = [
+            ("Xor", "Rotl"), ("Mul", "Add"), ("Shl", "And"), ("And", "Mul"),
+            ("Shl", "Or"), ("Xor", "And"), ("Mul", "Xor"), ("And", "Xor"),
+            ("Rotl", "Xor"), ("Sub", "And"), ("Xor", "Xor"), ("Or", "Or"),
+            ("ShrU", "And"), ("And", "And"), ("Xor", "Mul"), ("Xor", "ShrU"),
+        ]
+        var results: [IntBinBinOpInfo] = []
+        results += i32Pairs.map { IntBinBinOpInfo(type: "i32", op1: $0.0, op2: $0.1) }
+        results += i64Pairs.map { IntBinBinOpInfo(type: "i64", op1: $0.0, op2: $0.1) }
+        // `z - x * y` cannot be reached by swapping operands.
+        results.append(IntBinBinOpInfo(type: "i32", op1: "Mul", op2: "Sub", reversed: true))
+        return results
+    }()
+
+    // MARK: - Integer accumulator forms
+
+    /// The three accumulator forms of one non-trapping integer binary operation.
+    ///
+    /// | form | meaning |
+    /// |---|---|
+    /// | `<op>ToAcc` | `ireg = x op y` |
+    /// | `<op>FromAcc` | `result = ireg op y` |
+    /// | `<op>InAcc` | `ireg = ireg op y` |
+    ///
+    /// `ireg` holds the slot representation: an `i32` is zero-extended as
+    /// `sp[i32:]` stores it.
+    struct IntAccBinOpInfo {
+        /// `i32` or `i64`.
+        let type: String
+        /// The operation, in `Add`/`ShrU`/... spelling.
+        let op: String
+
+        var toAccName: String { "\(type)\(op)ToAcc" }
+        var fromAccName: String { "\(type)\(op)FromAcc" }
+        var inAccName: String { "\(type)\(op)InAcc" }
+
+        private func instruction(_ name: String, _ expression: String, _ layout: ImmediateLayout, _ use: RegisterUse) -> Instruction {
+            var inst = Instruction(
+                name: name,
+                documentation: """
+                    `\(expression)`, on `\(type)` operands
+
+                    An accumulator form of `\(type).\(VMGen.snakeCase(pascalCase: op))`.
+                    """,
+                immediateLayout: layout
+            )
+            inst.useIreg = use
+            return inst
+        }
+
+        var toAcc: Instruction {
+            instruction(toAccName, "ireg = x \(VMGen.snakeCase(pascalCase: op)) y", .accBinary, .write)
+        }
+        var fromAcc: Instruction {
+            instruction(fromAccName, "result = ireg \(VMGen.snakeCase(pascalCase: op)) y", .accUnary, .read)
+        }
+        var inAcc: Instruction {
+            instruction(inAccName, "ireg = ireg \(VMGen.snakeCase(pascalCase: op)) y", .acc, .write)
+        }
+        var toAccAndSlot: Instruction {
+            instruction("\(type)\(op)ToAccAndSlot", "result = ireg = x \(VMGen.snakeCase(pascalCase: op)) y", .binary, .write)
+        }
+    }
+
+    static let intAccBinOps: [IntAccBinOpInfo] = {
+        let ops = ["Add", "Sub", "Mul", "And", "Or", "Xor", "Shl", "ShrS", "ShrU", "Rotl", "Rotr"]
+        return intValueTypes.flatMap { type in ops.map { IntAccBinOpInfo(type: type, op: $0) } }
+    }()
+
+    /// Fused compare+branch forms whose left operand is the accumulator. A
+    /// value arriving as the right operand swaps the comparison instead.
+    static func buildBrIfAccCmpInsts() -> [Instruction] {
+        var results: [Instruction] = []
+        for type in intValueTypes {
+            for op in brIfCmpOps {
+                let typeName = type.uppercased()
+                var inst = Instruction(
+                    name: "brIf\(typeName)\(op)Acc",
+                    documentation: """
+                        Conditional pc-relative branch if `ireg \(VMGen.snakeCase(pascalCase: op)) y` holds for `\(type)` operands
+
+                        The accumulator form of `brIf\(typeName)\(op)`.
+                        """,
+                    isControl: true, mayUpdateFrame: false,
+                    immediateLayout: .brIfAccCmpOperand
+                )
+                inst.useIreg = .read
+                results.append(inst)
+            }
+        }
+        return results
+    }
+
+    static let brIfAccCmpInsts: [Instruction] = buildBrIfAccCmpInsts()
+
+    static let accMiscInsts: [Instruction] = {
+        var brIfAcc = Instruction(
+            name: "brIfAcc",
+            documentation: """
+                Conditional pc-relative branch if the low 32 bits of the accumulator are non-zero
+
+                The accumulator form of `brIf`.
+                """,
+            isControl: true, mayUpdateFrame: false,
+            immediateLayout: .brIfAccOperand
+        )
+        brIfAcc.useIreg = .read
+        var brIfNotAcc = Instruction(
+            name: "brIfNotAcc",
+            documentation: """
+                Conditional pc-relative branch if the low 32 bits of the accumulator are zero
+
+                The accumulator form of `brIfNot`.
+                """,
+            isControl: true, mayUpdateFrame: false,
+            immediateLayout: .brIfAccOperand
+        )
+        brIfNotAcc.useIreg = .read
+        var globalGetToAcc = Instruction(
+            name: "globalGetToAcc",
+            documentation: "`global.get` for a scalar global, into the accumulator",
+            immediateLayout: .globalOperand
+        )
+        globalGetToAcc.useIreg = .write
+        return [brIfAcc, brIfNotAcc, globalGetToAcc]
+    }()
+
+    // MARK: - Immediate-operand integer forms
+
+    /// An integer operation whose right operand can be a constant carried in the
+    /// instruction. `i32` operands use the immediate's bit pattern, `i64`
+    /// operands sign-extend it. There is no `Sub`: the translator emits `x - c`
+    /// as `x + (-c)`.
+    struct IntImmOpInfo {
+        let type: String
+        let op: String
+        /// `i32` for comparisons, `type` otherwise.
+        let resultType: String
+
+        var name: String { "\(type)\(op)Imm" }
+
+        var instruction: Instruction {
+            var inst = Instruction(
+                name: name,
+                documentation: """
+                    `\(type).\(VMGen.snakeCase(pascalCase: op))` with a constant right operand
+
+                    The immediate is 32 bits\(type == "i64" ? ", sign-extended to 64 bits" : "").
+                    """,
+                immediateLayout: .binaryImm
+            )
+            inst.isDirectThreadedOnly = true
+            return inst
+        }
+
+        /// `result = ireg = x op imm`.
+        var toAccAndSlot: Instruction {
+            var inst = Instruction(
+                name: "\(name)ToAccAndSlot",
+                documentation: "`result = ireg = x \(VMGen.snakeCase(pascalCase: op)) imm`, on `\(type)` operands",
+                immediateLayout: .binaryImm
+            )
+            inst.useIreg = .write
+            return inst
+        }
+
+        /// `ireg = x op imm`.
+        var toAcc: Instruction {
+            var inst = Instruction(
+                name: "\(name)ToAcc",
+                documentation: "`ireg = x \(VMGen.snakeCase(pascalCase: op)) imm`, on `\(type)` operands",
+                immediateLayout: .accBinaryImm
+            )
+            inst.useIreg = .write
+            return inst
+        }
+    }
+
+    static let intBinImmInsts: [IntImmOpInfo] = intValueTypes.flatMap { type in
+        ["Add", "Mul", "And", "Or", "Xor", "Shl", "ShrS", "ShrU", "Rotl", "Rotr"].map {
+            IntImmOpInfo(type: type, op: $0, resultType: type)
+        }
+    }
+
+    static let intCmpImmInsts: [IntImmOpInfo] = intValueTypes.flatMap { type in
+        brIfCmpOps.map { IntImmOpInfo(type: type, op: $0, resultType: "i32") }
+    }
+
+    /// Fused compare against a constant and branch. The branch-if-not
+    /// polarity is reached by complementing the comparison.
+    static let brIfCmpImmInsts: [Instruction] = intValueTypes.flatMap { type in
+        brIfCmpOps.map { op in
+            var inst = Instruction(
+                name: "brIf\(type.uppercased())\(op)Imm",
+                documentation: """
+                    Conditional pc-relative branch if `\(type).\(VMGen.snakeCase(pascalCase: op))` against a constant holds
+                    """,
+                isControl: true, mayUpdateFrame: false,
+                immediateLayout: .brIfCmpImmOperand
+            )
+            inst.isDirectThreadedOnly = true
+            return inst
+        }
+    }
+
+    /// Fused bit test against a constant mask and branch, both polarities.
+    static let brIfAndImmInsts: [Instruction] = intValueTypes.flatMap { type in
+        [false, true].map { negated in
+            var inst = Instruction(
+                name: negated ? "brIfNot\(type.uppercased())AndImm" : "brIf\(type.uppercased())AndImm",
+                documentation: """
+                    Conditional pc-relative branch if `(lhs & imm) \(negated ? "==" : "!=") 0` for `\(type)` operands
+                    """,
+                isControl: true, mayUpdateFrame: false,
+                immediateLayout: .brIfCmpImmOperand
+            )
+            inst.isDirectThreadedOnly = true
+            return inst
+        }
+    }
+
+    // MARK: - Float accumulator forms
+
+    /// The accumulator forms of one `f64` binary operation. `sub` and `div`
+    /// also have reversed forms, where the accumulated value is the right
+    /// operand; `add` and `mul` swap their operands instead.
+    ///
+    /// | form | meaning |
+    /// |---|---|
+    /// | `<op>ToAcc` | `freg = x op y` |
+    /// | `<op>FromAcc` | `result = freg op y` |
+    /// | `<op>InAcc` | `freg = freg op y` |
+    /// | `<op>FromAccRev` | `result = y op freg` |
+    /// | `<op>InAccRev` | `freg = y op freg` |
+    struct FloatAccBinOpInfo {
+        let op: String
+
+        var isCommutative: Bool { ["Add", "Mul"].contains(op) }
+
+        private func instruction(_ suffix: String, _ expression: String, _ layout: ImmediateLayout, _ use: RegisterUse) -> Instruction {
+            var inst = Instruction(
+                name: "f64\(op)\(suffix)",
+                documentation: """
+                    `\(expression)`, on `f64` operands
+
+                    An accumulator form of `f64.\(VMGen.snakeCase(pascalCase: op))`.
+                    """,
+                immediateLayout: layout
+            )
+            inst.useFreg = use
+            return inst
+        }
+
+        var instructions: [Instruction] {
+            let name = VMGen.snakeCase(pascalCase: op)
+            var results = [
+                instruction("ToAcc", "freg = x \(name) y", .accBinary, .write),
+                instruction("FromAcc", "result = freg \(name) y", .accUnary, .read),
+                instruction("InAcc", "freg = freg \(name) y", .acc, .write),
+            ]
+            if !isCommutative {
+                results += [
+                    instruction("FromAccRev", "result = y \(name) freg", .accUnary, .read),
+                    instruction("InAccRev", "freg = y \(name) freg", .acc, .write),
+                ]
+            }
+            return results
+        }
+    }
+
+    static let floatAccBinOps: [FloatAccBinOpInfo] = ["Add", "Sub", "Mul", "Div"].map { FloatAccBinOpInfo(op: $0) }
+
+    /// The `f64` two-operation superinstructions producing into the float
+    /// accumulator.
+    static let floatBinBinAccInsts: [Instruction] = floatBinBinOps.filter { $0.type == "f64" }.map { op in
+        var inst = Instruction(
+            name: "\(op.name)ToAcc",
+            documentation: """
+                `freg = (x \(VMGen.snakeCase(pascalCase: op.op1)) y) \(VMGen.snakeCase(pascalCase: op.op2)) z`, on `f64` operands
+
+                The accumulator form of `\(op.name)`.
+                """,
+            immediateLayout: .accBinBin
+        )
+        inst.useFreg = .write
+        return inst
+    }
+
+    /// Fused `f64` compare+branch forms whose left operand is the float
+    /// accumulator. With the operand order fixed, `gt` and `ge` need opcodes of
+    /// their own; `eq` and `ne` are exact complements and cover both polarities.
+    static let brIfFAccCmpInsts: [Instruction] = [
+        ("brIfF64EqAcc", "freg == y"), ("brIfF64NeAcc", "freg != y"),
+        ("brIfF64LtAcc", "freg < y"), ("brIfF64LeAcc", "freg <= y"),
+        ("brIfF64GtAcc", "freg > y"), ("brIfF64GeAcc", "freg >= y"),
+        ("brIfNotF64LtAcc", "!(freg < y)"), ("brIfNotF64LeAcc", "!(freg <= y)"),
+        ("brIfNotF64GtAcc", "!(freg > y)"), ("brIfNotF64GeAcc", "!(freg >= y)"),
+    ].map { name, taken in
+        var inst = Instruction(
+            name: name,
+            documentation: """
+                Conditional pc-relative branch if `\(taken)` holds for `f64` operands
+
+                A fused float compare+branch whose left operand is the float accumulator.
+                """,
+            isControl: true, mayUpdateFrame: false,
+            immediateLayout: .brIfAccCmpOperand
+        )
+        inst.useFreg = .read
+        return inst
+    }
+
+    static let floatAccMiscInsts: [Instruction] = {
+        var sqrt = Instruction(
+            name: "f64SqrtToAcc",
+            documentation: "`freg = sqrt(operand)`",
+            immediateLayout: .acc
+        )
+        sqrt.useFreg = .write
+        var loadToFAcc = Instruction(
+            name: "f64LoadToFAcc",
+            documentation: "`freg = load(sp[pointer] + offset)`, on a 32-bit memory",
+            mayThrow: false, useCurrentMemory: .read, immediateLayout: .accMemoryPointer)
+        loadToFAcc.mayDispatchToTrap = true
+        loadToFAcc.useFreg = .write
+        var loadFromAccToFAcc = Instruction(
+            name: "f64LoadFromAccToFAcc",
+            documentation: "`freg = load(ireg + offset)`, on a 32-bit memory",
+            mayThrow: false, useCurrentMemory: .read, immediateLayout: .accMemoryOffset)
+        loadFromAccToFAcc.mayDispatchToTrap = true
+        loadFromAccToFAcc.useIreg = .read
+        loadFromAccToFAcc.useFreg = .write
+        var storeFromFAcc = Instruction(
+            name: "f64StoreFromFAcc",
+            documentation: "`store(sp[pointer] + offset) = freg`, on a 32-bit memory",
+            mayThrow: false, useCurrentMemory: .read, immediateLayout: .accMemoryPointer)
+        storeFromFAcc.mayDispatchToTrap = true
+        storeFromFAcc.useFreg = .read
+        return [sqrt, loadToFAcc, loadFromAccToFAcc, storeFromFAcc]
+    }()
+
+    /// A copy followed by the accumulator's value written to a slot.
+    static let copyStackAccToSlot: Instruction = {
+        var inst = Instruction(
+            name: "copyStackAccToSlot",
+            documentation: "`sp[dest] = sp[source]`, then `sp[result] = ireg`"
+        ) {
+            $0.field(name: "source", type: .VReg)
+            $0.field(name: "dest", type: .VReg)
+            $0.field(name: "result", type: .VReg)
+        }
+        inst.useIreg = .read
+        return inst
+    }()
+
+    /// `select` whose condition arrives in the integer accumulator.
+    static let selectAcc: Instruction = {
+        var inst = Instruction(
+            name: "selectAcc",
+            documentation: "`select` testing the low 32 bits of the integer accumulator"
+        ) {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "onTrue", type: .VReg)
+            $0.field(name: "onFalse", type: .VReg)
+        }
+        inst.useIreg = .read
+        return inst
+    }()
+
+    /// Predicates with a fused `select` over two slots. The others are
+    /// reached by exchanging the candidates or the comparison's operands.
+    static let selectCmpOps = ["Eq", "LtS", "LtU"]
+
+    /// Predicates with a fused `select` against a constant. The constant is
+    /// always the right operand, so only the candidates can be exchanged.
+    static let selectCmpImmOps = ["Eq", "LtS", "LtU", "GtS", "GtU"]
+
+    /// `select` whose condition is an integer comparison.
+    static let selectCmpInsts: [Instruction] = intValueTypes.flatMap { type in
+        let slotForms = selectCmpOps.map { op in
+            var inst = Instruction(
+                name: "select\(type.uppercased())\(op)",
+                documentation: "`select` whose condition is `\(type).\(VMGen.snakeCase(pascalCase: op))` of two slots",
+                immediateLayout: .selectCmp
+            )
+            inst.isDirectThreadedOnly = true
+            return inst
+        }
+        let immForms = selectCmpImmOps.map { op in
+            var inst = Instruction(
+                name: "select\(type.uppercased())\(op)Imm",
+                documentation: "`select` whose condition is `\(type).\(VMGen.snakeCase(pascalCase: op))` against a constant",
+                immediateLayout: .selectCmpImm
+            )
+            inst.isDirectThreadedOnly = true
+            return inst
+        }
+        return slotForms + immForms
+    }
+
     // MARK: - Instruction generation
 
     static func buildInstructions() -> [Instruction] {
@@ -675,8 +1629,10 @@ extension VMGen {
                 $0.field(name: "source", type: .LVReg)
                 $0.field(name: "dest", type: .LVReg)
             },
-            Instruction(name: "globalGet", documentation: "WebAssembly Core Instruction `global.get`", immediateLayout: .globalAndVRegOperand),
-            Instruction(name: "globalSet", documentation: "WebAssembly Core Instruction `global.set`", immediateLayout: .globalAndVRegOperand),
+            Instruction(name: "globalGet", documentation: "WebAssembly Core Instruction `global.get` for a scalar (64-bit slot) global", immediateLayout: .globalAndVRegOperand),
+            Instruction(name: "globalSet", documentation: "WebAssembly Core Instruction `global.set` for a scalar (64-bit slot) global", immediateLayout: .globalAndVRegOperand),
+            Instruction(name: "globalGetV128", documentation: "WebAssembly Core Instruction `global.get` for a `v128` global", immediateLayout: .globalAndVRegOperand),
+            Instruction(name: "globalSetV128", documentation: "WebAssembly Core Instruction `global.set` for a `v128` global", immediateLayout: .globalAndVRegOperand),
             // Controls
             Instruction(
                 name: "call", documentation: "WebAssembly Core Instruction `call`",
@@ -703,25 +1659,24 @@ extension VMGen {
                 $0.field(name: "tableIndex", type: .UInt32)
                 $0.field(name: "rawType", type: .UInt32)
                 $0.field(name: "index", type: .VReg)
-                $0.field(name: "spAddend", type: .VReg)
+                $0.field(name: "arguments", type: .VReg)
             },
-            Instruction(name: "resizeFrameHeader", documentation: """
-                        Resize the frame header by increasing param/result slots and copying `sizeToCopy`
-                        slots placed after the header
-                        """,
-                        mayThrow: true, mayUpdateFrame: true) {
-                $0.field(name: "delta", type: .VReg)
-                $0.field(name: "sizeToCopy", type: .VReg)
-            },
+            // A tail call's `arguments` is the slot of its first argument, and
+            // `frameBase` is where the parameter area of the current frame
+            // starts, which is where the callee's parameter area goes.
             Instruction(name: "returnCall", documentation: "WebAssembly Core Instruction `return_call`",
                         isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
                 $0.field(name: "rawCallee", type: .UInt64)
+                $0.field(name: "arguments", type: .VReg)
+                $0.field(name: "frameBase", type: .LVReg)
             },
             Instruction(name: "returnCallIndirect", documentation: "WebAssembly Core Instruction `return_call_indirect`",
                         isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
                 $0.field(name: "tableIndex", type: .UInt32)
                 $0.field(name: "rawType", type: .UInt32)
                 $0.field(name: "index", type: .VReg)
+                $0.field(name: "arguments", type: .VReg)
+                $0.field(name: "frameBase", type: .LVReg)
             },
             Instruction(name: "unreachable", documentation: "WebAssembly Core Instruction `unreachable`",
                         isControl: true, mayThrow: true),
@@ -736,11 +1691,13 @@ extension VMGen {
             Instruction(
                 name: "brIfNot", documentation: "Conditional pc-relative branch if the condition is false",
                 isControl: true, mayUpdateFrame: false, immediateLayout: .brIfOperand),
+            // `index` first keeps its frame access a plain `[base, index]`
+            // address; the table pointer second lets both slots load together.
             Instruction(name: "brTable", documentation: "WebAssembly Core Instruction `br_table`",
                         isControl: true, mayUpdateFrame: false) {
-                $0.field(name: "rawBaseAddress", type: .UInt64)
-                $0.field(name: "count", type: .UInt16)
                 $0.field(name: "index", type: .VReg)
+                $0.field(name: "lastIndex", type: .UInt16)
+                $0.field(name: "rawBaseAddress", type: .UInt64)
             },
             Instruction(name: "_return", documentation: "Return from a function",
                         isControl: true, mayUpdateFrame: true, useCurrentMemory: .write),
@@ -775,6 +1732,161 @@ extension VMGen {
         instructions += atomicWaitNotifyInsts
         // Exception handling
         instructions += exceptionHandlingInsts
+        instructions += brIfCmpInsts
+        instructions += [
+            Instruction(
+                name: "returnCrossInstance",
+                documentation: """
+                    Return from a function whose caller runs in another instance
+
+                    Never emitted by the translator. `_return` dispatches to this when the
+                    frame it pops was entered from a different instance, so that the common
+                    intra-module return handler contains no call and therefore needs no
+                    stack frame. It receives the *unmodified* `sp`/`pc` of the `_return`
+                    that handed off to it.
+                    """,
+                isControl: true, mayUpdateFrame: true, useCurrentMemory: .write
+            )
+        ]
+        instructions += memoryTrapInsts
+        instructions += brIfFCmpInsts
+        instructions += floatBinBinOps.map(\.instruction)
+        instructions += brIfAndInsts
+        instructions += intBinBinOps.map(\.instruction)
+        instructions += intAccBinOps.map(\.toAcc)
+        instructions += intAccBinOps.map(\.fromAcc)
+        instructions += intAccBinOps.map(\.inAcc)
+        instructions += brIfAccCmpInsts
+        instructions += accMiscInsts
+        instructions += memoryAccInsts
+        instructions += floatAccBinOps.flatMap(\.instructions)
+        instructions += floatBinBinAccInsts
+        instructions += brIfFAccCmpInsts
+        instructions += floatAccMiscInsts
+        instructions += intBinImmInsts.map(\.instruction)
+        instructions += intCmpImmInsts.map(\.instruction)
+        instructions += brIfCmpImmInsts
+        instructions += brIfAndImmInsts
+        instructions += intBinImmInsts.map(\.toAcc)
+        instructions += intAccBinOps.map(\.toAccAndSlot)
+        instructions += intBinImmInsts.map(\.toAccAndSlot)
+        instructions += memoryLoadOps.map(\.toAccAndSlotInstruction)
+        instructions += [copyStackAccToSlot, selectAcc]
+        var copyStack2 = Instruction(
+            name: "copyStack2",
+            documentation: "Two register copies, `sp[dest0] = sp[source0]` then `sp[dest1] = sp[source1]`, where the second does not read the first's destination"
+        ) {
+            $0.field(name: "source0", type: .VReg)
+            $0.field(name: "dest0", type: .VReg)
+            $0.field(name: "source1", type: .VReg)
+            $0.field(name: "dest1", type: .VReg)
+        }
+        copyStack2.isDirectThreadedOnly = true
+        instructions += [copyStack2]
+        instructions += selectCmpInsts
+        instructions += memoryLoadOps.map(\.withCopyInstruction)
+        var consumeFuel = Instruction(
+            name: "consumeFuel",
+            documentation: """
+                Charge the fuel cost of the region that begins here
+
+                Emitted at function entry, at loop headers and at the arms of an `if`, and only
+                when the engine is configured with fuel metering. The immediate is the summed
+                cost of the Wasm operators in the region, so a region is charged once, before it
+                runs. Exhaustion dispatches to `outOfFuelTrap` rather than throwing, so that a
+                loop's per-iteration charge stays a straight-line handler.
+                """,
+            immediateLayout: .consumeFuel
+        )
+        consumeFuel.mayDispatchToTrap = true
+        var outOfFuelTrap = Instruction(
+            name: "outOfFuelTrap",
+            documentation: """
+                Suspend a resumable call at the failed `consumeFuel`, or raise `Trap(.outOfFuel)`.
+                Dispatched to by `consumeFuel`; never emitted.
+
+                Control-shaped so that it receives the program counter, from which it finds the
+                `consumeFuel` to retry when the call resumes.
+                """,
+            isControl: true, mayThrow: true
+        )
+        outOfFuelTrap.isTrapPseudoInstruction = true
+        instructions += [consumeFuel, outOfFuelTrap]
+        var checkEpoch = Instruction(
+            name: "checkEpoch",
+            documentation: """
+                Check the engine's epoch against the store's deadline
+
+                Emitted at function entry and at loop headers, and only when the engine is
+                configured with epoch interruption. Reaching the deadline dispatches to
+                `epochDeadlineTrap`.
+                """
+        )
+        checkEpoch.mayDispatchToTrap = true
+        var epochDeadlineTrap = Instruction(
+            name: "epochDeadlineTrap",
+            documentation: """
+                Suspend a resumable call at the `checkEpoch` that reached the deadline, or raise
+                `Trap(.epochDeadlineReached)`. Dispatched to by `checkEpoch`; never emitted.
+
+                Control-shaped so that it receives the program counter, from which it finds the
+                `checkEpoch` to run again when the call resumes.
+                """,
+            isControl: true, mayThrow: true
+        )
+        epochDeadlineTrap.isTrapPseudoInstruction = true
+        instructions += [checkEpoch, epochDeadlineTrap]
+        // Typed function references
+        instructions += [
+            Instruction(name: "callRef", documentation: "WebAssembly Core Instruction `call_ref`",
+                        isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+                $0.field(name: "callee", type: .VReg)
+                $0.field(name: "arguments", type: .VReg)
+            },
+            Instruction(name: "returnCallRef", documentation: "WebAssembly Core Instruction `return_call_ref`",
+                        isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+                $0.field(name: "callee", type: .VReg)
+                $0.field(name: "arguments", type: .VReg)
+                $0.field(name: "frameBase", type: .LVReg)
+            },
+            Instruction(name: "refAsNonNull", documentation: "WebAssembly Core Instruction `ref.as_non_null`", mayThrow: true) {
+                $0.field(name: "value", type: .LVReg)
+                $0.field(name: "result", type: .LVReg)
+            },
+            Instruction(
+                name: "brIfNull", documentation: "Conditional pc-relative branch if the condition is a null reference",
+                isControl: true, mayUpdateFrame: false, immediateLayout: .brIfOperand),
+            Instruction(
+                name: "brIfNotNull", documentation: "Conditional pc-relative branch if the condition is not a null reference",
+                isControl: true, mayUpdateFrame: false, immediateLayout: .brIfOperand),
+        ]
+        // Multi-memory
+        instructions += [
+            Instruction(
+                name: "selectMemory",
+                documentation: """
+                    Point the current memory registers at the given memory of the current instance.
+
+                    Emitted around an instruction that accesses a memory other than 0 (multi-memory);
+                    memory instructions otherwise always access memory 0.
+                    """,
+                useCurrentMemory: .write
+            ) {
+                $0.field(name: "memory", type: .MemoryIndex)
+            },
+            Instruction(
+                name: "selectSharedMemory",
+                documentation: """
+                    `selectMemory` around an access to a shared memory, which also moves the trap guard.
+
+                    A shared memory's bounds check relies on faults in its guard pages. Kept apart
+                    from `selectMemory` so that the common handler makes no call and stays a leaf.
+                    """,
+                useCurrentMemory: .write
+            ) {
+                $0.field(name: "memory", type: .MemoryIndex)
+            },
+        ]
         return instructions
     }
 

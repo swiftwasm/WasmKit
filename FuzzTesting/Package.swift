@@ -4,6 +4,8 @@ import PackageDescription
 
 let package = Package(
     name: "FuzzTesting",
+    // WasmKit itself requires macOS 15.
+    platforms: [.macOS("15.0")],
     products: [
         // Discussion: Why we build libraries instead of executables linking libFuzzer?
         //
@@ -23,6 +25,11 @@ let package = Package(
         // fuzzing target functions and manually link them with fuzzing runtime libraries.
         .library(name: "FuzzTranslator", type: .static, targets: ["FuzzTranslator"]),
         .library(name: "FuzzExecute", type: .static, targets: ["FuzzExecute"]),
+        .library(name: "FuzzWAT", type: .static, targets: ["FuzzWAT"]),
+        .library(name: "FuzzWAST", type: .static, targets: ["FuzzWAST"]),
+        .library(name: "FuzzResumable", type: .static, targets: ["FuzzResumable"]),
+        // Runs the FuzzResumable oracle without libFuzzer, e.g. on macOS or with a racing ticker.
+        .executable(name: "FuzzResumableDriver", targets: ["FuzzResumableDriver"]),
         // FuzzDifferential is not a libFuzzer-based target, so we build it as an executable.
         .executable(name: "FuzzDifferential", targets: ["FuzzDifferential"]),
     ],
@@ -38,10 +45,26 @@ let package = Package(
             "WasmKitFuzzing",
             .product(name: "WasmKit", package: "WasmKit"),
         ]),
+        .target(name: "FuzzWAT", dependencies: [
+            .product(name: "WAT", package: "WasmKit"),
+        ]),
+        .target(name: "FuzzWAST", dependencies: [
+            .product(name: "WAT", package: "WasmKit"),
+        ]),
         .executableTarget(name: "FuzzDifferential", dependencies: [
             .product(name: "WasmKit", package: "WasmKit"),
             .product(name: "WAT", package: "WasmKit"),
             "WasmCAPI",
+        ]),
+        .target(name: "FuzzResumable", dependencies: ["ResumableFuzzing"]),
+        .executableTarget(name: "FuzzResumableDriver", dependencies: [
+            "ResumableFuzzing",
+            .product(name: "WasmKit", package: "WasmKit"),
+        ]),
+        .target(name: "ResumableFuzzing", dependencies: [
+            .product(name: "WasmKit", package: "WasmKit"),
+            .product(name: "WAT", package: "WasmKit"),
+            .product(name: "WasmParser", package: "WasmKit"),
         ]),
         .target(name: "WasmCAPI"),
         .target(name: "WasmKitFuzzing", dependencies: [

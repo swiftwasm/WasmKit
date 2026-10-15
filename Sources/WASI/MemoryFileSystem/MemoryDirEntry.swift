@@ -1,12 +1,8 @@
-import SystemExtras
-import SystemPackage
-
 /// A WASIDir implementation backed by an in-memory directory node.
 struct MemoryDirEntry: WASIDir {
-    struct ReadEntriesResult: WASIReaddirIterator {
+    struct MemoryDirectoryIterator: WASIReaddirIterator {
         let children: [String]
-        let fileSystem: MemoryFileSystem
-        let basePath: String
+        let dirNode: MemoryDirectoryNode
         var nextIndex: Int
 
         mutating func next() -> Result<ReaddirElement, any Error>? {
@@ -15,8 +11,9 @@ struct MemoryDirEntry: WASIDir {
             let name = children[index]
             nextIndex += 1
             return Result(catching: {
-                let childPath = MemoryFileSystem.joinGuestPath(basePath, name)
-                guard let childNode = fileSystem.lookup(at: childPath) else {
+                // Ask the directory this descriptor refers to for the child,
+                // rather than looking the name up by path from the root.
+                guard let childNode = dirNode.getChild(name: name) else {
                     throw WASIAbi.Errno.ENOENT
                 }
 
@@ -44,7 +41,6 @@ struct MemoryDirEntry: WASIDir {
 
     let preopenPath: String?
     let dirNode: MemoryDirectoryNode
-    let path: String
     let fileSystem: MemoryFileSystem
 
     func readlink(atPath path: String) throws -> [UInt8] {
@@ -105,28 +101,17 @@ struct MemoryDirEntry: WASIDir {
         // No-op for memory filesystem - no resources to release
     }
 
-    func openFile(
-        symlinkFollow: Bool,
-        path: String,
-        oflags: WASIAbi.Oflags,
-        accessMode: FileAccessMode,
-        fdflags: WASIAbi.Fdflags
-    ) throws -> FileDescriptor {
-        // Memory filesystem doesn't return real file descriptors for this method.
-        // File opening is handled through the WASI bridge's path_open implementation.
-        throw WASIAbi.Errno.ENOTSUP
-    }
-
     func createDirectory(atPath path: String) throws {
-        try fileSystem.ensureDirectory(at: MemoryFileSystem.joinGuestPath(self.path, path))
+        let (parent, name) = try MemoryFileSystem.resolveParent(from: dirNode, path: path)
+        _ = try parent.getOrCreateChildDirectory(name: name)
     }
 
     func removeDirectory(atPath path: String) throws {
-        try fileSystem.removeNode(at: self.path, relativePath: path, mustBeDirectory: true)
+        try fileSystem.removeNode(in: dirNode, relativePath: path, mustBeDirectory: true)
     }
 
     func removeFile(atPath path: String) throws {
-        try fileSystem.removeNode(at: self.path, relativePath: path, mustBeDirectory: false)
+        try fileSystem.removeNode(in: dirNode, relativePath: path, mustBeDirectory: false)
     }
 
     func symlink(from sourcePath: String, to destPath: String) throws {
@@ -140,22 +125,22 @@ struct MemoryDirEntry: WASIDir {
         }
 
         try fileSystem.rename(
-            from: sourcePath, at: self.path,
-            to: destPath, at: newMemoryDir.path
+            from: sourcePath, in: dirNode,
+            to: destPath, in: newMemoryDir.dirNode
         )
     }
 
-    func readEntries(cookie: WASIAbi.DirCookie) throws -> ReadEntriesResult {
-        ReadEntriesResult(
-            children: dirNode.listChildren(),
-            fileSystem: fileSystem,
-            basePath: path,
-            nextIndex: Int(cookie)
-        )
+    func readEntries(cookie: WASIAbi.DirCookie) throws -> WASIReaddirEntries {
+        WASIReaddirEntries(
+            MemoryDirectoryIterator(
+                children: dirNode.listChildren(),
+                dirNode: dirNode,
+                nextIndex: Int(clamping: cookie)
+            ))
     }
 
     func attributes(path: String, symlinkFollow: Bool) throws -> WASIAbi.Filestat {
-        guard let node = fileSystem.lookup(at: MemoryFileSystem.joinGuestPath(self.path, path)) else {
+        guard let node = try MemoryFileSystem.resolve(from: dirNode, path: path) else {
             throw WASIAbi.Errno.ENOENT
         }
 
@@ -178,7 +163,7 @@ struct MemoryDirEntry: WASIDir {
             fileType = .REGULAR_FILE
             if let fileNode = node as? MemoryFileNode {
                 size = WASIAbi.FileSize(try fileNode.size)
-                let timestamps = try fileNode.timestamps
+                let timestamps = fileNode.timestamps
                 atim = timestamps.atim
                 mtim = timestamps.mtim
                 ctim = timestamps.ctim
@@ -199,7 +184,7 @@ struct MemoryDirEntry: WASIDir {
         atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags, symlinkFollow: Bool
     ) throws {
-        guard let node = fileSystem.lookup(at: MemoryFileSystem.joinGuestPath(self.path, path)) else {
+        guard let node = try MemoryFileSystem.resolve(from: dirNode, path: path) else {
             throw WASIAbi.Errno.ENOENT
         }
 
@@ -231,30 +216,6 @@ struct MemoryDirEntry: WASIDir {
             return
         }
 
-        // nil means the times were applied in memory; a non-nil handle is a host
-        // fd whose times we set below.
-        guard let handle = fileNode.setTimesInMemory(atim: newAtim, mtim: newMtim) else {
-            return
-        }
-
-        let accessTime: FileTime
-        if fstFlags.contains(.ATIM) {
-            accessTime = FileTime(seconds: Int(atim / 1_000_000_000), nanoseconds: Int(atim % 1_000_000_000))
-        } else if fstFlags.contains(.ATIM_NOW) {
-            accessTime = .now
-        } else {
-            accessTime = .omit
-        }
-
-        let modTime: FileTime
-        if fstFlags.contains(.MTIM) {
-            modTime = FileTime(seconds: Int(mtim / 1_000_000_000), nanoseconds: Int(mtim % 1_000_000_000))
-        } else if fstFlags.contains(.MTIM_NOW) {
-            modTime = .now
-        } else {
-            modTime = .omit
-        }
-
-        try handle.setTimes(access: accessTime, modification: modTime)
+        fileNode.setTimes(atim: newAtim, mtim: newMtim)
     }
 }

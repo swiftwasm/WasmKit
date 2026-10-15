@@ -1,4 +1,3 @@
-import Foundation
 import Testing
 import WasmParser
 
@@ -6,235 +5,145 @@ import WasmParser
 
 @Suite
 struct Wasm2watTests {
-
-    // MARK: - ModuleCollector unit tests
-
-    @Test func collectEmptyModule() throws {
-        let binary = try binaryStream(forWat: "(module)")
-        let info = try collectModule(stream: binary)
-        #expect(info.types.isEmpty)
-        #expect(info.imports.isEmpty)
-        #expect(info.functionTypeIndices.isEmpty)
-        #expect(info.tables.isEmpty)
-        #expect(info.memories.isEmpty)
-        #expect(info.globals.isEmpty)
-        #expect(info.exports.isEmpty)
-        #expect(info.start == nil)
-        #expect(info.elementSectionBytes == nil)
-        #expect(info.codeSectionBytes == nil)
-        #expect(info.dataSectionBytes == nil)
+    private static func printed(_ wat: String) throws -> String {
+        var printer = WatPrinter(info: try collectModule(stream: binaryStream(forWat: wat)), output: "")
+        try printer.print()
+        return printer.output
     }
-
-    @Test func collectTypeSection() throws {
-        let binary = try binaryStream(
-            forWat:
-                """
-                (module
-                  (type (func (param i32 i32) (result i32)))
-                  (type (func))
-                )
-                """)
-        let info = try collectModule(stream: binary)
-        #expect(info.types.count == 2)
-        #expect(info.types[0].parameters == [.i32, .i32])
-        #expect(info.types[0].results == [.i32])
-        #expect(info.types[1].parameters == [])
-        #expect(info.types[1].results == [])
-    }
-
-    @Test func collectFunctionAndCode() throws {
-        let binary = try binaryStream(
-            forWat:
-                """
-                (module
-                  (func (param i32 i32) (result i32)
-                    local.get 0
-                    local.get 1
-                    i32.add)
-                )
-                """)
-        let info = try collectModule(stream: binary)
-        #expect(info.functionTypeIndices.count == 1)
-        // Code is now stored as a raw slice; parse one entry to verify it.
-        let codeBytes = try #require(info.codeSectionBytes)
-        var parser = WasmParser.Parser(sectionBodyBytes: codeBytes)
-        let count: UInt32 = try parser.parseUnsigned()
-        #expect(count == 1)
-        let code = try parser.parseCodeEntry()
-        #expect(code.locals == [])
-    }
-
-    @Test func collectImports() throws {
-        let binary = try binaryStream(
-            forWat:
-                """
-                (module
-                  (import "env" "log" (func (param i32)))
-                  (import "env" "mem" (memory 1))
-                )
-                """)
-        let info = try collectModule(stream: binary)
-        #expect(info.imports.count == 2)
-        #expect(info.imports[0].module == "env")
-        #expect(info.imports[0].name == "log")
-        if case .function = info.imports[0].descriptor {
-            // ok
-        } else {
-            Issue.record("Expected function import")
-        }
-        #expect(info.imports[1].name == "mem")
-        if case .memory = info.imports[1].descriptor {
-            // ok
-        } else {
-            Issue.record("Expected memory import")
-        }
-    }
-
-    @Test func collectExports() throws {
-        let binary = try binaryStream(
-            forWat:
-                """
-                (module
-                  (func (export "add") (param i32 i32) (result i32)
-                    local.get 0
-                    local.get 1
-                    i32.add)
-                )
-                """)
-        let info = try collectModule(stream: binary)
-        #expect(info.exports.count == 1)
-        #expect(info.exports[0].name == "add")
-        if case .function(let idx) = info.exports[0].descriptor {
-            #expect(idx == 0)
-        } else {
-            Issue.record("Expected function export")
-        }
-    }
-
-    @Test func collectMemory() throws {
-        let binary = try binaryStream(forWat: "(module (memory 1 4))")
-        let info = try collectModule(stream: binary)
-        #expect(info.memories.count == 1)
-        #expect(info.memories[0].type.min == 1)
-        #expect(info.memories[0].type.max == 4)
-    }
-
-    @Test func collectGlobal() throws {
-        let binary = try binaryStream(
-            forWat:
-                """
-                (module
-                  (global i32 (i32.const 42))
-                  (global (mut i64) (i64.const -1))
-                )
-                """)
-        let info = try collectModule(stream: binary)
-        #expect(info.globals.count == 2)
-        #expect(info.globals[0].type.mutability == .constant)
-        #expect(info.globals[0].type.valueType == .i32)
-        #expect(info.globals[1].type.mutability == .variable)
-        #expect(info.globals[1].type.valueType == .i64)
-    }
-
-    @Test func collectDataSegment() throws {
-        let binary = try binaryStream(
-            forWat:
-                """
-                (module
-                  (memory 1)
-                  (data (i32.const 0) "hello")
-                )
-                """)
-        let info = try collectModule(stream: binary)
-        let dataBytes = try #require(info.dataSectionBytes)
-        var parser = WasmParser.Parser(sectionBodyBytes: dataBytes)
-        let count: UInt32 = try parser.parseUnsigned()
-        #expect(count == 1)
-        let seg = try parser.parseDataSegmentEntry()
-        if case .active(let active) = seg {
-            #expect(active.index == 0)
-            #expect(Array(active.initializer) == Array("hello".utf8))
-        } else {
-            Issue.record("Expected active data segment")
-        }
-    }
-
-    // MARK: - WatPrinter unit tests
 
     @Test func printEmptyModule() throws {
-        let binary = try binaryStream(forWat: "(module)")
-        let info = try collectModule(stream: binary)
-        var printer = WatPrinter(info: info)
-        let wat = try printer.print()
+        let wat = try Self.printed("(module)")
         #expect(wat == "(module\n)\n")
     }
 
     @Test func printFunctionType() throws {
-        let binary = try binaryStream(
-            forWat:
-                """
-                (module
-                  (type (func (param i32 i32) (result i32)))
-                )
-                """)
-        let info = try collectModule(stream: binary)
-        var printer = WatPrinter(info: info)
-        let wat = try printer.print()
+        let wat = try Self.printed(
+            """
+            (module
+              (type (func (param i32 i32) (result i32)))
+            )
+            """)
         #expect(wat.contains("(type (;0;) (func (param i32 i32) (result i32)))"))
     }
 
     @Test func printMemoryWithMax() throws {
-        let binary = try binaryStream(forWat: "(module (memory 1 4))")
-        let info = try collectModule(stream: binary)
-        var printer = WatPrinter(info: info)
-        let wat = try printer.print()
+        let wat = try Self.printed("(module (memory 1 4))")
         #expect(wat.contains("(memory (;0;) 1 4)"))
     }
 
     @Test func printExport() throws {
-        let binary = try binaryStream(
-            forWat:
-                """
-                (module
-                  (func (export "add") (param i32 i32) (result i32)
-                    local.get 0
-                    local.get 1
-                    i32.add)
-                )
-                """)
-        let info = try collectModule(stream: binary)
-        var printer = WatPrinter(info: info)
-        let wat = try printer.print()
+        let wat = try Self.printed(
+            """
+            (module
+              (func (export "add") (param i32 i32) (result i32)
+                local.get 0
+                local.get 1
+                i32.add)
+            )
+            """)
         #expect(wat.contains(#"(export "add" (func 0))"#))
     }
 
     @Test func printGlobalMutable() throws {
-        let binary = try binaryStream(
-            forWat:
-                """
-                (module
-                  (global (mut i32) (i32.const 0))
-                )
-                """)
-        let info = try collectModule(stream: binary)
-        var printer = WatPrinter(info: info)
-        let wat = try printer.print()
+        let wat = try Self.printed(
+            """
+            (module
+              (global (mut i32) (i32.const 0))
+            )
+            """)
         #expect(wat.contains("(global (;0;) (mut i32) (i32.const 0))"))
     }
 
     @Test func printDataSegment() throws {
-        let binary = try binaryStream(
-            forWat:
-                """
-                (module
-                  (memory 1)
-                  (data (i32.const 0) "hello")
-                )
-                """)
-        let info = try collectModule(stream: binary)
-        var printer = WatPrinter(info: info)
-        let wat = try printer.print()
+        let wat = try Self.printed(
+            """
+            (module
+              (memory 1)
+              (data (i32.const 0) "hello")
+            )
+            """)
         #expect(wat.contains("(data (;0;)"))
         #expect(wat.contains("hello"))
+    }
+
+    private struct RecordingOutput: TextOutputStream {
+        var pieces: [String] = []
+        mutating func write(_ string: String) { pieces.append(string) }
+    }
+
+    @Test func outputArrivesOneFieldAtATime() throws {
+        let binary = try wat2wasm("(module (func (drop (i32.const 1))) (func (drop (i32.const 2))))")
+        var output = RecordingOutput()
+        try wasm2wat(StaticByteStreamSource(bytes: binary), features: .default, to: &output)
+        #expect(output.pieces.joined() == (try wasm2wat(StaticByteStreamSource(bytes: binary))))
+        #expect(!output.pieces.contains { $0.contains("i32.const 1") && $0.contains("i32.const 2") })
+    }
+
+    /// `.default` has no SIMD, so this fails if a section's sub-parser ignores the feature set.
+    @Test func featureSetThreadsIntoCodeSubparser() throws {
+        let wat = """
+            (module (func (result v128) v128.const i32x4 1 2 3 4))
+            """
+        let binary = try wat2wasm(wat, features: .all)
+        let text = try wasm2wat(StaticByteStreamSource(bytes: binary), features: .all)
+        let binary2 = try wat2wasm(text, features: .all)
+        #expect(binary == binary2)
+    }
+
+    /// Modules that have no code, data or element section.
+    @Test func emptySectionsRoundtrip() throws {
+        let cases = [
+            "(module)",
+            "(module (memory 1))",
+            "(module (table 1 funcref))",
+        ]
+        for wat in cases {
+            let binary = try wat2wasm(wat)
+            let text = try wasm2wat(StaticByteStreamSource(bytes: binary))
+            let binary2 = try wat2wasm(text)
+            #expect(binary == binary2, "Roundtrip mismatch for: \(wat)")
+        }
+    }
+
+    @Test func nonNameCustomSectionRoundtrip() throws {
+        let originalBinary = try wat2wasm("(module)")
+        // Splice in a custom "producers" section between magic+version (8 bytes)
+        // and the rest of the binary. Section bytes: id 0, size 0x0B, name-len 9,
+        // "producers" (9 bytes), then a single 0x00 placeholder content byte.
+        var withCustom = Array(originalBinary[0..<8])
+        withCustom += [0x00, 0x0B, 0x09, 0x70, 0x72, 0x6F, 0x64, 0x75, 0x63, 0x65, 0x72, 0x73, 0x00]
+        withCustom += Array(originalBinary[8...])
+        let text = try wasm2wat(StaticByteStreamSource(bytes: withCustom))
+        let binary2 = try wat2wasm(text)
+        // wasm2wat drops custom sections.
+        #expect(originalBinary == binary2)
+    }
+
+    /// `WasmFeatureSet.default` includes `.exceptionHandling`.
+    @Test func tagSectionRoundtrip() throws {
+        let wat = """
+            (module
+              (type (func (param i32)))
+              (tag (type 0)))
+            """
+        let binary = try wat2wasm(wat)
+        let text = try wasm2wat(StaticByteStreamSource(bytes: binary))
+        let binary2 = try wat2wasm(text)
+        #expect(binary == binary2)
+    }
+
+    /// One data segment of each binary kind: active in memory 0 (kind 0),
+    /// passive (kind 1), and active in another memory (kind 2).
+    @Test func mixedDataSegmentKindsRoundtrip() throws {
+        let wat = """
+            (module (memory 1) (memory 1)
+                    (data (i32.const 0) "first")
+                    (data "passive")
+                    (data (memory 1) (i32.const 100) "third"))
+            """
+        let binary = try wat2wasm(wat, features: .all)
+        let text = try wasm2wat(StaticByteStreamSource(bytes: binary), features: .all)
+        #expect(text.contains(#"(data (;2;) (memory 1) (i32.const 100) "third")"#))
+        #expect(try wat2wasm(text, features: .all) == binary)
     }
 }

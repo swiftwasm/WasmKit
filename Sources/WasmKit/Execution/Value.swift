@@ -212,10 +212,6 @@ extension UInt64 {
 }
 
 extension FloatingPoint {
-    func add(_ other: Self) -> Self { self + other }
-    func sub(_ other: Self) -> Self { self - other }
-    func mul(_ other: Self) -> Self { self * other }
-    func div(_ other: Self) -> Self { self / other }
     func min(_ other: Self) -> Self {
         guard !isNaN && !other.isNaN else {
             return .nan
@@ -238,6 +234,44 @@ extension FloatingPoint {
         }
         return Swift.max(self, other)
     }
+}
+
+extension BinaryFloatingPoint {
+    /// The saturating truncation `trunc_sat` performs: NaN becomes zero and a
+    /// value outside the destination range clamps to its nearest end.
+    @inline(__always)
+    fileprivate func truncSat<T: FixedWidthInteger>(rounding: (Self) -> T, max: Self, min: Self) -> T {
+        guard !self.isNaN else { return .zero }
+        if self <= min { return .min }
+        if self >= max { return .max }
+        return rounding(self)
+    }
+}
+
+// `f32` operations on a whole slot, the value and a `+0.0` high half, for the
+// `f32x2` accessor. Each maps `+0.0` to `+0.0`, so the high half stays zero, and the
+// slot is loaded, computed and stored without moving the result out of FP registers.
+extension SIMD2 where Scalar == Float32 {
+    func add(_ other: Self) -> Self { self + other }
+    func sub(_ other: Self) -> Self { self - other }
+    func mul(_ other: Self) -> Self { self * other }
+    var sqrt: Self { self.squareRoot() }
+    var ceil: Self { self.rounded(.up) }
+    var floor: Self { self.rounded(.down) }
+    var trunc: Self { self.rounded(.towardZero) }
+    var nearest: Self { self.rounded(.toNearestOrEven) }
+}
+
+extension SIMD2 where Scalar == UInt32 {
+    var convertToF32S: SIMD2<Float32> { SIMD2<Float32>(SIMD2<Int32>(truncatingIfNeeded: self)) }
+    var convertToF32U: SIMD2<Float32> { SIMD2<Float32>(self) }
+}
+
+extension FloatingPoint {
+    func add(_ other: Self) -> Self { self + other }
+    func sub(_ other: Self) -> Self { self - other }
+    func mul(_ other: Self) -> Self { self * other }
+    func div(_ other: Self) -> Self { self / other }
     func copySign(_ other: Self) -> Self {
         return sign == other.sign ? self : -self
     }
@@ -269,19 +303,6 @@ extension FloatingPoint {
         }
         return rounding(self)
     }
-    @inline(__always)
-    fileprivate func truncSatTo<T: FixedWidthInteger>(
-        rounding: (Self) -> T,
-        max: Self, min: Self
-    ) throws -> T {
-        guard !self.isNaN else { return .zero }
-        if self <= min {
-            return .min
-        } else if self >= max {
-            return .max
-        }
-        return rounding(self)
-    }
 }
 
 extension Float32 {
@@ -305,26 +326,10 @@ extension Float32 {
             return try truncTo(rounding: { UInt64($0) }, max: 18446744073709551616.0, min: -1.0)
         }
     }
-    var truncSatToI32S: UInt32 {
-        get throws {
-            return try truncSatTo(rounding: { Int32($0) }, max: 2147483648.0, min: -2147483904.0).unsigned
-        }
-    }
-    var truncSatToI64S: UInt64 {
-        get throws {
-            return try truncSatTo(rounding: { Int64($0) }, max: 9223372036854775808.0, min: -9223373136366403584.0).unsigned
-        }
-    }
-    var truncSatToI32U: UInt32 {
-        get throws {
-            return try truncSatTo(rounding: { UInt32($0) }, max: 4294967296.0, min: -1.0)
-        }
-    }
-    var truncSatToI64U: UInt64 {
-        get throws {
-            return try truncSatTo(rounding: { UInt64($0) }, max: 18446744073709551616.0, min: -1.0)
-        }
-    }
+    var truncSatToI32S: UInt32 { UInt32(bitPattern: truncSat(rounding: { Int32($0) }, max: 2147483648.0, min: -2147483904.0)) }
+    var truncSatToI64S: UInt64 { UInt64(bitPattern: truncSat(rounding: { Int64($0) }, max: 9223372036854775808.0, min: -9223373136366403584.0)) }
+    var truncSatToI32U: UInt32 { truncSat(rounding: { UInt32($0) }, max: 4294967296.0, min: -1.0) }
+    var truncSatToI64U: UInt64 { truncSat(rounding: { UInt64($0) }, max: 18446744073709551616.0, min: -1.0) }
     var promoteF32: Float64 { Float64(self) }
     var reinterpretToI32: UInt32 { bitPattern }
 }
@@ -349,26 +354,10 @@ extension Float64 {
             return try truncTo(rounding: { UInt64($0) }, max: 18446744073709551616.0, min: -1.0)
         }
     }
-    var truncSatToI32S: UInt32 {
-        get throws {
-            return try truncSatTo(rounding: { Int32($0) }, max: 2147483648.0, min: -2147483649.0).unsigned
-        }
-    }
-    var truncSatToI64S: UInt64 {
-        get throws {
-            return try truncSatTo(rounding: { Int64($0) }, max: 9223372036854775808.0, min: -9223372036854777856.0).unsigned
-        }
-    }
-    var truncSatToI32U: UInt32 {
-        get throws {
-            return try truncSatTo(rounding: { UInt32($0) }, max: 4294967296.0, min: -1.0)
-        }
-    }
-    var truncSatToI64U: UInt64 {
-        get throws {
-            return try truncSatTo(rounding: { UInt64($0) }, max: 18446744073709551616.0, min: -1.0)
-        }
-    }
+    var truncSatToI32S: UInt32 { UInt32(bitPattern: truncSat(rounding: { Int32($0) }, max: 2147483648.0, min: -2147483649.0)) }
+    var truncSatToI64S: UInt64 { UInt64(bitPattern: truncSat(rounding: { Int64($0) }, max: 9223372036854775808.0, min: -9223372036854777856.0)) }
+    var truncSatToI32U: UInt32 { truncSat(rounding: { UInt32($0) }, max: 4294967296.0, min: -1.0) }
+    var truncSatToI64U: UInt64 { truncSat(rounding: { UInt64($0) }, max: 18446744073709551616.0, min: -1.0) }
     var demoteF64: Float32 { Float32(self) }
     var reinterpretToI64: UInt64 { bitPattern }
 }

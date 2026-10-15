@@ -16,16 +16,65 @@ enum Spectest {
         testsuitePath.appendingPathComponent(file)
     }
 
+    /// Files at the top level of the testsuite that use typed function references. wast2json
+    /// needs its flag for them, and the flag changes how it encodes element segments, so only
+    /// these files get it.
+    static let functionReferencesFiles: Set<String> = [
+        "br_if.wast", "br_on_non_null.wast", "br_on_null.wast", "br_table.wast", "call_ref.wast",
+        "linking.wast", "local_init.wast", "local_tee.wast", "ref.wast", "ref_as_non_null.wast",
+        "ref_is_null.wast", "return_call.wast", "return_call_indirect.wast", "return_call_ref.wast",
+        "select.wast", "table-sub.wast", "table.wast", "unreached-invalid.wast", "unreached-valid.wast",
+    ]
+
+    private static let unparsedByWast2json = "wast2json cannot parse GC types"
+    private static let usesSkippedModule = "Uses a skipped module"
+
+    /// Directives at the top level of the testsuite that the WAT tests skip, by the line they start
+    /// on. They are also left out of the script that the reference tool encodes.
+    static let skippedDirectives: [String: [Int: String]] = [
+        "table_init.wast": [
+            2272: unparsedByWast2json,  // `(type $arr (array (mut arrayref)))`
+            2286: usesSkippedModule,  // Invokes the module on line 2272, which wast2json needs left out too
+        ],
+        "table_init64.wast": [
+            2457: unparsedByWast2json,  // `(type $arr (array (mut arrayref)))`
+            2471: usesSkippedModule,  // Invokes the module on line 2457, which wast2json needs left out too
+        ],
+    ]
+
+    /// Directives that wasm-tools cannot parse, by file name and the line they start on. They are
+    /// left out of the script it encodes.
+    static let unparsedByWasmTools: [String: [Int: String]] = [
+        "type-subtyping.wast": [
+            954: "wasm-tools reads at most one supertype"  // A type with two supertypes, which must be invalid
+        ]
+    ]
+
+    /// Whether `wast` is at the top level of the testsuite.
+    static func isTopLevel(_ wast: URL) -> Bool {
+        wast.deletingLastPathComponent().path == testsuitePath.path
+    }
+
+    static func usesFunctionReferences(_ wast: URL) -> Bool {
+        let directory = wast.deletingLastPathComponent()
+        return directory.lastPathComponent == "function-references"
+            || (directory.path == testsuitePath.path && functionReferencesFiles.contains(wast.lastPathComponent))
+    }
+
+    /// - Parameter exclude: File names, or path suffixes such as `proposals/threads/memory.wast`.
     static func wastFiles(include: [String] = [], exclude: [String] = ["annotations.wast"]) -> [URL] {
         #if os(Android)
             return []
         #else
             return [
                 testsuitePath,
-                testsuitePath.appendingPathComponent("proposals/memory64"),
-                testsuitePath.appendingPathComponent("proposals/tail-call"),
                 testsuitePath.appendingPathComponent("proposals/threads"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
+                rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/function-references"),
+                rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/multi-memory"),
+                rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/multi-memory/threads"),
+                rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/gc"),
+                rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/annotations"),
             ].flatMap {
                 try! FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
             }.compactMap { filePath in
@@ -37,7 +86,7 @@ enum Spectest {
                 if !include.isEmpty {
                     guard include.contains(filePath.lastPathComponent) else { return nil }
                 } else {
-                    guard !exclude.contains(filePath.lastPathComponent) else { return nil }
+                    guard !exclude.contains(where: { filePath.path.hasSuffix("/" + $0) }) else { return nil }
                 }
                 return filePath
             }
@@ -46,11 +95,28 @@ enum Spectest {
 
     static func deriveFeatureSet(wast: URL) -> WasmFeatureSet {
         var features = WasmFeatureSet.default
-        if wast.deletingLastPathComponent().path.hasSuffix("proposals/memory64") {
+        if wast.deletingLastPathComponent().path == testsuitePath.path {
+            // The spec testsuite's top level is Wasm 3.0, which merged these proposals.
             features.insert(.memory64)
+            features.insert(.tailCall)
+            features.insert(.multiMemory)
+            features.insert(.gc)
         }
         if wast.deletingLastPathComponent().path.hasSuffix("proposals/threads") {
             features.insert(.threads)
+        }
+        if usesFunctionReferences(wast) {
+            features.insert(.functionReferences)
+        }
+        if wast.deletingLastPathComponent().lastPathComponent == "multi-memory" {
+            features.insert(.multiMemory)
+        }
+        if wast.deletingLastPathComponent().path.hasSuffix("multi-memory/threads") {
+            features.insert(.multiMemory)
+            features.insert(.threads)
+        }
+        if wast.deletingLastPathComponent().lastPathComponent == "gc" {
+            features.insert(.gc)
         }
         return features
     }
@@ -58,6 +124,8 @@ enum Spectest {
     struct Command: Decodable {
         enum CommandType: String, Decodable {
             case module
+            /// `(module instance ...)`, which instantiates an earlier module definition.
+            case instance
             case action
             case register
             case assertReturn = "assert_return"
@@ -65,6 +133,7 @@ enum Spectest {
             case assertTrap = "assert_trap"
             case assertMalformed = "assert_malformed"
             case assertExhaustion = "assert_exhaustion"
+            case assertException = "assert_exception"
             case assertUnlinkable = "assert_unlinkable"
             case assertUninstantiable = "assert_uninstantiable"
             case assertReturnCanonicalNan = "assert_return_canonical_nan"

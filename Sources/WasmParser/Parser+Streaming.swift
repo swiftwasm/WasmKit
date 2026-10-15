@@ -24,7 +24,7 @@ extension Parser {
         )
         return Code(
             locals: locals, expression: expressionBytes,
-            offset: expressionStart, features: features
+            offset: expressionStart, bodyOffset: bodyStart, features: features
         )
     }
 
@@ -86,6 +86,9 @@ extension Parser {
             }
 
             type = refType
+        } else if features.contains(.functionReferences) && !flag.contains(.usesExpressions) {
+            // A segment listing function indices only holds non-null functions.
+            type = ReferenceType(isNullable: false, heapType: .funcRef)
         } else {
             type = .funcRef
         }
@@ -97,9 +100,7 @@ extension Parser {
             }
         }
 
-        // Both branches read a vector, but `parseConstExpression` is a `Parser`
-        // method and cannot run against the `inout ByteStream` a vector-parsing
-        // closure receives, so the count is read and looped over here.
+        // `parseConstExpression` needs the `Parser`, which a `parseVector` closure does not get.
         let initCount: UInt32 = try parseUnsigned()
         var expressions: [ConstExpression] = []
         if flag.contains(.usesExpressions) {
@@ -114,12 +115,5 @@ extension Parser {
         initializer = expressions
 
         return ElementSegment(type: type, initializer: initializer, mode: mode)
-    }
-
-    /// Whether the parser's stream has reached its end. Wraps
-    /// `stream.hasReachedEnd()` because `stream` itself is `@usableFromInline`
-    /// internal.
-    package func hasReachedEnd() throws(WasmParserError) -> Bool {
-        try stream.hasReachedEnd()
     }
 }

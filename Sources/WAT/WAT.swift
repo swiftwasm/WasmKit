@@ -1,5 +1,39 @@
 import WasmParser
 
+/// A `@custom` annotation declaring an inline custom section in WAT.
+struct CustomSectionDecl {
+    /// Standard section kinds used in placement directives.
+    enum SectionKind: String {
+        case type
+        case `import`
+        case `func`
+        case table
+        case memory
+        case global
+        case export
+        case start
+        case elem
+        case code
+        case data
+        case datacount
+        /// Only valid as `(before first)`.
+        case first
+        /// Only valid as `(after last)`.
+        case last
+    }
+
+    /// Where this custom section should be placed in the binary. A section without one
+    /// goes `(after last)`.
+    enum Placement: Equatable {
+        case before(SectionKind)
+        case after(SectionKind)
+    }
+
+    let name: String
+    let placement: Placement
+    let content: [UInt8]
+}
+
 /// Options for encoding a WebAssembly module into a binary format.
 public struct EncodeOptions: Sendable {
     /// Whether to include the name section.
@@ -17,7 +51,7 @@ public struct EncodeOptions: Sendable {
 /// Transforms a WebAssembly text format (WAT) string into a WebAssembly binary format byte array.
 ///
 /// This function supports both core modules and Component Model components (when the `ComponentModel`
-/// trait is enabled). It tries to parse as a module first, then falls back to component parsing.
+/// trait is enabled). It looks ahead to determine whether the input is a component or core module.
 ///
 /// - Parameter input: The WAT string to transform
 /// - Returns: The WebAssembly binary format byte array
@@ -66,10 +100,26 @@ public func wat2wasm(
     #endif
 }
 
+/// The origin of a module name: either from a `$id` identifier or an `@name` annotation.
+public enum ModuleName: Equatable {
+    /// From `$id`; value includes the `$` prefix.
+    case identifier(String)
+    /// From `(@name "...")`; raw UTF-8 string, no prefix.
+    case annotation(String)
+
+    /// The name for the name section (`$` prefix stripped for identifiers).
+    var nameValue: String {
+        switch self {
+        case .identifier(let s): String(s.dropFirst())
+        case .annotation(let s): s
+        }
+    }
+}
+
 /// A WAT module representation.
 public struct Wat {
-    /// The module name from `(module $name ...)`, including the `$` prefix.
-    var id: String? = nil
+    /// The module name from `(module $name ...)` or `(module (@name "...") ...)`.
+    var id: ModuleName? = nil
     var types: TypesMap
     let functionsMap: NameMapping<WatParser.FunctionDecl>
     let tablesMap: NameMapping<WatParser.TableDecl>
@@ -77,12 +127,15 @@ public struct Wat {
     let memories: NameMapping<WatParser.MemoryDecl>
     let globals: NameMapping<WatParser.GlobalDecl>
     let tagsMap: NameMapping<WatParser.TagDecl>
+    /// For each defined tag, the number of functions defined before it, so that
+    /// the encoder adds implicit types to the type section in source order.
+    let definedFunctionCountsBeforeTags: [Int]
     let elementsMap: NameMapping<WatParser.ElementDecl>
     let data: NameMapping<WatParser.DataSegmentDecl>
     let start: FunctionIndex?
     let imports: [Import]
     let exports: [Export]
-    let customSections = [CustomSection]()
+    let customSections: [CustomSectionDecl]
     let features: WasmFeatureSet
 
     let parser: Parser
@@ -96,11 +149,13 @@ public struct Wat {
             memories: NameMapping<WatParser.MemoryDecl>(),
             globals: NameMapping<WatParser.GlobalDecl>(),
             tagsMap: NameMapping<WatParser.TagDecl>(),
+            definedFunctionCountsBeforeTags: [],
             elementsMap: NameMapping<WatParser.ElementDecl>(),
             data: NameMapping<WatParser.DataSegmentDecl>(),
             start: nil,
             imports: [],
             exports: [],
+            customSections: [],
             features: features,
             parser: Parser("")
         )
@@ -144,8 +199,16 @@ public func parseWAT(_ input: String, features: WasmFeatureSet = .default) throw
     var wat: Wat
     if try parser.takeParenBlockStart("module") {
         let moduleId = try parser.takeId()
+        let nameAnnot = try parser.takeNameAnnotation()
+        if nameAnnot != nil, try parser.takeNameAnnotation() != nil {
+            throw WatParserError("@name annotation: multiple module names", location: parser.lexer.location())
+        }
         wat = try parseWAT(&parser, features: features)
-        wat.id = moduleId?.value
+        if let nameAnnot {
+            wat.id = .annotation(nameAnnot)
+        } else if let moduleId {
+            wat.id = .identifier(moduleId.value)
+        }
         try parser.skipParenBlock()
     } else {
         // The root (module) may be omitted
@@ -159,18 +222,49 @@ public func parseWAT(_ input: String, features: WasmFeatureSet = .default) throw
 }
 
 /// A WAST script representation.
-public struct Wast {
-    var parser: WastParser
+public struct WAST {
+    var parser: WASTParser
+    /// Set once a directive could not even be skipped over, which leaves nothing to resume from.
+    private var isExhausted = false
 
     init(_ input: String, features: WasmFeatureSet) {
-        self.parser = WastParser(input, features: features)
+        self.parser = WASTParser(input, features: features)
+    }
+
+    /// Parses the next directive, stepping past one that fails to parse instead of ending the
+    /// script, so that the directives after an unsupported one still run.
+    ///
+    /// - Returns: The directive, or why it failed to parse, and the location where it starts;
+    ///   `nil` if there are no more directives to parse.
+    public mutating func nextDirectiveResult() -> (directive: Result<WASTDirective, WASTDirectiveError>, location: Location)? {
+        guard !isExhausted else { return nil }
+        let start = parser.parser
+        let location = (try? parser.parser.peek()?.location(in: parser.parser.lexer)) ?? parser.parser.lexer.location()
+        do {
+            guard let directive = try parser.nextDirective() else { return nil }
+            return (.success(directive), location)
+        } catch {
+            parser.parser = start
+            var module: WASTDirectiveError.Module?
+            do {
+                _ = try parser.parser.expect(.leftParen)
+                if try parser.parser.takeKeyword("module") {
+                    let isDefinition = try parser.parser.takeKeyword("definition")
+                    module = WASTDirectiveError.Module(id: try parser.parser.takeId()?.value, isDefinition: isDefinition)
+                }
+                try parser.parser.skipParenBlock()
+            } catch {
+                isExhausted = true
+            }
+            return (.failure(WASTDirectiveError(error: error, module: module)), location)
+        }
     }
 
     /// Parses the next directive in the WAST script.
     ///
     /// - Returns: A tuple containing the parsed directive and its location in the WAST script
     ///   or `nil` if there are no more directives to parse.
-    public mutating func nextDirective() throws(WatParserError) -> (directive: WastDirective, location: Location)? {
+    public mutating func nextDirective() throws(WatParserError) -> (directive: WASTDirective, location: Location)? {
         let location = try parser.parser.peek()?.location(in: parser.parser.lexer) ?? parser.parser.lexer.location()
         if let directive = try parser.nextDirective() {
             return (directive, location)
@@ -180,12 +274,27 @@ public struct Wast {
     }
 }
 
-/// Parses a WebAssembly script test format (WAST) string into a `Wast` instance.
+/// A WAST directive that failed to parse.
+public struct WASTDirectiveError: Error {
+    /// A module directive, which the directives after it may use.
+    public struct Module: Sendable {
+        /// The name of the module specified in $id form
+        public let id: String?
+        /// Whether this is a `(module definition ...)`, which is not instantiated.
+        public let isDefinition: Bool
+    }
+
+    public let error: WatParserError
+    /// Set if the directive is a `(module ...)`.
+    public let module: Module?
+}
+
+/// Parses a WebAssembly script test format (WAST) string into a `WAST` instance.
 ///
 /// - Parameter input: The WAST string to parse
-/// - Returns: The parsed `Wast` instance
+/// - Returns: The parsed `WAST` instance
 ///
-/// The returned `Wast` instance can be used to iterate over the directives in the WAST script.
+/// The returned `WAST` instance can be used to iterate over the directives in the WAST script.
 ///
 /// ```swift
 /// var wast = try parseWAST("""
@@ -203,8 +312,8 @@ public struct Wast {
 ///     print("\(location): \(directive)")
 /// }
 /// ```
-public func parseWAST(_ input: String, features: WasmFeatureSet = .default) throws(WatParserError) -> Wast {
-    return Wast(input, features: features)
+public func parseWAST(_ input: String, features: WasmFeatureSet = .default) throws(WatParserError) -> WAST {
+    return WAST(input, features: features)
 }
 
 // MARK: - Component WAST
@@ -212,18 +321,18 @@ public func parseWAST(_ input: String, features: WasmFeatureSet = .default) thro
 #if ComponentModel
 
     /// A Component WAST script representation.
-    public struct ComponentWast {
-        var parser: ComponentWastParser
+    public struct ComponentWAST {
+        var parser: ComponentWASTParser
 
         init(_ input: String, features: WasmFeatureSet) {
-            self.parser = ComponentWastParser(input, features: features)
+            self.parser = ComponentWASTParser(input, features: features)
         }
 
         /// Parses the next directive in the Component WAST script.
         ///
         /// - Returns: A tuple containing the parsed directive and its location in the script,
         ///   or `nil` if there are no more directives to parse.
-        public mutating func nextDirective() throws -> (directive: ComponentWastDirective, location: Location)? {
+        public mutating func nextDirective() throws -> (directive: ComponentWASTDirective, location: Location)? {
             let location = try parser.parser.peek()?.location(in: parser.parser.lexer) ?? parser.parser.lexer.location()
             if let directive = try parser.nextDirective() {
                 return (directive, location)
@@ -239,13 +348,13 @@ public func parseWAST(_ input: String, features: WasmFeatureSet = .default) thro
         }
     }
 
-    /// Parses a Component WAST string into a `ComponentWast` instance.
+    /// Parses a Component WAST string into a `ComponentWAST` instance.
     ///
     /// - Parameter input: The Component WAST string to parse
     /// - Parameter features: The feature set to use for parsing
-    /// - Returns: The parsed `ComponentWast` instance
+    /// - Returns: The parsed `ComponentWAST` instance
     ///
-    /// The returned `ComponentWast` instance can be used to iterate over the directives in the script.
+    /// The returned `ComponentWAST` instance can be used to iterate over the directives in the script.
     ///
     /// ```swift
     /// var wast = try parseComponentWAST("""
@@ -264,8 +373,8 @@ public func parseWAST(_ input: String, features: WasmFeatureSet = .default) thro
     public func parseComponentWAST(
         _ input: String,
         features: WasmFeatureSet = .default
-    ) throws(WatParserError) -> ComponentWast {
-        return ComponentWast(input, features: features)
+    ) throws(WatParserError) -> ComponentWAST {
+        return ComponentWAST(input, features: features)
     }
 
 #endif
@@ -278,19 +387,26 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
     var typesMap = TypesMap()
 
     do {
-        var unresolvedTypesMapping = NameMapping<WatParser.FunctionTypeDecl>()
+        var unresolvedTypesMapping = NameMapping<WatParser.SubTypeDecl>()
+        var groups: [(range: Range<Int>, isRec: Bool)] = []
         // 1. Collect module type decls and resolve symbolic references inside
         // their definitions.
         var watParser = WatParser(parser: initialParser)
         while let decl = try watParser.next() {
-            guard case .type(let decl) = decl.kind else { continue }
-            try unresolvedTypesMapping.add(decl)
+            guard case .type(let decls, let isRec) = decl.kind else { continue }
+            let start = unresolvedTypesMapping.count
+            for decl in decls {
+                try unresolvedTypesMapping.add(decl)
+            }
+            groups.append((start..<unresolvedTypesMapping.count, isRec))
         }
-        for decl in unresolvedTypesMapping {
-            try typesMap.add(
-                TypesMap.NamedResolvedType(
-                    id: decl.id, type: decl.type.resolve(unresolvedTypesMapping)
-                ))
+        for group in groups {
+            var members: [(id: Name?, sub: WatParser.ResolvedSubType)] = []
+            for index in group.range {
+                let decl = unresolvedTypesMapping[index]
+                members.append((decl.id, try decl.sub.resolve(unresolvedTypesMapping)))
+            }
+            try typesMap.addExplicitGroup(members, isRec: group.isRec)
         }
     }
 
@@ -302,9 +418,12 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
     var dataSegmentsMap = NameMapping<WatParser.DataSegmentDecl>()
     var globalsMap = NameMapping<WatParser.GlobalDecl>()
     var tagsMap = NameMapping<WatParser.TagDecl>()
+    var definedFunctionCount = 0
+    var definedFunctionCountsBeforeTags: [Int] = []
     var start: Parser.IndexOrId?
 
     var exportDecls: [WatParser.ExportDecl] = []
+    var customSections: [CustomSectionDecl] = []
 
     var hasNonImport = false
     func visitDecl(decl: WatParser.ModuleField) throws(WatParserError) {
@@ -348,7 +467,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
             let index = try functionsMap.add(decl)
             addExports(decl.exports, index: index, kind: .function)
             switch decl.kind {
-            case .definition: break
+            case .definition: definedFunctionCount += 1
             case .imported(let importNames):
                 addImport(importNames) { () throws(WatParserError) in
                     let typeIndex = try typesMap.resolveIndex(use: decl.typeUse)
@@ -395,7 +514,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
             let index = try tagsMap.add(decl)
             addExports(decl.exports, index: index, kind: .tag)
             switch decl.kind {
-            case .definition: break
+            case .definition: definedFunctionCountsBeforeTags.append(definedFunctionCount)
             case .imported(let importNames):
                 addImport(importNames) { () throws(WatParserError) in
                     let typeIndex = try typesMap.resolveIndex(use: decl.typeUse)
@@ -413,6 +532,8 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
                 throw WatParserError("Multiple start sections", location: location)
             }
             start = startIndex
+        case .custom(let decl):
+            customSections.append(decl)
         }
     }
 
@@ -456,11 +577,13 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
         memories: memoriesMap,
         globals: globalsMap,
         tagsMap: tagsMap,
+        definedFunctionCountsBeforeTags: definedFunctionCountsBeforeTags,
         elementsMap: elementSegmentsMap,
         data: dataSegmentsMap,
         start: startIndex,
         imports: imports,
         exports: exports,
+        customSections: customSections,
         features: features,
         parser: parser
     )
@@ -473,7 +596,6 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
 /// - Parameters:
 ///   - stream: The raw bytes stream of a WebAssembly binary module, either `StaticByteStreamSource` or `FileHandleStreamSource`.
 ///   - features: The feature set to use while parsing the binary (default: `.default`).
-/// - Returns: A `String` containing the WAT representation of the module.
 ///
 /// ```swift
 /// import WAT
@@ -485,8 +607,21 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
 public func wasm2wat<Source: ByteStreamSource>(
     _ stream: Source,
     features: WasmFeatureSet = .default
-) throws -> String {
+) throws(WasmParserError) -> String {
+    var text = ""
+    try wasm2wat(stream, features: features, to: &text)
+    return text
+}
+
+/// Writes the WAT text of the binary module read from `stream` to `output`, one
+/// module field at a time.
+package func wasm2wat<Source: ByteStreamSource, Output: TextOutputStream>(
+    _ stream: Source,
+    features: WasmFeatureSet,
+    to output: inout Output
+) throws(WasmParserError) {
     let info = try collectModule(stream: stream, features: features)
-    var printer = WatPrinter(info: info)
-    return try printer.print()
+    var printer = WatPrinter(info: info, output: output)
+    defer { output = printer.output }
+    try printer.print()
 }

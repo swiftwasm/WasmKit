@@ -7,16 +7,28 @@ add_wasmkit_library(WasmKit
   SIMDOpcode.swift
   Translator.swift
   Validator.swift
+  TypeCanonicalization.swift
+  TypeMatching.swift
   WasmKitError.swift
   ResourceLimiter.swift
+  Execution/SharedMemory.swift
   Component/CanonicalLifting.swift
   Component/CanonicalLowering.swift
   Component/CanonicalCall.swift
   Component/CanonicalOptions.swift
   Component/ComponentTypes.swift
   Execution/DebuggerInstructionMapping.swift
+  Execution/EpochTicker.swift
   Execution/Instructions/Control.swift
+  Execution/Instructions/ControlAccumulator.swift
+  Execution/Instructions/ControlAccumulatorFloat.swift
+  Execution/Instructions/ControlFusedAnd.swift
+  Execution/Instructions/ControlFusedFloat.swift
+  Execution/Instructions/ControlFusedImm.swift
+  Execution/Instructions/IntegerImmediate.swift
+  Execution/Instructions/Epoch.swift
   Execution/Instructions/ExceptionHandling.swift
+  Execution/Instructions/Fuel.swift
   Execution/Instructions/Instruction.swift
   Execution/Instructions/Table.swift
   Execution/Instructions/Memory.swift
@@ -31,13 +43,16 @@ add_wasmkit_library(WasmKit
   Execution/EngineInterceptor.swift
   Execution/Errors.swift
   Execution/Execution.swift
+  Execution/ExecutionStack.swift
   Execution/Function.swift
+  Execution/FailableAllocation.swift
   Execution/Instances.swift
   Execution/MprotectLinearMemory.swift
   Execution/MprotectTrapGuard.swift
   Execution/StatsCollector.swift
   Execution/NameRegistry.swift
   Execution/Profiler.swift
+  Execution/ResumableCall.swift
   Execution/Runtime.swift
   Execution/SharedMemoryStorage.swift
   Execution/SignpostTracer.swift
@@ -47,13 +62,27 @@ add_wasmkit_library(WasmKit
   Execution/Value.swift
   Execution/V128Storage.swift
   Platform/AtomicParkingLot.swift
+  Platform/Cell.swift
+  Platform/PlatformMutex.swift
   Platform/SystemVirtualMemory.swift
 )
 
+# Joined -DName form: separate "-D;Name" pairs lose their "-D" to CMake's
+# COMPILE_OPTIONS de-duplication when more than one define is present.
 if(WASMKIT_ENABLE_FILESYSTEM)
   target_compile_options(WasmKit PRIVATE
-    $<$<COMPILE_LANGUAGE:Swift>:-D;FileSystem>)
+    $<$<COMPILE_LANGUAGE:Swift>:-DFileSystem>)
 endif()
 
+# `Cell` (Platform/Cell.swift) stores a value inline with `@_rawLayout`. SHELL: keeps the flag and
+# its value together; as separate options CMake's de-duplication can split them.
+target_compile_options(WasmKit PRIVATE
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature RawLayout>")
+
+target_compile_options(WasmKit PRIVATE
+  $<$<COMPILE_LANGUAGE:Swift>:-DMultiThread>)
+target_compile_options(WasmKit PRIVATE
+  $<$<COMPILE_LANGUAGE:Swift>:-DDisassembler>)
+
 target_link_wasmkit_libraries(WasmKit PUBLIC
-  _CWasmKit WasmParser SystemExtras WasmTypes SystemPackage)
+  _CWasmKit WasmParser WasmTypes)

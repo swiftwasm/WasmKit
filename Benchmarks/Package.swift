@@ -8,7 +8,6 @@ let package = Package(
     dependencies: [
         .package(name: "WasmKit", path: "../"),
         .package(url: "https://github.com/ordo-one/benchmark", .upToNextMajor(from: "1.4.0")),
-        .package(url: "https://github.com/apple/swift-system.git", from: "1.6.4"),
     ]
 )
 
@@ -67,7 +66,6 @@ package.targets += [
         name: "WasmParserBenchmark",
         dependencies: [
             .product(name: "Benchmark", package: "benchmark"),
-            .product(name: "SystemPackage", package: "swift-system"),
             .product(name: "WasmKit", package: "WasmKit"),
             .product(name: "WAT", package: "WasmKit"),
         ],
@@ -75,5 +73,19 @@ package.targets += [
         plugins: [
             .plugin(name: "BenchmarkPlugin", package: "benchmark")
         ]
+    ),
+]
+
+// Replay of the wasmi-benchmarks suite. Not an ordo-one benchmark target: it is
+// a plain executable that prints CSV, so its numbers line up with the ones
+// wasmi's own criterion harness prints. See README.md.
+package.targets += [
+    .executableTarget(
+        name: "WasmiBenchmarks",
+        dependencies: [
+            .product(name: "WAT", package: "WasmKit"),
+            .product(name: "WasmKit", package: "WasmKit"),
+        ],
+        path: "Sources/WasmiBenchmarks"
     ),
 ]

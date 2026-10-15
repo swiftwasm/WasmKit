@@ -1,15 +1,30 @@
 import WasmTypes
 
 extension Sp {
+    /// The address of the slot pair a `v128` operand occupies.
+    ///
+    /// Both halves are addressed off one base pointer so the compiler can still
+    /// merge them into a single 128-bit load or store (`ldr q`/`str q` on
+    /// arm64); forming the second address by re-adding a byte offset to `sp`
+    /// costs an extra add and a sign-extension and blocks the merge.
+    @inline(__always)
+    private func v128Slots(at reg: VReg) -> UnsafeMutablePointer<StackSlot> {
+        UnsafeMutableRawPointer(self)
+            .advanced(by: Int(reg.byteOffset))
+            .assumingMemoryBound(to: StackSlot.self)
+    }
+
     @inline(__always)
     func loadV128(at reg: VReg) -> V128Storage {
-        V128Storage(lo: self[Int(reg)], hi: self[Int(reg) + 1])
+        let slots = v128Slots(at: reg)
+        return V128Storage(lo: slots[0], hi: slots[1])
     }
 
     @inline(__always)
     func storeV128(_ value: V128Storage, at reg: VReg) {
-        self[Int(reg)] = value.lo
-        self[Int(reg) + 1] = value.hi
+        let slots = v128Slots(at: reg)
+        slots[0] = value.lo
+        slots[1] = value.hi
     }
 }
 

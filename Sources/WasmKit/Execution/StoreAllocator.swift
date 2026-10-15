@@ -1,4 +1,3 @@
-import Synchronization
 import WasmParser
 
 /// A simple bump allocator for a single type.
@@ -169,17 +168,21 @@ struct Interned<T: Internable>: Equatable, Hashable, Sendable {
 
 /// A deduplicating interner for values of type `Item`.
 ///
-/// Thread-safe: all access is serialized by an internal `Mutex`.
+/// Thread-safe when the `MultiThread` trait is enabled: all access is
+/// serialized by the internal `PlatformMutex`.
 final class Interner<Item: Hashable & Internable & Sendable>: Sendable {
     private struct State {
         var itemByIntern: [Item]
         var internByItem: [Item: Interned<Item>]
     }
 
-    private let state: Mutex<State>
+    // `var` because the single-threaded PlatformMutex fallback mutates in
+    // place; the mutex itself guarantees exclusivity, which Sendable checking
+    // cannot see.
+    nonisolated(unsafe) private var state: PlatformMutex<State>
 
     init() {
-        state = Mutex(State(itemByIntern: [], internByItem: [:]))
+        state = PlatformMutex(State(itemByIntern: [], internByItem: [:]))
     }
 
     /// Interns the given `item` and returns an interned value.
@@ -278,21 +281,22 @@ extension StoreAllocator {
     ) throws -> InternalInstance {
         // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
 
-        let types = module.types
+        let canonicalizer = try TypeCanonicalizer(typeSection: module.types, interner: funcTypeInterner)
         var importedFunctions: [InternalFunction] = []
         var importedTables: [InternalTable] = []
         var importedMemories: [InternalMemory] = []
         var importedGlobals: [InternalGlobal] = []
+        var importedGlobalTypes: [GlobalType] = []
         var importedTags: [InternalTag] = []
 
         // External values imported in this module should be included in corresponding index spaces before definitions
         // local to to the module are added.
         for importEntry in module.imports {
             guard let (external, allocator) = imports.lookup(module: importEntry.module, name: importEntry.name) else {
-                throw ImportError(.missing(moduleName: importEntry.module, externalName: importEntry.name))
+                throw WasmKitError(message: .missing(moduleName: importEntry.module, externalName: importEntry.name))
             }
             guard allocator === self else {
-                throw ImportError(.importedEntityFromDifferentStore(importEntry))
+                throw WasmKitError(message: .importedEntityFromDifferentStore(importEntry))
             }
 
             switch (importEntry.descriptor, external) {
@@ -301,16 +305,22 @@ extension StoreAllocator {
                 guard typeIndex < module.types.count else {
                     throw WasmKitError(message: .indexOutOfBounds("type", typeIndex, max: module.types.count))
                 }
-                let expected = module.types[Int(typeIndex)]
-                guard engine.internType(expected) == type else {
-                    let actual = engine.resolveType(type)
-                    throw ImportError(.incompatibleFunctionType(importEntry, actual: actual, expected: expected))
+                let expected = try canonicalizer.canonicalID(of: typeIndex)
+                guard expected == type else {
+                    throw WasmKitError(
+                        message: .incompatibleFunctionType(importEntry, actual: engine.resolveType(type), expected: engine.resolveType(expected))
+                    )
                 }
                 importedFunctions.append(externalFunc)
 
             case (.table(let tableType), .table(let table)):
+                let tableType = try canonicalizer.canonicalize(tableType)
                 if let max = table.limits.max, max < tableType.limits.min {
-                    throw ImportError(.incompatibleTableType(importEntry, actual: tableType, expected: table.tableType))
+                    throw WasmKitError(message: .incompatibleTableType(importEntry, actual: tableType, expected: table.tableType))
+                }
+                // Element types must be equivalent: a table can be both read and written.
+                guard tableType.elementType == table.tableType.elementType else {
+                    throw WasmKitError(message: .incompatibleTableType(importEntry, actual: tableType, expected: table.tableType))
                 }
                 importedTables.append(table)
 
@@ -319,44 +329,56 @@ extension StoreAllocator {
 
                 // Check shared flag matches
                 guard memoryType.shared == limit.shared else {
-                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
+                    throw WasmKitError(message: .incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
                 }
                 // Check memory64 flag matches
                 guard memoryType.isMemory64 == limit.isMemory64 else {
-                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
+                    throw WasmKitError(message: .incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
                 }
                 // Check limits compatibility: provided memory must satisfy imported memory type requirements.
                 // Note: The memory may have grown already, so compare against the current size.
                 let currentSizeInPages = UInt64(memory.withValue { $0.byteCount }) / UInt64(MemoryEntity.pageSize)
                 guard currentSizeInPages >= memoryType.min else {
-                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
+                    throw WasmKitError(message: .incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
                 }
                 // If the imported memory type has a max, the provided memory must have a max and be <= imported max.
                 if let importedMax = memoryType.max {
                     guard let providedMax = limit.max, providedMax <= importedMax else {
-                        throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
+                        throw WasmKitError(message: .incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
                     }
                 }
                 importedMemories.append(memory)
 
             case (.global(let globalType), .global(let global)):
-                guard globalType == global.globalType else {
-                    throw ImportError(.incompatibleGlobalType(importEntry, actual: global.globalType, expected: globalType))
+                let globalType = try canonicalizer.canonicalize(globalType)
+                let provided = global.globalType
+                // A mutable global can be both read and written, so its type must be
+                // equivalent; an immutable one may provide a subtype.
+                let matches =
+                    switch globalType.mutability {
+                    case .variable: provided == globalType
+                    case .constant: provided.mutability == .constant && provided.valueType.isSubtype(of: globalType.valueType)
+                    }
+                guard matches else {
+                    throw WasmKitError(message: .incompatibleGlobalType(importEntry, actual: provided, expected: globalType))
                 }
                 importedGlobals.append(global)
+                importedGlobalTypes.append(globalType)
 
             case (.tag(let typeIndex), .tag(let tag)):
                 guard typeIndex < module.types.count else {
                     throw WasmKitError(message: .indexOutOfBounds("type", typeIndex, max: module.types.count))
                 }
-                let expected = module.types[Int(typeIndex)]
-                guard engine.internType(expected) == tag.type else {
-                    throw ImportError(.incompatibleFunctionType(importEntry, actual: engine.resolveType(tag.type), expected: expected))
+                let expected = try canonicalizer.canonicalID(of: typeIndex)
+                guard expected == tag.type else {
+                    throw WasmKitError(
+                        message: .incompatibleFunctionType(importEntry, actual: engine.resolveType(tag.type), expected: engine.resolveType(expected))
+                    )
                 }
                 importedTags.append(tag)
 
             default:
-                throw ImportError(.incompatibleType(importEntry, entity: external))
+                throw WasmKitError(message: .incompatibleType(importEntry, entity: external))
             }
         }
 
@@ -391,19 +413,48 @@ extension StoreAllocator {
         let instanceHandle = InternalInstance(unsafe: instancePointer)
 
         // Step 2.
-        let functions = allocateEntities(
+        let functions = try allocateEntities(
             imports: importedFunctions,
             internals: module.functions,
             allocateHandle: { f, index in
-                allocate(function: f, index: FunctionIndex(index), instance: instanceHandle, engine: engine)
+                let type = engine.internType(try canonicalizer.canonicalize(f.type))
+                return allocate(function: f, type: type, index: FunctionIndex(index), instance: instanceHandle)
             }
+        )
+
+        var functionRefs: Set<InternalFunction> = []
+        // Table initializers can only read imported globals, a global initializer can also read
+        // the globals defined before it, and element segments can read every global. Both
+        // contexts gain each global as it is allocated.
+        var constEvalContext = ConstEvaluationContext(
+            functions: functions,
+            globals: importedGlobals,
+            onFunctionReferenced: { function in
+                functionRefs.insert(function)
+            }
+        )
+        var constTypeContext = ConstExpressionTypeContext(
+            canonicalizer: canonicalizer, functions: functions, globalTypes: importedGlobalTypes
         )
 
         // Step 3.
         let tables = try allocateEntities(
             imports: importedTables,
-            internals: module.internalTables,
-            allocateHandle: { t, _ in try allocate(tableType: t, resourceLimiter: resourceLimiter) }
+            internals: Array(zip(module.internalTables, module.tableInitializers)),
+            allocateHandle: { table, _ in
+                let (tableType, initializer) = table
+                let canonicalType = try canonicalizer.canonicalize(tableType)
+                var initialValue: Reference?
+                if let initializer {
+                    let expectedType = ValueType.ref(canonicalType.elementType)
+                    try initializer.checkType(expectedType, context: constTypeContext)
+                    guard case .ref(let reference) = try initializer.evaluate(context: constEvalContext, expectedType: expectedType) else {
+                        preconditionFailure("a reference-typed constant expression produced a non-reference")
+                    }
+                    initialValue = reference
+                }
+                return try allocate(tableType: canonicalType, initialValue: initialValue, resourceLimiter: resourceLimiter)
+            }
         )
 
         // Step 4.
@@ -413,24 +464,20 @@ extension StoreAllocator {
             allocateHandle: { m, _ in try allocate(memoryType: m, engineConfiguration: engine.configuration, resourceLimiter: resourceLimiter) }
         )
 
-        var functionRefs: Set<InternalFunction> = []
         // Step 5.
-        let constEvalContext = ConstEvaluationContext(
-            functions: functions,
-            globals: importedGlobals.map(\.value),
-            onFunctionReferenced: { function in
-                functionRefs.insert(function)
-            }
-        )
-
         let globals = try allocateEntities(
             imports: importedGlobals,
             internals: module.globals,
             allocateHandle: { global, _ in
+                let globalType = try canonicalizer.canonicalize(global.type)
+                try global.initializer.checkType(globalType.valueType, context: constTypeContext)
                 let initialValue = try global.initializer.evaluate(
-                    context: constEvalContext, expectedType: global.type.valueType
+                    context: constEvalContext, expectedType: globalType.valueType
                 )
-                return try allocate(globalType: global.type, initialValue: initialValue)
+                let allocated = try allocate(globalType: globalType, initialValue: initialValue)
+                constEvalContext.globals.append(allocated)
+                constTypeContext.globalTypes.append(globalType)
+                return allocated
             }
         )
 
@@ -439,8 +486,7 @@ extension StoreAllocator {
             imports: importedTags,
             internals: module.tagTypes[module.moduleImports.numberOfTags...],
             allocateHandle: { typeIndex, _ in
-                let funcType = try Module.resolveType(typeIndex, typeSection: module.types)
-                return allocate(tagType: funcType, engine: engine)
+                return allocate(tagType: try canonicalizer.canonicalID(of: typeIndex))
             }
         )
 
@@ -448,14 +494,18 @@ extension StoreAllocator {
         let elements = try ImmutableArray<InternalElementSegment>(allocator: arrayAllocator, count: module.elements.count) { buffer in
             for (index, element) in module.elements.enumerated() {
                 // TODO: Avoid evaluating element expr twice in `Module.instantiate` and here.
-                var references = try element.evaluateInits(context: constEvalContext)
+                let elementType = try canonicalizer.canonicalize(element.type)
+                for item in element.initializer {
+                    try item.checkType(.ref(elementType), context: constTypeContext)
+                }
+                var references = try element.evaluateInits(context: constEvalContext, type: elementType)
                 switch element.mode {
                 case .active, .declarative:
                     // active & declarative segments are unavailable at runtime
                     references = []
                 case .passive: break
                 }
-                let handle = allocate(elementType: element.type, references: references)
+                let handle = allocate(elementType: elementType, references: references)
                 buffer.initializeElement(at: index, to: handle)
             }
         }
@@ -506,11 +556,13 @@ extension StoreAllocator {
 
         // Steps 20-21.
         let instanceEntity = InstanceEntity(
-            types: types,
+            types: canonicalizer.typeIDs.map { engine.resolveType($0) },
+            typeIDs: canonicalizer.typeIDs,
             functions: functions,
             tables: tables,
             memories: memories,
             globals: globals,
+            globalTypes: importedGlobalTypes + globals.dropFirst(importedGlobals.count).map(\.globalType),
             tags: tags,
             elementSegments: elements,
             dataSegments: dataSegments,
@@ -530,14 +582,14 @@ extension StoreAllocator {
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-func>
     private func allocate(
         function: GuestFunction,
+        type: InternedFuncType,
         index: FunctionIndex,
-        instance: InternalInstance,
-        engine: Engine
+        instance: InternalInstance
     ) -> InternalFunction {
         let code = InternalUncompiledCode(unsafe: codes.allocate(initializing: function.code))
         let pointer = functions.allocate(
             initializing: WasmFunctionEntity(
-                index: index, type: engine.internType(function.type),
+                index: index, type: type,
                 code: code,
                 instance: instance
             )
@@ -547,12 +599,16 @@ extension StoreAllocator {
 
     internal func allocate(
         type: FunctionType,
-        implementation: @escaping Function.Implementation,
+        implementation: @escaping Function.RawImplementation,
         engine: Engine
     ) -> InternalFunction {
         let pointer = hostFunctions.allocate(
             initializing: HostFunctionEntity(
-                type: engine.internType(type), implementation: implementation
+                type: engine.internType(type),
+                parameterTypes: type.parameters,
+                resultTypes: type.results,
+                layout: ParameterAreaLayout(type: type),
+                implementation: implementation
             )
         )
         return InternalFunction.host(EntityHandle(unsafe: pointer))
@@ -560,8 +616,8 @@ extension StoreAllocator {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-table>
-    func allocate(tableType: TableType, resourceLimiter: any ResourceLimiter) throws -> InternalTable {
-        let pointer = try tables.allocate(initializing: TableEntity(tableType, resourceLimiter: resourceLimiter))
+    func allocate(tableType: TableType, initialValue: Reference? = nil, resourceLimiter: any ResourceLimiter) throws -> InternalTable {
+        let pointer = try tables.allocate(initializing: TableEntity(tableType, initialValue: initialValue, resourceLimiter: resourceLimiter))
         return InternalTable(unsafe: pointer)
     }
 
@@ -572,7 +628,7 @@ extension StoreAllocator {
         return InternalMemory(unsafe: pointer)
     }
 
-    #if os(macOS) || os(Linux)
+    #if (os(macOS) || os(Linux)) && !$Embedded
         /// Allocate a memory entity wrapping an existing shared memory storage.
         ///
         /// Used by `wasi_thread_spawn` to provide the same shared memory as an
@@ -594,8 +650,8 @@ extension StoreAllocator {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-tag>
-    func allocate(tagType: FunctionType, engine: Engine) -> InternalTag {
-        let pointer = tags.allocate(initializing: TagEntity(type: engine.internType(tagType)))
+    func allocate(tagType: InternedFuncType) -> InternalTag {
+        let pointer = tags.allocate(initializing: TagEntity(type: tagType))
         return InternalTag(unsafe: pointer)
     }
 
@@ -637,10 +693,12 @@ extension StoreAllocator {
             // All other fields are empty/default since this is purely for aggregating exports
             let entity = InstanceEntity(
                 types: [],
+                typeIDs: [],
                 functions: ImmutableArray(),
                 tables: ImmutableArray(),
                 memories: ImmutableArray(),
                 globals: ImmutableArray(),
+                globalTypes: [],
                 tags: ImmutableArray(),
                 elementSegments: ImmutableArray(),
                 dataSegments: ImmutableArray(),

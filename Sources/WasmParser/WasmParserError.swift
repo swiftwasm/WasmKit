@@ -169,6 +169,11 @@ extension WasmParserError.Message {
     }
 
     @usableFromInline
+    static func malformedCompositeType(_ byte: UInt8) -> Self {
+        Self("Malformed composite type: \(byte)")
+    }
+
+    @usableFromInline
     static let sectionOutOfOrder = Self("Sections in the module are out of order")
 
     @usableFromInline
@@ -177,6 +182,10 @@ extension WasmParserError.Message {
     }
 
     @usableFromInline static let malformedIndirectCall = Self("Malformed indirect call")
+
+    @usableFromInline static func malformedMemArgFlags(_ flags: UInt32) -> Self {
+        Self("malformed memop flags: \(flags)")
+    }
 
     @usableFromInline static func malformedDataSegmentKind(_ kind: UInt32) -> Self {
         Self("Malformed data segment kind: \(kind)")
@@ -198,5 +207,10 @@ extension WasmParserError.Message {
     @usableFromInline
     static func invalidCatchClauseId(_ id: UInt8) -> Self {
         Self("Invalid catch clause id: \(id)")
+    }
+
+    @usableFromInline
+    static func invalidCastFlags(_ flags: UInt8) -> Self {
+        Self("Invalid cast flags: \(flags)")
     }
 }

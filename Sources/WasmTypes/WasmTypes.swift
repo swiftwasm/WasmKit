@@ -23,6 +23,26 @@ public enum AbstractHeapType: UInt8, Equatable, Hashable, Sendable {
 
     /// A reference to an exception.
     case exnRef
+
+    /// The top of the GC hierarchy of internal references.
+    case any
+    /// A reference that `ref.eq` can compare: an `i31`, a struct or an array.
+    case eq
+    /// An unboxed 31-bit integer.
+    case i31
+    /// A reference to a GC struct.
+    case structRef
+    /// A reference to a GC array.
+    case arrayRef
+    /// The bottom of the GC hierarchy of internal references. `none` would read as `nil` in an
+    /// `AbstractHeapType?` context.
+    case noneRef
+    /// The bottom of the external hierarchy.
+    case noExtern
+    /// The bottom of the function hierarchy.
+    case noFunc
+    /// The bottom of the exception hierarchy.
+    case noExn
 }
 
 public enum HeapType: Equatable, Hashable, Sendable {
@@ -78,6 +98,84 @@ public enum ValueType: Equatable, Hashable, Sendable {
     case v128
     /// Reference value type.
     case ref(ReferenceType)
+}
+
+/// A packed integer type, which only a struct field or an array element can have.
+public enum PackedType: Equatable, Hashable, Sendable {
+    case i8
+    case i16
+}
+
+/// The type a struct field or an array element stores.
+public enum StorageType: Equatable, Hashable, Sendable {
+    case value(ValueType)
+    case packed(PackedType)
+}
+
+/// The type of a struct field or an array element.
+public struct FieldType: Equatable, Hashable, Sendable {
+    public var storage: StorageType
+    public var isMutable: Bool
+
+    public init(storage: StorageType, isMutable: Bool) {
+        self.storage = storage
+        self.isMutable = isMutable
+    }
+}
+
+/// A GC struct type.
+public struct StructType: Equatable, Hashable, Sendable {
+    public var fields: [FieldType]
+
+    public init(fields: [FieldType]) {
+        self.fields = fields
+    }
+}
+
+/// A GC array type.
+public struct ArrayType: Equatable, Hashable, Sendable {
+    public var element: FieldType
+
+    public init(element: FieldType) {
+        self.element = element
+    }
+}
+
+/// The body of a type definition.
+///
+/// > Note:
+/// <https://webassembly.github.io/gc/core/syntax/types.html#composite-types>
+public enum CompositeType: Equatable, Hashable, Sendable {
+    case function(FunctionType)
+    case structType(StructType)
+    case arrayType(ArrayType)
+}
+
+/// A type definition with its declared supertypes.
+///
+/// > Note:
+/// <https://webassembly.github.io/gc/core/syntax/types.html#recursive-types>
+public struct SubType: Equatable, Hashable, Sendable {
+    /// Whether no other type may declare this one as its supertype.
+    public var isFinal: Bool
+    public var supertypes: [UInt32]
+    public var body: CompositeType
+
+    public init(isFinal: Bool, supertypes: [UInt32], body: CompositeType) {
+        self.isFinal = isFinal
+        self.supertypes = supertypes
+        self.body = body
+    }
+}
+
+/// A group of type definitions that may refer to each other. A type definition outside a `rec` group
+/// is a group of its own.
+public struct RecursiveGroup: Equatable, Hashable, Sendable {
+    public var types: [SubType]
+
+    public init(types: [SubType]) {
+        self.types = types
+    }
 }
 
 /// A 128-bit vector value, represented by its raw bytes.

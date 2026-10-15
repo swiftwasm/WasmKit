@@ -13,26 +13,70 @@
 #if WasmDebuggingSupport
 
     import GDBRemoteProtocol
-    import Logging
-    import NIOCore
-    import NIOFileSystem
-    import SystemPackage
+    import WASI
     import WasmKit
     import WasmKitWASI
 
-    extension BinaryInteger {
+    extension FixedWidthInteger {
         init?(hexEncoded: Substring) {
-            var result = Self.zero
-            for (offset, element) in hexEncoded.reversed().enumerated() {
-                guard let digit = element.hexDigitValue else { return nil }
-                result += Self(digit) << (offset * 4)
-            }
+            guard !hexEncoded.isEmpty else { return nil }
 
+            var result = Self.zero
+            for element in hexEncoded {
+                guard let digit = element.hexDigitValue else { return nil }
+                let (shifted, shiftOverflowed) = result.multipliedReportingOverflow(by: 16)
+                let (sum, addOverflowed) = shifted.addingReportingOverflow(Self(digit))
+                guard !shiftOverflowed, !addOverflowed else { return nil }
+                result = sum
+            }
             self = result
         }
     }
 
-    package actor WasmKitGDBHandler {
+    /// The module instance and global index a `qWasmGlobal` request names.
+    ///
+    /// A debugger advertising `qWasmInstance+` specifies the instance owning
+    /// the global index with an `instance:<id>` field. Older debuggers may send
+    /// a frame index instead.
+    struct WasmGlobalRequest {
+        private static let instanceKey = "instance:"
+
+        /// The instance owning the global index space, or nil where the request named a
+        /// frame and the instance is whichever one that frame is executing.
+        let instance: UInt64?
+
+        let globalIndex: UInt
+
+        /// Parses `<global>;instance:<id>` or the older `<frame>;<global>`.
+        init?(arguments: String) {
+            // Keep empty fields so a malformed `<frame>;` is rejected rather than read as `<frame>`.
+            var fields = arguments.split(separator: ";", omittingEmptySubsequences: false)
+
+            // A request may terminate its last field with the delimiter, yielding a
+            // trailing empty field that carries no argument.
+            if fields.count == 3 && fields[2].isEmpty {
+                fields.removeLast()
+            }
+
+            // Exactly two fields, so a request mixing both forms is rejected rather than
+            // read as one of them.
+            guard fields.count == 2, let first = UInt(fields[0]) else { return nil }
+
+            if fields[1].hasPrefix(Self.instanceKey) {
+                guard let instance = UInt64(fields[1].dropFirst(Self.instanceKey.count)) else { return nil }
+                self.instance = instance
+                self.globalIndex = first
+                return
+            }
+
+            guard let globalIndex = UInt(fields[1]) else { return nil }
+            self.instance = nil
+            self.globalIndex = globalIndex
+        }
+    }
+
+    /// A sans-IO GDB remote-protocol target.
+    package final class WasmKitGDBHandler {
         enum ResumeThreadsAction: String {
             case step = "s"
             case `continue` = "c"
@@ -41,6 +85,7 @@
         package enum Error: Swift.Error {
             case unknownTransferArguments
             case unknownReadMemoryArguments
+            case unknownWriteMemoryArguments(String)
             case stoppingAtEntrypointFailed
             case multipleThreadsNotSupported
             case unknownThreadAction(String)
@@ -50,60 +95,149 @@
             case unknownHexEncodedArguments(String)
             case unknownWasmLocalArguments(String)
             case unknownWasmGlobalArguments(String)
+            case unknownDetachOnErrorArgument(String)
         }
 
-        private let moduleFilePath: FilePath
-        private let logger: Logger
-        private let allocator: ByteBufferAllocator
+        private let moduleFilePath: String
+        private let logger: GDBLogger
         private var debugger: Debugger
 
+        /// Generic error reply. `QEnableErrorStrings` is unsupported, so a bare code is
+        /// the only way to refuse a request the target understands but cannot answer.
+        private static let errorReply = GDBTargetResponse.Kind.error(0x45)
+
+        /// Error code for refused reads, matching debugserver.
+        private static let readFailed: UInt8 = 0x08
+
+        /// Error code for refused writes, matching debugserver.
+        private static let writeFailed: UInt8 = 0x09
+
         private var memoryView: DebuggerMemoryView
+        /// User-set breakpoints, keyed by the address the debugger host
+        /// requested, with the engine's resolved address as the value.
+        /// Stops at a resolved address are reported as breakpoint stops at
+        /// the requested address, which is the location the host knows.
+        private var userBreakpoints: [Int: Int] = [:]
         private let wasi: WASIBridgeToHost
 
-        package init(
-            moduleFilePath: FilePath,
-            engineConfiguration: EngineConfiguration,
-            logger: Logger,
-            allocator: ByteBufferAllocator
-        ) async throws {
-            self.logger = logger
-            self.allocator = allocator
+        /// Whether a client that goes away without `k` or `D` leaves the guest running to
+        /// completion, as `QSetDetachOnError` selects.
+        package private(set) var detachesOnDisconnect = true
 
-            let wasmBinary = try await FileSystem.shared.withFileHandle(forReadingAt: moduleFilePath) {
-                try await $0.readToEnd(maximumSizeAllowed: .unlimited)
-            }
+        /// Creates a handler debugging the given WebAssembly binary.
+        ///
+        /// The handler is transport- and file-system-free: the caller supplies
+        /// the module bytes (read from disk, flash, or anywhere else) and
+        /// `moduleFilePath` is only reported to the debugger host for module
+        /// identification.
+        /// Debugs a module against a caller-supplied WASI instance.
+        ///
+        /// The handler takes ownership: ``close()`` closes `wasi`, and the
+        /// initialiser closes it if setting the debuggee up fails.
+        ///
+        /// Bare-metal targets need this: the host file system is unavailable
+        /// there, so stdio has to be injected as `WASIFile`s pointing at a
+        /// UART. Building the bridge here rather than internally is what makes
+        /// the stub usable on a device.
+        package init(
+            wasmBinary: [UInt8],
+            moduleFilePath: String,
+            wasi: WASIBridgeToHost,
+            engineConfiguration: EngineConfiguration,
+            logger: GDBLogger
+        ) throws {
+            self.logger = logger
 
             self.moduleFilePath = moduleFilePath
 
             let store = Store(engine: Engine(configuration: engineConfiguration))
             var imports = Imports()
-            let wasi = try WASIBridgeToHost()
             wasi.link(to: &imports, store: store)
             self.wasi = wasi
 
             do {
-                self.debugger = try Debugger(module: parseWasm(bytes: .init(buffer: wasmBinary)), store: store, imports: imports)
+                self.debugger = try Debugger(module: parseWasm(bytes: wasmBinary), store: store, imports: imports)
                 try self.debugger.stopAtEntrypoint()
                 try self.debugger.run()
                 guard case .stoppedAtBreakpoint = self.debugger.state else {
                     throw Error.stoppingAtEntrypointFailed
                 }
             } catch {
-                try wasi.close()
-                throw error
+                throw CleanupFailure.preserving(error, cleanup: wasi.close)
             }
 
-            self.memoryView = DebuggerMemoryView(allocator: allocator, wasmBinary: wasmBinary)
+            self.memoryView = DebuggerMemoryView(wasmBinary: wasmBinary)
+        }
+
+        /// Debugs a module against a host-backed WASI instance.
+        package convenience init(
+            wasmBinary: [UInt8],
+            moduleFilePath: String,
+            wasiConfiguration: WASIConfiguration,
+            engineConfiguration: EngineConfiguration,
+            logger: GDBLogger
+        ) throws {
+            try self.init(
+                wasmBinary: wasmBinary,
+                moduleFilePath: moduleFilePath,
+                wasi: WASIBridgeToHost(configuration: wasiConfiguration),
+                engineConfiguration: engineConfiguration,
+                logger: logger
+            )
+        }
+
+        /// How far to let the guest run.
+        private enum Resume {
+            /// One Wasm instruction.
+            case step
+            /// Until the next breakpoint.
+            case untilBreakpoint
+            /// Until the guest ends.
+            case toCompletion
+        }
+
+        private func resume(_ resume: Resume) throws {
+            do {
+                switch resume {
+                case .step: try self.debugger.step()
+                case .untilBreakpoint: try self.debugger.runPreservingCurrentBreakpoint()
+                case .toCompletion: try self.debugger.run()
+                }
+            } catch let exit as WASIExitCode {
+                self.debugger.recordExit(status: exit.code)
+            }
         }
 
         package func close() throws {
             try wasi.close()
         }
 
+        /// Lets the guest run to completion, as `D` asks for. The resume is blocking, so a guest
+        /// that never terminates keeps the caller here.
+        package func detach() throws {
+            self.debugger.removeAllBreakpoints()
+            self.userBreakpoints.removeAll()
+
+            // Resuming a guest that already returned would be a restart, which is unimplemented.
+            guard case .stoppedAtBreakpoint = self.debugger.state else { return }
+
+            try self.resume(.toCompletion)
+        }
+
+        enum Endianness {
+            case big, little
+        }
+
+        /// Reply that the guest has exited with the given exit status.
+        private static func exitReply(status: some FixedWidthInteger) -> GDBTargetResponse.Kind {
+            .string("W\(HexEncoding.encode(UInt8(truncatingIfNeeded: status).bigEndianBytes))")
+        }
+
         private func hexDump<I: FixedWidthInteger>(_ value: I, endianness: Endianness) -> String {
-            var buffer = self.allocator.buffer(capacity: MemoryLayout<I>.size)
-            buffer.writeInteger(value, endianness: endianness)
-            return buffer.hexDump(format: .compact)
+            switch endianness {
+            case .big: return HexEncoding.encode(value.bigEndianBytes)
+            case .little: return HexEncoding.encode(value.littleEndianBytes)
+            }
         }
 
         private func firstHexArgument<I: FixedWidthInteger>(argumentsString: String, separator: Character, endianness: Endianness) throws -> I {
@@ -111,13 +245,45 @@
                 throw Error.unknownHexEncodedArguments(argumentsString)
             }
 
-            var hexBuffer = try self.allocator.buffer(plainHexEncodedBytes: String(hexString))
+            guard let hexBytes = HexEncoding.decode(hexString), hexBytes.count >= MemoryLayout<I>.size else {
+                throw Error.unknownHexEncodedArguments(argumentsString)
+            }
 
-            guard let argument = hexBuffer.readInteger(endianness: endianness, as: I.self) else {
+            let prefix = hexBytes.prefix(MemoryLayout<I>.size)
+            let argument: I?
+            switch endianness {
+            case .big: argument = I(bigEndianBytes: prefix)
+            case .little: argument = I(littleEndianBytes: prefix)
+            }
+            guard let argument else {
                 throw Error.unknownHexEncodedArguments(argumentsString)
             }
 
             return argument
+        }
+
+        private static func writeMemoryArguments(_ arguments: String) throws -> (addressInProtocolSpace: UInt64, bytes: [UInt8]) {
+            let addressAndRest = arguments.split(separator: ",", maxSplits: 1)
+            guard addressAndRest.count == 2,
+                let addressInProtocolSpace = UInt64(hexEncoded: addressAndRest[0])
+            else { throw Error.unknownWriteMemoryArguments(arguments) }
+
+            let lengthAndBytes = addressAndRest[1].split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+            guard lengthAndBytes.count == 2,
+                let length = Int(hexEncoded: lengthAndBytes[0]),
+                let bytes = HexEncoding.decode(lengthAndBytes[1]),
+                bytes.count == length
+            else { throw Error.unknownWriteMemoryArguments(arguments) }
+
+            return (addressInProtocolSpace, bytes)
+        }
+
+        /// Whether the stop is a hit of a breakpoint the host asked for at the reported address. A stop's
+        /// bytecode can implement several Wasm instructions, and a step through them passes over the
+        /// others without any breakpoint having been hit; a step that arrives at a breakpoint has not
+        /// hit it yet either.
+        private func isStoppedAtUserBreakpoint(_ breakpoint: Debugger.BreakpointState) -> Bool {
+            breakpoint.isBreakpointHit && self.userBreakpoints[breakpoint.reportedPc] == breakpoint.wasmPc
         }
 
         var currentThreadStopInfo: GDBTargetResponse.Kind {
@@ -128,27 +294,33 @@
                 ]
                 switch self.debugger.state {
                 case .stoppedAtBreakpoint(let breakpoint):
-                    let pc = breakpoint.wasmPc
-                    let pcInHostAddressSpace = UInt64(pc) + DebuggerMemoryView.executableCodeOffset
-                    result.append(("thread-pcs", self.hexDump(pcInHostAddressSpace, endianness: .big)))
-                    result.append(("00", self.hexDump(pcInHostAddressSpace, endianness: .little)))
-                    result.append(("reason", "trace"))
+                    let reportedPc = UInt64(breakpoint.reportedPc) + DebuggerMemoryView.executableCodeOffset
+                    result.append(("thread-pcs", self.hexDump(reportedPc, endianness: .big)))
+                    result.append(("00", self.hexDump(reportedPc, endianness: .little)))
+                    result.append(("reason", self.isStoppedAtUserBreakpoint(breakpoint) ? "breakpoint" : "trace"))
                     return .keyValuePairs(result)
 
                 case .entrypointReturned(let values):
                     guard !values.isEmpty else {
-                        return .string("W\(self.hexDump(0 as UInt8, endianness: .big))")
+                        return Self.exitReply(status: 0)
                     }
 
                     guard case .i32(let exitCode) = values.first else {
                         throw Error.exitCodeUnknown(values)
                     }
 
-                    return .string("W\(self.hexDump(exitCode, endianness: .big))")
+                    return Self.exitReply(status: exitCode)
 
-                case .trapped(let trapReason):
-                    result.append(("reason", "trap"))
-                    result.append(("description", trapReason))
+                case .exited(let status):
+                    return Self.exitReply(status: status)
+
+                case .trapped(let trap):
+                    // Report as an exception so the host treats it as a crash rather than a breakpoint.
+                    let pc = UInt64(trap.callStack.first ?? 0) + DebuggerMemoryView.executableCodeOffset
+                    result.append(("thread-pcs", self.hexDump(pc, endianness: .big)))
+                    result.append(("00", self.hexDump(pc, endianness: .little)))
+                    result.append(("reason", "exception"))
+                    result.append(("description", HexEncoding.encode(Array(trap.description.utf8))))
                     return .keyValuePairs(result)
 
                 case .instantiated:
@@ -159,7 +331,7 @@
 
         package func handle(command: GDBHostCommand) throws -> GDBTargetResponse {
             let responseKind: GDBTargetResponse.Kind
-            logger.trace("handling GDB host command", metadata: ["GDBHostCommand": .string(command.kind.rawValue)])
+            logger.trace("handling GDB host command: \(command.kind.rawValue)")
 
             var isNoAckModeActive = false
             switch command.kind {
@@ -180,7 +352,7 @@
                 ])
 
             case .supportedFeatures:
-                responseKind = .string("qXfer:libraries:read+;PacketSize=1000;")
+                responseKind = .string("qXfer:libraries:read+;qWasmInstance+;PacketSize=1000;")
 
             case .vContSupportedActions:
                 responseKind = .vContSupportedActions([.continue, .step])
@@ -188,6 +360,18 @@
             case .isVAttachOrWaitSupported, .enableErrorStrings, .structuredDataPlugins, .readMemoryBinaryData,
                 .symbolLookup, .jsonThreadsInfo, .jsonThreadExtendedInfo:
                 responseKind = .empty
+
+            case .setDetachOnError:
+                switch command.arguments {
+                case "0":
+                    self.detachesOnDisconnect = false
+                case "1":
+                    self.detachesOnDisconnect = true
+                default:
+                    throw Error.unknownDetachOnErrorArgument(command.arguments)
+                }
+
+                responseKind = .ok
 
             case .processInfo:
                 responseKind = .keyValuePairs([
@@ -224,7 +408,7 @@
                         ("generic", "pc"),
                     ])
                 } else {
-                    responseKind = .string("E45")
+                    responseKind = Self.errorReply
                 }
 
             case .transfer:
@@ -232,7 +416,7 @@
                     responseKind = .string(
                         """
                         l<library-list>\
-                        <library name="\(self.moduleFilePath.string)">\
+                        <library name="\(self.moduleFilePath)">\
                         <section address="0x\(String(DebuggerMemoryView.executableCodeOffset, radix: 16))"/>\
                         </library>\
                         </library-list>
@@ -249,25 +433,45 @@
                     let length = UInt(hexEncoded: argumentsArray[1])
                 else { throw Error.unknownReadMemoryArguments }
 
-                responseKind = .hexEncodedBinary(
-                    try self.memoryView.readMemory(
-                        debugger: self.debugger,
-                        addressInProtocolSpace: addressInProtocolSpace,
-                        length: length
+                do {
+                    responseKind = .hexEncodedBinary(
+                        try self.memoryView.readMemory(
+                            debugger: self.debugger,
+                            addressInProtocolSpace: addressInProtocolSpace,
+                            length: length
+                        )
                     )
-                )
+                } catch {
+                    logger.debug("memory read `\(command.arguments)` failed: \(error)")
+                    responseKind = .error(Self.readFailed)
+                }
+
+            case .writeMemory:
+                do {
+                    let (addressInProtocolSpace, bytes) = try Self.writeMemoryArguments(command.arguments)
+                    try self.memoryView.writeMemory(
+                        debugger: &self.debugger,
+                        addressInProtocolSpace: addressInProtocolSpace,
+                        bytes: bytes
+                    )
+                    responseKind = .ok
+                } catch {
+                    logger.debug("memory write `\(command.arguments)` failed: \(error)")
+                    responseKind = .error(Self.writeFailed)
+                }
 
             case .wasmCallStack:
-                let callStack = self.debugger.currentCallStack
-                var buffer = self.allocator.buffer(capacity: callStack.count * 8)
+                let callStack = self.debugger.reportedCallStack
+                var buffer = [UInt8]()
+                buffer.reserveCapacity(callStack.count * 8)
                 for pc in callStack {
-                    buffer.writeInteger(UInt64(pc) + DebuggerMemoryView.executableCodeOffset, endianness: .little)
+                    buffer.append(contentsOf: (UInt64(pc) + DebuggerMemoryView.executableCodeOffset).littleEndianBytes)
                 }
-                responseKind = .hexEncodedBinary(buffer.readableBytesView)
+                responseKind = .hexEncodedBinary(buffer)
 
             case .resumeThreads:
                 // TODO: support multiple threads each with its own action here.
-                let threadActions = command.arguments.components(separatedBy: ":")
+                let threadActions = command.arguments.split(separator: ":", omittingEmptySubsequences: false).map(String.init)
                 guard threadActions.count == 2, let threadActionString = threadActions.first else {
                     throw Error.multipleThreadsNotSupported
                 }
@@ -278,15 +482,15 @@
 
                 switch threadAction {
                 case .step:
-                    try self.debugger.step()
+                    try self.resume(.step)
                 case .continue:
-                    try self.debugger.runPreservingCurrentBreakpoint()
+                    try self.resume(.untilBreakpoint)
                 }
 
                 responseKind = try self.currentThreadStopInfo
 
             case .continue:
-                try self.debugger.runPreservingCurrentBreakpoint()
+                try self.resume(.untilBreakpoint)
 
                 responseKind = try self.currentThreadStopInfo
 
@@ -294,34 +498,40 @@
                 throw Error.killRequestReceived
 
             case .detach:
-                for address in self.debugger.breakpoints.keys {
-                    try self.debugger.disableBreakpoint(address: address)
-                }
-
-                try self.debugger.run()
+                try self.detach()
                 throw Error.killRequestReceived
 
             case .insertSoftwareBreakpoint:
-                try self.debugger.enableBreakpoint(
-                    address: Int(
-                        self.firstHexArgument(
-                            argumentsString: command.arguments,
-                            separator: ",",
-                            endianness: .big
-                        ) - DebuggerMemoryView.executableCodeOffset)
-                )
-                responseKind = .ok
+                let requested = Int(
+                    try self.firstHexArgument(
+                        argumentsString: command.arguments,
+                        separator: ",",
+                        endianness: .big
+                    ) - DebuggerMemoryView.executableCodeOffset)
+                // Report refusal as a GDB error instead of throwing to keep the connection open.
+                do {
+                    self.userBreakpoints[requested] = try self.debugger.enableBreakpoint(address: requested)
+                    responseKind = .ok
+                } catch let error as Debugger.Error {
+                    logger.debug("refusing a breakpoint at \(requested): \(error)")
+                    responseKind = Self.errorReply
+                }
 
             case .removeSoftwareBreakpoint:
-                try self.debugger.disableBreakpoint(
-                    address: Int(
-                        self.firstHexArgument(
-                            argumentsString: command.arguments,
-                            separator: ",",
-                            endianness: .big
-                        ) - DebuggerMemoryView.executableCodeOffset)
-                )
-                responseKind = .ok
+                let requested = Int(
+                    try self.firstHexArgument(
+                        argumentsString: command.arguments,
+                        separator: ",",
+                        endianness: .big
+                    ) - DebuggerMemoryView.executableCodeOffset)
+                do {
+                    try self.debugger.disableBreakpoint(address: requested)
+                    self.userBreakpoints[requested] = nil
+                    responseKind = .ok
+                } catch let error as Debugger.Error {
+                    logger.debug("refusing to remove a breakpoint at \(requested): \(error)")
+                    responseKind = Self.errorReply
+                }
 
             case .wasmLocal:
                 let arguments = command.arguments.split(separator: ";")
@@ -334,44 +544,70 @@
                     throw Error.unknownWasmLocalArguments(command.arguments)
                 }
 
-                responseKind = .hexEncodedBinary(
-                    self.allocator.buffer(
-                        integer: try self.debugger.getLocal(frameIndex: frameIndex, localIndex: localIndex),
-                        endianness: .little
-                    ).readableBytesView
-                )
+                do {
+                    responseKind = .hexEncodedBinary(
+                        try self.debugger.getLocal(frameIndex: frameIndex, localIndex: localIndex).littleEndianBytes
+                    )
+                } catch {
+                    logger.debug("local read `\(command.arguments)` failed: \(error)")
+                    responseKind = .error(Self.readFailed)
+                }
 
             case .wasmGlobal:
-                // Keep empty fields so a malformed `<frame>;` is rejected rather than read as `<frame>`.
-                let arguments = command.arguments.split(separator: ";", omittingEmptySubsequences: false)
-                guard arguments.count == 2,
-                    let globalIndex = UInt(arguments[1])
-                else {
+                guard let request = WasmGlobalRequest(arguments: command.arguments) else {
                     throw Error.unknownWasmGlobalArguments(command.arguments)
                 }
 
-                responseKind = .hexEncodedBinary(
-                    self.allocator.buffer(
-                        integer: try self.debugger.getGlobal(index: globalIndex),
-                        endianness: .little
-                    ).readableBytesView
-                )
+                // A global index is meaningful only within one instance's global index
+                // space, so a request naming another instance is refused rather than
+                // answered from this one.
+                if let instance = request.instance, instance != DebuggerMemoryView.moduleInstanceID {
+                    responseKind = Self.errorReply
+                } else {
+                    do {
+                        responseKind = .hexEncodedBinary(
+                            try self.debugger.getGlobal(index: request.globalIndex).littleEndianBytes
+                        )
+                    } catch {
+                        logger.debug("global read `\(command.arguments)` failed: \(error)")
+                        responseKind = .error(Self.readFailed)
+                    }
+                }
 
             case .memoryRegionInfo:
-                responseKind = .empty
+                // A host probes support by sending this query without an address.
+                if command.arguments.isEmpty {
+                    responseKind = .ok
+                } else if let addressInProtocolSpace = UInt64(hexEncoded: command.arguments[...]) {
+                    let region = self.memoryView.memoryRegion(
+                        debugger: self.debugger,
+                        containing: addressInProtocolSpace
+                    )
+                    var pairs = [
+                        ("start", String(region.start, radix: 16)),
+                        ("size", String(region.size, radix: 16)),
+                    ]
+                    if let permissions = region.permissions {
+                        pairs.append(("permissions", permissions))
+                    }
+                    if let name = region.name {
+                        pairs.append(("name", HexEncoding.encode(name.utf8)))
+                    }
+                    responseKind = .keyValuePairs(pairs)
+                } else {
+                    logger.debug("refusing a memory region query for `\(command.arguments)`")
+                    responseKind = Self.errorReply
+                }
 
             case .generalRegisters:
                 responseKind = .empty
 
             case .unsupported:
-                logger.debug(
-                    "unsupported GDB host command",
-                    metadata: ["rawCommand": .string(command.arguments)]
-                )
+                logger.debug("unsupported GDB host command: \(command.arguments)")
                 responseKind = .empty
             }
 
-            logger.trace("handler produced a response", metadata: ["GDBTargetResponse": .string("\(responseKind)")])
+            logger.trace("handler produced a response: \(responseKind)")
 
             return .init(kind: responseKind, isNoAckModeActive: isNoAckModeActive)
         }

@@ -42,11 +42,6 @@ def main():
                 continue
             targets.append(os.path.join(targets_dir, target))
 
-    # NOTE: SystemExtras is not included in the list of targets because it
-    #       follows swift-system style conventions, which is different from
-    #       swift-format.
-    targets.remove(os.path.join("Sources", "SystemExtras"))
-
     if args.build_swift_format:
       swift_format = build_swift_format()
     else:

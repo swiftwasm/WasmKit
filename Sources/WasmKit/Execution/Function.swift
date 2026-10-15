@@ -37,6 +37,16 @@ public struct Function: Equatable {
     /// The type of a host function implementation closure.
     public typealias Implementation = (borrowing Caller, [Value]) throws -> [Value]
 
+    /// A host function that reads its parameters from, and writes its results
+    /// into, buffers the engine supplies.
+    ///
+    /// The array-based form has to allocate for every call, and on a small
+    /// device an allocation costs far more than the work most host functions
+    /// do. The buffers are valid only for the duration of the call.
+    public typealias RawImplementation = (
+        borrowing Caller, UnsafeBufferPointer<Value>, UnsafeMutableBufferPointer<Value>
+    ) throws -> Void
+
     internal let handle: InternalFunction
     let store: Store
 
@@ -71,7 +81,45 @@ public struct Function: Equatable {
         type: FunctionType,
         body: @escaping Implementation
     ) {
-        self.init(handle: store.allocator.allocate(type: type, implementation: body, engine: store.engine), store: store)
+        self.init(
+            handle: store.allocator.allocate(
+                type: type, implementation: Function.adapting(body, results: type.results),
+                engine: store.engine),
+            store: store)
+    }
+
+    /// Wraps an array-based host function in the buffer-based form the engine
+    /// calls, materialising the arrays and checking the results it returns.
+    static func adapting(
+        _ body: @escaping Implementation, results: [ValueType]
+    ) -> RawImplementation {
+        { caller, parameters, out in
+            let produced = try body(caller, Array(parameters))
+            guard produced.count == results.count else {
+                throw Trap(.resultTypesMismatch(expected: results, got: produced))
+            }
+            for index in 0..<produced.count {
+                do {
+                    try produced[index].checkType(results[index])
+                } catch {
+                    throw Trap(.resultTypesMismatch(expected: results, got: produced))
+                }
+                out[index] = produced[index]
+            }
+        }
+    }
+
+    /// Creates a function backed by a host implementation that does not
+    /// allocate to receive its parameters.
+    public init(
+        store: Store,
+        parameters: [ValueType], results: [ValueType] = [],
+        raw body: @escaping RawImplementation
+    ) {
+        let type = FunctionType(parameters: parameters, results: results)
+        self.init(
+            handle: store.allocator.allocate(type: type, implementation: body, engine: store.engine),
+            store: store)
     }
 
     /// The signature type of the function.
@@ -87,7 +135,8 @@ public struct Function: Equatable {
     /// - Returns: The results of the function invocation.
     @discardableResult
     public func invoke(_ arguments: [Value] = []) throws -> [Value] {
-        return try handle.invoke(arguments, store: store)
+        var stack = ExecutionStack(engine: store.engine)
+        return try handle.invoke(arguments, store: store, stack: &stack)
     }
 
     /// Invokes a function of the given address with the given parameters.
@@ -96,6 +145,19 @@ public struct Function: Equatable {
     ///   - arguments: The arguments to pass to the function.
     /// - Throws: A trap if the function invocation fails.
     /// - Returns: The results of the function invocation.
+    /// Invokes the function on a stack the caller owns.
+    ///
+    /// ``invoke(_:)`` allocates a stack for the call and frees it again, which
+    /// is the right default but is worth avoiding when calling in repeatedly
+    /// and allocation is expensive. The stack is taken `inout` so that a host
+    /// function called from here cannot run a second guest on the same one.
+    @discardableResult
+    public func invoke(
+        _ arguments: [Value] = [], on stack: inout ExecutionStack
+    ) throws -> [Value] {
+        return try handle.invoke(arguments, store: store, stack: &stack)
+    }
+
     @discardableResult
     public func callAsFunction(_ arguments: [Value] = []) throws -> [Value] {
         return try invoke(arguments)
@@ -166,7 +228,9 @@ extension InternalFunction: ValidatableEntity {
 }
 
 extension InternalFunction {
-    func invoke(_ arguments: [Value], store: Store) throws -> [Value] {
+    func invoke(
+        _ arguments: [Value], store: Store, stack: inout ExecutionStack
+    ) throws -> [Value] {
         if isWasm {
             let entity = wasm
             let resolvedType = store.engine.resolveType(entity.type)
@@ -175,31 +239,34 @@ extension InternalFunction {
                 store: store,
                 function: self,
                 type: resolvedType,
-                arguments: arguments
+                arguments: arguments,
+                stack: &stack
             )
         } else {
-            let entity = host
-            let resolvedType = store.engine.resolveType(entity.type)
-            try check(functionType: resolvedType, parameters: arguments)
-            let caller = Caller(instanceHandle: nil, store: store)
-            let results = try entity.implementation(caller, arguments)
-            try check(functionType: resolvedType, results: results)
-            return results
+            // A host function does not run on the guest stack at all.
+            return try invokeHost(arguments, store: store)
         }
+    }
+
+    func invokeHost(_ arguments: [Value], store: Store) throws -> [Value] {
+        let entity = host
+        let resolvedType = store.engine.resolveType(entity.type)
+        try check(functionType: resolvedType, parameters: arguments)
+        let caller = Caller(instanceHandle: nil, store: store)
+        var results = [Value](repeating: .i32(0), count: resolvedType.results.count)
+        let implementation = entity.implementation
+        try arguments.withUnsafeBufferPointer { parameters in
+            try results.withUnsafeMutableBufferPointer { out in
+                try implementation(caller, parameters, out)
+            }
+        }
+        try check(functionType: resolvedType, results: results)
+        return results
     }
 
     private func check(expectedTypes: [ValueType], values: [Value]) -> Bool {
         guard expectedTypes.count == values.count else { return false }
-        for (expected, value) in zip(expectedTypes, values) {
-            switch (expected, value) {
-            case (.i32, .i32), (.i64, .i64), (.f32, .f32), (.f64, .f64), (.v128, .v128),
-                (.ref(.funcRef), .ref(.function)), (.ref(.externRef), .ref(.extern)),
-                (.ref(.exnRef), .ref(.exception)):
-                break
-            default: return false
-            }
-        }
-        return true
+        return zip(values, expectedTypes).allSatisfy { $0.matches($1) }
     }
 
     private func check(functionType: FunctionType, parameters: [Value]) throws {
@@ -214,15 +281,32 @@ extension InternalFunction {
         }
     }
 
+    /// The compiled instruction sequence, or `nil` when there is none to point
+    /// at: a host function, or a wasm function that has not been compiled yet.
+    ///
+    /// `InternalFunction` is a tagged pointer, so reading `wasm` for a host
+    /// function reinterprets a `HostFunctionEntity` allocation as a
+    /// `WasmFunctionEntity`. Callers that cannot guarantee a compiled wasm
+    /// callee must use this instead of ``assumeCompiled()``.
+    func compiledIseq() -> InstructionSequence? {
+        guard isWasm else { return nil }
+        switch self.wasm.code {
+        case .compiled(let iseq), .debuggable(_, let iseq): return iseq
+        case .uncompiled: return nil
+        }
+    }
+
+    /// - Precondition: the callee is a wasm function and is already compiled.
+    ///   Only the engine's `internalCall` path guarantees this, because
+    ///   `compilingCall` rewrites itself to `internalCall` after compiling.
     func assumeCompiled() -> (
         InstructionSequence,
-        locals: Int,
         function: EntityHandle<WasmFunctionEntity>
     ) {
         let entity = self.wasm
         switch entity.code {
         case .compiled(let iseq), .debuggable(_, let iseq):
-            return (iseq, entity.numberOfNonParameterLocalSlots, entity)
+            return (iseq, entity)
         case .uncompiled:
             preconditionFailure()
         }
@@ -234,6 +318,8 @@ struct WasmFunctionEntity {
     let instance: InternalInstance
     let index: FunctionIndex
     let numberOfNonParameterLocalSlots: Int
+    /// The size of the function body in bytes, which sizes its constant pool.
+    let codeSize: Int
     var code: CodeBody
 
     init(index: FunctionIndex, type: InternedFuncType, code: InternalUncompiledCode, instance: InternalInstance) {
@@ -241,6 +327,7 @@ struct WasmFunctionEntity {
         self.instance = instance
         self.code = .uncompiled(code)
         self.numberOfNonParameterLocalSlots = code.locals.reduce(into: 0) { $0 += $1.stackSlotCount }
+        self.codeSize = code.expression.count
         self.index = index
     }
 
@@ -258,6 +345,10 @@ struct WasmFunctionEntity {
         let store = store.value
         let engine = store.engine
         let type = self.type
+        // A function's own type is the root frame's block type, and it does not
+        // go through `resolveBlockType`. The translator is noncopyable, so this
+        // cannot be a throw inside its `init`.
+        try engine.resolveType(type).checkFitsInterpreter()
         let iseq = try code.withValue { code in
             try InstructionTranslator(
                 allocator: store.allocator.iseqAllocator,
@@ -302,18 +393,52 @@ typealias InternalUncompiledCode = EntityHandle<Code>
 /// A compiled instruction sequence.
 struct InstructionSequence {
     let instructions: UnsafeMutableBufferPointer<CodeSlot>
-    /// The maximum height of the value stack during execution of this function.
-    /// This height does not count the locals.
+    /// The maximum height of the value stack, which starts at `sp`.
     let maxStackHeight: Int
 
-    /// The constant value pool associated with this instruction sequence.
-    /// See ``FrameHeaderLayout`` for how they are laid out on the stack.
-    let constants: UnsafeBufferPointer<UntypedValue>
+    /// The image the constants and the locals of a new frame start out as: the
+    /// constants that were given a slot, then the default value of each
+    /// non-parameter local slot. It ends right below the saved slots.
+    ///
+    /// The image is kept in one buffer so entering a function is a single
+    /// contiguous copy. It is addressed the way the frame is: it occupies the
+    /// bytes `frameInitOffset ..< -24` from ``frameInitAnchor``, just as it
+    /// does from the new frame's `sp`, so a call copies it with the same
+    /// offsets from both and computes no address.
+    let frameInitAnchor: UnsafeRawPointer
+    /// The byte offset of the start of the image from ``frameInitAnchor``, and
+    /// from `sp`. Never above the saved slots, `-24`.
+    let frameInitOffset: Int
 
-    init(instructions: UnsafeMutableBufferPointer<CodeSlot>, maxStackHeight: Int, constants: UnsafeBufferPointer<UntypedValue>) {
+    /// The frame-initialization image as a buffer.
+    var frameInit: UnsafeBufferPointer<UntypedValue> {
+        let savedSlotsOffset = -StackLayout.numberOfSavingSlots * MemoryLayout<UntypedValue>.stride
+        return UnsafeBufferPointer(
+            start: (frameInitAnchor + frameInitOffset).assumingMemoryBound(to: UntypedValue.self),
+            count: (savedSlotsOffset - frameInitOffset) / MemoryLayout<UntypedValue>.stride
+        )
+    }
+
+    /// The number of slots from the start of the parameter area to `sp`. See
+    /// ``StackLayout/entryOffset``.
+    let entryOffset: Int
+
+    /// The number of slots the parameters take.
+    let parameterSlotCount: Int
+
+    init(
+        instructions: UnsafeMutableBufferPointer<CodeSlot>,
+        maxStackHeight: Int,
+        frameInit: (anchor: UnsafeRawPointer, offset: Int),
+        entryOffset: Int,
+        parameterSlotCount: Int
+    ) {
         self.instructions = instructions
         self.maxStackHeight = maxStackHeight
-        self.constants = constants
+        self.frameInitAnchor = frameInit.anchor
+        self.frameInitOffset = frameInit.offset
+        self.entryOffset = entryOffset
+        self.parameterSlotCount = parameterSlotCount
     }
 
     var baseAddress: UnsafeMutablePointer<CodeSlot> {
@@ -333,4 +458,13 @@ extension Reference {
         //       of public one in WasmTypes
         return .function(value.bitPattern)
     }
+}
+
+extension EntityHandle<WasmFunctionEntity> {
+    var type: InternedFuncType { withValue { $0.type } }
+    var instance: InternalInstance { withValue { $0.instance } }
+    var index: FunctionIndex { withValue { $0.index } }
+    var numberOfNonParameterLocalSlots: Int { withValue { $0.numberOfNonParameterLocalSlots } }
+    var codeSize: Int { withValue { $0.codeSize } }
+    var code: CodeBody { withValue { $0.code } }
 }

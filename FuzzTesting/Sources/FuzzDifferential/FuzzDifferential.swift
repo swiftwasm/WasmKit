@@ -1,8 +1,15 @@
 import WasmCAPI
 import WasmKit
 import WAT
-import SystemPackage
 import Foundation
+
+/// Raised when the harness itself cannot compare a module -- not a disagreement
+/// between the engines. Anything else thrown by ``Engine/run(moduleBytes:)``
+/// means that engine rejected the module, which *is* a comparable outcome.
+struct UntestableModule: Error {
+    let reason: String
+    init(_ reason: String) { self.reason = reason }
+}
 
 protocol Engine {
     var name: String { get }
@@ -81,7 +88,8 @@ extension ValueType {
                 return .ref(.extern(nil))
             case .abstract(.exnRef):
                 return .ref(.exception(nil))
-            case .concrete:
+            case .concrete, .abstract(.any), .abstract(.eq), .abstract(.i31), .abstract(.structRef), .abstract(.arrayRef),
+                .abstract(.noneRef), .abstract(.noExtern), .abstract(.noFunc), .abstract(.noExn):
                 // We don't model GC reference heap types yet; use a null externref.
                 return .ref(.extern(nil))
             }
@@ -125,7 +133,7 @@ struct WasmKitEngine: Engine {
             return memory
         }
         guard memories.count <= 1 else {
-            throw ExecError("Multiple memories are not supported")
+            throw UntestableModule("Multiple memories are not supported")
         }
         let memory = memories.first
         let funcs: [Function] = exports.compactMap {
@@ -135,15 +143,21 @@ struct WasmKitEngine: Engine {
             return fn
         }
         guard let fn = funcs.first else {
-            throw ExecError("No functions found")
+            throw UntestableModule("No functions found")
         }
         let type = fn.type
         let arguments = type.parameters.map { $0.defaultValue }
+        func snapshot(_ memory: Memory?) -> [UInt8]? {
+            guard let memory else { return nil }
+            return memory.withUnsafeBufferPointer(offset: 0, count: memory.byteCount) {
+                Array($0)
+            }
+        }
         do {
             let results = try fn(arguments)
-            return ExecResult(values: results, trap: nil, memory: memory?.data)
+            return ExecResult(values: results, trap: nil, memory: snapshot(memory))
         } catch {
-            return ExecResult(values: nil, trap: String(describing: error), memory: memory?.data)
+            return ExecResult(values: nil, trap: String(describing: error), memory: snapshot(memory))
         }
     }
 }
@@ -209,7 +223,7 @@ struct ReferenceEngine: Engine {
         }
 
         guard let fn = fn else {
-            throw ExecError("No functions found")
+            throw UntestableModule("No functions found")
         }
         let type = WasmCAPI.wasm_func_type(fn)
         let paramTypes = WasmCAPI.wasm_functype_params(type)
@@ -229,7 +243,7 @@ struct ReferenceEngine: Engine {
             case WASM_FUNCREF: value.of.ref = nil
             case WASM_EXTERNREF: value.of.ref = nil
             default:
-                throw ExecError("Unsupported value type")
+                throw UntestableModule("Unsupported value type")
             }
             arguments.data[i] = value
         }
@@ -260,7 +274,7 @@ struct ReferenceEngine: Engine {
             case WASM_F32: return .f32(value.of.f32.bitPattern)
             case WASM_F64: return .f64(value.of.f64.bitPattern)
             default:
-                throw ExecError("Unsupported value type: \(kind)")
+                throw UntestableModule("Unsupported value type: \(kind)")
             }
         }
         return ExecResult(values: values, trap: nil, memory: memoryData)
@@ -298,10 +312,35 @@ struct ReferenceEngine: Engine {
         } else {
             moduleBytes = try Array(Data(contentsOf: URL(fileURLWithPath: moduleFile)))
         }
-        let results = try engines.map { try ($0.run(moduleBytes: moduleBytes), $0.name) }
-        guard results.count > 1 else {
+        guard engines.count > 1 else {
             throw ExecError("Expected at least two engines")
         }
+        // Run each engine independently. Mapping with `try` meant one engine
+        // rejecting the module aborted the comparison, and the caller reported
+        // that as agreement -- so "one engine accepted this and the other did
+        // not" could never be found, which is the difference that matters most.
+        var outcomes: [(result: ExecResult?, name: String)] = []
+        for engine in engines {
+            do {
+                outcomes.append((try engine.run(moduleBytes: moduleBytes), engine.name))
+            } catch is UntestableModule {
+                return true
+            } catch {
+                // The engine rejected the module. That is an outcome to compare,
+                // not a reason to stop.
+                outcomes.append((nil, engine.name))
+            }
+        }
+        let accepted = outcomes.map { $0.result != nil }
+        guard accepted.allSatisfy({ $0 == accepted[0] }) else {
+            for outcome in outcomes {
+                print("\(outcome.name): \(outcome.result == nil ? "rejected" : "accepted") the module")
+            }
+            return false
+        }
+        // Both rejected it; there is nothing left to compare.
+        guard accepted[0] else { return true }
+        let results = outcomes.map { (result: $0.result!, name: $0.name) }
         return results.dropFirst().allSatisfy({ ExecResult.check(results[0], $0) })
     }
 }

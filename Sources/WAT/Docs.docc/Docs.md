@@ -64,10 +64,10 @@ while let (directive, location) = try wast.nextDirective() {
 
 ### WAST structures
 
-- ``Wast``
-- ``WastDirective``
+- ``WAST``
+- ``WASTDirective``
 - ``ModuleDirective``
 - ``ModuleSource``
-- ``WastInvoke``
-- ``WastExecute``
-- ``WastExpectValue``
+- ``WASTInvoke``
+- ``WASTExecute``
+- ``WASTExpectValue``

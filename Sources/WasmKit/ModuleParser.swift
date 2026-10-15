@@ -19,10 +19,10 @@ public func parseWasm(bytes: ArraySlice<UInt8>, features: WasmFeatureSet = .defa
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
 func parseModule<Source: ByteStreamSource>(parser: consuming WasmParser.Parser<Source>, features: WasmFeatureSet = .default) throws(WasmKitError) -> Module {
-    var types: [FunctionType] = []
+    var types = TypeSection([])
     var typeIndices: [TypeIndex] = []
     var codes: [Code] = []
-    var tables: [TableType] = []
+    var tables: [WasmParser.Table] = []
     var memories: [MemoryType] = []
     var globals: [WasmParser.Global] = []
     var tags: [WasmParser.Tag] = []
@@ -40,15 +40,15 @@ func parseModule<Source: ByteStreamSource>(parser: consuming WasmParser.Parser<S
         case .customSection(let customSection):
             customSections.append(customSection)
         case .typeSection(let typeSection):
-            types = typeSection
+            types = TypeSection(typeSection)
         case .importSection(let importSection):
             imports = importSection
         case .functionSection(let types):
             typeIndices = types
         case .tableSection(let tableSection):
-            tables = tableSection.map(\.type)
+            tables = tableSection
         case .memorySection(let memorySection):
-            memories = memorySection.map(\.type)
+            memories = memorySection.map { $0.type }
         case .globalSection(let globalSection):
             globals = globalSection
         case .tagSection(let tagSection):
@@ -93,7 +93,7 @@ func parseModule<Source: ByteStreamSource>(parser: consuming WasmParser.Parser<S
     let functions = try codes.enumerated().map { index, code throws(WasmKitError) in
         // SAFETY: The number of typeIndices is guaranteed to be the same as the number of codes
         let funcTypeIndex = typeIndices[index]
-        let funcType = try Module.resolveType(funcTypeIndex, typeSection: types)
+        let funcType = try types.functionType(at: funcTypeIndex)
         return GuestFunction(
             type: funcType,
             code: code
