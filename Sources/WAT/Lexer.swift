@@ -233,7 +233,7 @@ struct Lexer {
             skipLineComment()
             return .lineComment
         case "\"",
-            _ where isIdChar(initialChar):
+            _ where Self.isIdChar(initialChar):
             let (kind, text) = try lexReservedChars(initial: initialChar)
             switch kind {
             case .idChars:
@@ -369,10 +369,10 @@ struct Lexer {
                 throw cursor.createError("malformed UTF-8 encoding")
             }
             return id
-        } else if let ch = cursor.peek(), isIdChar(ch) {
+        } else if let ch = cursor.peek(), Self.isIdChar(ch) {
             let idStart = cursor.nextIndex
             _ = cursor.next()
-            while let next = cursor.peek(), isIdChar(next) {
+            while let next = cursor.peek(), Self.isIdChar(next) {
                 _ = cursor.next()
             }
             return String(cursor.input[idStart..<cursor.nextIndex])
@@ -410,7 +410,7 @@ struct Lexer {
                     if cursor.peek() == "@" {
                         // Consume the annotation ID so body-skipping doesn't misparse it.
                         let charAfterAt = cursor.peek(at: 1)
-                        if let c = charAfterAt, isIdChar(c) || c == "\"" {
+                        if let c = charAfterAt, Self.isIdChar(c) || c == "\"" {
                             _ = cursor.next()
                             _ = try readAnnotationId()
                         }
@@ -468,7 +468,7 @@ struct Lexer {
     }
 
     // https://webassembly.github.io/spec/core/text/values.html#text-idchar
-    private func isIdChar(_ char: Unicode.Scalar) -> Bool {
+    static func isIdChar(_ char: Unicode.Scalar) -> Bool {
         // NOTE: Intentionally not using Range here to keep fast enough even in debug mode
         return ("0" <= char && char <= "9")
             || ("A" <= char && char <= "Z")
@@ -494,7 +494,7 @@ struct Lexer {
         var char = initial
 
         while true {
-            if isIdChar(char) {
+            if Self.isIdChar(char) {
                 _ = cursor.next()
                 numberOfIdChars += 1
             } else if char == "\"" {

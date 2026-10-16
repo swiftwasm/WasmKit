@@ -30,6 +30,7 @@
         }
     }
 
+    /// A stream backed by an open file descriptor.
     public final class FileHandleStreamSource: ByteStreamSource {
         private let fileHandle: CInt
         /// Whether this source is responsible for closing `fileHandle`.

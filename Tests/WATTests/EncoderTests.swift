@@ -640,4 +640,62 @@ struct EncoderTests {
         #expect(elemNames == [0: "myelem"])
         #expect(dataNames == [0: "mydata"])
     }
+
+    private static func nameSubsections(of bytes: [UInt8]) throws -> [ParsedNames] {
+        var parser = WasmParser.Parser(bytes: bytes)
+        while let payload = try parser.parseNext() {
+            if case .customSection(let section) = payload, section.name == "name" {
+                var nameParser = NameSectionParser(stream: StaticByteStreamSource(bytes: section.bytes))
+                return try nameParser.parseAll()
+            }
+        }
+        return []
+    }
+
+    @Test
+    func encodeNameSectionCountsTryTableLabels() throws {
+        let bytes = try wat2wasm(
+            """
+            (module
+                (func
+                    block $o
+                        try_table $t (catch_all $o)
+                            br $t
+                        end
+                    end
+                    block $b
+                        br $b
+                    end
+                )
+            )
+            """,
+            options: EncodeOptions(nameSection: true)
+        )
+        let labels = try Self.nameSubsections(of: bytes).compactMap { names -> [UInt32: NameMap]? in
+            guard case .labels(let labels) = names else { return nil }
+            return labels
+        }
+        #expect(labels == [[0: [0: "o", 1: "t", 2: "b"]]])
+    }
+
+    @Test
+    func encodeNameSectionKeepsParameterNamesBesideATypeUse() throws {
+        let bytes = try wat2wasm(
+            """
+            (module
+                (type $t (func (param i32)))
+                (func (type $t) (param $p i32)
+                    local.get $p
+                    drop
+                )
+            )
+            """,
+            options: EncodeOptions(nameSection: true)
+        )
+        let locals = try Self.nameSubsections(of: bytes).compactMap { names -> [UInt32: NameMap]? in
+            guard case .locals(let locals) = names else { return nil }
+            return locals
+        }
+        #expect(locals == [[0: [0: "p"]]])
+    }
 }

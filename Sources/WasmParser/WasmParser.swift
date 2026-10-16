@@ -291,7 +291,7 @@ extension Parser {
 
     @inline(__always)
     @inlinable
-    mutating func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws(WasmParserError) -> T {
+    package mutating func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws(WasmParserError) -> T {
         try stream.parseUnsigned(T.self)
     }
 
@@ -1056,7 +1056,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#custom-section>
     @usableFromInline
-    mutating func parseCustomSection(size: UInt32) throws(WasmParserError) -> CustomSection {
+    package mutating func parseCustomSection(size: UInt32) throws(WasmParserError) -> CustomSection {
         let preNameIndex = stream.currentIndex
         let name = try parseName()
         let nameSize = stream.currentIndex - preNameIndex
@@ -1074,7 +1074,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#type-section>
     @inlinable
-    mutating func parseTypeSection() throws(WasmParserError) -> [RecursiveGroup] {
+    package mutating func parseTypeSection() throws(WasmParserError) -> [RecursiveGroup] {
         let features = self.features
         guard features.contains(.gc) else {
             return try parseVector { (s) throws(WasmParserError) in
@@ -1087,7 +1087,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#import-section>
     @usableFromInline
-    mutating func parseImportSection() throws(WasmParserError) -> [Import] {
+    package mutating func parseImportSection() throws(WasmParserError) -> [Import] {
         let features = self.features
         return try parseVector { (s) throws(WasmParserError) in
             let module = try s.parseName()
@@ -1100,14 +1100,14 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#function-section>
     @inlinable
-    mutating func parseFunctionSection() throws(WasmParserError) -> [TypeIndex] {
+    package mutating func parseFunctionSection() throws(WasmParserError) -> [TypeIndex] {
         return try parseVector { (s) throws(WasmParserError) in try s.parseUnsigned() }
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#table-section>
     @usableFromInline
-    mutating func parseTableSection() throws(WasmParserError) -> [Table] {
+    package mutating func parseTableSection() throws(WasmParserError) -> [Table] {
         let count: UInt32 = try parseUnsigned()
         var tables: [Table] = []
         for _ in 0..<count {
@@ -1132,7 +1132,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#memory-section>
     @usableFromInline
-    mutating func parseMemorySection() throws(WasmParserError) -> [Memory] {
+    package mutating func parseMemorySection() throws(WasmParserError) -> [Memory] {
         let features = self.features
         return try parseVector { (s) throws(WasmParserError) in try Memory(type: s.parseLimits(features: features)) }
     }
@@ -1140,7 +1140,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#global-section>
     @usableFromInline
-    mutating func parseGlobalSection() throws(WasmParserError) -> [Global] {
+    package mutating func parseGlobalSection() throws(WasmParserError) -> [Global] {
         let count: UInt32 = try parseUnsigned()
         var globals: [Global] = []
         for _ in 0..<count {
@@ -1154,7 +1154,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/exception-handling/core/binary/modules.html#tag-section>
     @usableFromInline
-    mutating func parseTagSection() throws(WasmParserError) -> [Tag] {
+    package mutating func parseTagSection() throws(WasmParserError) -> [Tag] {
         return try parseVector { (s) throws(WasmParserError) in
             let attribute: UInt8 = try s.parseUnsigned()
             guard attribute == 0 else { throw s.makeError(.invalidTagAttribute(attribute)) }
@@ -1166,7 +1166,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#export-section>
     @usableFromInline
-    mutating func parseExportSection() throws(WasmParserError) -> [Export] {
+    package mutating func parseExportSection() throws(WasmParserError) -> [Export] {
         let features = self.features
         return try parseVector { (s) throws(WasmParserError) in
             let name = try s.parseName()
@@ -1178,82 +1178,18 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#start-section>
     @usableFromInline
-    mutating func parseStartSection() throws(WasmParserError) -> FunctionIndex {
+    package mutating func parseStartSection() throws(WasmParserError) -> FunctionIndex {
         return try parseUnsigned()
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#element-section>
     @inlinable
-    mutating func parseElementSection() throws(WasmParserError) -> [ElementSegment] {
+    package mutating func parseElementSection() throws(WasmParserError) -> [ElementSegment] {
         let count: UInt32 = try parseUnsigned()
         var segments: [ElementSegment] = []
         for _ in 0..<count {
-            let flag = try ElementSegment.Flag(rawValue: parseUnsigned())
-
-            let type: ReferenceType
-            let initializer: [ConstExpression]
-            let mode: ElementSegment.Mode
-
-            if flag.contains(.isPassiveOrDeclarative) {
-                if flag.contains(.isDeclarative) {
-                    mode = .declarative
-                } else {
-                    mode = .passive
-                }
-            } else {
-                let table: TableIndex
-
-                if flag.contains(.hasTableIndex) {
-                    table = try parseUnsigned()
-                } else {
-                    table = 0
-                }
-
-                let offset = try parseConstExpression()
-                mode = .active(table: table, offset: offset)
-            }
-
-            if flag.segmentHasRefType {
-                let valueType = try stream.parseValueType(features: features)
-
-                guard case .ref(let refType) = valueType else {
-                    throw makeError(.expectedRefType(actual: valueType))
-                }
-
-                type = refType
-            } else if features.contains(.functionReferences) && !flag.contains(.usesExpressions) {
-                // A segment listing function indices only holds non-null functions.
-                type = ReferenceType(isNullable: false, heapType: .funcRef)
-            } else {
-                type = .funcRef
-            }
-
-            if flag.segmentHasElemKind {
-                // `elemkind` parsing as defined in the spec
-                let elemKind = try parseUnsigned() as UInt32
-                guard elemKind == 0x00 else {
-                    throw makeError(.unexpectedElementKind(expected: 0x00, actual: elemKind))
-                }
-            }
-
-            if flag.contains(.usesExpressions) {
-                let initCount: UInt32 = try parseUnsigned()
-                var expressions: [ConstExpression] = []
-                for _ in 0..<initCount {
-                    expressions.append(try parseConstExpression())
-                }
-                initializer = expressions
-            } else {
-                let initCount: UInt32 = try parseUnsigned()
-                var expressions: [ConstExpression] = []
-                for _ in 0..<initCount {
-                    expressions.append(try [Instruction.refFunc(functionIndex: parseUnsigned() as UInt32)])
-                }
-                initializer = expressions
-            }
-
-            segments.append(ElementSegment(type: type, initializer: initializer, mode: mode))
+            segments.append(try parseElementEntry())
         }
         return segments
     }
@@ -1261,36 +1197,11 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#code-section>
     @inlinable
-    mutating func parseCodeSection() throws(WasmParserError) -> [Code] {
-        let features = self.features
+    package mutating func parseCodeSection() throws(WasmParserError) -> [Code] {
         let count: UInt32 = try parseUnsigned()
         var codes: [Code] = []
         for _ in 0..<count {
-            let size = try parseUnsigned() as UInt32
-            let bodyStart = stream.currentIndex
-            let localTypes = try stream.parseVector { (s) throws(WasmParserError) -> (n: UInt32, type: ValueType) in
-                let n: UInt32 = try s.parseUnsigned()
-                let t = try s.parseValueType(features: features)
-                return (n, t)
-            }
-            let totalLocals = localTypes.reduce(UInt64(0)) { $0 + UInt64($1.n) }
-            guard totalLocals < limits.maxFunctionLocals else {
-                throw makeError(.tooManyLocals(totalLocals, limit: limits.maxFunctionLocals))
-            }
-
-            let locals = localTypes.flatMap { (n: UInt32, type: ValueType) in
-                return Array(repeating: type, count: Int(n))
-            }
-            let expressionStart = stream.currentIndex
-            let expressionBytes = try stream.consume(
-                count: Int(size) - (expressionStart - bodyStart)
-            )
-            codes.append(
-                Code(
-                    locals: locals, expression: expressionBytes,
-                    offset: expressionStart, bodyOffset: bodyStart, features: features
-                )
-            )
+            codes.append(try parseCodeEntry())
         }
         return codes
     }
@@ -1298,28 +1209,11 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#data-section>
     @inlinable
-    mutating func parseDataSection() throws(WasmParserError) -> [DataSegment] {
+    package mutating func parseDataSection() throws(WasmParserError) -> [DataSegment] {
         let count: UInt32 = try parseUnsigned()
         var segments: [DataSegment] = []
         for _ in 0..<count {
-            let kind: UInt32 = try parseUnsigned()
-            switch kind {
-            case 0:
-                let offset = try parseConstExpression()
-                let initializer = try stream.parseVectorBytes()
-                segments.append(.active(.init(index: 0, offset: offset, initializer: initializer)))
-
-            case 1:
-                segments.append(try .passive(stream.parseVectorBytes()))
-
-            case 2:
-                let index: UInt32 = try parseUnsigned()
-                let offset = try parseConstExpression()
-                let initializer = try stream.parseVectorBytes()
-                segments.append(.active(.init(index: index, offset: offset, initializer: initializer)))
-            default:
-                throw makeError(.malformedDataSegmentKind(kind))
-            }
+            segments.append(try parseDataSegmentEntry())
         }
         return segments
     }
@@ -1406,6 +1300,29 @@ extension Parser {
         }
     }
 
+    /// The order slot of section `id`, or `nil` for a custom section. Throws for an
+    /// unknown ID, and for the tag section without exception handling.
+    @inlinable
+    func sectionOrder(id: UInt8) throws(WasmParserError) -> OrderTracking.Order? {
+        switch id {
+        case 0: return nil
+        case 1: return .type
+        case 2: return ._import
+        case 3: return .function
+        case 4: return .table
+        case 5: return .memory
+        case 6: return .global
+        case 7: return .export
+        case 8: return .start
+        case 9: return .element
+        case 10: return .code
+        case 11: return .data
+        case 12: return .dataCount
+        case 13 where features.contains(.exceptionHandling): return .tag
+        default: throw makeError(.malformedSectionID(id))
+        }
+    }
+
     /// Attempts to parse a chunk of the Wasm binary stream.
     ///
     /// - Returns: A `ParsingPayload` if the parsing was successful, otherwise `nil`.
@@ -1450,55 +1367,26 @@ extension Parser {
             let sectionSize: UInt32 = try parseUnsigned()
             let sectionStart = stream.currentIndex
 
+            let order = try sectionOrder(id: sectionID)
             let payload: ParsingPayload
-            let order: OrderTracking.Order?
             switch sectionID {
-            case 0:
-                order = nil
-                payload = .customSection(try parseCustomSection(size: sectionSize))
-            case 1:
-                order = .type
-                payload = .typeSection(try parseTypeSection())
-            case 2:
-                order = ._import
-                payload = .importSection(try parseImportSection())
-            case 3:
-                order = .function
-                payload = .functionSection(try parseFunctionSection())
-            case 4:
-                order = .table
-                payload = .tableSection(try parseTableSection())
-            case 5:
-                order = .memory
-                payload = .memorySection(try parseMemorySection())
-            case 6:
-                order = .global
-                payload = .globalSection(try parseGlobalSection())
-            case 7:
-                order = .export
-                payload = .exportSection(try parseExportSection())
-            case 8:
-                order = .start
-                payload = .startSection(try parseStartSection())
-            case 9:
-                order = .element
-                payload = .elementSection(try parseElementSection())
-            case 10:
-                order = .code
-                payload = .codeSection(try parseCodeSection())
-            case 11:
-                order = .data
-                payload = .dataSection(try parseDataSection())
-            case 12:
-                order = .dataCount
-                payload = .dataCount(try parseDataCountSection())
-            case 13 where features.contains(.exceptionHandling):
-                order = .tag
-                payload = .tagSection(try parseTagSection())
-            default:
-                throw makeError(.malformedSectionID(sectionID))
+            case 0: payload = .customSection(try parseCustomSection(size: sectionSize))
+            case 1: payload = .typeSection(try parseTypeSection())
+            case 2: payload = .importSection(try parseImportSection())
+            case 3: payload = .functionSection(try parseFunctionSection())
+            case 4: payload = .tableSection(try parseTableSection())
+            case 5: payload = .memorySection(try parseMemorySection())
+            case 6: payload = .globalSection(try parseGlobalSection())
+            case 7: payload = .exportSection(try parseExportSection())
+            case 8: payload = .startSection(try parseStartSection())
+            case 9: payload = .elementSection(try parseElementSection())
+            case 10: payload = .codeSection(try parseCodeSection())
+            case 11: payload = .dataSection(try parseDataSection())
+            case 12: payload = .dataCount(try parseDataCountSection())
+            case 13: payload = .tagSection(try parseTagSection())
+            default: throw makeError(.malformedSectionID(sectionID))
             }
-            if let order = order {
+            if let order {
                 try orderTracking.track(order: order, parser: self)
             }
             let expectedSectionEnd = sectionStart + Int(sectionSize)
@@ -1567,6 +1455,26 @@ public struct NameSectionParser<Source: ByteStreamSource> {
             results.append(result)
         }
         return results
+    }
+
+    /// Parses the entire name section like ``parseAll()``, and also returns the tag names
+    /// subsection (ID 11), which ``ParsedNames`` has no case for.
+    package mutating func parseAllIncludingTagNames() throws(WasmParserError) -> (names: [ParsedNames], tagNames: NameMap) {
+        var results: [ParsedNames] = []
+        var tagNames: NameMap = [:]
+        while try !stream.hasReachedEnd() {
+            let id = try stream.consumeAny()
+            if id == 11 {
+                _ = try stream.parseUnsigned(UInt32.self)
+                tagNames = try Self.parseNameMap(stream: &stream)
+                continue
+            }
+            guard let result = try Self.parseNameSubsection(type: id, stream: &stream) else {
+                continue
+            }
+            results.append(result)
+        }
+        return (results, tagNames)
     }
 
     static func parseNameSubsection(type: UInt8, stream: inout ByteStream<Source>) throws(WasmParserError) -> ParsedNames? {

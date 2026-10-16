@@ -1,7 +1,10 @@
 import Foundation
 import Testing
-import WASTRunner
+import WAT
 import WasmKit
+import WasmParser
+
+@testable import WASTRunner
 
 @Suite
 struct SpectestTests {
@@ -46,6 +49,23 @@ struct SpectestTests {
         ]
     }
 
+    /// Spec files with constructs wasm2wat does not print: custom sections from `@custom`
+    /// annotations, and GC types.
+    static let roundTripUnsupported =
+        [
+            "Tests/WasmKitTests/ExtraSuite/annotations/custom.wast",
+            "Tests/WasmKitTests/ExtraSuite/annotations/custom_datacount.wast",
+            "Vendor/testsuite/custom/branch_hint.wast",
+            "Vendor/testsuite/custom/custom_annot.wast",
+        ]
+        + [
+            "array.wast", "array_copy.wast", "array_fill.wast", "array_init_data.wast", "array_init_elem.wast",
+            "array_new_data.wast", "array_new_elem.wast", "br_on_cast.wast", "br_on_cast_fail.wast", "extern.wast",
+            "i31.wast", "ref_cast.wast", "ref_eq.wast", "ref_null.wast", "ref_test.wast", "struct.wast", "tag.wast",
+            "table_init.wast", "table_init64.wast", "type-canon.wast", "type-equivalence.wast", "type-rec.wast",
+            "type-subtyping.wast",
+        ].map { "Vendor/testsuite/\($0)" }
+
     static func testCases(in paths: [String]) throws -> [TestCase] {
         var exclude = SpectestDiscovery(path: []).exclude
         exclude += UnsupportedSpectests.files.map { "Vendor/testsuite/\($0)" }
@@ -78,6 +98,37 @@ struct SpectestTests {
             defaultConfig.threadingModel = .token
             // Sanity check that non-default threading models work.
             try Self.run(test: test, configuration: defaultConfig)
+        }
+
+        @Test(
+            arguments: try SpectestDiscovery(
+                path: SpectestTests.testPaths,
+                exclude: SpectestDiscovery(path: []).exclude + SpectestTests.roundTripUnsupported
+            ).discover()
+        )
+        func roundTrip(test: TestCase) throws {
+            let data = try #require(FileManager.default.contents(atPath: test.path))
+            let rootPath = URL(fileURLWithPath: test.path).deletingLastPathComponent().path
+            let features = WASTRunContext.deriveFeatureSet(rootPath: rootPath)
+            let names = EncodeOptions(nameSection: true)
+            var content = try parseWAST(String(data: data, encoding: .utf8)!, features: features)
+
+            while let (directive, _) = try content.nextDirective() {
+                guard case .module(let moduleDirective) = directive else { continue }
+                let binary: [UInt8]
+                switch moduleDirective.source {
+                case .text(let wat): binary = try wat.encode(options: names)
+                case .binary:
+                    // Binary modules may use non-canonical encodings (e.g. non-minimal LEB128).
+                    continue
+                case .quote(let text):
+                    binary = try wat2wasm(String(decoding: text, as: UTF8.self), features: features, options: names)
+                }
+
+                let text = try wasm2wat(StaticByteStreamSource(bytes: binary), features: features)
+                let binary2 = try wat2wasm(text, features: features, options: names)
+                #expect(binary == binary2, "Round-trip mismatch in \(test.relativePath)")
+            }
         }
     #endif
 }
