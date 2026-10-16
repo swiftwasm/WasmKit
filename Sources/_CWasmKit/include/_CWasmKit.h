@@ -1,6 +1,7 @@
 #ifndef WASMKIT__CWASMKIT_H
 #define WASMKIT__CWASMKIT_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 // <stdint.h> must precede <stdatomic.h>: some bare-metal C libraries (newlib)
@@ -41,7 +42,7 @@ static inline CTYPE wasmkit_atomic_rmw_xor_##WIDTH(void *WASMKIT_NONNULL ptr, CT
 static inline CTYPE wasmkit_atomic_rmw_xchg_##WIDTH(void *WASMKIT_NONNULL ptr, CTYPE val) { \
     return __atomic_exchange_n((CTYPE *)ptr, val, __ATOMIC_SEQ_CST); \
 } \
-static inline _Bool wasmkit_atomic_cmpxchg_##WIDTH( \
+static inline bool wasmkit_atomic_cmpxchg_##WIDTH( \
     void *WASMKIT_NONNULL ptr, CTYPE *WASMKIT_NONNULL expected, CTYPE desired \
 ) { \
     return __atomic_compare_exchange_n( \
