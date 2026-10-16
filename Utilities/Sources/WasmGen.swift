@@ -596,7 +596,7 @@ enum WasmGen {
 
             /// An instruction encoder that is responsible for encoding opcodes and immediates
             /// in Wasm binary format.
-            protocol BinaryInstructionEncoder: InstructionVisitor {
+            public protocol BinaryInstructionEncoder: InstructionVisitor {
                 /// Encodes an instruction opcode.
                 mutating func encodeInstruction(_ opcode: [UInt8]) throws(VisitorError)
 
@@ -640,7 +640,7 @@ enum WasmGen {
             """
 
         for instruction in instructions.categorized {
-            code += "    mutating func \(instruction.visitMethodName)("
+            code += "    public mutating func \(instruction.visitMethodName)("
             code += instruction.associatedValues.map { i in
                 if i.argumentName == i.parameterName {
                     return "\(i.parameterName): \(i.type)"
