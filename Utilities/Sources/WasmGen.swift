@@ -554,8 +554,14 @@ enum WasmGen {
             /// Claim the next byte to be decoded
             @inlinable mutating func claimNextByte() throws(WasmParserError) -> UInt8
 
+            /// Claim the opcode that follows a prefix byte, which is encoded as a `u32` in LEB128.
+            @inlinable mutating func claimPrefixedOpcode() throws(WasmParserError) -> UInt32
+
             /// Throw an error due to unknown opcode.
             func throwUnknown(_ opcode: [UInt8]) throws(WasmParserError) -> Never
+
+            /// Throw an error due to an unknown opcode after a prefix byte.
+            func throwUnknown(prefix: UInt8, opcode: UInt32) throws(WasmParserError) -> Never
 
         """
         for instruction in instructions.categorized {
@@ -587,9 +593,51 @@ enum WasmGen {
         ) throws(WasmParserError) -> Instruction {
         """
 
-        func renderParseSwitchCase(_ root: Trie, depth: Int = 0) {
+        func renderInstruction(_ instruction: Instruction, indent: String) {
+            let categorized = instructions.categorized.first(where: {
+                $0.visitMethodName == instruction.visitMethodName
+            })!
+
+            if !instruction.immediates.isEmpty {
+                code += "\(indent)    let ("
+                code += instruction.immediates.map(\.label).joined(separator: ", ")
+                code += ") = try decoder.\(instruction.visitMethodName)("
+                if instruction.category != nil {
+                    code += ".\(instruction.name.enumCase)"
+                }
+                code += ")\n"
+            }
+
+            // Build the Instruction enum value
+            code += "\(indent)    return "
+            if categorized.associatedValues.isEmpty {
+                code += ".\(categorized.enumCaseName)\n"
+            } else {
+                code += ".\(categorized.enumCaseName)("
+                var arguments: [(label: String?, value: String)] = []
+                if instruction.category != nil {
+                    arguments.append((label: nil, value: ".\(instruction.name.enumCase)"))
+                }
+                for immediate in instruction.immediates {
+                    arguments.append((label: immediate.label, value: immediate.label))
+                }
+                code += arguments.map { i in
+                    if let label = i.label {
+                        return "\(label): \(i.value)"
+                    } else {
+                        return i.value
+                    }
+                }.joined(separator: ", ")
+                code += ")\n"
+            }
+        }
+
+        func opcodeByteName(_ depth: Int) -> String { "opcode\(depth)" }
+
+        /// Renders a switch over the raw bytes of `root`. `unknown` is the statement that
+        /// rejects a byte with no instruction at `depth`.
+        func renderParseSwitchCase(_ root: Trie, depth: Int, unknown: (Int) -> String) {
             let indent = String(repeating: " ", count: (depth + 1) * 4)
-            func opcodeByteName(_ depth: Int) -> String { "opcode\(depth)" }
             let opcodeByte = opcodeByteName(depth)
             code += """
 
@@ -600,53 +648,83 @@ enum WasmGen {
             for (opcode, trie) in root.children.sorted(by: { $0.key < $1.key }) {
                 code += "\(indent)case \(String(format: "0x%02X", opcode)):\n"
                 if let instruction = trie.instruction {
-                    let categorized = instructions.categorized.first(where: {
-                        $0.visitMethodName == instruction.visitMethodName
-                    })!
-
-                    if !instruction.immediates.isEmpty {
-                        code += "\(indent)    let ("
-                        code += instruction.immediates.map(\.label).joined(separator: ", ")
-                        code += ") = try decoder.\(instruction.visitMethodName)("
-                        if instruction.category != nil {
-                            code += ".\(instruction.name.enumCase)"
-                        }
-                        code += ")\n"
-                    }
-
-                    // Build the Instruction enum value
-                    code += "\(indent)    return "
-                    if categorized.associatedValues.isEmpty {
-                        code += ".\(categorized.enumCaseName)\n"
-                    } else {
-                        code += ".\(categorized.enumCaseName)("
-                        var arguments: [(label: String?, value: String)] = []
-                        if instruction.category != nil {
-                            arguments.append((label: nil, value: ".\(instruction.name.enumCase)"))
-                        }
-                        for immediate in instruction.immediates {
-                            arguments.append((label: immediate.label, value: immediate.label))
-                        }
-                        code += arguments.map { i in
-                            if let label = i.label {
-                                return "\(label): \(i.value)"
-                            } else {
-                                return i.value
-                            }
-                        }.joined(separator: ", ")
-                        code += ")\n"
-                    }
+                    renderInstruction(instruction, indent: indent)
+                } else if depth == 0 {
+                    renderPrefixedSwitchCase(trie, depth: depth + 1)
                 } else {
-                    renderParseSwitchCase(trie, depth: depth + 1)
+                    renderParseSwitchCase(trie, depth: depth + 1, unknown: unknown)
                 }
             }
             code += "\(indent)default:\n"
-            let opcode = "[" + (0...depth).map { opcodeByteName($0) }.joined(separator: ", ") + "]"
-            code += "\(indent)    try decoder.throwUnknown(\(opcode))\n"
+            code += "\(indent)    \(unknown(depth))\n"
             code += "\(indent)}\n"
         }
 
-        renderParseSwitchCase(root)
+        /// Renders the switch after a prefix byte, whose opcode is a `u32` in LEB128.
+        ///
+        /// The opcode table spells each opcode in its shortest encoding. The binary format also
+        /// allows longer ones, so the switch decodes the integer instead of matching its bytes.
+        /// Bytes after the integer, such as the reserved zero of `atomic.fence`, stay raw bytes.
+        func renderPrefixedSwitchCase(_ root: Trie, depth: Int) {
+            func collect(_ trie: Trie, path: [UInt8], into results: inout [(bytes: [UInt8], instruction: Instruction)]) {
+                for (byte, child) in trie.children {
+                    if let instruction = child.instruction {
+                        results.append((path + [byte], instruction))
+                    } else {
+                        collect(child, path: path + [byte], into: &results)
+                    }
+                }
+            }
+            var entries: [(bytes: [UInt8], instruction: Instruction)] = []
+            collect(root, path: [], into: &entries)
+
+            var terminals: [UInt32: Instruction] = [:]
+            var trailing: [UInt32: Trie] = [:]
+            for (bytes, instruction) in entries {
+                guard let end = bytes.firstIndex(where: { $0 & 0x80 == 0 }) else {
+                    fatalError("Unterminated LEB128 opcode for \(instruction.name)")
+                }
+                var value: UInt32 = 0
+                for (index, byte) in bytes[...end].enumerated() {
+                    value |= UInt32(byte & 0x7F) << (7 * index)
+                }
+                let encodedLength = max(1, (32 - value.leadingZeroBitCount + 6) / 7)
+                assert(encodedLength == end + 1, "Opcode of \(instruction.name) is not in its shortest LEB128 encoding")
+                let rest = bytes[(end + 1)...]
+                if rest.isEmpty {
+                    assert(terminals[value] == nil && trailing[value] == nil)
+                    terminals[value] = instruction
+                } else {
+                    assert(terminals[value] == nil)
+                    trailing[value, default: Trie()].insert(rest, instruction: instruction)
+                }
+            }
+
+            let indent = String(repeating: " ", count: (depth + 1) * 4)
+            let opcodeName = opcodeByteName(depth)
+            let unknown = "try decoder.throwUnknown(prefix: \(opcodeByteName(depth - 1)), opcode: \(opcodeName))"
+            code += """
+
+            \(indent)let \(opcodeName) = try decoder.claimPrefixedOpcode()
+            \(indent)switch \(opcodeName) {
+
+            """
+            for value in Set(terminals.keys).union(trailing.keys).sorted() {
+                code += "\(indent)case \(String(format: "0x%02X", value)):\n"
+                if let instruction = terminals[value] {
+                    renderInstruction(instruction, indent: indent)
+                } else if let trie = trailing[value] {
+                    renderParseSwitchCase(trie, depth: depth + 1, unknown: { _ in unknown })
+                }
+            }
+            code += "\(indent)default:\n"
+            code += "\(indent)    \(unknown)\n"
+            code += "\(indent)}\n"
+        }
+
+        renderParseSwitchCase(root, depth: 0) { depth in
+            "try decoder.throwUnknown([" + (0...depth).map { opcodeByteName($0) }.joined(separator: ", ") + "])"
+        }
         code += "}\n"
 
         // Generate dispatchInstruction — pure dispatch to visitor

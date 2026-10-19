@@ -713,6 +713,18 @@ extension Parser: BinaryInstructionDecoder {
         throw makeError(.illegalOpcode(opcode))
     }
 
+    /// Reports the prefix and the opcode in its shortest encoding, whichever length the binary used.
+    @inlinable func throwUnknown(prefix: UInt8, opcode: UInt32) throws(WasmParserError) -> Never {
+        var bytes = [prefix]
+        var rest = opcode
+        repeat {
+            let byte = UInt8(rest & 0x7F)
+            rest >>= 7
+            bytes.append(rest == 0 ? byte : byte | 0x80)
+        } while rest != 0
+        throw makeError(.illegalOpcode(bytes))
+    }
+
     @inlinable func visitUnknown(_ opcode: [UInt8]) throws(WasmParserError) -> Bool {
         try throwUnknown(opcode)
     }
@@ -1026,6 +1038,9 @@ extension Parser: BinaryInstructionDecoder {
     }
     @inlinable mutating func claimNextByte() throws(WasmParserError) -> UInt8 {
         return try stream.consumeAny()
+    }
+    @inlinable mutating func claimPrefixedOpcode() throws(WasmParserError) -> UInt32 {
+        return try parseUnsigned()
     }
 
     /// Parse a single binary instruction.
