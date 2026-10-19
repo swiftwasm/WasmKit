@@ -69,12 +69,14 @@ enum Spectest {
             return [
                 testsuitePath,
                 testsuitePath.appendingPathComponent("proposals/threads"),
+                testsuitePath.appendingPathComponent("proposals/wide-arithmetic"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/function-references"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/multi-memory"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/multi-memory/threads"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/gc"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/annotations"),
+                rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/wide-arithmetic"),
             ].flatMap {
                 try! FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
             }.compactMap { filePath in
@@ -117,6 +119,9 @@ enum Spectest {
         }
         if wast.deletingLastPathComponent().lastPathComponent == "gc" {
             features.insert(.gc)
+        }
+        if wast.deletingLastPathComponent().lastPathComponent == "wide-arithmetic" {
+            features.insert(.wideArithmetic)
         }
         return features
     }

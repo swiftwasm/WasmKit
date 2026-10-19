@@ -26,6 +26,7 @@ struct SpectestTests {
             // constant expressions, relaxed SIMD, typed function references and multi-memory.
             Self.testsuite.path,
             Self.testsuite.appendingPathComponent("custom").path,
+            Self.testsuite.appendingPathComponent("proposals/wide-arithmetic").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/memory64").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/function-references").path,
@@ -33,6 +34,7 @@ struct SpectestTests {
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/fuel").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/gc").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/annotations").path,
+            Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/wide-arithmetic").path,
         ]
     }
 

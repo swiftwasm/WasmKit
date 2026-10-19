@@ -1620,6 +1620,17 @@ extension VMGen {
         return slotForms + immForms
     }
 
+    // MARK: - Wide arithmetic instructions
+
+    /// The instructions of the wide arithmetic proposal. Each one writes the low
+    /// and the high half of a 128-bit result to two registers.
+    static let wideArithmeticInsts: [Instruction] = [
+        Instruction(name: "i64Add128", documentation: "WebAssembly Core Instruction `i64.add128`", immediateLayout: .binary128),
+        Instruction(name: "i64Sub128", documentation: "WebAssembly Core Instruction `i64.sub128`", immediateLayout: .binary128),
+        Instruction(name: "i64MulWideS", documentation: "WebAssembly Core Instruction `i64.mul_wide_s`", immediateLayout: .mulWide),
+        Instruction(name: "i64MulWideU", documentation: "WebAssembly Core Instruction `i64.mul_wide_u`", immediateLayout: .mulWide),
+    ]
+
     // MARK: - Instruction generation
 
     static func buildInstructions() -> [Instruction] {
@@ -1887,6 +1898,7 @@ extension VMGen {
                 $0.field(name: "memory", type: .MemoryIndex)
             },
         ]
+        instructions += wideArithmeticInsts
         return instructions
     }
 

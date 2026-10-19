@@ -2006,6 +2006,22 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             /// folded into the operation that consumes it. See
             /// ``BinaryEmission``.
             let binary: BinaryOperation?
+            /// The result register that ``resultRelink`` rewrites, when the relink must
+            /// check that the value it stores is that register. Only an instruction with
+            /// two results sets it. See ``ISeqBuilder/emitPair(low:high:_:)``.
+            var relinkedResult: VReg? = nil
+            /// The relink of the lower result of a pair, which this emission offers once
+            /// ``resultRelink`` has moved the upper result.
+            var lowerRelink: LowerRelink? = nil
+        }
+
+        /// The relink of the lower result of an instruction with two results.
+        fileprivate struct LowerRelink {
+            /// The register of the lower result as emitted.
+            let result: VReg
+            /// Builds the relink of the lower result, given the register the upper
+            /// result was moved to.
+            let make: (_ high: VReg) -> ResultRelink
         }
 
         private var labels: [LabelEntry] = []
@@ -2278,10 +2294,20 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             return (copy.producer, copy.source, copy.dest)
         }
 
-        mutating func relinkLastInstructionResult(_ newResult: VReg) -> Bool {
+        /// Rewrites the last emission to store its result in `newResult`.
+        ///
+        /// - Parameters:
+        ///   - newResult: The register that receives the result instead.
+        ///   - value: The register the value being stored is read from. It must be the
+        ///     result that ``LastEmission/relinkedResult`` names, when the emission names one.
+        /// - Returns: Whether the emission was rewritten.
+        mutating func relinkLastInstructionResult(_ newResult: VReg, storing value: VReg) -> Bool {
             guard let lastEmission = self.lastEmission,
                 let resultRelink = lastEmission.resultRelink
             else { return false }
+            if let relinkedResult = lastEmission.relinkedResult, relinkedResult != value {
+                return false
+            }
             let newInstruction = resultRelink(newResult)
             assign(at: lastEmission.position.offsetFromHead, newInstruction)
             if emitsDirectOnlyInstructions, let form = lastAcc?.producer, form.hasAccAndSlotForm {
@@ -2289,6 +2315,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                     position: lastEmission.position, end: lastEmission.end, form: form.relinked(to: newResult), keepsSlot: true)
             }
             resetLastEmission()
+            if let lowerRelink = lastEmission.lowerRelink {
+                self.lastEmission = LastEmission(
+                    position: lastEmission.position, end: lastEmission.end, resultRelink: lowerRelink.make(newResult),
+                    fusable: nil, binary: nil, relinkedResult: lowerRelink.result
+                )
+            }
             return true
         }
 
@@ -2329,6 +2361,28 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 binary: binary
             )
             hasLastAcc = false
+        }
+
+        /// Builds an instruction with two results from the registers of its results.
+        typealias PairRelink = (_ low: VReg, _ high: VReg) -> Instruction
+
+        /// Emits an instruction with two results, where `high` sits above `low` on the
+        /// value stack.
+        ///
+        /// A `local.set` or `local.tee` right after the instruction relinks `high` as it
+        /// would relink a single result. The emission then offers the relink of `low` to
+        /// the next one. Each relink checks the register it consumes, because a
+        /// `local.tee` of `high` pushes its local above `low` without dropping the offer.
+        mutating func emitPair(low: VReg, high: VReg, _ make: @escaping PairRelink) {
+            emit(make(low, high), resultRelink: { make(low, $0) })
+            // The emission is replaced as a whole. Swift 6.3.2 with assertions rejects
+            // optional-chained stores into its fields with a SIL memory lifetime failure.
+            guard let emission = lastEmission else { return }
+            lastEmission = LastEmission(
+                position: emission.position, end: emission.end, resultRelink: emission.resultRelink,
+                fusable: nil, binary: nil, relinkedResult: high,
+                lowerRelink: LowerRelink(result: low, make: { high in { make($0, high) } })
+            )
         }
 
         mutating func putLabel() -> LabelRef {
@@ -2697,6 +2751,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     ) {
         let oldPC = iseqBuilder.insertingPC
         iseqBuilder.emit(instruction, resultRelink: resultRelink, fusable: fusable, binary: binary)
+        self.updateInstructionMapping(from: oldPC)
+    }
+
+    /// Emits an instruction with two results. See ``ISeqBuilder/emitPair(low:high:_:)``.
+    private mutating func emitPair(low: VReg, high: VReg, _ make: @escaping ISeqBuilder.PairRelink) {
+        let oldPC = iseqBuilder.insertingPC
+        iseqBuilder.emitPair(low: low, high: high, make)
         self.updateInstructionMapping(from: oldPC)
     }
 
@@ -4467,7 +4528,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // and they carry no `resultRelink`). That is load-bearing rather than
         // accidental: those copies read the local's *old* value, and relinking
         // would move the write of its new value before them.
-        if iseqBuilder.relinkLastInstructionResult(result) {
+        if iseqBuilder.relinkLastInstructionResult(result, storing: value) {
             // Good news, copyStack is optimized out :)
             return
         }
@@ -5345,6 +5406,59 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             return offset
         }
         try iseqBuilder.pinLabelHere(onBranchNotTaken)
+    }
+
+    // MARK: - Wide arithmetic
+
+    mutating func visitWideArithmetic(_ wideArithmetic: WasmParser.Instruction.WideArithmetic) throws(WasmKitError) -> Output {
+        guard module.features.contains(.wideArithmetic) else {
+            let name: String
+            switch wideArithmetic {
+            case .i64Add128: name = "i64.add128"
+            case .i64Sub128: name = "i64.sub128"
+            case .i64MulWideS: name = "i64.mul_wide_s"
+            case .i64MulWideU: name = "i64.mul_wide_u"
+            }
+            throw WasmKitError("\(name) requires the wide-arithmetic feature")
+        }
+        switch wideArithmetic {
+        case .i64Add128: try visitBinary128(Instruction.i64Add128)
+        case .i64Sub128: try visitBinary128(Instruction.i64Sub128)
+        case .i64MulWideS: try visitMulWide(Instruction.i64MulWideS)
+        case .i64MulWideU: try visitMulWide(Instruction.i64MulWideU)
+        }
+    }
+
+    /// Translates an operation on two 128-bit integers, each given as its low and high halves.
+    private mutating func visitBinary128(
+        _ instruction: @escaping (Instruction.Binary128Operand) -> Instruction
+    ) throws(WasmKitError) {
+        let rhsHigh = try popVRegOperand(.i64)
+        let rhsLow = try popVRegOperand(.i64)
+        let lhsHigh = try popVRegOperand(.i64)
+        let lhsLow = try popVRegOperand(.i64)
+        let low = valueStack.push(.i64)
+        let high = valueStack.push(.i64)
+        guard let lhsLow, let lhsHigh, let rhsLow, let rhsHigh else { return }
+        emitPair(low: low, high: high) { low, high in
+            instruction(
+                Instruction.Binary128Operand(
+                    lhsLow: lhsLow, lhsHigh: lhsHigh, rhsLow: rhsLow, rhsHigh: rhsHigh, low: low, high: high))
+        }
+    }
+
+    /// Translates a multiplication of two `i64` operands into their 128-bit product.
+    private mutating func visitMulWide(
+        _ instruction: @escaping (Instruction.MulWideOperand) -> Instruction
+    ) throws(WasmKitError) {
+        let rhs = try popVRegOperand(.i64)
+        let lhs = try popVRegOperand(.i64)
+        let low = valueStack.push(.i64)
+        let high = valueStack.push(.i64)
+        guard let lhs, let rhs else { return }
+        emitPair(low: low, high: high) { low, high in
+            instruction(Instruction.MulWideOperand(lhs: lhs, rhs: rhs, low: low, high: high))
+        }
     }
 
     // MARK: - Garbage collection

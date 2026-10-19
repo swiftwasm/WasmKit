@@ -617,6 +617,7 @@ extension WasmFeatureSet.Feature {
         case .functionReferences: "function-references"
         case .multiMemory: "multi-memory"
         case .gc: "gc"
+        case .wideArithmetic: "wide-arithmetic"
         }
     }
 }

@@ -575,6 +575,10 @@ extension WASTRunContext {
             // WasmKit's own GC tests, which check what the proposal needs on its own.
             features.insert(.gc)
         }
+        if rootPath.hasSuffix("wide-arithmetic") {
+            // The proposal's spec tests and WasmKit's own tests for it.
+            features.insert(.wideArithmetic)
+        }
         if rootPath.hasSuffix("fuel") {
             // A tail call is one of the ways a guest can run forever, so the fuel suite needs it.
             features.insert(.tailCall)

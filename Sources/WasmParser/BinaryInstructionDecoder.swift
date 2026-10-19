@@ -861,6 +861,14 @@ func parseBinaryInstruction(
         case 0x11:
             let (table) = try decoder.visitTableFill()
             return .tableFill(table: table)
+        case 0x13:
+            return .wideArithmetic(.i64Add128)
+        case 0x14:
+            return .wideArithmetic(.i64Sub128)
+        case 0x15:
+            return .wideArithmetic(.i64MulWideS)
+        case 0x16:
+            return .wideArithmetic(.i64MulWideU)
         default:
             try decoder.throwUnknown(prefix: opcode0, opcode: opcode1)
         }

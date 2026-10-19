@@ -554,6 +554,14 @@ extension Instruction {
             func binBin(_ name: String, _ op: Instruction.BinBinOperand) {
                 target.write("\(reg(op.result)) = \(name) \(reg(op.x)), \(reg(op.y)), \(reg(op.z))")
             }
+            func mulWide(_ name: String, _ op: Instruction.MulWideOperand) {
+                target.write("\(reg(op.low)), \(reg(op.high)) = \(name) \(reg(op.lhs)), \(reg(op.rhs))")
+            }
+            func binary128(_ name: String, _ op: Instruction.Binary128Operand) {
+                target.write(
+                    "\(reg(op.low)), \(reg(op.high)) = \(name) \(reg(op.lhsLow)), \(reg(op.lhsHigh)), \(reg(op.rhsLow)), \(reg(op.rhsHigh))"
+                )
+            }
             func loadToAcc(_ name: String, _ op: Instruction.AccMemoryPointerOperand) {
                 target.write("acc = \(name) \(reg(op.pointer)), \(offset(UInt64(op.offset)))")
             }
@@ -723,6 +731,10 @@ extension Instruction {
             case .i64ShrU(let op): binop("i64.shr_u", op)
             case .i64Eq(let op): binop("i64.eq", op)
             case .i64Eqz(let op): unop("i64.eqz", op)
+            case .i64Add128(let op): binary128("i64.add128", op)
+            case .i64Sub128(let op): binary128("i64.sub128", op)
+            case .i64MulWideS(let op): mulWide("i64.mul_wide_s", op)
+            case .i64MulWideU(let op): mulWide("i64.mul_wide_u", op)
             case .i32Store(let op): store("i32.store", op)
             case .brIfNot(let op):
                 target.write("br_if_not \(reg(op.condition)), \(branchTarget(instructionOffset, Int(op.offset)))")
