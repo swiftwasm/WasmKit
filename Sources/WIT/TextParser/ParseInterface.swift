@@ -44,9 +44,9 @@ extension InterfaceItemSyntax {
         case .union:
             return try .typeDef(.init(syntax: .parseUnion(lexer: &lexer, documents: documents, attributes: attributes)))
         case .id, .explicitId:
-            return try .function(NamedFunctionSyntax.parse(lexer: &lexer, documents: documents))
+            return try .function(NamedFunctionSyntax.parse(lexer: &lexer, documents: documents, attributes: attributes))
         case .use:
-            return try .use(UseSyntax.parse(lexer: &lexer))
+            return try .use(UseSyntax.parse(lexer: &lexer, attributes: attributes))
         default:
             throw ParseError(description: "`import`, `export`, `include`, `use`, or type definition")
         }
