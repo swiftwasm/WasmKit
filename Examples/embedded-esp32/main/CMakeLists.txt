@@ -4,7 +4,7 @@ else()
   set(devnull /dev/null)
 endif()
 idf_component_register(
-    SRCS "gdb_uart.c"
+    SRCS "gdb_uart.c" "swift_platform.c"
     PRIV_INCLUDE_DIRS "." "include"
     PRIV_REQUIRES idf_swift wasmkit wasi wasmkitwasi gdbremoteprotocol wasmkitgdbhandler esp_driver_uart
 )
