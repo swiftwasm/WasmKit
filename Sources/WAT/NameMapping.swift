@@ -261,7 +261,7 @@ struct TypesMap {
                 throw WatParserError("Type mismatch \(found) != \(inline)", location: indexOrId.location)
             }
         }
-        return (found, Int(index))
+        return (inline ?? found, Int(index))
     }
 
     /// Resolves a function type from a type use with an optional inline type
