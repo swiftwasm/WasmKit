@@ -717,6 +717,10 @@ extension ExpressionParser {
         // labels are resolved from the enclosing scope (the try_table's own label
         // is only in scope for the body instructions).
         self.labelStack.push(label)
+        if let label {
+            collectedLabelNames.append((nextLabelIndex, label.value))
+        }
+        nextLabelIndex += 1
         return (bt, TryCatch(catches: catches))
     }
     mutating func visitBrOnNull(wat: inout Wat) throws(WatParserError) -> UInt32 {

@@ -3,16 +3,18 @@
 // macros don't import into Swift). This intentionally duplicates a sliver of
 // IO code found elsewhere in the package: the WASI module's platform layer is
 // an implementation detail of WASI and is not shared as a utility.
+
+// `@preconcurrency`: Glibc and Bionic declare `stdout` as a mutable global.
 #if canImport(Darwin)
     import Darwin
 #elseif canImport(Glibc)
-    import Glibc
+    @preconcurrency import Glibc
 #elseif canImport(Musl)
     import Musl
 #elseif canImport(Android)
-    import Android
+    @preconcurrency import Android
 #elseif os(Windows)
-    import ucrt
+    import CRT
 #elseif os(WASI)
     import WASILibc
 #endif
@@ -31,10 +33,11 @@ enum CLIFile {
     }
 
     /// An opened file exposing the raw platform descriptor for
-    /// descriptor-based APIs. The handle owns the stream; call ``close()``
-    /// exactly once.
+    /// descriptor-based APIs. A handle from ``CLIFile/openRead(_:)`` or
+    /// ``CLIFile/createWrite(_:)`` owns its stream; call ``close()`` exactly once.
     struct Handle {
         fileprivate let stream: CFILEPointer
+        fileprivate var firstWriteErrno: CInt? = nil
 
         /// The raw platform descriptor, for APIs that borrow it. Callers
         /// must reposition via ``seekToStart()`` (not raw seeks) so the
@@ -96,6 +99,11 @@ enum CLIFile {
         try Handle(stream: _open(path, mode: "wb", what: "create"))
     }
 
+    /// The process's standard output. Do not close it.
+    static var standardOutput: Handle {
+        Handle(stream: stdout)
+    }
+
     private static func _open(_ path: String, mode: String, what: String) throws -> CFILEPointer {
         #if os(Windows)
             // Use the wide-character variant so non-ASCII paths survive.
@@ -113,14 +121,40 @@ enum CLIFile {
         return stream
     }
 
-    fileprivate static func _errnoMessage() -> String {
+    fileprivate static var _errno: CInt {
         #if os(Windows)
             var errnoValue: CInt = 0
             _get_errno(&errnoValue)
+            return errnoValue
         #else
-            let errnoValue = errno
+            return errno
         #endif
+    }
+
+    fileprivate static func _errnoMessage(_ errnoValue: CInt = _errno) -> String {
         guard let message = strerror(errnoValue) else { return "errno \(errnoValue)" }
         return String(cString: message)
+    }
+}
+
+extension CLIFile.Handle: TextOutputStream {
+    /// Writes `string` into the stream's buffer without flushing. ``flush()``
+    /// reports a failed write.
+    mutating func write(_ string: String) {
+        var string = string
+        string.withUTF8 { bytes in
+            guard let base = bytes.baseAddress, bytes.count > 0 else { return }
+            if fwrite(base, 1, bytes.count, stream) < bytes.count, firstWriteErrno == nil {
+                firstWriteErrno = CLIFile._errno
+            }
+        }
+    }
+
+    /// Writes out buffered data, throwing if this or an earlier write failed.
+    func flush() throws {
+        let flushErrno = fflush(stream) == 0 ? nil : CLIFile._errno
+        if let errnoValue = firstWriteErrno ?? flushErrno {
+            throw CLIFile.Error(description: "I/O error: \(CLIFile._errnoMessage(errnoValue))")
+        }
     }
 }

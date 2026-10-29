@@ -12,6 +12,7 @@ struct CLI: AsyncParsableCommand {
             Run.self,
             WAST.self,
             Wat2wasm.self,
+            Wasm2wat.self,
         ]
     )
 }
