@@ -12,8 +12,14 @@ protocol BinaryInstructionDecoder {
     /// Claim the next byte to be decoded
     @inlinable mutating func claimNextByte() throws(WasmParserError) -> UInt8
 
+    /// Claim the opcode that follows a prefix byte, which is encoded as a `u32` in LEB128.
+    @inlinable mutating func claimPrefixedOpcode() throws(WasmParserError) -> UInt32
+
     /// Throw an error due to unknown opcode.
     func throwUnknown(_ opcode: [UInt8]) throws(WasmParserError) -> Never
+
+    /// Throw an error due to an unknown opcode after a prefix byte.
+    func throwUnknown(prefix: UInt8, opcode: UInt32) throws(WasmParserError) -> Never
     /// Decode `block` immediates
     @inlinable mutating func visitBlock() throws(WasmParserError) -> BlockType
     /// Decode `loop` immediates
@@ -713,7 +719,7 @@ func parseBinaryInstruction(
         return .brOnNonNull(relativeDepth: relativeDepth)
     case 0xFB:
 
-        let opcode1 = try decoder.claimNextByte()
+        let opcode1 = try decoder.claimPrefixedOpcode()
         switch opcode1 {
         case 0x00:
             let (typeIndex) = try decoder.visitStructNew()
@@ -803,11 +809,11 @@ func parseBinaryInstruction(
         case 0x1E:
             return .i31GetU
         default:
-            try decoder.throwUnknown([opcode0, opcode1])
+            try decoder.throwUnknown(prefix: opcode0, opcode: opcode1)
         }
     case 0xFC:
 
-        let opcode1 = try decoder.claimNextByte()
+        let opcode1 = try decoder.claimPrefixedOpcode()
         switch opcode1 {
         case 0x00:
             return .conversion(.i32TruncSatF32S)
@@ -856,11 +862,11 @@ func parseBinaryInstruction(
             let (table) = try decoder.visitTableFill()
             return .tableFill(table: table)
         default:
-            try decoder.throwUnknown([opcode0, opcode1])
+            try decoder.throwUnknown(prefix: opcode0, opcode: opcode1)
         }
     case 0xFD:
 
-        let opcode1 = try decoder.claimNextByte()
+        let opcode1 = try decoder.claimPrefixedOpcode()
         switch opcode1 {
         case 0x00:
             let (memarg) = try decoder.visitLoad(.v128Load)
@@ -1157,1023 +1163,267 @@ func parseBinaryInstruction(
         case 0x7F:
             return .simd(.i32x4ExtaddPairwiseI16X8U)
         case 0x80:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8Abs)
-            case 0x02:
-                return .simd(.i8x16RelaxedSwizzle)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8Abs)
         case 0x81:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8Neg)
-            case 0x02:
-                return .simd(.i32x4RelaxedTruncF32X4S)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8Neg)
         case 0x82:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8Q15MulrSatS)
-            case 0x02:
-                return .simd(.i32x4RelaxedTruncF32X4U)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8Q15MulrSatS)
         case 0x83:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8AllTrue)
-            case 0x02:
-                return .simd(.i32x4RelaxedTruncF64X2SZero)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8AllTrue)
         case 0x84:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8Bitmask)
-            case 0x02:
-                return .simd(.i32x4RelaxedTruncF64X2UZero)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8Bitmask)
         case 0x85:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8NarrowI32X4S)
-            case 0x02:
-                return .simd(.f32x4RelaxedMadd)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8NarrowI32X4S)
         case 0x86:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8NarrowI32X4U)
-            case 0x02:
-                return .simd(.f32x4RelaxedNmadd)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8NarrowI32X4U)
         case 0x87:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8ExtendLowI8X16S)
-            case 0x02:
-                return .simd(.f64x2RelaxedMadd)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8ExtendLowI8X16S)
         case 0x88:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8ExtendHighI8X16S)
-            case 0x02:
-                return .simd(.f64x2RelaxedNmadd)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8ExtendHighI8X16S)
         case 0x89:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8ExtendLowI8X16U)
-            case 0x02:
-                return .simd(.i8x16RelaxedLaneselect)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8ExtendLowI8X16U)
         case 0x8A:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8ExtendHighI8X16U)
-            case 0x02:
-                return .simd(.i16x8RelaxedLaneselect)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8ExtendHighI8X16U)
         case 0x8B:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8Shl)
-            case 0x02:
-                return .simd(.i32x4RelaxedLaneselect)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8Shl)
         case 0x8C:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8ShrS)
-            case 0x02:
-                return .simd(.i64x2RelaxedLaneselect)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8ShrS)
         case 0x8D:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8ShrU)
-            case 0x02:
-                return .simd(.f32x4RelaxedMin)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8ShrU)
         case 0x8E:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8Add)
-            case 0x02:
-                return .simd(.f32x4RelaxedMax)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8Add)
         case 0x8F:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8AddSatS)
-            case 0x02:
-                return .simd(.f64x2RelaxedMin)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8AddSatS)
         case 0x90:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8AddSatU)
-            case 0x02:
-                return .simd(.f64x2RelaxedMax)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8AddSatU)
         case 0x91:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8Sub)
-            case 0x02:
-                return .simd(.i16x8RelaxedQ15MulrS)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8Sub)
         case 0x92:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8SubSatS)
-            case 0x02:
-                return .simd(.i16x8RelaxedDotI8X16I7X16S)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8SubSatS)
         case 0x93:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8SubSatU)
-            case 0x02:
-                return .simd(.i32x4RelaxedDotI8X16I7X16AddS)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8SubSatU)
         case 0x94:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f64x2Nearest)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f64x2Nearest)
         case 0x95:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8Mul)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8Mul)
         case 0x96:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8MinS)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8MinS)
         case 0x97:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8MinU)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8MinU)
         case 0x98:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8MaxS)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8MaxS)
         case 0x99:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8MaxU)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8MaxU)
         case 0x9B:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8AvgrU)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8AvgrU)
         case 0x9C:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8ExtmulLowI8X16S)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8ExtmulLowI8X16S)
         case 0x9D:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8ExtmulHighI8X16S)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8ExtmulHighI8X16S)
         case 0x9E:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8ExtmulLowI8X16U)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8ExtmulLowI8X16U)
         case 0x9F:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i16x8ExtmulHighI8X16U)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i16x8ExtmulHighI8X16U)
         case 0xA0:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4Abs)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4Abs)
         case 0xA1:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4Neg)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4Neg)
         case 0xA3:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4AllTrue)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4AllTrue)
         case 0xA4:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4Bitmask)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4Bitmask)
         case 0xA7:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4ExtendLowI16X8S)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4ExtendLowI16X8S)
         case 0xA8:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4ExtendHighI16X8S)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4ExtendHighI16X8S)
         case 0xA9:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4ExtendLowI16X8U)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4ExtendLowI16X8U)
         case 0xAA:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4ExtendHighI16X8U)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4ExtendHighI16X8U)
         case 0xAB:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4Shl)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4Shl)
         case 0xAC:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4ShrS)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4ShrS)
         case 0xAD:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4ShrU)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4ShrU)
         case 0xAE:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4Add)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4Add)
         case 0xB1:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4Sub)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4Sub)
         case 0xB5:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4Mul)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4Mul)
         case 0xB6:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4MinS)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4MinS)
         case 0xB7:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4MinU)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4MinU)
         case 0xB8:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4MaxS)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4MaxS)
         case 0xB9:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4MaxU)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4MaxU)
         case 0xBA:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4DotI16X8S)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4DotI16X8S)
         case 0xBC:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4ExtmulLowI16X8S)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4ExtmulLowI16X8S)
         case 0xBD:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4ExtmulHighI16X8S)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4ExtmulHighI16X8S)
         case 0xBE:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4ExtmulLowI16X8U)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4ExtmulLowI16X8U)
         case 0xBF:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4ExtmulHighI16X8U)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4ExtmulHighI16X8U)
         case 0xC0:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2Abs)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2Abs)
         case 0xC1:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2Neg)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2Neg)
         case 0xC3:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2AllTrue)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2AllTrue)
         case 0xC4:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2Bitmask)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2Bitmask)
         case 0xC7:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2ExtendLowI32X4S)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2ExtendLowI32X4S)
         case 0xC8:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2ExtendHighI32X4S)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2ExtendHighI32X4S)
         case 0xC9:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2ExtendLowI32X4U)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2ExtendLowI32X4U)
         case 0xCA:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2ExtendHighI32X4U)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2ExtendHighI32X4U)
         case 0xCB:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2Shl)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2Shl)
         case 0xCC:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2ShrS)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2ShrS)
         case 0xCD:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2ShrU)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2ShrU)
         case 0xCE:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2Add)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2Add)
         case 0xD1:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2Sub)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2Sub)
         case 0xD5:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2Mul)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2Mul)
         case 0xD6:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2Eq)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2Eq)
         case 0xD7:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2Ne)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2Ne)
         case 0xD8:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2LtS)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2LtS)
         case 0xD9:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2GtS)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2GtS)
         case 0xDA:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2LeS)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2LeS)
         case 0xDB:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2GeS)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2GeS)
         case 0xDC:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2ExtmulLowI32X4S)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2ExtmulLowI32X4S)
         case 0xDD:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2ExtmulHighI32X4S)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2ExtmulHighI32X4S)
         case 0xDE:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2ExtmulLowI32X4U)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2ExtmulLowI32X4U)
         case 0xDF:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i64x2ExtmulHighI32X4U)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i64x2ExtmulHighI32X4U)
         case 0xE0:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f32x4Abs)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f32x4Abs)
         case 0xE1:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f32x4Neg)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f32x4Neg)
         case 0xE3:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f32x4Sqrt)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f32x4Sqrt)
         case 0xE4:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f32x4Add)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f32x4Add)
         case 0xE5:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f32x4Sub)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f32x4Sub)
         case 0xE6:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f32x4Mul)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f32x4Mul)
         case 0xE7:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f32x4Div)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f32x4Div)
         case 0xE8:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f32x4Min)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f32x4Min)
         case 0xE9:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f32x4Max)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f32x4Max)
         case 0xEA:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f32x4Pmin)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f32x4Pmin)
         case 0xEB:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f32x4Pmax)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f32x4Pmax)
         case 0xEC:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f64x2Abs)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f64x2Abs)
         case 0xED:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f64x2Neg)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f64x2Neg)
         case 0xEF:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f64x2Sqrt)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f64x2Sqrt)
         case 0xF0:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f64x2Add)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f64x2Add)
         case 0xF1:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f64x2Sub)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f64x2Sub)
         case 0xF2:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f64x2Mul)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f64x2Mul)
         case 0xF3:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f64x2Div)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f64x2Div)
         case 0xF4:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f64x2Min)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f64x2Min)
         case 0xF5:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f64x2Max)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f64x2Max)
         case 0xF6:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f64x2Pmin)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f64x2Pmin)
         case 0xF7:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f64x2Pmax)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f64x2Pmax)
         case 0xF8:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4TruncSatF32X4S)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4TruncSatF32X4S)
         case 0xF9:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4TruncSatF32X4U)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4TruncSatF32X4U)
         case 0xFA:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f32x4ConvertI32X4S)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f32x4ConvertI32X4S)
         case 0xFB:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f32x4ConvertI32X4U)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f32x4ConvertI32X4U)
         case 0xFC:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4TruncSatF64X2SZero)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4TruncSatF64X2SZero)
         case 0xFD:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.i32x4TruncSatF64X2UZero)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.i32x4TruncSatF64X2UZero)
         case 0xFE:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f64x2ConvertLowI32X4S)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f64x2ConvertLowI32X4S)
         case 0xFF:
-
-            let opcode2 = try decoder.claimNextByte()
-            switch opcode2 {
-            case 0x01:
-                return .simd(.f64x2ConvertLowI32X4U)
-            default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
-            }
+            return .simd(.f64x2ConvertLowI32X4U)
+        case 0x100:
+            return .simd(.i8x16RelaxedSwizzle)
+        case 0x101:
+            return .simd(.i32x4RelaxedTruncF32X4S)
+        case 0x102:
+            return .simd(.i32x4RelaxedTruncF32X4U)
+        case 0x103:
+            return .simd(.i32x4RelaxedTruncF64X2SZero)
+        case 0x104:
+            return .simd(.i32x4RelaxedTruncF64X2UZero)
+        case 0x105:
+            return .simd(.f32x4RelaxedMadd)
+        case 0x106:
+            return .simd(.f32x4RelaxedNmadd)
+        case 0x107:
+            return .simd(.f64x2RelaxedMadd)
+        case 0x108:
+            return .simd(.f64x2RelaxedNmadd)
+        case 0x109:
+            return .simd(.i8x16RelaxedLaneselect)
+        case 0x10A:
+            return .simd(.i16x8RelaxedLaneselect)
+        case 0x10B:
+            return .simd(.i32x4RelaxedLaneselect)
+        case 0x10C:
+            return .simd(.i64x2RelaxedLaneselect)
+        case 0x10D:
+            return .simd(.f32x4RelaxedMin)
+        case 0x10E:
+            return .simd(.f32x4RelaxedMax)
+        case 0x10F:
+            return .simd(.f64x2RelaxedMin)
+        case 0x110:
+            return .simd(.f64x2RelaxedMax)
+        case 0x111:
+            return .simd(.i16x8RelaxedQ15MulrS)
+        case 0x112:
+            return .simd(.i16x8RelaxedDotI8X16I7X16S)
+        case 0x113:
+            return .simd(.i32x4RelaxedDotI8X16I7X16AddS)
         default:
-            try decoder.throwUnknown([opcode0, opcode1])
+            try decoder.throwUnknown(prefix: opcode0, opcode: opcode1)
         }
     case 0xFE:
 
-        let opcode1 = try decoder.claimNextByte()
+        let opcode1 = try decoder.claimPrefixedOpcode()
         switch opcode1 {
         case 0x00:
             let (memarg) = try decoder.visitMemoryAtomicNotify()
@@ -2191,7 +1441,7 @@ func parseBinaryInstruction(
             case 0x00:
                 return .atomicFence
             default:
-                try decoder.throwUnknown([opcode0, opcode1, opcode2])
+                try decoder.throwUnknown(prefix: opcode0, opcode: opcode1)
             }
         case 0x10:
             let (memarg) = try decoder.visitLoad(.i32AtomicLoad)
@@ -2383,7 +1633,7 @@ func parseBinaryInstruction(
             let (memarg) = try decoder.visitI64AtomicRmw32CmpxchgU()
             return .i64AtomicRmw32CmpxchgU(memarg: memarg)
         default:
-            try decoder.throwUnknown([opcode0, opcode1])
+            try decoder.throwUnknown(prefix: opcode0, opcode: opcode1)
         }
     default:
         try decoder.throwUnknown([opcode0])
