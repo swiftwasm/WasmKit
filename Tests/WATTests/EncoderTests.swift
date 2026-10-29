@@ -544,19 +544,7 @@ struct EncoderTests {
             options: EncodeOptions(nameSection: true)
         )
 
-        var parser = WasmParser.Parser(bytes: bytes)
-        var customSections: [CustomSection] = []
-        while let payload = try parser.parseNext() {
-            guard case .customSection(let section) = payload else {
-                continue
-            }
-            customSections.append(section)
-        }
-        let nameSection = customSections.first(where: { $0.name == "name" })
-        var nameParser = NameSectionParser(
-            stream: StaticByteStreamSource(bytes: nameSection?.bytes ?? [])
-        )
-        let names = try nameParser.parseAll()
+        let names = try Self.nameSubsections(of: bytes)
         #expect(names.count == 1)
         guard case .functions(let functionNames) = try #require(names.first) else {
             Issue.record("Expected functions name section")
@@ -588,19 +576,7 @@ struct EncoderTests {
             options: EncodeOptions(nameSection: true)
         )
 
-        // Extract the name custom section bytes
-        var parser = WasmParser.Parser(bytes: bytes)
-        var nameBytes: ArraySlice<UInt8>?
-        while let payload = try parser.parseNext() {
-            if case .customSection(let section) = payload, section.name == "name" {
-                nameBytes = section.bytes
-            }
-        }
-        let sectionBytes = Array(nameBytes ?? [])
-        var nameParser = NameSectionParser(
-            stream: StaticByteStreamSource(bytes: sectionBytes)
-        )
-        let parsed = try nameParser.parseAll()
+        let parsed = try Self.nameSubsections(of: bytes)
         #expect(parsed.count == 10)
 
         // Collect into a lookup by discriminator for readable assertions
@@ -614,6 +590,7 @@ struct EncoderTests {
         var globalNames: NameMap?
         var elemNames: NameMap?
         var dataNames: NameMap?
+        var tagNames: NameMap?
         for entry in parsed {
             switch entry {
             case .moduleName(let v): moduleName = v
@@ -626,6 +603,7 @@ struct EncoderTests {
             case .globals(let v): globalNames = v
             case .elements(let v): elemNames = v
             case .dataSegments(let v): dataNames = v
+            case .tags(let v): tagNames = v
             }
         }
 
@@ -639,5 +617,122 @@ struct EncoderTests {
         #expect(globalNames == [0: "myglob"])
         #expect(elemNames == [0: "myelem"])
         #expect(dataNames == [0: "mydata"])
+        #expect(tagNames == nil)
+    }
+
+    private static func nameSubsections(of bytes: [UInt8]) throws -> [ParsedNames] {
+        var parser = WasmParser.Parser(bytes: bytes)
+        while let payload = try parser.parseNext() {
+            if case .customSection(let section) = payload, section.name == "name" {
+                var nameParser = NameSectionParser(stream: StaticByteStreamSource(bytes: section.bytes))
+                return try nameParser.parseAll()
+            }
+        }
+        return []
+    }
+
+    @Test
+    func encodeNameSectionCountsTryTableLabels() throws {
+        let bytes = try wat2wasm(
+            """
+            (module
+                (func
+                    block $o
+                        try_table $t (catch_all $o)
+                            br $t
+                        end
+                    end
+                    block $b
+                        br $b
+                    end
+                )
+            )
+            """,
+            options: EncodeOptions(nameSection: true)
+        )
+        let labels = try Self.nameSubsections(of: bytes).compactMap { names -> [UInt32: NameMap]? in
+            guard case .labels(let labels) = names else { return nil }
+            return labels
+        }
+        #expect(labels == [[0: [0: "o", 1: "t", 2: "b"]]])
+    }
+
+    @Test
+    func encodeNameSectionKeepsParameterNamesBesideATypeUse() throws {
+        let bytes = try wat2wasm(
+            """
+            (module
+                (type $t (func (param i32)))
+                (func (type $t) (param $p i32)
+                    local.get $p
+                    drop
+                )
+            )
+            """,
+            options: EncodeOptions(nameSection: true)
+        )
+        let locals = try Self.nameSubsections(of: bytes).compactMap { names -> [UInt32: NameMap]? in
+            guard case .locals(let locals) = names else { return nil }
+            return locals
+        }
+        #expect(locals == [[0: [0: "p"]]])
+    }
+
+    @Test
+    func encodeFoldedIfConditionOutsideIfLabel() throws {
+        // The condition runs before the `if`, so `br $outer` crosses only the condition's block.
+        let bytes = try wat2wasm("(module (func (block $outer (if (block (result i32) (br $outer)) (then)))))")
+        let expected: [UInt8] = [
+            0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
+            0x01, 0x04, 0x01, 0x60, 0x00, 0x00,
+            0x03, 0x02, 0x01, 0x00,
+            0x0A, 0x0F, 0x01, 0x0D, 0x00, 0x02, 0x40, 0x02, 0x7F, 0x0C, 0x01, 0x0B, 0x04, 0x40, 0x0B, 0x0B, 0x0B,
+        ]
+        #expect(bytes == expected)
+    }
+
+    @Test
+    func encodeNameSectionNumbersFoldedIfLabelAfterCondition() throws {
+        let bytes = try wat2wasm(
+            "(module (func (if $l (block $b (result i32) (i32.const 1)) (then))))",
+            options: EncodeOptions(nameSection: true)
+        )
+        let labels = try Self.nameSubsections(of: bytes).compactMap { names -> [UInt32: NameMap]? in
+            guard case .labels(let labels) = names else { return nil }
+            return labels
+        }
+        #expect(labels == [[0: [0: "b", 1: "l"]]])
+    }
+
+    @Test
+    func encodeFoldedIfConditionRejectsIfLabel() throws {
+        let error = try #require(throws: WatParserError.self) {
+            _ = try wat2wasm("(module (func (if $l (block (result i32) (br $l)) (then))))")
+        }
+        #expect(error.message.hasPrefix("unknown label "))
+    }
+
+    @Test(arguments: [
+        "(module (func $f) (func (if (i32.const 1) (nop)) (call $f)))",
+        "(module (func (if (i32.const 1) nop)))",
+        "(module (func (if i32.const 1 (then))))",
+    ])
+    func encodeFoldedIfRequiresFoldedConditionAndThen(wat: String) throws {
+        let error = try #require(throws: WatParserError.self) {
+            _ = try wat2wasm(wat)
+        }
+        #expect(error.message == "expected a folded instruction or `(then ...)` in a folded `if`")
+    }
+
+    @Test(arguments: [
+        "(module (func (if (i32.const 1) (then) (nop))))",
+        "(module (func (if (i32.const 1) (then) (else) (nop))))",
+        "(module (func $f) (func (if (i32.const 1) (then nop) (call $f))))",
+    ])
+    func encodeFoldedIfRejectsInstructionAfterClauses(wat: String) throws {
+        let error = try #require(throws: WatParserError.self) {
+            _ = try wat2wasm(wat)
+        }
+        #expect(error.message == "expected `)` to close the folded `if`")
     }
 }

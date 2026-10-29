@@ -331,68 +331,63 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
             }
             try parser.expect(.leftParen)
             let keyword = try parser.expectKeyword()
+            if keyword == "if" {
+                foldedStack.append(try foldedIf(visitor: &visitor, wat: &wat))
+                continue
+            }
             let visit = try parseTextInstruction(keyword: keyword, wat: &wat)
             let suspense: Suspense
             switch keyword {
-            case "if":
-                // Special handling for "if" because of its special order
-                // Usually given (A (B) (C (D)) (E)), we visit B, D, C, E, A
-                // But for "if" (if (B) (then (C (D))) (else (E))), we want to visit B, "if", D, C, E
-
-                // Condition may be absent
-                if try !parser.takeParenBlockStart("then") {
-                    // Visit condition instructions
-                    while true {
-                        guard try foldedInstruction(visitor: &visitor, wat: &wat) else {
-                            break
-                        }
-                        if try parser.takeParenBlockStart("then") {
-                            break
-                        }
-                    }
-                }
-                // Visit "if"
-                _ = try visit(&visitor)
-                // Visit "then" block
-                try parse(visitor: &visitor, wat: &wat)
-                try parser.expect(.rightParen)
-                // Visit "else" block if present
-                if try parser.takeParenBlockStart("else") {
-                    // Visit only when "else" block has child expr
-                    if try parser.peek(.rightParen) == nil {
-                        _ = try visitor.visitElse()
-                        try parse(visitor: &visitor, wat: &wat)
-                    }
-                    try parser.expect(.rightParen)
-                }
-                suspense = Suspense(visit: { visitor, this throws(WatParserError) in
-                    // An unfolded `end` inside the folded block already popped this
-                    // label, which means the source has a surplus `end`.
-                    guard this.labelStack.pop() else {
-                        throw WatParserError("unexpected `end`: no block is open here", location: nil)
-                    }
-                    return try visitor.visitEnd()
-                })
             case "block", "loop", "try_table":
                 // Visit the block instruction itself
                 _ = try visit(&visitor)
                 // Visit child expr here because folded "block", "loop", and "try_table"
                 // allows unfolded child instructions unlike others.
                 try parse(visitor: &visitor, wat: &wat)
-                suspense = Suspense(visit: { visitor, this throws(WatParserError) in
-                    // An unfolded `end` inside the folded block already popped this
-                    // label, which means the source has a surplus `end`.
-                    guard this.labelStack.pop() else {
-                        throw WatParserError("unexpected `end`: no block is open here", location: nil)
-                    }
-                    return try visitor.visitEnd()
-                })
+                suspense = Self.blockEnd
             default:
                 suspense = Suspense(visit: { visitor, _ throws(WatParserError) in try visit(&visitor) })
             }
             foldedStack.append(suspense)
         } while !foldedStack.isEmpty
         return true
+    }
+
+    private mutating func foldedIf(visitor: inout Visitor, wat: inout Wat) throws(WatParserError) -> Suspense {
+        let label = try parser.takeId()
+        let type = try blockType(wat: &wat)
+        while try !parser.takeParenBlockStart("then") {
+            guard try foldedInstruction(visitor: &visitor, wat: &wat) else {
+                throw WatParserError(
+                    "expected a folded instruction or `(then ...)` in a folded `if`", location: parser.lexer.location())
+            }
+        }
+        // The label precedes the condition in the text but is in scope only in the `then` and `else` bodies.
+        pushLabel(label)
+        try visitor.visitIf(blockType: type)
+        try parse(visitor: &visitor, wat: &wat)
+        try parser.expect(.rightParen)
+        if try parser.takeParenBlockStart("else") {
+            if try parser.peek(.rightParen) == nil {
+                _ = try visitor.visitElse()
+                try parse(visitor: &visitor, wat: &wat)
+            }
+            try parser.expect(.rightParen)
+        }
+        guard try parser.peek(.rightParen) != nil else {
+            throw WatParserError("expected `)` to close the folded `if`", location: parser.lexer.location())
+        }
+        return Self.blockEnd
+    }
+
+    private static var blockEnd: Suspense {
+        Suspense(visit: { visitor, this throws(WatParserError) in
+            // An unfolded `end` inside the folded block already popped this label.
+            guard this.labelStack.pop() else {
+                throw WatParserError("unexpected `end`: no block is open here", location: nil)
+            }
+            return try visitor.visitEnd()
+        })
     }
 
     /// Parse a single instruction without consuming the surrounding parentheses and instruction keyword.
@@ -628,31 +623,23 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
 
 extension ExpressionParser {
     mutating func visitBlock(wat: inout Wat) throws(WatParserError) -> BlockType {
-        let label = try parser.takeId()
-        self.labelStack.push(label)
-        if let label {
-            collectedLabelNames.append((nextLabelIndex, label.value))
-        }
-        nextLabelIndex += 1
+        pushLabel(try parser.takeId())
         return try blockType(wat: &wat)
     }
     mutating func visitLoop(wat: inout Wat) throws(WatParserError) -> BlockType {
-        let label = try parser.takeId()
-        self.labelStack.push(label)
-        if let label {
-            collectedLabelNames.append((nextLabelIndex, label.value))
-        }
-        nextLabelIndex += 1
+        pushLabel(try parser.takeId())
         return try blockType(wat: &wat)
     }
     mutating func visitIf(wat: inout Wat) throws(WatParserError) -> BlockType {
-        let label = try parser.takeId()
-        self.labelStack.push(label)
+        pushLabel(try parser.takeId())
+        return try blockType(wat: &wat)
+    }
+    private mutating func pushLabel(_ label: Name?) {
+        labelStack.push(label)
         if let label {
             collectedLabelNames.append((nextLabelIndex, label.value))
         }
         nextLabelIndex += 1
-        return try blockType(wat: &wat)
     }
     mutating func visitBr(wat: inout Wat) throws(WatParserError) -> UInt32 {
         return try labelIndex()
@@ -716,7 +703,7 @@ extension ExpressionParser {
         // Push the try_table's label AFTER parsing catch clauses, since catch clause
         // labels are resolved from the enclosing scope (the try_table's own label
         // is only in scope for the body instructions).
-        self.labelStack.push(label)
+        pushLabel(label)
         return (bt, TryCatch(catches: catches))
     }
     mutating func visitBrOnNull(wat: inout Wat) throws(WatParserError) -> UInt32 {

@@ -1,4 +1,5 @@
 #if os(macOS) || os(Linux)
+    import CLITestSupport
     import Foundation
     import Testing
     import WasmKit
@@ -72,8 +73,7 @@
         }
 
         private func runModule(_ module: URL, threadsEnabled: Bool) throws -> (status: Int32, standardError: String) {
-            let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            let executable = try cliExecutable(testsDirectory: testsDirectory)
+            let executable = try wasmkitCLIExecutable()
 
             let process = Process()
             process.executableURL = executable
@@ -101,23 +101,8 @@
             return (process.terminationStatus, standardError)
         }
 
-        private func cliExecutable(testsDirectory: URL) throws -> URL {
-            let buildDirectory = testsDirectory.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent(".build")
-            let debugExecutable = buildDirectory.appendingPathComponent("debug/wasmkit-cli")
-            if FileManager.default.isExecutableFile(atPath: debugExecutable.path) {
-                return debugExecutable
-            }
-            let candidates = (FileManager.default.enumerator(at: buildDirectory, includingPropertiesForKeys: [.isRegularFileKey])?.allObjects as? [URL] ?? [])
-                .filter { $0.lastPathComponent == "wasmkit-cli" && FileManager.default.isExecutableFile(atPath: $0.path) }
-            guard let executable = candidates.first else {
-                throw SubprocessError.missingExecutable(buildDirectory.path)
-            }
-            return executable
-        }
-
         private enum SubprocessError: Error {
             case timedOut(String)
-            case missingExecutable(String)
         }
     }
 

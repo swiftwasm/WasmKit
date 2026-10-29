@@ -24,7 +24,7 @@ struct ByteStream<Source: ByteStreamSource> {
     @inlinable
     mutating func consume(count: Int) throws(WasmParserError) -> ArraySlice<UInt8> {
         guard count > 0 else { return [] }
-        guard let bytes = try source.readBytes(from: currentIndex, to: currentIndex + count) else {
+        guard count <= Int.max - currentIndex, let bytes = try source.readBytes(from: currentIndex, to: currentIndex + count) else {
             throw WasmParserError(kind: .parserUnexpectedEnd(expected: nil), offset: currentIndex)
         }
         currentIndex += count
@@ -87,11 +87,11 @@ public final class StaticByteStreamSource: ByteStreamSource {
 
     @inlinable
     public func readBytes(from startOffset: Int, to endOffset: Int) throws(WasmParserError) -> ArraySlice<UInt8>? {
-        let lowerIndex = bytes.startIndex + startOffset
-        let upperIndex = bytes.startIndex + endOffset
-        guard upperIndex <= bytes.endIndex else {
+        guard endOffset <= bytes.count else {
             return nil
         }
+        let lowerIndex = bytes.startIndex + startOffset
+        let upperIndex = bytes.startIndex + endOffset
         return self.bytes[lowerIndex..<upperIndex]
     }
 }
