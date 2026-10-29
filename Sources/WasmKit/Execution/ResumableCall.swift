@@ -18,13 +18,80 @@ public struct Suspension: Sendable {
         ///
         /// Set a new deadline and resume, and the call checks the epoch again where it stopped.
         case epochDeadlineReached
+        /// A host function that the guest called threw a ``SuspensionRequest``.
+        ///
+        /// `tag` is the request's tag, and `arguments` is a copy of what the guest passed to the
+        /// host function. The host function does not run again. Complete its call with
+        /// ``ResumableCall/resume(returning:answering:)`` or
+        /// ``ResumableCall/resume(failing:answering:)``, and the guest continues after it. To end
+        /// the call instead, cancel it with ``ResumableCall/resume(throwing:)``.
+        ///
+        /// A reference among the arguments is the same value a synchronous host function would
+        /// get. Copying the array copies the references and keeps nothing they name alive. A
+        /// function reference names a function of the call's store. It is valid only in that
+        /// store, while the store lives. An exception reference names an exception that this
+        /// call's guest caught, and it is valid only in this call. The same holds for references
+        /// in an answer. ``ResumableCall/resume(returning:answering:)`` checks the type of each
+        /// result, including whether it may be null, and the suspension it answers. It does not
+        /// check where a reference came from, so keeping each reference within its store and call
+        /// is up to the embedder.
+        ///
+        /// Neither the suspension nor an answer charges ``Store/fuel`` or checks the epoch
+        /// deadline. After an answer the guest runs under the usual rules, and it reaches its next
+        /// fuel charge or epoch check where it would after a synchronous host function. It can
+        /// have side effects before then. A deadline that passed during the suspension stops the
+        /// guest at the next epoch check. If the guest returns before it reaches one, the call
+        /// returns its results although the deadline has passed.
+        case hostCall(tag: UInt64, arguments: [Value])
     }
 
     /// What suspended the call.
     public let reason: Reason
+
+    /// The identity of a suspension at a host call, which an answer to it has to name.
+    let hostCallIdentity: HostCallIdentity?
+
+    init(reason: Reason, hostCallIdentity: HostCallIdentity? = nil) {
+        self.reason = reason
+        self.hostCallIdentity = hostCallIdentity
+    }
 }
 
-/// An error raised by misusing a ``ResumableCall``. The call is left as it was.
+/// Thrown by a host function to suspend the ``ResumableCall`` whose guest called it.
+///
+/// The call suspends at the host call with ``Suspension/Reason/hostCall(tag:arguments:)``. The
+/// embedder then does the host function's work outside of it, and continues the guest with
+/// ``ResumableCall/resume(returning:answering:)`` as if the host function had returned.
+///
+/// Only the guest of a ``ResumableCall`` can be suspended this way. A request from a host
+/// function that a plain call such as ``Function/invoke(_:)`` reached, or that was called with no
+/// guest in between, traps instead.
+///
+/// The host function's ``Caller`` and the buffers it was given are valid only while it runs. The
+/// suspension keeps none of them, and carries a copy of the arguments instead.
+public struct SuspensionRequest: Error, Sendable, Equatable {
+    /// A value the host function chooses, so that the embedder can tell requests apart.
+    ///
+    /// The call passes it on in ``Suspension/Reason/hostCall(tag:arguments:)`` and does not use it
+    /// otherwise. An answer is matched to its suspension by the ``Suspension`` it names.
+    public var tag: UInt64
+
+    /// Creates a request to suspend, tagged with `tag`.
+    public init(tag: UInt64 = 0) {
+        self.tag = tag
+    }
+}
+
+/// An error raised by misusing a ``ResumableCall``.
+///
+/// A call raises it when it refuses a request, such as an answer to another suspension. The
+/// refusal comes before anything runs or is written, so the call that refused is left as it was.
+///
+/// An error of this type that comes from elsewhere is not a refusal. A host function that the
+/// guest calls can throw one, for example from a nested call it misused, and it can be the error
+/// given to ``ResumableCall/resume(failing:answering:)`` or ``ResumableCall/resume(throwing:)``.
+/// Such an error finishes the call like any other error. ``ResumableCall/isFinished`` tells
+/// whether a call has ended.
 public struct ResumableCallError: Error, CustomStringConvertible, Sendable {
     /// The description of the error.
     public let description: String
@@ -36,7 +103,22 @@ public struct ResumableCallError: Error, CustomStringConvertible, Sendable {
         ResumableCallError(description: "the call has already finished")
     }
     static var exceptionNotThrowable: ResumableCallError {
-        ResumableCallError(description: "a WebAssembly exception cannot be thrown into a call suspended at a fuel check")
+        ResumableCallError(description: "a WebAssembly exception cannot be thrown into a suspended call to cancel it")
+    }
+    static var requestNotThrowable: ResumableCallError {
+        ResumableCallError(description: "a suspension request cannot be thrown into a suspended call")
+    }
+    static var suspendedAtHostCall: ResumableCallError {
+        ResumableCallError(description: "the call is suspended at a host call, which needs the host function's results")
+    }
+    static var notSuspendedAtHostCall: ResumableCallError {
+        ResumableCallError(description: "the call is not suspended at a host call")
+    }
+    static var otherSuspension: ResumableCallError {
+        ResumableCallError(description: "the answer is for another suspension")
+    }
+    static func resultTypesMismatch(expected: [ValueType], got: [Value]) -> ResumableCallError {
+        ResumableCallError(description: "the host function returns \(expected), not \(got)")
     }
 }
 
@@ -44,24 +126,66 @@ public struct ResumableCallError: Error, CustomStringConvertible, Sendable {
 ///
 /// Thrown by the code that suspends, and caught by ``ResumableCall``. The frames between `sp` and
 /// the root frame stay on the call's stack while it is suspended.
+///
+/// It is `Sendable` only because `Error` requires it. A signal never leaves the call that threw
+/// it. The call catches it on the thread that runs the guest and keeps it in its own state. Its
+/// pointers lead into the call's stack and into code that the call's store keeps, and the call
+/// holds both for as long as it holds the signal.
 struct SuspensionSignal: Error, @unchecked Sendable {
     let reason: Suspension.Reason
     /// The frame to continue in.
     let sp: Sp
     /// The head slot to continue from.
     let resumePC: Pc
+    /// The host call the guest is suspended in, when a host function asked to suspend.
+    let hostCall: SuspendedHostCall?
+
+    init(reason: Suspension.Reason, sp: Sp, resumePC: Pc, hostCall: SuspendedHostCall? = nil) {
+        self.reason = reason
+        self.sp = sp
+        self.resumePC = resumePC
+        self.hostCall = hostCall
+    }
 
     var suspension: Suspension {
-        Suspension(reason: reason)
+        Suspension(reason: reason, hostCallIdentity: hostCall?.identity)
+    }
+
+    /// Where a trap thrown into the suspended guest is raised, for its backtrace.
+    ///
+    /// A synchronous host function's trap is reported just past its call, which is where a
+    /// suspended host call continues. A check is reported just past its own head slot.
+    var trapSite: Pc {
+        hostCall == nil ? resumePC + 1 : resumePC
     }
 }
+
+/// A host call that a guest is suspended in.
+///
+/// `parameterArea` is on the suspended call's own stack, which the call keeps while it is
+/// suspended. The host function belongs to the call's store, which the call retains.
+struct SuspendedHostCall {
+    /// The host function, whose result types and layout an answer has to match.
+    let function: EntityHandle<HostFunctionEntity>
+    /// Where the call's results go.
+    let parameterArea: Sp
+    /// The identity of this suspension, compared by reference.
+    let identity: HostCallIdentity
+}
+
+/// An object whose identity names one suspension at a host call.
+///
+/// A ``Suspension`` keeps it alive, so its address is not reused while an answer can still name
+/// it.
+final class HostCallIdentity: Sendable {}
 
 /// A call to a function that can be suspended and resumed.
 ///
 /// A resumable call runs its guest on a stack of its own, which stays alive while the call is
 /// suspended. With ``EngineConfiguration/fuelMetering``, running out of ``Store/fuel`` suspends
 /// the guest instead of trapping, and so does reaching the epoch deadline with
-/// ``EngineConfiguration/epochInterruption``.
+/// ``EngineConfiguration/epochInterruption``. A host function that the guest calls can suspend it
+/// too, by throwing a ``SuspensionRequest``.
 ///
 /// ```swift
 /// let call = try ResumableCall(function: run, arguments: [])
@@ -70,10 +194,14 @@ struct SuspensionSignal: Error, @unchecked Sendable {
 ///     switch suspension.reason {
 ///     case .outOfFuel(let required):
 ///         store.fuel = Fuel(remaining: max(required, 10_000))
+///         status = try call.resume()
 ///     case .epochDeadlineReached:
 ///         store.setEpochDeadline(ticksBeyondCurrent: 1)
+///         status = try call.resume()
+///     case .hostCall(let tag, let arguments):
+///         let results = try await work(tag, arguments)
+///         status = try call.resume(returning: results, answering: suspension)
 ///     }
-///     status = try call.resume()
 /// }
 /// ```
 ///
@@ -81,7 +209,14 @@ struct SuspensionSignal: Error, @unchecked Sendable {
 /// order. A host function can run another resumable call too.
 ///
 /// A plain call made while a resumable call runs, such as a host function calling back into the
-/// guest with ``Function/invoke(_:)``, cannot be suspended: running out of fuel there traps.
+/// guest with ``Function/invoke(_:)``, cannot be suspended: running out of fuel there traps, and
+/// so does a ``SuspensionRequest``.
+///
+/// A call suspended at a host call waits for its answer like any other suspended call. Its store
+/// stays usable meanwhile. ``Suspension`` is `Sendable`, so the work behind an answer can happen
+/// on another thread. That does not let two threads use one store at once. A store and its calls
+/// are used by one thread at a time, and the embedder resumes the calls of a store one after
+/// another.
 public final class ResumableCall {
     /// What a run of the call ended with, when it did not throw.
     public enum Status {
@@ -201,14 +336,25 @@ public final class ResumableCall {
 
     /// Starts the call, or continues it after a suspension.
     ///
+    /// A call suspended at a host call cannot continue this way, because the guest needs the
+    /// host function's results. Complete it with ``resume(returning:answering:)``, even when the
+    /// host function returns nothing.
+    ///
     /// - Returns: Whether the function returned or the guest was suspended again.
-    /// - Throws: A trap, or another error the guest raised, which finishes the call; or a
-    ///   ``ResumableCallError`` if the call cannot be resumed, which leaves it as it was.
+    /// - Throws: An error that leaves the guest, such as a trap, which finishes the call. That
+    ///   includes an error a host function threw, even a ``ResumableCallError``. The method
+    ///   refuses with a ``ResumableCallError`` of its own when the call is running, has finished,
+    ///   or is suspended at a host call. A refusal comes before anything runs and leaves the call
+    ///   as it was.
     public func resume() throws -> Status {
         switch state.take() {
         case .ready(let arguments, let stack):
             return try start(arguments: arguments, on: stack)
         case .suspended(let signal, let stack):
+            guard signal.hostCall == nil else {
+                state = .suspended(signal, stack)
+                throw ResumableCallError.suspendedAtHostCall
+            }
             return try run(on: stack) { execution, _ in
                 try execution.resume(sp: signal.sp, pc: signal.resumePC)
             }
@@ -220,23 +366,174 @@ public final class ResumableCall {
         }
     }
 
+    /// Completes the host call that the guest is suspended in with `results`, and continues the
+    /// guest after it.
+    ///
+    /// The guest continues as if the host function had returned `results`. The host function
+    /// does not run again. A host function without results is completed with an empty array,
+    /// because ``resume()`` refuses a call suspended at a host call.
+    ///
+    /// Each result is checked against the host function's result type, including whether it may
+    /// be null. Where a reference came from is not checked. A function reference has to name a
+    /// function of the call's store, and an exception reference an exception this call's guest
+    /// caught, as ``Suspension/Reason/hostCall(tag:arguments:)`` describes.
+    ///
+    /// Accepting the answer neither charges ``Store/fuel`` nor checks the epoch deadline. The
+    /// guest then runs under the usual rules, and it reaches its next fuel charge or epoch check
+    /// where it would after a synchronous host function. It can have side effects before then.
+    /// If it returns before it reaches an epoch check, the call returns its results even when
+    /// the deadline passed during the suspension.
+    ///
+    /// - Parameters:
+    ///   - results: The host function's results, matching its result types.
+    ///   - suspension: The suspension this answers, which must be the one the call is suspended
+    ///     with. An answer meant for an earlier suspension of this call, or for another call, is
+    ///     refused.
+    /// - Returns: Whether the function returned or the guest was suspended again.
+    /// - Throws: An error that leaves the guest, such as a trap, which finishes the call. That
+    ///   includes an error a host function threw after the answer, even a
+    ///   ``ResumableCallError``. The method refuses with a ``ResumableCallError`` of its own when
+    ///   the call is not suspended at a host call, `suspension` is not its suspension, or
+    ///   `results` do not match. A refusal comes before anything is written or runs and leaves the
+    ///   call as it was.
+    public func resume(returning results: [Value], answering suspension: Suspension) throws -> Status {
+        try completeHostCall(answering: suspension) { hostCall in
+            let resultTypes = hostCall.function.resultTypes
+            guard results.count == resultTypes.count,
+                zip(results, resultTypes).allSatisfy({ $0.matches($1) })
+            else {
+                throw ResumableCallError.resultTypesMismatch(expected: resultTypes, got: results)
+            }
+        } continuing: { execution, signal, hostCall in
+            let function = hostCall.function
+            for (index, result) in results.enumerated() {
+                hostCall.parameterArea.storeValue(
+                    result, at: function.layout.resultReg(index), type: function.resultTypes[index])
+            }
+            try execution.resume(sp: signal.sp, pc: signal.resumePC)
+        }
+    }
+
+    /// Completes the host call that the guest is suspended in by throwing `error` from it.
+    ///
+    /// The guest sees `error` as if the host function had thrown it. A ``WasmKitException``
+    /// reaches the guest's exception handlers, and a handler that catches it continues the call.
+    /// A ``Trap`` gets the backtrace a synchronous trap at that host call would get, and finishes
+    /// the call. Any other error finishes the call as it is. This completes the host call. To
+    /// finish a call without letting the guest catch anything, cancel it with
+    /// ``resume(throwing:)``.
+    ///
+    /// Accepting the error neither charges ``Store/fuel`` nor checks the epoch deadline. A
+    /// handler that catches it runs under the usual rules, as the guest does after
+    /// ``resume(returning:answering:)``.
+    ///
+    /// - Parameters:
+    ///   - error: What the host function throws. It may not be a ``SuspensionRequest``, because
+    ///     the host call it completes cannot be suspended again.
+    ///   - suspension: The suspension this answers, which must be the one the call is suspended
+    ///     with.
+    /// - Returns: Whether the function returned or the guest was suspended again, after a guest
+    ///   exception handler caught `error`.
+    /// - Throws: `error` when the guest does not catch it, or another error that leaves the guest,
+    ///   which finishes the call. That holds when `error` is a ``ResumableCallError`` too. The
+    ///   method refuses with a ``ResumableCallError`` of its own when the call is not suspended at
+    ///   a host call, `suspension` is not its suspension, or `error` is a ``SuspensionRequest``. A
+    ///   refusal comes before anything runs and leaves the call as it was.
+    public func resume(failing error: any Error, answering suspension: Suspension) throws -> Status {
+        let store = function.store
+        return try completeHostCall(answering: suspension) { _ in
+            if error is SuspensionRequest {
+                throw ResumableCallError.requestNotThrowable
+            }
+        } continuing: { execution, signal, _ in
+            if let exception = error as? WasmKitException {
+                var sp = signal.sp
+                var pc = signal.resumePC
+                var md: Md = nil
+                var ms: Ms = 0
+                guard execution.handleException(exception, sp: &sp, pc: &pc, md: &md, ms: &ms) else {
+                    throw exception
+                }
+                try execution.resume(sp: sp, pc: pc)
+            } else if let trap = error as? Trap {
+                throw trap.withBacktrace(Execution.captureBacktrace(sp: signal.sp, pc: signal.trapSite, store: store))
+            } else {
+                throw error
+            }
+        }
+    }
+
     /// Finishes a call without running any more of it, throwing `error` from where it is.
     ///
-    /// This is how to cancel a call. A ``Trap`` gets the backtrace of the suspended guest. The
-    /// guest cannot catch `error`, so it may not be a ``WasmKitException``.
+    /// This is how to cancel a call, before it starts or whatever it is suspended for. A ``Trap``
+    /// gets the backtrace of the suspended guest. At a host call, that is the backtrace a
+    /// synchronous trap there would get. The guest cannot catch `error`, so it may not be a
+    /// ``WasmKitException``. It may not be a ``SuspensionRequest`` either, which a host function
+    /// that cancels a call and rethrows would otherwise pass on as a request to suspend its own
+    /// caller.
     ///
-    /// - Throws: `error`, which finishes the call; or a ``ResumableCallError`` if the call is
-    ///   running or finished, or `error` is a ``WasmKitException``, which leaves it as it was.
+    /// - Throws: `error`, which finishes the call, even when it is a ``ResumableCallError``. The
+    ///   method refuses with a ``ResumableCallError`` of its own when the call is running or
+    ///   finished, or `error` is a ``WasmKitException`` or a ``SuspensionRequest``. A refusal
+    ///   leaves the call as it was.
     public func resume(throwing error: any Error) throws -> Never {
         if error is WasmKitException {
             throw ResumableCallError.exceptionNotThrowable
         }
+        if error is SuspensionRequest {
+            throw ResumableCallError.requestNotThrowable
+        }
         if let signal = try state.finish(), let trap = error as? Trap {
-            // A trap site is just past the head slot of the instruction that raised it.
             throw trap.withBacktrace(
-                Execution.captureBacktrace(sp: signal.sp, pc: signal.resumePC + 1, store: function.store))
+                Execution.captureBacktrace(sp: signal.sp, pc: signal.trapSite, store: function.store))
         }
         throw error
+    }
+
+    /// Completes the host call that the guest is suspended in, when `check` accepts the answer,
+    /// and continues the guest.
+    ///
+    /// Nothing runs and nothing is written unless the call is suspended at a host call,
+    /// `suspension` is that suspension, and `check` returns. Otherwise the call is left as it was.
+    ///
+    /// - Parameters:
+    ///   - suspension: The suspension the answer names.
+    ///   - check: Validates the answer against the host call, throwing a ``ResumableCallError``
+    ///     to refuse it.
+    ///   - body: Writes the answer and continues the guest on the call's execution.
+    private func completeHostCall(
+        answering suspension: Suspension,
+        check: (SuspendedHostCall) throws -> Void,
+        continuing body: (inout Execution, SuspensionSignal, SuspendedHostCall) throws -> Void
+    ) throws -> Status {
+        switch state.take() {
+        case .suspended(let signal, let stack):
+            let hostCall: SuspendedHostCall
+            do {
+                guard let suspended = signal.hostCall else {
+                    throw ResumableCallError.notSuspendedAtHostCall
+                }
+                guard suspended.identity === suspension.hostCallIdentity else {
+                    throw ResumableCallError.otherSuspension
+                }
+                try check(suspended)
+                hostCall = suspended
+            } catch {
+                state = .suspended(signal, stack)
+                throw error
+            }
+            return try run(on: stack) { execution, _ in
+                try body(&execution, signal, hostCall)
+            }
+        case .ready(let arguments, let stack):
+            state = .ready(arguments, stack)
+            throw ResumableCallError.notSuspendedAtHostCall
+        case .running:
+            throw ResumableCallError.alreadyRunning
+        case .finished(let stack):
+            state = .finished(stack)
+            throw ResumableCallError.finished
+        }
     }
 
     private func start(arguments: [Value], on stack: consuming ExecutionStack) throws -> Status {
