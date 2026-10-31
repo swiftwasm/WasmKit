@@ -38,6 +38,7 @@ add_wasmkit_library(WasmKit
   Execution/Instructions/SIMDMemoryAndLane.swift
   Execution/Instructions/SIMDNumeric.swift
   Execution/Instructions/V128Lanes.swift
+  Execution/Instructions/WideArithmetic.swift
   Execution/ConstEvaluation.swift
   Execution/DispatchInstruction.swift
   Execution/EngineInterceptor.swift

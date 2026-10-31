@@ -356,6 +356,10 @@ func parseTextInstruction<V: InstructionVisitor>(
     case "i64.trunc_sat_f32_u": return { visitor throws(V.VisitorError) in return try visitor.visitConversion(.i64TruncSatF32U) }
     case "i64.trunc_sat_f64_s": return { visitor throws(V.VisitorError) in return try visitor.visitConversion(.i64TruncSatF64S) }
     case "i64.trunc_sat_f64_u": return { visitor throws(V.VisitorError) in return try visitor.visitConversion(.i64TruncSatF64U) }
+    case "i64.add128": return { visitor throws(V.VisitorError) in return try visitor.visitWideArithmetic(.i64Add128) }
+    case "i64.sub128": return { visitor throws(V.VisitorError) in return try visitor.visitWideArithmetic(.i64Sub128) }
+    case "i64.mul_wide_s": return { visitor throws(V.VisitorError) in return try visitor.visitWideArithmetic(.i64MulWideS) }
+    case "i64.mul_wide_u": return { visitor throws(V.VisitorError) in return try visitor.visitWideArithmetic(.i64MulWideU) }
     case "atomic.fence": return { visitor throws(V.VisitorError) in return try visitor.visitAtomicFence() }
     case "i32.atomic.load":
         let (memarg) = try expressionParser.visitLoad(.i32AtomicLoad, wat: &wat)

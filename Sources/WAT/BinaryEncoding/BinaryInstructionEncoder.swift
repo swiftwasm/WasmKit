@@ -460,6 +460,17 @@ extension BinaryInstructionEncoder {
         try encodeInstruction([0xFC, 0x10])
         try encodeImmediates(table: table)
     }
+    mutating func visitWideArithmetic(_ wideArithmetic: Instruction.WideArithmetic) throws(VisitorError) {
+        let opcode: [UInt8]
+        switch wideArithmetic {
+        case .i64Add128: opcode = [0xFC, 0x13]
+        case .i64Sub128: opcode = [0xFC, 0x14]
+        case .i64MulWideS: opcode = [0xFC, 0x15]
+        case .i64MulWideU: opcode = [0xFC, 0x16]
+        }
+
+        try encodeInstruction(opcode)
+    }
     mutating func visitAtomicFence() throws(VisitorError) { try encodeInstruction([0xFE, 0x03, 0x00]) }
     mutating func visitMemoryAtomicNotify(memarg: MemArg) throws(VisitorError) {
         try encodeInstruction([0xFE, 0x00])

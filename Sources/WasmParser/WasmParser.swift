@@ -166,6 +166,8 @@ public struct WasmFeatureSet: OptionSet, Sendable {
         case multiMemory
         /// The WebAssembly garbage collection proposal
         case gc
+        /// The WebAssembly wide arithmetic proposal
+        case wideArithmetic
 
         /// The bit this proposal occupies in a feature set. The values are part
         /// of the stored representation, so they must stay stable.
@@ -181,6 +183,7 @@ public struct WasmFeatureSet: OptionSet, Sendable {
             case .functionReferences: 6
             case .multiMemory: 7
             case .gc: 8
+            case .wideArithmetic: 9
             }
         }
     }
@@ -218,6 +221,9 @@ public struct WasmFeatureSet: OptionSet, Sendable {
     /// The WebAssembly garbage collection proposal
     @_alwaysEmitIntoClient
     public static var gc: WasmFeatureSet { WasmFeatureSet(.gc) }
+    /// The WebAssembly wide arithmetic proposal
+    @_alwaysEmitIntoClient
+    public static var wideArithmetic: WasmFeatureSet { WasmFeatureSet(.wideArithmetic) }
 
     /// The default feature set
     public static let `default`: WasmFeatureSet = [.referenceTypes, .exceptionHandling]

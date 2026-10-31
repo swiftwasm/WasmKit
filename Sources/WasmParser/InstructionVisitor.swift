@@ -202,6 +202,12 @@ public enum Instruction: Equatable, Sendable {
         case i64TruncSatF64S
         case i64TruncSatF64U
     }
+    public enum WideArithmetic: Equatable, Sendable {
+        case i64Add128
+        case i64Sub128
+        case i64MulWideS
+        case i64MulWideU
+    }
     public enum Simd: Equatable, Sendable {
         case i8x16Swizzle
         case i8x16Splat
@@ -516,6 +522,7 @@ public enum Instruction: Equatable, Sendable {
     case `tableSet`(table: UInt32)
     case `tableGrow`(table: UInt32)
     case `tableSize`(table: UInt32)
+    case `wideArithmetic`(Instruction.WideArithmetic)
     case `atomicFence`
     case `memoryAtomicNotify`(memarg: MemArg)
     case `memoryAtomicWait32`(memarg: MemArg)
@@ -673,6 +680,7 @@ extension AnyInstructionVisitor {
     public mutating func visitTableSet(table: UInt32) throws(VisitorError) { return try self.visit(.tableSet(table: table)) }
     public mutating func visitTableGrow(table: UInt32) throws(VisitorError) { return try self.visit(.tableGrow(table: table)) }
     public mutating func visitTableSize(table: UInt32) throws(VisitorError) { return try self.visit(.tableSize(table: table)) }
+    public mutating func visitWideArithmetic(_ wideArithmetic: Instruction.WideArithmetic) throws(VisitorError) { return try self.visit(.wideArithmetic(wideArithmetic)) }
     public mutating func visitAtomicFence() throws(VisitorError) { return try self.visit(.atomicFence) }
     public mutating func visitMemoryAtomicNotify(memarg: MemArg) throws(VisitorError) { return try self.visit(.memoryAtomicNotify(memarg: memarg)) }
     public mutating func visitMemoryAtomicWait32(memarg: MemArg) throws(VisitorError) { return try self.visit(.memoryAtomicWait32(memarg: memarg)) }
@@ -893,6 +901,8 @@ public protocol InstructionVisitor: ~Copyable {
     mutating func visitTableGrow(table: UInt32) throws(VisitorError)
     /// Visiting `table.size` instruction.
     mutating func visitTableSize(table: UInt32) throws(VisitorError)
+    /// Visiting `wideArithmetic` category instruction.
+    mutating func visitWideArithmetic(_: Instruction.WideArithmetic) throws(VisitorError)
     /// Visiting `atomic.fence` instruction.
     mutating func visitAtomicFence() throws(VisitorError)
     /// Visiting `memory.atomic.notify` instruction.
@@ -1143,6 +1153,7 @@ extension InstructionVisitor where Self: ~Copyable {
         case let .tableSet(table): return try visitTableSet(table: table)
         case let .tableGrow(table): return try visitTableGrow(table: table)
         case let .tableSize(table): return try visitTableSize(table: table)
+        case let .wideArithmetic(wideArithmetic): return try visitWideArithmetic(wideArithmetic)
         case .atomicFence: return try visitAtomicFence()
         case let .memoryAtomicNotify(memarg): return try visitMemoryAtomicNotify(memarg: memarg)
         case let .memoryAtomicWait32(memarg): return try visitMemoryAtomicWait32(memarg: memarg)
@@ -1297,6 +1308,7 @@ extension InstructionVisitor where Self: ~Copyable {
     public mutating func visitTableSet(table: UInt32) throws(VisitorError) {}
     public mutating func visitTableGrow(table: UInt32) throws(VisitorError) {}
     public mutating func visitTableSize(table: UInt32) throws(VisitorError) {}
+    public mutating func visitWideArithmetic(_ wideArithmetic: Instruction.WideArithmetic) throws(VisitorError) {}
     public mutating func visitAtomicFence() throws(VisitorError) {}
     public mutating func visitMemoryAtomicNotify(memarg: MemArg) throws(VisitorError) {}
     public mutating func visitMemoryAtomicWait32(memarg: MemArg) throws(VisitorError) {}

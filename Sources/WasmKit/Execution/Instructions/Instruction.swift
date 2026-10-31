@@ -2414,6 +2414,14 @@ enum Instruction {
     /// A shared memory's bounds check relies on faults in its guard pages. Kept apart
     /// from `selectMemory` so that the common handler makes no call and stays a leaf.
     case selectSharedMemory(Instruction.SelectSharedMemoryOperand)
+    /// WebAssembly Core Instruction `i64.add128`
+    case i64Add128(Instruction.Binary128Operand)
+    /// WebAssembly Core Instruction `i64.sub128`
+    case i64Sub128(Instruction.Binary128Operand)
+    /// WebAssembly Core Instruction `i64.mul_wide_s`
+    case i64MulWideS(Instruction.MulWideOperand)
+    /// WebAssembly Core Instruction `i64.mul_wide_u`
+    case i64MulWideU(Instruction.MulWideOperand)
 }
 
 extension Instruction {
@@ -3682,6 +3690,59 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.memory, 0, 0, 0, 0) as (UInt32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
+
+    struct Binary128Operand: InstructionImmediate {
+        var lhsLow: VReg
+        var lhsHigh: VReg
+        var rhsLow: VReg
+        var rhsHigh: VReg
+        var low: VReg
+        var high: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let lhsLow = VReg(byteOffset: Int16(truncatingIfNeeded: word0))
+                let lhsHigh = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 16))
+                let rhsLow = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 32))
+                let rhsHigh = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 48))
+                let word1 = pc.read(UInt64.self)
+                let low = VReg(byteOffset: Int16(truncatingIfNeeded: word1))
+                let high = VReg(byteOffset: Int16(truncatingIfNeeded: word1 >> 16))
+                return Self(lhsLow: lhsLow, lhsHigh: lhsHigh, rhsLow: rhsLow, rhsHigh: rhsHigh, low: low, high: high)
+            #else
+                let (lhsLow, lhsHigh, rhsLow, rhsHigh) = pc.read((VReg, VReg, VReg, VReg).self)
+                let (low, high, _, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
+                return Self(lhsLow: lhsLow, lhsHigh: lhsHigh, rhsLow: rhsLow, rhsHigh: rhsHigh, low: low, high: high)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.lhsLow, $0.lhsHigh, $0.rhsLow, $0.rhsHigh) as (VReg, VReg, VReg, VReg), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.low, $0.high, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct MulWideOperand: InstructionImmediate {
+        var lhs: VReg
+        var rhs: VReg
+        var low: VReg
+        var high: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let lhs = VReg(byteOffset: Int16(truncatingIfNeeded: word0))
+                let rhs = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 16))
+                let low = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 32))
+                let high = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 48))
+                return Self(lhs: lhs, rhs: rhs, low: low, high: high)
+            #else
+                let (lhs, rhs, low, high) = pc.read((VReg, VReg, VReg, VReg).self)
+                return Self(lhs: lhs, rhs: rhs, low: low, high: high)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.lhs, $0.rhs, $0.low, $0.high) as (VReg, VReg, VReg, VReg), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -4412,6 +4473,10 @@ extension Instruction {
         case .brIfNotNull(let immediate): return immediate
         case .selectMemory(let immediate): return immediate
         case .selectSharedMemory(let immediate): return immediate
+        case .i64Add128(let immediate): return immediate
+        case .i64Sub128(let immediate): return immediate
+        case .i64MulWideS(let immediate): return immediate
+        case .i64MulWideU(let immediate): return immediate
         default: return nil
         }
     }
@@ -5146,6 +5211,10 @@ extension Instruction {
         case .brIfNotNull(let immediate): immediate.emit(to: emit)
         case .selectMemory(let immediate): immediate.emit(to: emit)
         case .selectSharedMemory(let immediate): immediate.emit(to: emit)
+        case .i64Add128(let immediate): immediate.emit(to: emit)
+        case .i64Sub128(let immediate): immediate.emit(to: emit)
+        case .i64MulWideS(let immediate): immediate.emit(to: emit)
+        case .i64MulWideU(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -5892,13 +5961,17 @@ extension Instruction {
         case .brIfNull: return 733
         case .brIfNotNull: return 734
         case .selectMemory: return 735
-        default: return 736  // .selectSharedMemory
+        case .selectSharedMemory: return 736
+        case .i64Add128: return 737
+        case .i64Sub128: return 738
+        case .i64MulWideS: return 739
+        default: return 740  // .i64MulWideU
         }
     }
 }
 extension Instruction {
     /// The number of opcodes, trap pseudo-instructions included.
-    static let opcodeCount = 737
+    static let opcodeCount = 741
 
     /// Whether only the direct-threaded dispatcher implements this instruction;
     /// `Execution.doExecute` has no case for it.
@@ -6658,6 +6731,10 @@ extension Instruction {
         case 734: return .brIfNotNull(Instruction.BrIfOperand.load(from: &pc))
         case 735: return .selectMemory(Instruction.SelectMemoryOperand.load(from: &pc))
         case 736: return .selectSharedMemory(Instruction.SelectSharedMemoryOperand.load(from: &pc))
+        case 737: return .i64Add128(Instruction.Binary128Operand.load(from: &pc))
+        case 738: return .i64Sub128(Instruction.Binary128Operand.load(from: &pc))
+        case 739: return .i64MulWideS(Instruction.MulWideOperand.load(from: &pc))
+        case 740: return .i64MulWideU(Instruction.MulWideOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -7409,6 +7486,10 @@ extension Instruction {
         case 734: return "brIfNotNull"
         case 735: return "selectMemory"
         case 736: return "selectSharedMemory"
+        case 737: return "i64Add128"
+        case 738: return "i64Sub128"
+        case 739: return "i64MulWideS"
+        case 740: return "i64MulWideU"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }

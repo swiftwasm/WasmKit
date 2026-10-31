@@ -122,6 +122,7 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | Proposal | Status | WasmKit version |
 |----------|--------|-----------------|
 | [Threads and Atomics](https://github.com/webassembly/threads) | ✅ Implemented | [0.3.0] |
+| [Wide Arithmetic](https://github.com/WebAssembly/wide-arithmetic) | ✅ Implemented | `main` branch |
 
 #### Phase 1 - Feature Proposal (CG)
 

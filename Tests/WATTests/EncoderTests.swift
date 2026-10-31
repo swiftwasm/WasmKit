@@ -16,7 +16,7 @@ struct EncoderTests {
     // Memory64, tail calls, extended constant expressions and exceptions are
     // enabled by default since wabt 1.0.42, which also removed their flags.
     private static let wast2jsonFeatures = [
-        "--enable-threads"
+        "--enable-threads", "--enable-wide-arithmetic",
     ]
 
     /// Files whose output wast2json cannot produce or encodes differently.

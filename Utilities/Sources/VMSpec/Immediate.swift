@@ -258,6 +258,26 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "z", type: .VReg)
     }
 
+    /// `(sp[low], sp[high]) = sp[lhs] * sp[rhs]`, the full 128-bit product of two
+    /// `i64` operands. Four registers fill one code slot.
+    static let mulWide = Self(name: "MulWideOperand") {
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "rhs", type: .VReg)
+        $0.field(name: "low", type: .VReg)
+        $0.field(name: "high", type: .VReg)
+    }
+
+    /// `(sp[low], sp[high]) = (sp[lhsLow], sp[lhsHigh]) <op> (sp[rhsLow], sp[rhsHigh])`,
+    /// on 128-bit integers that each take two `i64` registers.
+    static let binary128 = Self(name: "Binary128Operand") {
+        $0.field(name: "lhsLow", type: .VReg)
+        $0.field(name: "lhsHigh", type: .VReg)
+        $0.field(name: "rhsLow", type: .VReg)
+        $0.field(name: "rhsHigh", type: .VReg)
+        $0.field(name: "low", type: .VReg)
+        $0.field(name: "high", type: .VReg)
+    }
+
     /// `ireg = sp[lhs] <op> sp[rhs]`.
     static let accBinary = Self(name: "AccBinaryOperand") {
         $0.field(name: "lhs", type: .VReg)
