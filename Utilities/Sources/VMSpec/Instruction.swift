@@ -1912,6 +1912,12 @@ extension VMGen {
             $0.field(name: "multiplier", type: .VReg)
             $0.field(name: "shift", type: .UInt16)
         })
+        instructions.append(Instruction(name: "i32AddImmGlobalSet", documentation: "Add an immediate and store the result in a register and a global") {
+            $0.field(name: "rawGlobal", type: .UInt64)
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "lhs", type: .VReg)
+            $0.field(name: "imm", type: .Int32)
+        })
         return instructions
     }
 
