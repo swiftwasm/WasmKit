@@ -41,3 +41,28 @@ import WAT
         #endif
     }
 }
+
+@Suite struct Memory32LoadTests {
+    @Test(arguments: [false, true])
+    func compactLoadBounds(shared: Bool) throws {
+        let module = try parseWasm(
+            bytes: wat2wasm(
+                """
+                (module (memory 1 2 \(shared ? "shared" : ""))
+                  (data (i32.const 65532) "abcd")
+                  (func (export "load") (param i32) (result i32) local.get 0 i32.load)
+                  (func (export "offset") (param i32) (result i32) local.get 0 i32.load offset=4294967295))
+                """, features: shared ? [.threads] : []), features: shared ? [.threads] : [])
+        let store = Store(engine: Engine())
+        let instance = try module.instantiate(store: store)
+        let load = try #require(instance.exports[function: "load"])
+        let offset = try #require(instance.exports[function: "offset"])
+        #expect(try load([.i32(65532)]) == [.i32(0x6463_6261)])
+        for x: UInt32 in [65533, 65536, .max] {
+            #expect(throws: (any Error).self) { try load([.i32(x)]) }
+        }
+        for x: UInt32 in [0, 1, .max] {
+            #expect(throws: (any Error).self) { try offset([.i32(x)]) }
+        }
+    }
+}
