@@ -1948,6 +1948,15 @@ extension VMGen {
             $0.field(name: "shift", type: .UInt32)
             $0.field(name: "dest", type: .LVReg)
         })
+        instructions.append(Instruction(name: "i64XorShiftMulPair", documentation: "Two dependent wrapping xor-shift-multiply operations, retaining both results") {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "intermediate", type: .VReg)
+            $0.field(name: "input", type: .VReg)
+            $0.field(name: "multiplier0", type: .VReg)
+            $0.field(name: "multiplier1", type: .VReg)
+            $0.field(name: "shift0", type: .UInt16)
+            $0.field(name: "shift1", type: .UInt16)
+        })
         return instructions
     }
 

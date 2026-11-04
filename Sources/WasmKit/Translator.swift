@@ -2052,6 +2052,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// the accumulator on untouched once fused with a following write of
         /// the producer's result.
         private var copyAfterAcc: (producer: AccProducer, source: VReg, dest: VReg, end: MetaProgramCounter)?
+        /// Retained across temporary emissions that a later peephole may rewind.
+        /// Adjacency and label checks are required before consuming this record.
+        private var lastXorMultiply: (operand: Instruction.I64XorShiftMulImmOperand, position: MetaProgramCounter, end: MetaProgramCounter)?
+        fileprivate func xorMultiply(before position: MetaProgramCounter, input: VReg) -> (operand: Instruction.I64XorShiftMulImmOperand, position: MetaProgramCounter)? {
+            guard let prior = lastXorMultiply, prior.end.offsetFromHead == position.offsetFromHead,
+                prior.operand.result == input, canRewind(to: prior.position)
+            else { return nil }
+            return (prior.operand, prior.position)
+        }
         /// An adjacent arithmetic result and copy eligible for a return fusion.
         private var lastXorReturnProducer: (operand: Instruction.I64XorShiftImmOperand, position: MetaProgramCounter, end: MetaProgramCounter)?
         private var lastArithmeticReturn: (operand: Instruction.I64XorShiftReturnOperand, position: MetaProgramCounter, end: MetaProgramCounter)?
@@ -2266,6 +2275,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 }
             #endif
             trace("rewind: \(instructions.count) -> \(position.offsetFromHead)")
+            if let prior = lastXorMultiply, prior.end.offsetFromHead > position.offsetFromHead {
+                lastXorMultiply = nil
+            }
             instructions.removeLast(instructions.count - position.offsetFromHead)
             resetLastEmission()
             lastAccAndSlot = nil
@@ -2344,6 +2356,13 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             lastXorReturnProducer = nil
             let newInstruction = resultRelink(newResult)
             assign(at: lastEmission.position.offsetFromHead, newInstruction)
+            if let prior = lastXorMultiply, prior.position.offsetFromHead == lastEmission.position.offsetFromHead {
+                if case .i64XorShiftMulImm(let operand) = newInstruction {
+                    lastXorMultiply = (operand, prior.position, prior.end)
+                } else {
+                    lastXorMultiply = nil
+                }
+            }
             if emitsDirectOnlyInstructions, let form = lastAcc?.producer, form.hasAccAndSlotForm {
                 lastAccAndSlot = AccProducer(
                     position: lastEmission.position, end: lastEmission.end, form: form.relinked(to: newResult), keepsSlot: true)
@@ -2389,6 +2408,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             var slots: [CodeSlot] = []
             instruction.emitImmediate(to: { slots.append($0) })
             for slot in slots { emitSlot(slot) }
+            if case .i64XorShiftMulImm(let operand) = instruction {
+                lastXorMultiply = (operand, position, insertingPC)
+            }
             let producer = lastXorReturnProducer
             lastXorReturnProducer = nil
             if case .i64XorShiftImm(let operand) = instruction {
@@ -5761,6 +5783,21 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 : (xorShift.result == rhsProduced && xorShift.result != lhsProduced ? lhsSource : nil)
             if let other {
                 let multiplier = ensureOnVReg(other)
+                if !module.isDebuggable,
+                    let prior = iseqBuilder.xorMultiply(before: xorShift.position, input: xorShift.input)
+                {
+                    iseqBuilder.rewind(to: prior.position)
+                    self.rewindInstructionMapping(to: prior.position)
+                    let make = { (result: VReg) in
+                        Instruction.i64XorShiftMulPair(
+                            .init(
+                                result: result, intermediate: prior.operand.result,
+                                input: prior.operand.input, multiplier0: prior.operand.multiplier, multiplier1: multiplier,
+                                shift0: prior.operand.shift, shift1: xorShift.shift))
+                    }
+                    emit(make(result), resultRelink: make)
+                    return
+                }
                 iseqBuilder.rewind(to: xorShift.position)
                 self.rewindInstructionMapping(to: xorShift.position)
                 emit(
