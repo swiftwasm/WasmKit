@@ -4843,6 +4843,18 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let pointer = try popVRegOperand(.address(isMemory64: false))
         let result = valueStack.push(load.type)
         guard let pointer else { return }
+        if load == .i32Load, let accCandidate,
+            case .binaryImm(.i32, .add, let lhs, let imm, let address) = accCandidate.form,
+            address == pointer, iseqBuilder.canRewind(to: accCandidate)
+        {
+            iseqBuilder.rewind(to: accCandidate.position)
+            rewindInstructionMapping(to: accCandidate.position)
+            let make = { (result: VReg) in
+                Instruction.i32AddImmLoad(.init(lhs: lhs, pointer: pointer, result: result, imm: imm, offset: offset))
+            }
+            emit(make(result), resultRelink: { newResult in make(newResult) })
+            return
+        }
         if let accCandidate, accCandidate.form.type == .i32, accCandidate.form.result == pointer,
             accCandidate.producing(into: .integer) != nil, iseqBuilder.canRewind(to: accCandidate)
         {

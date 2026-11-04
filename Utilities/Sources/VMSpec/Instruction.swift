@@ -1924,6 +1924,15 @@ extension VMGen {
             $0.field(name: "rhs", type: .VReg)
         })
         instructions.append(Instruction(name: "i32GlobalSubSet", documentation: "Read a global, subtract a register, and write both destinations", immediate: "I32GlobalAddSetOperand"))
+        var addLoad = Instruction(name: "i32AddImmLoad", documentation: "Add a wrapping address immediate and load i32", useCurrentMemory: .read) {
+            $0.field(name: "lhs", type: .VReg)
+            $0.field(name: "pointer", type: .VReg)
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "imm", type: .Int32)
+            $0.field(name: "offset", type: .UInt32)
+        }
+        addLoad.mayDispatchToTrap = true
+        instructions.append(addLoad)
         return instructions
     }
 

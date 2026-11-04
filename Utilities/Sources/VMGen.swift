@@ -122,6 +122,9 @@ enum VMGen {
 
     static func generateBasicInstImplementations() -> [String: String] {
         var inlineImpls: [String: String] = [:]
+        inlineImpls["i32AddImmLoad"] = """
+            if let trap = self.memoryLoadAddingImmediate(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate) { %TRAP% }
+            """
         for op in intBinOps + floatBinOps {
             inlineImpls[op.instruction.name] = """
             sp.pointee[\(op.resultSlot): immediate.result] = \(op.mayThrow ? "try " : "")sp.pointee[\(op.lhsSlot): immediate.lhs].\(camelCase(pascalCase: op.op))(sp.pointee[\(op.rhsSlot): immediate.rhs])
