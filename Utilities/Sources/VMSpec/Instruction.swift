@@ -1663,8 +1663,10 @@ extension VMGen {
 
                 This instruction can skip switching the current instance.
                 """,
-                isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .call
+                isControl: true, mayUpdateFrame: true, immediateLayout: .call
             ),
+            Instruction(name: "internalCallSlow", documentation: "Large-frame or trapping internal call",
+                        isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .call),
             Instruction(name: "callIndirect", documentation: "WebAssembly Core Instruction `call_indirect`",
                         isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
                 $0.field(name: "tableIndex", type: .UInt32)
