@@ -4,7 +4,7 @@ import WAT
 
 @_spi(Fuzzing) @_spi(OnlyForCLI) @testable import WasmKit
 
-#if os(macOS) || os(Linux)
+#if os(macOS) || os(iOS) || os(Linux)
 
     extension SharedMemoryStorage {
         /// Test convenience: construct from a `MemoryType`. Production code decomposes these

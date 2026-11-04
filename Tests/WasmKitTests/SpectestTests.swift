@@ -11,7 +11,7 @@ struct SpectestTests {
         projectDir
         .appendingPathComponent("Vendor/testsuite")
     /// Whether the default engine can back a shared memory here (requires mprotect: not ASan,
-    /// not token threading, 64-bit macOS/Linux).
+    /// not token threading, 64-bit macOS/iOS/Linux).
     static let sharedMemorySupported: Bool = {
         // A shared memory type only validates with the threads feature.
         var configuration = EngineConfiguration()

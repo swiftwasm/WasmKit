@@ -96,7 +96,7 @@
 #  include <TargetConditionals.h>
 #endif
 
-#if defined(__linux__) || (defined(__APPLE__) && TARGET_OS_OSX)
+#if defined(__linux__) || (defined(__APPLE__) && (TARGET_OS_OSX || TARGET_OS_IOS))
 #  define WASMKIT_MPROTECT_BOUND_CHECKING 1
 #else
 #  define WASMKIT_MPROTECT_BOUND_CHECKING 0
