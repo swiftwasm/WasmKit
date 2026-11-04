@@ -7374,6 +7374,13 @@ extension Execution {
         (pc.pointee, next) = self.internalCopy2Call(sp: &sp.pointee, pc: pc.pointee, immediate: immediate)
         return next
     }
+    @_silgen_name("wasmkit_execute_i32AddImmBrIf") @inline(__always)
+    mutating func execute_i32AddImmBrIf(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.I32AddImmBrIfOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.i32AddImmBrIf(sp: sp.pointee, pc: pc.pointee, ireg: &ireg.pointee, immediate: immediate)
+        return next
+    }
 }
 
 // The handler table exists only where Clang offers one of Swift's

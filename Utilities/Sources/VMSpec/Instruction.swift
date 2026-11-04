@@ -1942,6 +1942,14 @@ extension VMGen {
         instructions.append(Instruction(name: "internalCopyCall", documentation: "Copy argument slots and call an internal function", isControl: true, mayUpdateFrame: true, immediateLayout: .copyCall))
         instructions.append(Instruction(name: "compilingCopy2Call", documentation: "Copy argument slots and call an internal function", isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .copy2Call))
         instructions.append(Instruction(name: "internalCopy2Call", documentation: "Copy argument slots and call an internal function", isControl: true, mayUpdateFrame: true, immediateLayout: .copy2Call))
+        var addBranch = Instruction(name: "i32AddImmBrIf", documentation: "Wrapping immediate add retaining its result followed by a conditional branch", isControl: true) {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "lhs", type: .VReg)
+            $0.field(name: "imm", type: .Int32)
+            $0.field(name: "offset", type: .Int32)
+        }
+        addBranch.useIreg = .write
+        instructions.append(addBranch)
         return instructions
     }
 
