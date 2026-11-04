@@ -1901,6 +1901,17 @@ extension VMGen {
             },
         ]
         instructions += wideArithmeticInsts
+        instructions.append(Instruction(name: "i64XorShiftImm", documentation: "result = x ^ (x >> shift)") {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "input", type: .VReg)
+            $0.field(name: "shift", type: .UInt32)
+        })
+        instructions.append(Instruction(name: "i64XorShiftMulImm", documentation: "result = (x ^ (x >> shift)) * multiplier, wrapping") {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "input", type: .VReg)
+            $0.field(name: "multiplier", type: .VReg)
+            $0.field(name: "shift", type: .UInt16)
+        })
         return instructions
     }
 

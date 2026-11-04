@@ -2424,6 +2424,10 @@ enum Instruction {
     case i64MulWideS(Instruction.MulWideOperand)
     /// WebAssembly Core Instruction `i64.mul_wide_u`
     case i64MulWideU(Instruction.MulWideOperand)
+    /// result = x ^ (x >> shift)
+    case i64XorShiftImm(Instruction.I64XorShiftImmOperand)
+    /// result = (x ^ (x >> shift)) * multiplier, wrapping
+    case i64XorShiftMulImm(Instruction.I64XorShiftMulImmOperand)
 }
 
 extension Instruction {
@@ -3745,6 +3749,50 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.lhs, $0.rhs, $0.low, $0.high) as (VReg, VReg, VReg, VReg), to: CodeSlot.self) }
         }
     }
+
+    struct I64XorShiftImmOperand: InstructionImmediate {
+        var result: VReg
+        var input: VReg
+        var shift: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let result = VReg(byteOffset: Int16(truncatingIfNeeded: word0))
+                let input = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 16))
+                let shift = UInt32(truncatingIfNeeded: word0 >> 32)
+                return Self(result: result, input: input, shift: shift)
+            #else
+                let (result, input, shift) = pc.read((VReg, VReg, UInt32).self)
+                return Self(result: result, input: input, shift: shift)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.result, $0.input, $0.shift) as (VReg, VReg, UInt32), to: CodeSlot.self) }
+        }
+    }
+
+    struct I64XorShiftMulImmOperand: InstructionImmediate {
+        var result: VReg
+        var input: VReg
+        var multiplier: VReg
+        var shift: UInt16
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let word0 = pc.read(UInt64.self)
+                let result = VReg(byteOffset: Int16(truncatingIfNeeded: word0))
+                let input = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 16))
+                let multiplier = VReg(byteOffset: Int16(truncatingIfNeeded: word0 >> 32))
+                let shift = UInt16(truncatingIfNeeded: word0 >> 48)
+                return Self(result: result, input: input, multiplier: multiplier, shift: shift)
+            #else
+                let (result, input, multiplier, shift) = pc.read((VReg, VReg, VReg, UInt16).self)
+                return Self(result: result, input: input, multiplier: multiplier, shift: shift)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.result, $0.input, $0.multiplier, $0.shift) as (VReg, VReg, VReg, UInt16), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -4480,6 +4528,8 @@ extension Instruction {
         case .i64Sub128(let immediate): return immediate
         case .i64MulWideS(let immediate): return immediate
         case .i64MulWideU(let immediate): return immediate
+        case .i64XorShiftImm(let immediate): return immediate
+        case .i64XorShiftMulImm(let immediate): return immediate
         default: return nil
         }
     }
@@ -5219,6 +5269,8 @@ extension Instruction {
         case .i64Sub128(let immediate): immediate.emit(to: emit)
         case .i64MulWideS(let immediate): immediate.emit(to: emit)
         case .i64MulWideU(let immediate): immediate.emit(to: emit)
+        case .i64XorShiftImm(let immediate): immediate.emit(to: emit)
+        case .i64XorShiftMulImm(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -5970,13 +6022,15 @@ extension Instruction {
         case .i64Add128: return 738
         case .i64Sub128: return 739
         case .i64MulWideS: return 740
-        default: return 741  // .i64MulWideU
+        case .i64MulWideU: return 741
+        case .i64XorShiftImm: return 742
+        default: return 743  // .i64XorShiftMulImm
         }
     }
 }
 extension Instruction {
     /// The number of opcodes, trap pseudo-instructions included.
-    static let opcodeCount = 742
+    static let opcodeCount = 744
 
     /// Whether only the direct-threaded dispatcher implements this instruction;
     /// `Execution.doExecute` has no case for it.
@@ -6741,6 +6795,8 @@ extension Instruction {
         case 739: return .i64Sub128(Instruction.Binary128Operand.load(from: &pc))
         case 740: return .i64MulWideS(Instruction.MulWideOperand.load(from: &pc))
         case 741: return .i64MulWideU(Instruction.MulWideOperand.load(from: &pc))
+        case 742: return .i64XorShiftImm(Instruction.I64XorShiftImmOperand.load(from: &pc))
+        case 743: return .i64XorShiftMulImm(Instruction.I64XorShiftMulImmOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -7497,6 +7553,8 @@ extension Instruction {
         case 739: return "i64Sub128"
         case 740: return "i64MulWideS"
         case 741: return "i64MulWideU"
+        case 742: return "i64XorShiftImm"
+        case 743: return "i64XorShiftMulImm"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }

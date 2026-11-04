@@ -147,6 +147,15 @@ enum VMGen {
                         sp.pointee[\(op.type): immediate.result] = \(second)
                 """
         }
+        inlineImpls["i64XorShiftImm"] = """
+            let input = sp.pointee[i64: immediate.input]
+            sp.pointee[i64: immediate.result] = input ^ (input &>> UInt64(immediate.shift))
+            """
+        inlineImpls["i64XorShiftMulImm"] = """
+            let input = sp.pointee[i64: immediate.input]
+            let mixed = input ^ (input &>> UInt64(immediate.shift))
+            sp.pointee[i64: immediate.result] = mixed &* sp.pointee[i64: immediate.multiplier]
+            """
         for op in intAccBinOps {
             let load = op.type == "i32" ? "UInt32(truncatingIfNeeded: ireg.pointee)" : "ireg.pointee"
             func store(_ expression: String) -> String {
