@@ -469,6 +469,7 @@ extension Execution {
         case 754: return self.execute_internalCopy2Call(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 755: return self.execute_i64XorShiftReturn(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 756: return self.execute_i64XorShiftMulPair(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 757: return self.execute_i64XorShiftMulPairReturn(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -7413,6 +7414,13 @@ sp.pointee[i64: immediate.result] = mixed &* sp.pointee[i64: immediate.multiplie
 let first = (input ^ (input &>> UInt64(immediate.shift0))) &* sp.pointee[i64: immediate.multiplier0]
 sp.pointee[i64: immediate.intermediate] = first
 sp.pointee[i64: immediate.result] = (first ^ (first &>> UInt64(immediate.shift1))) &* sp.pointee[i64: immediate.multiplier1]
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64XorShiftMulPairReturn") @inline(__always)
+    mutating func execute_i64XorShiftMulPairReturn(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.I64XorShiftMulPairReturnOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.i64XorShiftMulPairReturn(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee, immediate: immediate)
         return next
     }
 }

@@ -87,6 +87,18 @@ extension Execution {
     }
 
     @inline(__always)
+    mutating func i64XorShiftMulPairReturn(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.I64XorShiftMulPairReturnOperand) -> (Pc, CodeSlot) {
+        let input = sp[i64: immediate.input]
+        let first = (input ^ (input &>> UInt64(immediate.shift0))) &* sp[i64: immediate.multiplier0]
+        sp[i64: immediate.result0] = first
+        let second = (first ^ (first &>> UInt64(immediate.shift1))) &* sp[i64: immediate.multiplier1]
+        sp[i64: immediate.result1] = second
+        sp[i64: immediate.result] = second ^ (second &>> immediate.shift2)
+        sp[immediate.dest] = sp[immediate.result]
+        return _return(sp: &sp, pc: pc, md: &md, ms: &ms)
+    }
+
+    @inline(__always)
     mutating func returnCopy(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CopyStackOperand) -> (Pc, CodeSlot) {
         sp[immediate.dest] = sp[immediate.source]
         return _return(sp: &sp, pc: pc, md: &md, ms: &ms)

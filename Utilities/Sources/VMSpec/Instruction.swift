@@ -1957,6 +1957,18 @@ extension VMGen {
             $0.field(name: "shift0", type: .UInt16)
             $0.field(name: "shift1", type: .UInt16)
         })
+        instructions.append(Instruction(name: "i64XorShiftMulPairReturn", documentation: "Two ordered xor-shift-multiply operations followed by xor-shift and return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+            $0.field(name: "result0", type: .VReg)
+            $0.field(name: "result1", type: .VReg)
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "input", type: .VReg)
+            $0.field(name: "multiplier0", type: .VReg)
+            $0.field(name: "multiplier1", type: .VReg)
+            $0.field(name: "shift0", type: .UInt16)
+            $0.field(name: "shift1", type: .UInt16)
+            $0.field(name: "shift2", type: .UInt32)
+            $0.field(name: "dest", type: .LVReg)
+        })
         return instructions
     }
 
