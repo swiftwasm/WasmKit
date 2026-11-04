@@ -459,6 +459,8 @@ extension Execution {
         case 744: return self.execute_i32GlobalSubSet(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 745: return try self.executeToken_i32AddImmLoad(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 746: return try self.executeToken_i32LoadMemory32(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 747: return self.execute_returnCopy(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 748: return self.execute_returnCopy2(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -7324,6 +7326,20 @@ extension Execution {
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         if let trap = self.memoryLoad32(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_returnCopy") @inline(__always)
+    mutating func execute_returnCopy(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.CopyStackOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.returnCopy(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_returnCopy2") @inline(__always)
+    mutating func execute_returnCopy2(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.CopyStack2Operand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.returnCopy2(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee, immediate: immediate)
         return next
     }
 }

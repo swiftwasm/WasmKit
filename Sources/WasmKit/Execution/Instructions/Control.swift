@@ -77,6 +77,21 @@ extension Execution {
         return pc.next()
     }
 
+    @inline(__always)
+    mutating func returnCopy(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CopyStackOperand) -> (Pc, CodeSlot) {
+        sp[immediate.dest] = sp[immediate.source]
+        return _return(sp: &sp, pc: pc, md: &md, ms: &ms)
+    }
+
+    @inline(__always)
+    mutating func returnCopy2(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CopyStack2Operand) -> (Pc, CodeSlot) {
+        let value0 = sp[immediate.source0]
+        let value1 = sp[immediate.source1]
+        sp[immediate.dest0] = value0
+        sp[immediate.dest1] = value1
+        return _return(sp: &sp, pc: pc, md: &md, ms: &ms)
+    }
+
     /// Returns to a caller in a different instance, switching `md`/`ms` back.
     ///
     /// Never emitted by the translator: ``_return`` dispatches here when the frame

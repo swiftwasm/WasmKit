@@ -1936,6 +1936,8 @@ extension VMGen {
         var load32 = Instruction(name: "i32LoadMemory32", documentation: "Load i32 with a 32-bit address and static offset", useCurrentMemory: .read, immediateLayout: .accMemoryPointerResult)
         load32.mayDispatchToTrap = true
         instructions.append(load32)
+        instructions.append(Instruction(name: "returnCopy", documentation: "Copy a result slot and return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write, immediate: "CopyStackOperand"))
+        instructions.append(Instruction(name: "returnCopy2", documentation: "Copy two independent result slots and return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write, immediate: "CopyStack2Operand"))
         return instructions
     }
 

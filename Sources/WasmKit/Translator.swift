@@ -2066,6 +2066,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// the accumulator on untouched once fused with a following write of
         /// the producer's result.
         private var copyAfterAcc: (producer: AccProducer, source: VReg, dest: VReg, end: MetaProgramCounter)?
+        /// The last emitted copy instruction, for fusing it into a following
+        /// `return` or internal call.
+        private var lastReturnCopy: (instruction: Instruction, position: MetaProgramCounter, end: MetaProgramCounter)?
+        fileprivate var returnCopy: (instruction: Instruction, position: MetaProgramCounter)? {
+            guard let copy = lastReturnCopy, copy.end.offsetFromHead == insertingPC.offsetFromHead,
+                canRewind(to: copy.position)
+            else { return nil }
+            return (copy.instruction, copy.position)
+        }
         /// The last emitted single copy, for pairing it with the next one.
         private var lastCopy: (source: VReg, dest: VReg, position: MetaProgramCounter, end: MetaProgramCounter)?
         /// The highest offset any label has been pinned at.
@@ -2269,6 +2278,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             relinkedGlobalUpdate = nil
             copyAfterAcc = nil
             lastCopy = nil
+            lastReturnCopy = nil
         }
 
         /// Records a single copy just emitted at `position`.
@@ -2381,6 +2391,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             var slots: [CodeSlot] = []
             instruction.emitImmediate(to: { slots.append($0) })
             for slot in slots { emitSlot(slot) }
+            switch instruction {
+            case .copyStack(let operand): lastReturnCopy = (.returnCopy(operand), position, insertingPC)
+            case .copyStack2(let operand): lastReturnCopy = (.returnCopy2(operand), position, insertingPC)
+            default: lastReturnCopy = nil
+            }
             self.lastEmission = LastEmission(
                 position: position, end: insertingPC,
                 resultRelink: resultRelink,
@@ -3189,6 +3204,16 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
         return emittedCopy
     }
+    private mutating func emitReturnInstruction() {
+        if !module.isDebuggable, let copy = iseqBuilder.returnCopy {
+            iseqBuilder.rewind(to: copy.position)
+            rewindInstructionMapping(to: copy.position)
+            emit(copy.instruction)
+        } else {
+            emit(._return(.init()))
+        }
+    }
+
     private mutating func translateReturn() throws(WasmKitError) {
         if isIntercepting {
             // Emit `onExit` instruction before every `return` instruction
@@ -3202,9 +3227,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             emit(.catchHandlersEnd(Instruction.CatchHandlersEndOperand(count: handlersToUnwind)))
         }
         try visitReturnLike()
-        let oldPC = iseqBuilder.insertingPC
-        iseqBuilder.emit(._return(.init()))
-        self.updateInstructionMapping(from: oldPC)
+        emitReturnInstruction()
     }
     /// Emits the return a tail call to a host function continues with.
     ///
@@ -3263,9 +3286,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // Check dangling labels
         try iseqBuilder.assertDanglingLabels()
 
-        let oldPC = iseqBuilder.insertingPC
-        iseqBuilder.emit(._return(.init()))
-        self.updateInstructionMapping(from: oldPC)
+        emitReturnInstruction()
         // The function body's region closes here rather than in `visitEnd`, which returns for the
         // root frame without popping it.
         if let region = fuelRegion {
