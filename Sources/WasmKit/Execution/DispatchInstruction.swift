@@ -457,6 +457,8 @@ extension Execution {
         case 742: return self.execute_i64XorShiftImm(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 743: return self.execute_i64XorShiftMulImm(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 744: return self.execute_i32AddImmGlobalSet(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 745: return self.execute_i32GlobalAddSet(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 746: return self.execute_i32GlobalSubSet(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -7293,6 +7295,22 @@ sp.pointee[i64: immediate.result] = mixed &* sp.pointee[i64: immediate.multiplie
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         self.i32AddImmGlobalSet(sp: sp.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32GlobalAddSet") @inline(__always)
+    mutating func execute_i32GlobalAddSet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.I32GlobalAddSetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        self.i32GlobalAddSet(sp: sp.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32GlobalSubSet") @inline(__always)
+    mutating func execute_i32GlobalSubSet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.I32GlobalAddSetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        self.i32GlobalSubSet(sp: sp.pointee, immediate: immediate)
         return next
     }
 }
