@@ -2052,6 +2052,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// the accumulator on untouched once fused with a following write of
         /// the producer's result.
         private var copyAfterAcc: (producer: AccProducer, source: VReg, dest: VReg, end: MetaProgramCounter)?
+        /// An adjacent arithmetic result and copy eligible for a return fusion.
+        private var lastXorReturnProducer: (operand: Instruction.I64XorShiftImmOperand, position: MetaProgramCounter, end: MetaProgramCounter)?
+        private var lastArithmeticReturn: (operand: Instruction.I64XorShiftReturnOperand, position: MetaProgramCounter, end: MetaProgramCounter)?
+        fileprivate var arithmeticReturn: (operand: Instruction.I64XorShiftReturnOperand, position: MetaProgramCounter)? {
+            guard let value = lastArithmeticReturn, value.end.offsetFromHead == insertingPC.offsetFromHead,
+                canRewind(to: value.position)
+            else { return nil }
+            return (value.operand, value.position)
+        }
         /// The last emitted single copy, for pairing it with the next one.
         private var lastReturnCopy: (instruction: Instruction, position: MetaProgramCounter, end: MetaProgramCounter)?
         fileprivate var returnCopy: (instruction: Instruction, position: MetaProgramCounter)? {
@@ -2264,6 +2273,8 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             copyAfterAcc = nil
             lastCopy = nil
             lastReturnCopy = nil
+            lastArithmeticReturn = nil
+            lastXorReturnProducer = nil
             xorShift = nil
         }
 
@@ -2330,6 +2341,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                         type: op.type, op: op.op, lhs: op.lhs, rhs: op.rhs,
                         result: newResult, rhsConstant: op.rhsConstant), prefix: candidate.prefix)
             }
+            lastXorReturnProducer = nil
             let newInstruction = resultRelink(newResult)
             assign(at: lastEmission.position.offsetFromHead, newInstruction)
             if emitsDirectOnlyInstructions, let form = lastAcc?.producer, form.hasAccAndSlotForm {
@@ -2377,6 +2389,22 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             var slots: [CodeSlot] = []
             instruction.emitImmediate(to: { slots.append($0) })
             for slot in slots { emitSlot(slot) }
+            let producer = lastXorReturnProducer
+            lastXorReturnProducer = nil
+            if case .i64XorShiftImm(let operand) = instruction {
+                lastXorReturnProducer = (operand, position, insertingPC)
+            }
+            lastArithmeticReturn = nil
+            if case .copyStack(let copy) = instruction, let producer,
+                producer.end.offsetFromHead == position.offsetFromHead,
+                copy.source == LVReg(producer.operand.result), canRewind(to: producer.position)
+            {
+                lastArithmeticReturn = (
+                    .init(
+                        result: producer.operand.result, input: producer.operand.input, shift: producer.operand.shift, dest: copy.dest
+                    ), producer.position, insertingPC
+                )
+            }
             switch instruction {
             case .copyStack(let operand): lastReturnCopy = (.returnCopy(operand), position, insertingPC)
             case .copyStack2(let operand): lastReturnCopy = (.returnCopy2(operand), position, insertingPC)
@@ -3154,7 +3182,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         return emittedCopy
     }
     private mutating func emitReturnInstruction() {
-        if !module.isDebuggable, let copy = iseqBuilder.returnCopy {
+        if !module.isDebuggable, let arithmetic = iseqBuilder.arithmeticReturn {
+            iseqBuilder.rewind(to: arithmetic.position)
+            rewindInstructionMapping(to: arithmetic.position)
+            emit(.i64XorShiftReturn(arithmetic.operand))
+        } else if !module.isDebuggable, let copy = iseqBuilder.returnCopy {
             iseqBuilder.rewind(to: copy.position)
             rewindInstructionMapping(to: copy.position)
             emit(copy.instruction)
