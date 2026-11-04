@@ -87,7 +87,7 @@ import WAT
             let instance = try module.instantiate(store: store)
             var listing = ""
             try instance.dumpFunctions(to: &listing, module: module)
-            #expect(listing.components(separatedBy: "i64XorShiftMulImm").count >= 3)
+            #expect(listing.contains("i64XorShiftMulPair"))
         }
     #endif
 
