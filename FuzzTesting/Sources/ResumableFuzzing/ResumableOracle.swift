@@ -433,10 +433,10 @@ struct Subject {
     mutating func suspended(_ suspension: Suspension, _ context: inout Context) throws {
         let store = context.store
         if ResumableOracle.trace {
-            print("instance \(index) \(exports[next]) suspended \(suspension.reason) left \(store.fuel!.remaining) pool \(pool)")
+            print("instance \(index) \(exports[next]) suspended \(suspension) left \(store.fuel!.remaining) pool \(pool)")
         }
         let call = self.call!
-        if call.suspension?.reason != suspension.reason {
+        if call.suspension != suspension {
             throw context.finding("suspension reported \(String(describing: call.suspension)), resume returned \(suspension)")
         }
         if !diverged, context.rng.chance(2), !ResumableOracle.unsliced {
@@ -447,7 +447,7 @@ struct Subject {
                 return
             }
         }
-        switch suspension.reason {
+        switch suspension {
         case .outOfFuel(let required):
             lastWasFuel = true
             let left = store.fuel!.remaining
@@ -464,7 +464,7 @@ struct Subject {
                 } catch {
                     throw context.finding("retrying a charge of \(required) with \(store.fuel!.remaining) threw \(error)")
                 }
-                guard case .suspended(let again) = retried, again.reason == .outOfFuel(required: required) else {
+                guard case .suspended(let again) = retried, again == .outOfFuel(required: required) else {
                     throw context.finding("retrying a charge of \(required) with \(store.fuel!.remaining) did not suspend again")
                 }
                 do { try call.resume(throwing: Cancelled()) } catch is Cancelled {}

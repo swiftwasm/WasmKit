@@ -904,7 +904,11 @@ extension Execution {
         function: EntityHandle<HostFunctionEntity>, parameterArea: Sp,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
-        try invokeHostFunction(function: function, sp: sp, parameterArea: parameterArea)
+        do {
+            try invokeHostFunction(function: function, sp: sp, parameterArea: parameterArea)
+        } catch {
+            try Self.hostFunctionThrew(error, function: function, sp: sp, parameterArea: parameterArea, resumePC: pc)
+        }
         // A host function may re-enter the guest and grow the caller's
         // default memory. A malloc-backed memory moves when it grows, so the
         // cached base and bound would otherwise be left dangling.
@@ -954,6 +958,9 @@ extension Execution {
                 // Other errors build no backtrace from here and leave the moved frame as it is.
                 saved.store(below: sp)
                 throw trap
+            } catch {
+                // A suspension keeps the moved frame: resuming runs the return that follows.
+                try Self.hostFunctionThrew(error, function: host, sp: newSp, parameterArea: parameterArea, resumePC: pc)
             }
             if let instance = newSp.currentInstance {
                 CurrentMemory.mayUpdateCurrentInstance(instance: instance, md: &md, ms: &ms)
@@ -1074,6 +1081,65 @@ extension Execution {
             Execution.CurrentMemory.mayUpdateCurrentInstance(instance: calleeInstance, md: &md, ms: &ms)
         }
         return (iseq.baseAddress, newSp)
+    }
+
+    /// Rethrows an error a host function threw, unless the function is waiting on its
+    /// continuation: then suspends the call at the host call, to continue from `resumePC` in the
+    /// frame `sp` once the results are in its parameter area.
+    @inline(never)
+    static func hostFunctionThrew(
+        _ error: any Error, function: EntityHandle<HostFunctionEntity>,
+        sp: Sp, parameterArea: Sp, resumePC: Pc
+    ) throws -> Never {
+        if let pending = error as? PendingHostCall {
+            throw SuspensionSignal(
+                reason: .hostCall(pending, function: function, parameterArea: parameterArea),
+                sp: sp, resumePC: resumePC)
+        }
+        throw error
+    }
+
+    /// Continues a call suspended at a call to the host function `function`, finishing that call
+    /// with `completion` first.
+    ///
+    /// `sp`, `parameterArea` and `pc` are where the call suspended. The completion's results go
+    /// into the parameter area; if it throws, the host function throws there.
+    mutating func resumeHostCall(
+        function: EntityHandle<HostFunctionEntity>, sp: Sp, parameterArea: Sp, pc: Pc,
+        completion: PendingHostCall.Completion
+    ) throws {
+        let caller = Caller(instanceHandle: currentInstance(sp: sp), store: store.value, sp: sp)
+        let resultTypes = function.resultTypes
+        let layout = function.layout
+        do {
+            let results = try completion(caller)
+            try Function.checkResults(results, types: resultTypes)
+            for index in 0..<resultTypes.count {
+                parameterArea.storeValue(results[index], at: layout.resultReg(index), type: resultTypes[index])
+            }
+        } catch {
+            return try resume(throwing: error, sp: sp, pc: pc)
+        }
+        try resume(sp: sp, pc: pc)
+    }
+
+    /// Continues a suspended execution by throwing `error` from where it stopped, just before the
+    /// head slot `pc` in the frame `sp`: a handler in the guest can catch a ``WasmKitException``.
+    mutating func resume(throwing error: any Error, sp: Sp, pc: Pc) throws {
+        if let exception = error as? WasmKitException {
+            var handlerSp = sp
+            var handlerPc = pc
+            var md: Md = nil
+            var ms: Ms = 0
+            guard handleException(exception, sp: &handlerSp, pc: &handlerPc, md: &md, ms: &ms) else {
+                throw exception
+            }
+            return try resume(sp: handlerSp, pc: handlerPc)
+        }
+        if let trap = error as? Trap {
+            throw trap.withBacktrace(Self.captureBacktrace(sp: sp, pc: pc, store: store.value))
+        }
+        throw error
     }
 
     /// Executes the given host function.

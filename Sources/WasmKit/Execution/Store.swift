@@ -46,6 +46,12 @@ public final class Store {
     /// paths that would suspend read it. It lives here rather than in `Execution` because adding a
     /// stored property there grows the call and throw handlers, even though they never read it.
     var isSuspendable: Bool = false
+    /// The serial numbers of the ``ResumableCall``s on this store that are running, one inside
+    /// another, outermost first.
+    var runningResumableCalls: [UInt64] = []
+    /// The serial number of the next ``ResumableCall`` made on this store. A number, not the
+    /// call's identity, which a later call can reuse once the call is gone.
+    var nextResumableCallSerial: UInt64 = 0
 
     /// The epoch at which guest code running on this store stops. `UInt64.max` means "never".
     ///
@@ -105,7 +111,7 @@ public final class Store {
     /// (Default: never)
     ///
     /// Guest code checks the epoch at function entries and loop headers. At the deadline, a
-    /// ``ResumableCall`` suspends with ``Suspension/Reason/epochDeadlineReached`` and any other
+    /// ``ResumableCall`` suspends with ``Suspension/epochDeadlineReached`` and any other
     /// call traps. Zero stops at the next check. Set a new deadline before resuming, or the call
     /// suspends again at once.
     ///
@@ -127,7 +133,7 @@ extension Store: Equatable {
 /// A caller context passed to host functions
 /// Not copyable to avoid storing stale stack pointer.
 public struct Caller: ~Copyable {
-    private let instanceHandle: InternalInstance?
+    let instanceHandle: InternalInstance?
     /// The stack pointer at the point of the host function call.
     private let sp: Sp?
     /// The instance that called the host function.
@@ -152,6 +158,10 @@ public struct Caller: ~Copyable {
         self.store = store
         self.sp = sp
     }
+
+    /// Whether the host function can suspend the call it was called from: the call runs as a
+    /// ``ResumableCall``, and no other host function lies between it and this one.
+    public var canSuspend: Bool { store.isSuspendable }
 
     /// Captures the current WebAssembly call stack backtrace.
     ///
