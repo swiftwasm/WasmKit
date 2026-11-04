@@ -36,6 +36,15 @@ enum MemoryAccessTrap {
 }
 
 extension Execution {
+    mutating func memoryLoadAddingImmediate(sp: Sp, md: Md, ms: Ms, immediate: Instruction.I32AddImmLoadOperand) -> MemoryAccessTrap? {
+        let pointer = sp[i32: immediate.lhs] &+ UInt32(bitPattern: immediate.imm)
+        sp[i32: immediate.pointer] = pointer
+        return memoryLoadFromAcc(
+            sp: sp, md: md, ms: ms, ireg: UInt64(pointer),
+            loadOperand: .init(result: immediate.result, offset: immediate.offset),
+            loadAs: UInt32.self, castToValue: { .i32($0) })
+    }
+
     @inline(never) func throwOutOfBoundsMemoryAccess() throws -> Never {
         throw Trap(.memoryOutOfBounds)
     }
