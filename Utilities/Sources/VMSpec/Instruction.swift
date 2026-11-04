@@ -1938,6 +1938,10 @@ extension VMGen {
         instructions.append(load32)
         instructions.append(Instruction(name: "returnCopy", documentation: "Copy a result slot and return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write, immediate: "CopyStackOperand"))
         instructions.append(Instruction(name: "returnCopy2", documentation: "Copy two independent result slots and return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write, immediate: "CopyStack2Operand"))
+        instructions.append(Instruction(name: "compilingCopyCall", documentation: "Copy argument slots and call an internal function", isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .copyCall))
+        instructions.append(Instruction(name: "internalCopyCall", documentation: "Copy argument slots and call an internal function", isControl: true, mayUpdateFrame: true, immediateLayout: .copyCall))
+        instructions.append(Instruction(name: "compilingCopy2Call", documentation: "Copy argument slots and call an internal function", isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .copy2Call))
+        instructions.append(Instruction(name: "internalCopy2Call", documentation: "Copy argument slots and call an internal function", isControl: true, mayUpdateFrame: true, immediateLayout: .copy2Call))
         return instructions
     }
 

@@ -2444,6 +2444,14 @@ enum Instruction {
     case returnCopy(Instruction.CopyStackOperand)
     /// Copy two independent result slots and return
     case returnCopy2(Instruction.CopyStack2Operand)
+    /// Copy argument slots and call an internal function
+    case compilingCopyCall(Instruction.CopyCallOperand)
+    /// Copy argument slots and call an internal function
+    case internalCopyCall(Instruction.CopyCallOperand)
+    /// Copy argument slots and call an internal function
+    case compilingCopy2Call(Instruction.Copy2CallOperand)
+    /// Copy argument slots and call an internal function
+    case internalCopy2Call(Instruction.Copy2CallOperand)
 }
 
 extension Instruction {
@@ -3830,6 +3838,46 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.imm, $0.offset) as (Int32, UInt32), to: CodeSlot.self) }
         }
     }
+
+    struct CopyCallOperand: InstructionImmediate {
+        var source: LVReg
+        var dest: LVReg
+        var rawCallee: UInt64
+        var arguments: VReg
+        var spAddend: LVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (source, dest) = pc.read((LVReg, LVReg).self)
+            let (rawCallee) = pc.read((UInt64).self)
+            let (arguments, spAddend) = pc.read((VReg, LVReg).self)
+            return Self(source: source, dest: dest, rawCallee: rawCallee, arguments: arguments, spAddend: spAddend)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.source, $0.dest) as (LVReg, LVReg), to: CodeSlot.self) }
+            emitSlot { $0.rawCallee }
+            emitSlot { unsafeBitCast(($0.arguments, $0.spAddend) as (VReg, LVReg), to: CodeSlot.self) }
+        }
+    }
+
+    struct Copy2CallOperand: InstructionImmediate {
+        var source0: VReg
+        var dest0: VReg
+        var source1: VReg
+        var dest1: VReg
+        var rawCallee: UInt64
+        var arguments: VReg
+        var spAddend: LVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (source0, dest0, source1, dest1) = pc.read((VReg, VReg, VReg, VReg).self)
+            let (rawCallee) = pc.read((UInt64).self)
+            let (arguments, spAddend) = pc.read((VReg, LVReg).self)
+            return Self(source0: source0, dest0: dest0, source1: source1, dest1: dest1, rawCallee: rawCallee, arguments: arguments, spAddend: spAddend)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.source0, $0.dest0, $0.source1, $0.dest1) as (VReg, VReg, VReg, VReg), to: CodeSlot.self) }
+            emitSlot { $0.rawCallee }
+            emitSlot { unsafeBitCast(($0.arguments, $0.spAddend) as (VReg, LVReg), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -4572,6 +4620,10 @@ extension Instruction {
         case .i32LoadMemory32(let immediate): return immediate
         case .returnCopy(let immediate): return immediate
         case .returnCopy2(let immediate): return immediate
+        case .compilingCopyCall(let immediate): return immediate
+        case .internalCopyCall(let immediate): return immediate
+        case .compilingCopy2Call(let immediate): return immediate
+        case .internalCopy2Call(let immediate): return immediate
         default: return nil
         }
     }
@@ -5318,6 +5370,10 @@ extension Instruction {
         case .i32LoadMemory32(let immediate): immediate.emit(to: emit)
         case .returnCopy(let immediate): immediate.emit(to: emit)
         case .returnCopy2(let immediate): immediate.emit(to: emit)
+        case .compilingCopyCall(let immediate): immediate.emit(to: emit)
+        case .internalCopyCall(let immediate): immediate.emit(to: emit)
+        case .compilingCopy2Call(let immediate): immediate.emit(to: emit)
+        case .internalCopy2Call(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -6076,13 +6132,17 @@ extension Instruction {
         case .i32AddImmLoad: return 745
         case .i32LoadMemory32: return 746
         case .returnCopy: return 747
-        default: return 748  // .returnCopy2
+        case .returnCopy2: return 748
+        case .compilingCopyCall: return 749
+        case .internalCopyCall: return 750
+        case .compilingCopy2Call: return 751
+        default: return 752  // .internalCopy2Call
         }
     }
 }
 extension Instruction {
     /// The number of opcodes, trap pseudo-instructions included.
-    static let opcodeCount = 749
+    static let opcodeCount = 753
 
     /// Whether only the direct-threaded dispatcher implements this instruction;
     /// `Execution.doExecute` has no case for it.
@@ -6854,6 +6914,10 @@ extension Instruction {
         case 746: return .i32LoadMemory32(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
         case 747: return .returnCopy(Instruction.CopyStackOperand.load(from: &pc))
         case 748: return .returnCopy2(Instruction.CopyStack2Operand.load(from: &pc))
+        case 749: return .compilingCopyCall(Instruction.CopyCallOperand.load(from: &pc))
+        case 750: return .internalCopyCall(Instruction.CopyCallOperand.load(from: &pc))
+        case 751: return .compilingCopy2Call(Instruction.Copy2CallOperand.load(from: &pc))
+        case 752: return .internalCopy2Call(Instruction.Copy2CallOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -7617,6 +7681,10 @@ extension Instruction {
         case 746: return "i32LoadMemory32"
         case 747: return "returnCopy"
         case 748: return "returnCopy2"
+        case 749: return "compilingCopyCall"
+        case 750: return "internalCopyCall"
+        case 751: return "compilingCopy2Call"
+        case 752: return "internalCopy2Call"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
