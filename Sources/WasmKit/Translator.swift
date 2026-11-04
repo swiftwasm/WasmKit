@@ -4128,7 +4128,31 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             }
             spAddend = LVReg(slotIndex: spAddendSlotIndex)
             if module.isSameInstance(wasm.instance) {
-                emit(.compilingCall(Instruction.CallOperand(callee: callee, arguments: arguments, spAddend: spAddend)))
+                let call = Instruction.CallOperand(callee: callee, arguments: arguments, spAddend: spAddend)
+                if !module.isDebuggable, let copy = iseqBuilder.returnCopy {
+                    let fused: Instruction?
+                    switch copy.instruction {
+                    case .returnCopy(let operand):
+                        fused = .compilingCopyCall(
+                            .init(
+                                source: operand.source, dest: operand.dest,
+                                rawCallee: call.rawCallee, arguments: arguments, spAddend: spAddend))
+                    case .returnCopy2(let operand):
+                        fused = .compilingCopy2Call(
+                            .init(
+                                source0: operand.source0, dest0: operand.dest0,
+                                source1: operand.source1, dest1: operand.dest1,
+                                rawCallee: call.rawCallee, arguments: arguments, spAddend: spAddend))
+                    default: fused = nil
+                    }
+                    if let fused {
+                        iseqBuilder.rewind(to: copy.position)
+                        rewindInstructionMapping(to: copy.position)
+                        emit(fused)
+                        return
+                    }
+                }
+                emit(.compilingCall(call))
                 return
             }
         }

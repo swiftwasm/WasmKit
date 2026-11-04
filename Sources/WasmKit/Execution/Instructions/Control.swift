@@ -176,6 +176,50 @@ extension Execution {
         return pc.next()
     }
 
+    @inline(__always)
+    mutating func compilingCopyCall(sp: inout Sp, pc: Pc, immediate: Instruction.CopyCallOperand) throws -> (Pc, CodeSlot) {
+        sp[immediate.dest] = sp[immediate.source]
+        let call = Instruction.CallOperand(rawCallee: immediate.rawCallee, arguments: immediate.arguments, spAddend: immediate.spAddend)
+        try call.callee.wasm.ensureCompiled(store: store)
+        pc.advanced(by: -4).pointee = Instruction.internalCopyCall(immediate).headSlotInline(
+            threadingModel: store.value.engine.configuration.threadingModel)
+        return try internalCallSlow(sp: &sp, pc: pc, immediate: call)
+    }
+
+    @inline(__always)
+    mutating func internalCopyCall(sp: inout Sp, pc: Pc, immediate: Instruction.CopyCallOperand) -> (Pc, CodeSlot) {
+        sp[immediate.dest] = sp[immediate.source]
+        let call = Instruction.CallOperand(rawCallee: immediate.rawCallee, arguments: immediate.arguments, spAddend: immediate.spAddend)
+        // The final two slots retain the ordinary call operand layout, so
+        // internalCall can redispatch a failed fast path without repeating copies.
+        return internalCall(sp: &sp, pc: pc, immediate: call)
+    }
+
+    @inline(__always)
+    mutating func compilingCopy2Call(sp: inout Sp, pc: Pc, immediate: Instruction.Copy2CallOperand) throws -> (Pc, CodeSlot) {
+        let value0 = sp[immediate.source0]
+        let value1 = sp[immediate.source1]
+        sp[immediate.dest0] = value0
+        sp[immediate.dest1] = value1
+        let call = Instruction.CallOperand(rawCallee: immediate.rawCallee, arguments: immediate.arguments, spAddend: immediate.spAddend)
+        try call.callee.wasm.ensureCompiled(store: store)
+        pc.advanced(by: -4).pointee = Instruction.internalCopy2Call(immediate).headSlotInline(
+            threadingModel: store.value.engine.configuration.threadingModel)
+        return try internalCallSlow(sp: &sp, pc: pc, immediate: call)
+    }
+
+    @inline(__always)
+    mutating func internalCopy2Call(sp: inout Sp, pc: Pc, immediate: Instruction.Copy2CallOperand) -> (Pc, CodeSlot) {
+        let value0 = sp[immediate.source0]
+        let value1 = sp[immediate.source1]
+        sp[immediate.dest0] = value0
+        sp[immediate.dest1] = value1
+        let call = Instruction.CallOperand(rawCallee: immediate.rawCallee, arguments: immediate.arguments, spAddend: immediate.spAddend)
+        // The final two slots retain the ordinary call operand layout, so
+        // internalCall can redispatch a failed fast path without repeating copies.
+        return internalCall(sp: &sp, pc: pc, immediate: call)
+    }
+
     @inline(never)
     private func prepareForIndirectCall(
         sp: Sp, tableIndex: TableIndex, expectedType: InternedFuncType,
