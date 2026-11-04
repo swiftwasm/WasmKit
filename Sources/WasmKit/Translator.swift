@@ -2052,6 +2052,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// the slot stays written, so it only has to be the last thing in the
         /// buffer, which ``accProducer`` checks.
         private var lastAccAndSlot: AccProducer?
+        // A relinked binary retains its local write when fused with global.set.
+        private var relinkedGlobalUpdate: BinaryEmission?
+        fileprivate var globalUpdateEmission: BinaryEmission? { binaryEmission ?? relinkedGlobalUpdate }
         /// Whether to emit instructions only the direct-threaded dispatcher
         /// implements (`Instruction.isDirectThreadedOnly`), such as the
         /// accumulator forms. Off under token threading, and for a debuggable
@@ -2263,6 +2266,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             instructions.removeLast(instructions.count - position.offsetFromHead)
             resetLastEmission()
             lastAccAndSlot = nil
+            relinkedGlobalUpdate = nil
             copyAfterAcc = nil
             lastCopy = nil
         }
@@ -2322,6 +2326,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             if let relinkedResult = lastEmission.relinkedResult, relinkedResult != value {
                 return false
             }
+            if let candidate = binaryEmission {
+                let op = candidate.operation
+                relinkedGlobalUpdate = BinaryEmission(
+                    position: candidate.position, end: candidate.end,
+                    operation: BinaryOperation(
+                        type: op.type, op: op.op, lhs: op.lhs, rhs: op.rhs,
+                        result: newResult, rhsConstant: op.rhsConstant), prefix: candidate.prefix)
+            }
             let newInstruction = resultRelink(newResult)
             assign(at: lastEmission.position.offsetFromHead, newInstruction)
             if emitsDirectOnlyInstructions, let form = lastAcc?.producer, form.hasAccAndSlotForm {
@@ -2362,6 +2374,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             fusable: (condition: FusableCondition, result: VReg, start: MetaProgramCounter?)? = nil,
             binary: BinaryOperation? = nil
         ) {
+            relinkedGlobalUpdate = nil
             let position = insertingPC
             trace("emitInstruction: \(instruction)")
             emitSlot(headSlot(of: instruction))
@@ -4641,12 +4654,31 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     mutating func visitGlobalSet(globalIndex: UInt32) throws(WasmKitError) -> Output {
         let type = try module.globalType(globalIndex)
         let producer = iseqBuilder.accProducer
+        let update = iseqBuilder.globalUpdateEmission
         guard let value = try popVRegOperand(type) else { return }
         guard let global = module.resolveGlobal(globalIndex) else {
             // Skip actual code emission if validation-only mode
             return
         }
         try validator.validateGlobalSet(global.globalType)
+        if type == .i32, let update, update.operation.type == .i32,
+            update.operation.result == value, update.operation.rhsConstant == nil,
+            update.operation.op == .add || update.operation.op == .sub,
+            case .globalGet(.i32, let sourceGlobal, let sourceResult) = update.prefix,
+            sourceGlobal.bitPattern == global.bitPattern, sourceResult == update.operation.lhs,
+            update.end.offsetFromHead - update.position.offsetFromHead == 4,
+            iseqBuilder.canRewind(to: update)
+        {
+            iseqBuilder.rewind(to: update.position)
+            rewindInstructionMapping(to: update.position)
+            let operand = Instruction.I32GlobalAddSetOperand(rawGlobal: UInt64(UInt(bitPattern: global.bitPattern)), result: value, rhs: update.operation.rhs)
+            if update.operation.op == .add {
+                emit(.i32GlobalAddSet(operand))
+            } else {
+                emit(.i32GlobalSubSet(operand))
+            }
+            return
+        }
         if type == .i32, let producer,
             case .binaryImm(.i32, .add, let lhs, let imm, let result) = producer.form,
             result == value, iseqBuilder.canRewind(to: producer)

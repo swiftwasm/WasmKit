@@ -1,6 +1,21 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/instructions.html#variable-instructions>
 extension Execution {
+    mutating func i32GlobalAddSet(sp: Sp, immediate: Instruction.I32GlobalAddSetOperand) {
+        InternalGlobal(bitPattern: UInt(immediate.rawGlobal)).unsafelyUnwrapped.withValue {
+            let value = UInt32(truncatingIfNeeded: $0.rawStorage.lo) &+ sp[i32: immediate.rhs]
+            sp[i32: immediate.result] = value
+            $0.rawStorage.lo = UInt64(value)
+        }
+    }
+    mutating func i32GlobalSubSet(sp: Sp, immediate: Instruction.I32GlobalAddSetOperand) {
+        InternalGlobal(bitPattern: UInt(immediate.rawGlobal)).unsafelyUnwrapped.withValue {
+            let value = UInt32(truncatingIfNeeded: $0.rawStorage.lo) &- sp[i32: immediate.rhs]
+            sp[i32: immediate.result] = value
+            $0.rawStorage.lo = UInt64(value)
+        }
+    }
+
     mutating func i32AddImmGlobalSet(sp: Sp, immediate: Instruction.I32AddImmGlobalSetOperand) {
         let value = sp[i32: immediate.lhs] &+ UInt32(bitPattern: immediate.imm)
         sp[i32: immediate.result] = value

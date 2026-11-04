@@ -2432,6 +2432,10 @@ enum Instruction {
     case i64MulWideU(Instruction.MulWideOperand)
     /// Add an immediate and store the result in a register and a global
     case i32AddImmGlobalSet(Instruction.I32AddImmGlobalSetOperand)
+    /// Read a global, add a register, and write both destinations
+    case i32GlobalAddSet(Instruction.I32GlobalAddSetOperand)
+    /// Read a global, subtract a register, and write both destinations
+    case i32GlobalSubSet(Instruction.I32GlobalAddSetOperand)
 }
 
 extension Instruction {
@@ -3778,6 +3782,29 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.result, $0.lhs, $0.imm) as (VReg, VReg, Int32), to: CodeSlot.self) }
         }
     }
+
+    struct I32GlobalAddSetOperand: InstructionImmediate {
+        var rawGlobal: UInt64
+        var result: VReg
+        var rhs: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let rawGlobal = pc.read(UInt64.self)
+                let word1 = pc.read(UInt64.self)
+                let result = VReg(byteOffset: Int16(truncatingIfNeeded: word1))
+                let rhs = VReg(byteOffset: Int16(truncatingIfNeeded: word1 >> 16))
+                return Self(rawGlobal: rawGlobal, result: result, rhs: rhs)
+            #else
+                let (rawGlobal) = pc.read((UInt64).self)
+                let (result, rhs, _, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
+                return Self(rawGlobal: rawGlobal, result: result, rhs: rhs)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.rawGlobal }
+            emitSlot { unsafeBitCast(($0.result, $0.rhs, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -4514,6 +4541,8 @@ extension Instruction {
         case .i64MulWideS(let immediate): return immediate
         case .i64MulWideU(let immediate): return immediate
         case .i32AddImmGlobalSet(let immediate): return immediate
+        case .i32GlobalAddSet(let immediate): return immediate
+        case .i32GlobalSubSet(let immediate): return immediate
         default: return nil
         }
     }
@@ -5254,6 +5283,8 @@ extension Instruction {
         case .i64MulWideS(let immediate): immediate.emit(to: emit)
         case .i64MulWideU(let immediate): immediate.emit(to: emit)
         case .i32AddImmGlobalSet(let immediate): immediate.emit(to: emit)
+        case .i32GlobalAddSet(let immediate): immediate.emit(to: emit)
+        case .i32GlobalSubSet(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -6006,13 +6037,15 @@ extension Instruction {
         case .i64Sub128: return 739
         case .i64MulWideS: return 740
         case .i64MulWideU: return 741
-        default: return 742  // .i32AddImmGlobalSet
+        case .i32AddImmGlobalSet: return 742
+        case .i32GlobalAddSet: return 743
+        default: return 744  // .i32GlobalSubSet
         }
     }
 }
 extension Instruction {
     /// The number of opcodes, trap pseudo-instructions included.
-    static let opcodeCount = 743
+    static let opcodeCount = 745
 
     /// Whether only the direct-threaded dispatcher implements this instruction;
     /// `Execution.doExecute` has no case for it.
@@ -6778,6 +6811,8 @@ extension Instruction {
         case 740: return .i64MulWideS(Instruction.MulWideOperand.load(from: &pc))
         case 741: return .i64MulWideU(Instruction.MulWideOperand.load(from: &pc))
         case 742: return .i32AddImmGlobalSet(Instruction.I32AddImmGlobalSetOperand.load(from: &pc))
+        case 743: return .i32GlobalAddSet(Instruction.I32GlobalAddSetOperand.load(from: &pc))
+        case 744: return .i32GlobalSubSet(Instruction.I32GlobalAddSetOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -7535,6 +7570,8 @@ extension Instruction {
         case 740: return "i64MulWideS"
         case 741: return "i64MulWideU"
         case 742: return "i32AddImmGlobalSet"
+        case 743: return "i32GlobalAddSet"
+        case 744: return "i32GlobalSubSet"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }

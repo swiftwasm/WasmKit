@@ -16,6 +16,13 @@ import WAT
                     local.get 1 global.get $g)
                   (func (export "sub") (param i32) (result i32)
                     local.get 0 i32.const 16 i32.sub global.set $g global.get $g)
+                  (func (export "update") (param i32) (result i32 i32) (local i32)
+                    local.get 0 global.set $g
+                    global.get $g i32.const 16 i32.sub local.tee 1 global.set $g
+                    local.get 1 global.get $g)
+                  (func (export "add") (param i32) (result i32)
+                    local.get 0 global.set $g
+                    global.get $g i32.const 16 i32.add global.set $g global.get $g)
                   (func (export "join") (param i32 i32) (result i32)
                     block (result i32)
                       local.get 0 local.get 1 br_if 0 drop
@@ -27,9 +34,13 @@ import WAT
         let instance = try module.instantiate(store: store)
         let f = try #require(instance.exports[function: "f"])
         let sub = try #require(instance.exports[function: "sub"])
+        let update = try #require(instance.exports[function: "update"])
+        let add = try #require(instance.exports[function: "add"])
         let join = try #require(instance.exports[function: "join"])
         for x: UInt32 in [0, 1, 16, .max, 0xffff_fff0, 0x8000_0000] {
             #expect(try f([.i32(x)]) == [.i32(x &+ 16), .i32(x &+ 16)])
+            #expect(try update([.i32(x)]) == [.i32(x &- 16), .i32(x &- 16)])
+            #expect(try add([.i32(x)]) == [.i32(x &+ 16)])
             #expect(try sub([.i32(x)]) == [.i32(x &- 16)])
             #expect(try join([.i32(x), .i32(0)]) == [.i32(x &+ 16)])
             #expect(try join([.i32(x), .i32(1)]) == [.i32(x)])
@@ -39,7 +50,11 @@ import WAT
             let dumpInstance = try module.instantiate(store: dumpStore)
             var listing = ""
             try dumpInstance.dumpFunctions(to: &listing, module: module)
-            if threadingModel == .direct { #expect(listing.contains("i32AddImmGlobalSet")) }
+            if threadingModel == .direct {
+                #expect(listing.contains("i32AddImmGlobalSet"))
+                #expect(listing.contains("i32GlobalAddSet"))
+                #expect(listing.contains("i32GlobalSubSet"))
+            }
         #endif
     }
 }

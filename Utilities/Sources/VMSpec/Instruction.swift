@@ -1918,6 +1918,12 @@ extension VMGen {
             $0.field(name: "lhs", type: .VReg)
             $0.field(name: "imm", type: .Int32)
         })
+        instructions.append(Instruction(name: "i32GlobalAddSet", documentation: "Read a global, add a register, and write both destinations") {
+            $0.field(name: "rawGlobal", type: .UInt64)
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "rhs", type: .VReg)
+        })
+        instructions.append(Instruction(name: "i32GlobalSubSet", documentation: "Read a global, subtract a register, and write both destinations", immediate: "I32GlobalAddSetOperand"))
         return instructions
     }
 
