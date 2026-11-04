@@ -24,6 +24,7 @@ public final class Engine {
     /// stack frame on the hottest return path, so it is computed once here
     /// and read through the execution state instead.
     let crossInstanceReturnSlot: CodeSlot
+    let internalCallSlowSlot: CodeSlot
 
     /// Advances this engine's epoch. Send it to the thread that should stop guest code, such as
     /// a timer.
@@ -61,6 +62,9 @@ public final class Engine {
         self.configuration = configuration
         self.interceptor = interceptor
         self.funcTypeInterner = Interner()
+        self.internalCallSlowSlot = Instruction.internalCallSlow(
+            .init(rawCallee: 0, arguments: .zero, spAddend: LVReg(slotIndex: 0))
+        ).headSlot(threadingModel: configuration.threadingModel)
         self.crossInstanceReturnSlot = Instruction.returnCrossInstance(.init()).headSlot(
             threadingModel: configuration.threadingModel
         )
