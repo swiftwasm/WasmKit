@@ -1933,6 +1933,9 @@ extension VMGen {
         }
         addLoad.mayDispatchToTrap = true
         instructions.append(addLoad)
+        var load32 = Instruction(name: "i32LoadMemory32", documentation: "Load i32 with a 32-bit address and static offset", useCurrentMemory: .read, immediateLayout: .accMemoryPointerResult)
+        load32.mayDispatchToTrap = true
+        instructions.append(load32)
         return instructions
     }
 

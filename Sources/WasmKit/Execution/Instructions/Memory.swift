@@ -36,6 +36,16 @@ enum MemoryAccessTrap {
 }
 
 extension Execution {
+    mutating func memoryLoad32(sp: Sp, md: Md, ms: Ms, immediate: Instruction.AccMemoryPointerResultOperand) -> MemoryAccessTrap? {
+        // Both addends are zero-extended UInt32, so adding the load width
+        // cannot overflow UInt64. Keep memory64 on the general checked path.
+        let address = UInt64(sp[i32: immediate.pointer]) &+ UInt64(immediate.offset)
+        if _slowPath(address &+ 4 > UInt64(ms)) { return .outOfBounds }
+        sp[i32: immediate.result] = md.unsafelyUnwrapped.loadUnaligned(
+            fromByteOffset: Execution.checkedByteOffset(address), as: UInt32.self)
+        return nil
+    }
+
     mutating func memoryLoadAddingImmediate(sp: Sp, md: Md, ms: Ms, immediate: Instruction.I32AddImmLoadOperand) -> MemoryAccessTrap? {
         let pointer = sp[i32: immediate.lhs] &+ UInt32(bitPattern: immediate.imm)
         sp[i32: immediate.pointer] = pointer
