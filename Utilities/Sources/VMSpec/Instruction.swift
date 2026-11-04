@@ -1969,6 +1969,14 @@ extension VMGen {
             $0.field(name: "shift2", type: .UInt32)
             $0.field(name: "dest", type: .LVReg)
         })
+        var addBranch = Instruction(name: "i32AddImmBrIf", documentation: "Wrapping immediate add retaining its result followed by a conditional branch", isControl: true) {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "lhs", type: .VReg)
+            $0.field(name: "imm", type: .Int32)
+            $0.field(name: "offset", type: .Int32)
+        }
+        addBranch.useIreg = .write
+        instructions.append(addBranch)
         return instructions
     }
 
