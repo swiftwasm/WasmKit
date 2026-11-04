@@ -454,6 +454,7 @@ extension Execution {
         case 739: return self.execute_i64Sub128(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 740: return self.execute_i64MulWideS(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 741: return self.execute_i64MulWideU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 742: return self.execute_i32AddImmGlobalSet(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -7263,6 +7264,14 @@ extension Execution {
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         self.i64MulWideU(sp: sp.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32AddImmGlobalSet") @inline(__always)
+    mutating func execute_i32AddImmGlobalSet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.I32AddImmGlobalSetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        self.i32AddImmGlobalSet(sp: sp.pointee, immediate: immediate)
         return next
     }
 }

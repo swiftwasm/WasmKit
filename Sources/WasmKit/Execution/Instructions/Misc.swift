@@ -1,6 +1,14 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/instructions.html#variable-instructions>
 extension Execution {
+    mutating func i32AddImmGlobalSet(sp: Sp, immediate: Instruction.I32AddImmGlobalSetOperand) {
+        let value = sp[i32: immediate.lhs] &+ UInt32(bitPattern: immediate.imm)
+        sp[i32: immediate.result] = value
+        InternalGlobal(bitPattern: UInt(immediate.rawGlobal)).unsafelyUnwrapped.withValue {
+            $0.rawStorage.lo = UInt64(value)
+        }
+    }
+
     /// `global.get` on a global whose value fits a single 64-bit stack slot.
     ///
     /// The global's shape is fixed by its type, so the translator picks this

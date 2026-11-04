@@ -4640,12 +4640,22 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
     mutating func visitGlobalSet(globalIndex: UInt32) throws(WasmKitError) -> Output {
         let type = try module.globalType(globalIndex)
+        let producer = iseqBuilder.accProducer
         guard let value = try popVRegOperand(type) else { return }
         guard let global = module.resolveGlobal(globalIndex) else {
             // Skip actual code emission if validation-only mode
             return
         }
         try validator.validateGlobalSet(global.globalType)
+        if type == .i32, let producer,
+            case .binaryImm(.i32, .add, let lhs, let imm, let result) = producer.form,
+            result == value, iseqBuilder.canRewind(to: producer)
+        {
+            iseqBuilder.rewind(to: producer.position)
+            rewindInstructionMapping(to: producer.position)
+            emit(.i32AddImmGlobalSet(.init(rawGlobal: UInt64(UInt(bitPattern: global.bitPattern)), result: result, lhs: lhs, imm: imm)))
+            return
+        }
         let operand = Instruction.GlobalAndVRegOperand(reg: LLVReg(value), global: global)
         emit(type == .v128 ? .globalSetV128(operand) : .globalSet(operand))
     }

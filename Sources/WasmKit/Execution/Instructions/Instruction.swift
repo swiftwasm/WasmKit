@@ -2430,6 +2430,8 @@ enum Instruction {
     case i64MulWideS(Instruction.MulWideOperand)
     /// WebAssembly Core Instruction `i64.mul_wide_u`
     case i64MulWideU(Instruction.MulWideOperand)
+    /// Add an immediate and store the result in a register and a global
+    case i32AddImmGlobalSet(Instruction.I32AddImmGlobalSetOperand)
 }
 
 extension Instruction {
@@ -3751,6 +3753,31 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.lhs, $0.rhs, $0.low, $0.high) as (VReg, VReg, VReg, VReg), to: CodeSlot.self) }
         }
     }
+
+    struct I32AddImmGlobalSetOperand: InstructionImmediate {
+        var rawGlobal: UInt64
+        var result: VReg
+        var lhs: VReg
+        var imm: Int32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let rawGlobal = pc.read(UInt64.self)
+                let word1 = pc.read(UInt64.self)
+                let result = VReg(byteOffset: Int16(truncatingIfNeeded: word1))
+                let lhs = VReg(byteOffset: Int16(truncatingIfNeeded: word1 >> 16))
+                let imm = Int32(truncatingIfNeeded: word1 >> 32)
+                return Self(rawGlobal: rawGlobal, result: result, lhs: lhs, imm: imm)
+            #else
+                let (rawGlobal) = pc.read((UInt64).self)
+                let (result, lhs, imm) = pc.read((VReg, VReg, Int32).self)
+                return Self(rawGlobal: rawGlobal, result: result, lhs: lhs, imm: imm)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.rawGlobal }
+            emitSlot { unsafeBitCast(($0.result, $0.lhs, $0.imm) as (VReg, VReg, Int32), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -4486,6 +4513,7 @@ extension Instruction {
         case .i64Sub128(let immediate): return immediate
         case .i64MulWideS(let immediate): return immediate
         case .i64MulWideU(let immediate): return immediate
+        case .i32AddImmGlobalSet(let immediate): return immediate
         default: return nil
         }
     }
@@ -5225,6 +5253,7 @@ extension Instruction {
         case .i64Sub128(let immediate): immediate.emit(to: emit)
         case .i64MulWideS(let immediate): immediate.emit(to: emit)
         case .i64MulWideU(let immediate): immediate.emit(to: emit)
+        case .i32AddImmGlobalSet(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -5976,13 +6005,14 @@ extension Instruction {
         case .i64Add128: return 738
         case .i64Sub128: return 739
         case .i64MulWideS: return 740
-        default: return 741  // .i64MulWideU
+        case .i64MulWideU: return 741
+        default: return 742  // .i32AddImmGlobalSet
         }
     }
 }
 extension Instruction {
     /// The number of opcodes, trap pseudo-instructions included.
-    static let opcodeCount = 742
+    static let opcodeCount = 743
 
     /// Whether only the direct-threaded dispatcher implements this instruction;
     /// `Execution.doExecute` has no case for it.
@@ -6747,6 +6777,7 @@ extension Instruction {
         case 739: return .i64Sub128(Instruction.Binary128Operand.load(from: &pc))
         case 740: return .i64MulWideS(Instruction.MulWideOperand.load(from: &pc))
         case 741: return .i64MulWideU(Instruction.MulWideOperand.load(from: &pc))
+        case 742: return .i32AddImmGlobalSet(Instruction.I32AddImmGlobalSetOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -7503,6 +7534,7 @@ extension Instruction {
         case 739: return "i64Sub128"
         case 740: return "i64MulWideS"
         case 741: return "i64MulWideU"
+        case 742: return "i32AddImmGlobalSet"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
