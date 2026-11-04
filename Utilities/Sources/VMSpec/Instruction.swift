@@ -1942,6 +1942,12 @@ extension VMGen {
         instructions.append(Instruction(name: "internalCopyCall", documentation: "Copy argument slots and call an internal function", isControl: true, mayUpdateFrame: true, immediateLayout: .copyCall))
         instructions.append(Instruction(name: "compilingCopy2Call", documentation: "Copy argument slots and call an internal function", isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .copy2Call))
         instructions.append(Instruction(name: "internalCopy2Call", documentation: "Copy argument slots and call an internal function", isControl: true, mayUpdateFrame: true, immediateLayout: .copy2Call))
+        instructions.append(Instruction(name: "i64XorShiftReturn", documentation: "Compute xor-shift, copy its result, and return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "input", type: .VReg)
+            $0.field(name: "shift", type: .UInt32)
+            $0.field(name: "dest", type: .LVReg)
+        })
         return instructions
     }
 

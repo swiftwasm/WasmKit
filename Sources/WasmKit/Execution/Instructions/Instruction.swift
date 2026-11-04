@@ -2450,6 +2450,8 @@ enum Instruction {
     case compilingCopy2Call(Instruction.Copy2CallOperand)
     /// Copy argument slots and call an internal function
     case internalCopy2Call(Instruction.Copy2CallOperand)
+    /// Compute xor-shift, copy its result, and return
+    case i64XorShiftReturn(Instruction.I64XorShiftReturnOperand)
 }
 
 extension Instruction {
@@ -3920,6 +3922,22 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.arguments, $0.spAddend) as (VReg, LVReg), to: CodeSlot.self) }
         }
     }
+
+    struct I64XorShiftReturnOperand: InstructionImmediate {
+        var result: VReg
+        var input: VReg
+        var shift: UInt32
+        var dest: LVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (result, input, shift) = pc.read((VReg, VReg, UInt32).self)
+            let (dest, _, _, _, _) = pc.read((LVReg, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(result: result, input: input, shift: shift, dest: dest)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.result, $0.input, $0.shift) as (VReg, VReg, UInt32), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.dest, 0, 0, 0, 0) as (LVReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -4668,6 +4686,7 @@ extension Instruction {
         case .internalCopyCall(let immediate): return immediate
         case .compilingCopy2Call(let immediate): return immediate
         case .internalCopy2Call(let immediate): return immediate
+        case .i64XorShiftReturn(let immediate): return immediate
         default: return nil
         }
     }
@@ -5420,6 +5439,7 @@ extension Instruction {
         case .internalCopyCall(let immediate): immediate.emit(to: emit)
         case .compilingCopy2Call(let immediate): immediate.emit(to: emit)
         case .internalCopy2Call(let immediate): immediate.emit(to: emit)
+        case .i64XorShiftReturn(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -6184,13 +6204,14 @@ extension Instruction {
         case .compilingCopyCall: return 751
         case .internalCopyCall: return 752
         case .compilingCopy2Call: return 753
-        default: return 754  // .internalCopy2Call
+        case .internalCopy2Call: return 754
+        default: return 755  // .i64XorShiftReturn
         }
     }
 }
 extension Instruction {
     /// The number of opcodes, trap pseudo-instructions included.
-    static let opcodeCount = 755
+    static let opcodeCount = 756
 
     /// Whether only the direct-threaded dispatcher implements this instruction;
     /// `Execution.doExecute` has no case for it.
@@ -6968,6 +6989,7 @@ extension Instruction {
         case 752: return .internalCopyCall(Instruction.CopyCallOperand.load(from: &pc))
         case 753: return .compilingCopy2Call(Instruction.Copy2CallOperand.load(from: &pc))
         case 754: return .internalCopy2Call(Instruction.Copy2CallOperand.load(from: &pc))
+        case 755: return .i64XorShiftReturn(Instruction.I64XorShiftReturnOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -7737,6 +7759,7 @@ extension Instruction {
         case 752: return "internalCopyCall"
         case 753: return "compilingCopy2Call"
         case 754: return "internalCopy2Call"
+        case 755: return "i64XorShiftReturn"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
