@@ -102,6 +102,8 @@ See [examples](https://github.com/swiftwasm/WasmKit/tree/main/Examples) for exec
 - ``Suspension``
 - ``ResumableCallError``
 - ``EpochTicker``
+- ``HostContinuation``
+- ``HostWaiter``
 
 ### Binary Parser
 
@@ -118,6 +120,7 @@ See [examples](https://github.com/swiftwasm/WasmKit/tree/main/Examples) for exec
 
 - ``Imports``
 - ``Caller``
+- ``AsyncCaller``
 - ``GuestMemory``
 - ``UnsafeGuestPointer``
 - ``UnsafeGuestRawPointer``
