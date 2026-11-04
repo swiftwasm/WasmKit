@@ -3913,6 +3913,18 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 return
             }
             if let producer = accConditionProducer(accCandidate, condition: condition) {
+                if case .binaryImm(.i32, .add, let lhs, let imm, let result) = producer.form {
+                    iseqBuilder.rewind(to: producer.position)
+                    self.rewindInstructionMapping(to: producer.position)
+                    let oldPC = iseqBuilder.insertingPC
+                    iseqBuilder.emitWithLabel(Instruction.i32AddImmBrIf, frame.continuation) { _, selfPC, continuation in
+                        Instruction.I32AddImmBrIfOperand(
+                            result: result, lhs: lhs, imm: imm,
+                            offset: Int32(continuation.offsetFromHead - selfPC.offsetFromHead))
+                    }
+                    self.updateInstructionMapping(from: oldPC)
+                    return
+                }
                 rewindProducerIntoAccumulator(producer)
                 let oldPC = iseqBuilder.insertingPC
                 iseqBuilder.emitWithLabel(Instruction.brIfAcc, frame.continuation) { _, selfPC, continuation in

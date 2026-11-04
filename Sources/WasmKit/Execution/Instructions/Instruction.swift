@@ -2456,6 +2456,8 @@ enum Instruction {
     case i64XorShiftMulPair(Instruction.I64XorShiftMulPairOperand)
     /// Two ordered xor-shift-multiply operations followed by xor-shift and return
     case i64XorShiftMulPairReturn(Instruction.I64XorShiftMulPairReturnOperand)
+    /// Wrapping immediate add retaining its result followed by a conditional branch
+    case i32AddImmBrIf(Instruction.I32AddImmBrIfOperand)
 }
 
 extension Instruction {
@@ -3998,6 +4000,22 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.shift2, $0.dest) as (UInt32, LVReg), to: CodeSlot.self) }
         }
     }
+
+    struct I32AddImmBrIfOperand: InstructionImmediate {
+        var result: VReg
+        var lhs: VReg
+        var imm: Int32
+        var offset: Int32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (result, lhs, imm) = pc.read((VReg, VReg, Int32).self)
+            let (offset, _, _, _, _) = pc.read((Int32, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(result: result, lhs: lhs, imm: imm, offset: offset)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.result, $0.lhs, $0.imm) as (VReg, VReg, Int32), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.offset, 0, 0, 0, 0) as (Int32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -4749,6 +4767,7 @@ extension Instruction {
         case .i64XorShiftReturn(let immediate): return immediate
         case .i64XorShiftMulPair(let immediate): return immediate
         case .i64XorShiftMulPairReturn(let immediate): return immediate
+        case .i32AddImmBrIf(let immediate): return immediate
         default: return nil
         }
     }
@@ -5504,6 +5523,7 @@ extension Instruction {
         case .i64XorShiftReturn(let immediate): immediate.emit(to: emit)
         case .i64XorShiftMulPair(let immediate): immediate.emit(to: emit)
         case .i64XorShiftMulPairReturn(let immediate): immediate.emit(to: emit)
+        case .i32AddImmBrIf(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -6271,19 +6291,20 @@ extension Instruction {
         case .internalCopy2Call: return 754
         case .i64XorShiftReturn: return 755
         case .i64XorShiftMulPair: return 756
-        default: return 757  // .i64XorShiftMulPairReturn
+        case .i64XorShiftMulPairReturn: return 757
+        default: return 758  // .i32AddImmBrIf
         }
     }
 }
 extension Instruction {
     /// The number of opcodes, trap pseudo-instructions included.
-    static let opcodeCount = 758
+    static let opcodeCount = 759
 
     /// Whether only the direct-threaded dispatcher implements this instruction;
     /// `Execution.doExecute` has no case for it.
     var isDirectThreadedOnly: Bool {
         switch opcodeID {
-        case 366, 367, 368, 369, 370, 371, 372, 373, 374, 375, 376, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 387, 388, 389, 390, 391, 392, 393, 394, 395, 396, 397, 398, 399, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 432, 433, 434, 435, 436, 437, 438, 439, 440, 441, 442, 443, 444, 445, 446, 447, 448, 449, 450, 451, 452, 453, 454, 455, 456, 457, 458, 459, 460, 461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494, 495, 496, 497, 498, 499, 500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510, 511, 512, 513, 514, 515, 516, 517, 518, 519, 520, 521, 522, 523, 524, 525, 526, 527, 528, 529, 530, 531, 532, 533, 534, 535, 536, 537, 538, 539, 540, 541, 542, 543, 544, 545, 546, 547, 548, 549, 550, 551, 552, 553, 554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565, 566, 567, 568, 569, 570, 571, 572, 573, 574, 575, 576, 577, 578, 579, 580, 581, 582, 583, 584, 585, 586, 587, 588, 589, 590, 591, 592, 593, 594, 595, 596, 597, 598, 599, 600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611, 612, 613, 614, 615, 616, 617, 618, 619, 620, 621, 622, 623, 624, 625, 626, 627, 628, 629, 630, 631, 632, 633, 634, 635, 636, 637, 638, 639, 640, 641, 642, 643, 644, 645, 646, 647, 648, 649, 650, 651, 652, 653, 654, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703, 704, 705, 706, 707, 708, 709, 710, 711, 712: return true
+        case 366, 367, 368, 369, 370, 371, 372, 373, 374, 375, 376, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 387, 388, 389, 390, 391, 392, 393, 394, 395, 396, 397, 398, 399, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 432, 433, 434, 435, 436, 437, 438, 439, 440, 441, 442, 443, 444, 445, 446, 447, 448, 449, 450, 451, 452, 453, 454, 455, 456, 457, 458, 459, 460, 461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494, 495, 496, 497, 498, 499, 500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510, 511, 512, 513, 514, 515, 516, 517, 518, 519, 520, 521, 522, 523, 524, 525, 526, 527, 528, 529, 530, 531, 532, 533, 534, 535, 536, 537, 538, 539, 540, 541, 542, 543, 544, 545, 546, 547, 548, 549, 550, 551, 552, 553, 554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565, 566, 567, 568, 569, 570, 571, 572, 573, 574, 575, 576, 577, 578, 579, 580, 581, 582, 583, 584, 585, 586, 587, 588, 589, 590, 591, 592, 593, 594, 595, 596, 597, 598, 599, 600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611, 612, 613, 614, 615, 616, 617, 618, 619, 620, 621, 622, 623, 624, 625, 626, 627, 628, 629, 630, 631, 632, 633, 634, 635, 636, 637, 638, 639, 640, 641, 642, 643, 644, 645, 646, 647, 648, 649, 650, 651, 652, 653, 654, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703, 704, 705, 706, 707, 708, 709, 710, 711, 712, 758: return true
         default: return false
         }
     }
@@ -7058,6 +7079,7 @@ extension Instruction {
         case 755: return .i64XorShiftReturn(Instruction.I64XorShiftReturnOperand.load(from: &pc))
         case 756: return .i64XorShiftMulPair(Instruction.I64XorShiftMulPairOperand.load(from: &pc))
         case 757: return .i64XorShiftMulPairReturn(Instruction.I64XorShiftMulPairReturnOperand.load(from: &pc))
+        case 758: return .i32AddImmBrIf(Instruction.I32AddImmBrIfOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -7830,6 +7852,7 @@ extension Instruction {
         case 755: return "i64XorShiftReturn"
         case 756: return "i64XorShiftMulPair"
         case 757: return "i64XorShiftMulPairReturn"
+        case 758: return "i32AddImmBrIf"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
