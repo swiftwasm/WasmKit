@@ -179,9 +179,6 @@ extension TrapReason.Message {
     static func resultTypesMismatch(expected: [ValueType], got: [Value]) -> Self {
         Self("result types don't match, expected [\(ValueType.descriptionList(expected))], got [\(Value.descriptionList(got))]")
     }
-    static var asyncHostFunctionNotAwaited: Self {
-        Self("an asynchronous host function was called from a call that is not awaited")
-    }
     static var hostSuspensionNotAllowed: Self {
         Self("a host function left a call waiting that cannot be suspended")
     }

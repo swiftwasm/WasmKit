@@ -266,22 +266,6 @@ public final class ResumableCall {
     /// - Throws: A trap, or another error the guest raised, which finishes the call; or a
     ///   ``ResumableCallError`` if the call cannot be resumed, which leaves it as it was.
     public func resume() throws -> Status {
-        #if !$Embedded
-            var status = try resumeOnce()
-            // Only an awaited resume runs an asynchronous host function: elsewhere it traps.
-            while case .suspended(.waitingForHost(let waiter)) = status, waiter.pending.asyncCall != nil {
-                waiter.pending.asyncCall = nil
-                waiter.pending.complete { _ in throw Trap(.asyncHostFunctionNotAwaited) }
-                status = try resumeOnce()
-            }
-            return status
-        #else
-            try resumeOnce()
-        #endif
-    }
-
-    /// Starts the call, or continues it after a suspension, once.
-    func resumeOnce() throws -> Status {
         switch state.take() {
         case .ready(let arguments, let stack):
             return try start(arguments: arguments, on: stack)

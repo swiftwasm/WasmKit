@@ -24,12 +24,6 @@ final class PendingHostCall: Error, @unchecked Sendable {
     /// `.consumed`.
     private var completion: Completion?
 
-    #if !$Embedded
-        /// The asynchronous body that `ResumableCall.resume()` runs to complete the
-        /// call, for a function made with ``Function/async(store:parameters:results:_:)``.
-        var asyncCall: AsyncHostCall?
-    #endif
-
     /// Records how the host function's call finishes, and calls what waits for it.
     func complete(_ completion: @escaping Completion) {
         let outcome: (waiters: [@Sendable () -> Void], resumedTwice: Bool) = state.withLock { state in
@@ -199,21 +193,10 @@ extension Function {
         parameters: [ValueType], results: [ValueType] = [],
         _ body: @escaping (borrowing Caller, [Value], HostContinuation) throws -> Void
     ) -> Function {
-        suspending(store: store, type: FunctionType(parameters: parameters, results: results)) { caller, arguments in
-            let pending = PendingHostCall()
-            try body(caller, arguments, HostContinuation(pending: pending))
-            return pending
-        }
-    }
-
-    /// Creates a host function from `body`, which starts the call and returns its pending state.
-    static func suspending(
-        store: Store, type: FunctionType,
-        _ body: @escaping (borrowing Caller, [Value]) throws -> PendingHostCall
-    ) -> Function {
-        let results = type.results
+        let type = FunctionType(parameters: parameters, results: results)
         let implementation: RawImplementation = { caller, parameters, out in
-            let pending = try body(caller, Array(parameters))
+            let pending = PendingHostCall()
+            try body(caller, Array(parameters), HostContinuation(pending: pending))
             if let completion = pending.takeCompletion() {
                 return try write(completion(caller), to: out, types: results)
             }

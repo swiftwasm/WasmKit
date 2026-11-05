@@ -135,7 +135,7 @@ extension Store: Equatable {
 /// A caller context passed to host functions
 /// Not copyable to avoid storing stale stack pointer.
 public struct Caller: ~Copyable {
-    let instanceHandle: InternalInstance?
+    private let instanceHandle: InternalInstance?
     /// The stack pointer at the point of the host function call.
     private let sp: Sp?
     /// The instance that called the host function.

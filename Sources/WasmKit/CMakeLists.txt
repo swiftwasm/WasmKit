@@ -53,7 +53,6 @@ add_wasmkit_library(WasmKit
   Execution/StatsCollector.swift
   Execution/NameRegistry.swift
   Execution/Profiler.swift
-  Execution/AsyncHostFunction.swift
   Execution/HostContinuation.swift
   Execution/ResumableCall.swift
   Execution/Runtime.swift
