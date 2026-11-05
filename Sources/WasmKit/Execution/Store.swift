@@ -46,12 +46,6 @@ public final class Store {
     /// paths that would suspend read it. It lives here rather than in `Execution` because adding a
     /// stored property there grows the call and throw handlers, even though they never read it.
     var isSuspendable: Bool = false
-    /// The serial numbers of the ``ResumableCall``s on this store that are running, one inside
-    /// another, outermost first.
-    var runningResumableCalls: [UInt64] = []
-    /// The serial number of the next ``ResumableCall`` made on this store. A number, not the
-    /// call's identity, which a later call can reuse once the call is gone.
-    var nextResumableCallSerial: UInt64 = 0
 
     /// The epoch at which guest code running on this store stops. `UInt64.max` means "never".
     ///
@@ -98,6 +92,14 @@ public final class Store {
     let allocator: StoreAllocator
     /// The engine associated with this store.
     public let engine: Engine
+
+    // Kept below the fields guest code reads, so that adding them does not move those.
+    /// The serial numbers of the ``ResumableCall``s on this store that are running, one inside
+    /// another, outermost first.
+    var runningResumableCalls: [UInt64] = []
+    /// The serial number of the next ``ResumableCall`` made on this store. A number, not the
+    /// call's identity, which a later call can reuse once the call is gone.
+    var nextResumableCallSerial: UInt64 = 0
 
     /// Create a new store associated with the given engine.
     public init(engine: Engine) {
