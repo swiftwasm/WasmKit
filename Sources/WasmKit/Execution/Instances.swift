@@ -647,7 +647,7 @@ struct MemoryEntity: ~Copyable {
 
     /// Backing storage for a linear memory; shared memories are the `.shared` case.
     private enum Storage {
-        #if (os(macOS) || os(Linux)) && !$Embedded
+        #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
             case mprotect(MprotectLinearMemory)
             case shared(SharedMemoryStorage)
         #endif
@@ -661,7 +661,7 @@ struct MemoryEntity: ~Copyable {
             engineConfiguration: EngineConfiguration
         ) throws(Trap) {
             if isShared {
-                #if (os(macOS) || os(Linux)) && !$Embedded
+                #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
                     self = .shared(try SharedMemoryStorage(initialBytes: initialBytes, maxBytes: maxBytes, isMemory64: isMemory64, engineConfiguration: engineConfiguration))
                     return
                 #else
@@ -669,7 +669,7 @@ struct MemoryEntity: ~Copyable {
                 #endif
             }
 
-            #if (os(macOS) || os(Linux)) && !$Embedded
+            #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
                 if !isMemory64, engineConfiguration.memoryBoundsChecking == .mprotect {
                     let reservationSize = MprotectLinearMemory.wasm32ReservationSize(offsetGuardSize: engineConfiguration.memoryOffsetGuardSize)
                     do {
@@ -685,13 +685,13 @@ struct MemoryEntity: ~Copyable {
 
         var data: UnsafeBufferPointer<UInt8> {
             switch self {
-            #if (os(macOS) || os(Linux)) && !$Embedded
+            #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
                 case .mprotect(let memory):
                     return memory.makeBufferPointer()
             #endif
             case .malloc(let buffer):
                 return buffer.data
-            #if (os(macOS) || os(Linux)) && !$Embedded
+            #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
                 case .shared(let shared):
                     return UnsafeBufferPointer(
                         start: shared.basePointer.assumingMemoryBound(to: UInt8.self),
@@ -703,13 +703,13 @@ struct MemoryEntity: ~Copyable {
 
         var baseAddress: UnsafeMutableRawPointer? {
             switch self {
-            #if (os(macOS) || os(Linux)) && !$Embedded
+            #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
                 case .mprotect(let memory):
                     return memory.baseAddress
             #endif
             case .malloc(let buffer):
                 return buffer.baseAddress
-            #if (os(macOS) || os(Linux)) && !$Embedded
+            #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
                 case .shared(let shared):
                     return shared.basePointer
             #endif
@@ -718,13 +718,13 @@ struct MemoryEntity: ~Copyable {
 
         var byteCount: Int {
             switch self {
-            #if (os(macOS) || os(Linux)) && !$Embedded
+            #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
                 case .mprotect(let memory):
                     return memory.committedSize
             #endif
             case .malloc(let buffer):
                 return buffer.byteCount
-            #if (os(macOS) || os(Linux)) && !$Embedded
+            #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
                 case .shared(let shared):
                     return shared.currentByteCount.load(ordering: .acquiring)
             #endif
@@ -733,13 +733,13 @@ struct MemoryEntity: ~Copyable {
 
         var trapGuardReservationSize: Int {
             switch self {
-            #if (os(macOS) || os(Linux)) && !$Embedded
+            #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
                 case .mprotect(let memory):
                     return memory.reservationSize
             #endif
             case .malloc(let buffer):
                 return buffer.trapGuardReservationSize
-            #if (os(macOS) || os(Linux)) && !$Embedded
+            #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
                 case .shared(let shared):
                     return shared.reservationSize
             #endif
@@ -751,13 +751,13 @@ struct MemoryEntity: ~Copyable {
         /// whose real bound is enforced by the guard pages via the trap guard.
         var boundsCheckLimit: Int {
             switch self {
-            #if (os(macOS) || os(Linux)) && !$Embedded
+            #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
                 case .mprotect(let memory):
                     return memory.committedSize
             #endif
             case .malloc(let buffer):
                 return buffer.byteCount
-            #if (os(macOS) || os(Linux)) && !$Embedded
+            #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
                 case .shared(let shared):
                     return shared.reservationSize
             #endif
@@ -769,7 +769,7 @@ struct MemoryEntity: ~Copyable {
         /// bounds/limiter/commit atomically; the single-threaded backings check then commit.
         mutating func grow(by pageCount: Int, maxPageCount: UInt64, resourceLimiter: any ResourceLimiter) throws -> Int {
             switch self {
-            #if (os(macOS) || os(Linux)) && !$Embedded
+            #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
                 case .mprotect(var memory):
                     guard let target = try Self.checkGrow(currentBytes: memory.committedSize, by: pageCount, maxPageCount: maxPageCount, resourceLimiter: resourceLimiter) else { return -1 }
                     try memory.grow(to: target.newByteCount)
@@ -781,7 +781,7 @@ struct MemoryEntity: ~Copyable {
                 try buffer.grow(to: target.newByteCount)
                 self = .malloc(buffer)
                 return target.oldPages
-            #if (os(macOS) || os(Linux)) && !$Embedded
+            #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
                 case .shared(let shared):
                     return try shared.grow(by: pageCount, resourceLimiter: resourceLimiter)
             #endif
@@ -806,13 +806,13 @@ struct MemoryEntity: ~Copyable {
 
         func deallocate() {
             switch self {
-            #if (os(macOS) || os(Linux)) && !$Embedded
+            #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
                 case .mprotect(let memory):
                     memory.deallocate()
             #endif
             case .malloc(let buffer):
                 buffer.deallocate()
-            #if (os(macOS) || os(Linux)) && !$Embedded
+            #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
                 case .shared:
                     // Ref-counted; ARC frees the backing when the last importer is released.
                     break
@@ -826,7 +826,7 @@ struct MemoryEntity: ~Copyable {
 
     /// The shared backing's `atomic.wait`/`notify` parking lot, or nil if not shared.
     var sharedParkingLot: AtomicParkingLot? {
-        #if (os(macOS) || os(Linux)) && !$Embedded
+        #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
             if case .shared(let shared) = storage { return shared.parkingLot }
         #endif
         return nil
@@ -861,7 +861,7 @@ struct MemoryEntity: ~Copyable {
         limit = memoryType
     }
 
-    #if (os(macOS) || os(Linux)) && !$Embedded
+    #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
         /// Creates a memory entity for a shared memory backed by pre-allocated `SharedMemoryStorage`.
         init(_ memoryType: MemoryType, sharedStorage: SharedMemoryStorage) {
             precondition(memoryType.shared)
@@ -1051,7 +1051,7 @@ public struct Memory: Equatable {
         )
     }
 
-    #if (os(macOS) || os(Linux)) && !$Embedded
+    #if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
         /// Creates a store-local wrapper around a store-independent shared-memory backing.
         ///
         /// The resulting ``Memory`` belongs to `store` and must not be shared

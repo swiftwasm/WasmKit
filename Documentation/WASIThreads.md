@@ -30,5 +30,10 @@ consume an ID.
 This is intentionally a process-oriented CLI capability, not a general
 long-lived embedding API. A worker trap or `proc_exit` terminates the host
 process; returning from `_start` also terminates it, allowing the operating
-system to clean up detached workers. It requires a 64-bit macOS or Linux host,
-and the `MultiThread` package trait when building the CLI product.
+system to clean up detached workers. It requires a 64-bit macOS, iOS or Linux
+host, and the `MultiThread` package trait when building the CLI product.
+
+Each shared memory reserves the whole 4 GiB wasm32 address range plus the
+offset guard; only committed pages are readable and writable. iOS devices may
+refuse a reservation that size, so an iOS host must handle the allocation
+failing.

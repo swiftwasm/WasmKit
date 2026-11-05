@@ -43,7 +43,7 @@ public enum WASIThreadsError: Error, Sendable, CustomStringConvertible {
         switch self {
         case .invalidMaximumThreads: "WASI Threads maximumThreads must be at least one"
         case .nativeStackSizeTooSmall(let minimum): "WASI Threads native stack size must be at least \(minimum) bytes"
-        case .unsupportedPlatform: "WASI Threads requires a 64-bit macOS or Linux host"
+        case .unsupportedPlatform: "WASI Threads requires a 64-bit macOS, iOS, or Linux host"
         case .incompatibleEngine(let reason): "WASI Threads requires \(reason)"
         }
     }
@@ -130,7 +130,7 @@ public final class WASIThreads: @unchecked Sendable {
         processControl: WASIThreadsProcessControl,
         childImports: @escaping ChildImportsBuilder
     ) throws {
-        #if os(macOS) || os(Linux)
+        #if os(macOS) || os(iOS) || os(Linux)
             #if MultiThread && (arch(x86_64) || arch(arm64))
                 guard configuration.maximumThreads >= 1 else { throw WASIThreadsError.invalidMaximumThreads }
                 let minimumStackSize = Int(wasmkit_wasi_threads_min_stack_size())
@@ -178,7 +178,7 @@ public final class WASIThreads: @unchecked Sendable {
     /// Creates the imports for one store, including the module's shared memory
     /// import and `wasi.thread-spawn`.
     public func makeImports(store: Store) throws -> Imports {
-        #if os(macOS) || os(Linux)
+        #if os(macOS) || os(iOS) || os(Linux)
             var imports = try childImports(store)
             imports.define(
                 module: sharedMemoryImport.module, name: sharedMemoryImport.name,

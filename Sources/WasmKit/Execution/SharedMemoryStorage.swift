@@ -1,6 +1,6 @@
 // Shared memory relies on the mprotect guard-page reservation for OOB detection, so it is
 // only built where that is available (see `SharedMemoryStorage.isSupported`).
-#if (os(macOS) || os(Linux)) && !$Embedded
+#if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
 
     import Synchronization
     import WasmParser
@@ -51,7 +51,7 @@
 
         /// Whether a shared memory can be created under `engineConfiguration` on this platform.
         /// Shared memory relies on mprotect guard-page OOB detection, which is available on wasm32
-        /// 64-bit macOS/Linux. Note Swift treats Android as `os(Android)`, not `os(Linux)`, so it is
+        /// 64-bit macOS/iOS/Linux. Note Swift treats Android as `os(Android)`, not `os(Linux)`, so it is
         /// excluded even though the C side sees `__linux__`.
         static func isSupported(engineConfiguration: EngineConfiguration, isMemory64: Bool) -> Bool {
             #if arch(x86_64) || arch(arm64)
