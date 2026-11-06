@@ -127,7 +127,20 @@ extension Execution {
     }
 
     @inline(__always)
-    mutating func internalCall(sp: inout Sp, pc: Pc, immediate: Instruction.CallOperand) throws -> (Pc, CodeSlot) {
+    mutating func internalCall(sp: inout Sp, pc: Pc, immediate: Instruction.CallOperand) -> (Pc, CodeSlot) {
+        let (iseq, function) = immediate.callee.assumeCompiled()
+        let newSp = sp.advanced(by: immediate.spAddend)
+        guard pushSmallFrame(iseq: iseq, function: function, sp: sp, newSp: newSp, returnPC: pc) else {
+            // Revisit the same two-slot operand with the slow handler. No guest
+            // state changed, including the caller frame used for trap backtraces.
+            return (pc.advanced(by: -2), store.value.engine.internalCallSlowSlot)
+        }
+        sp = newSp
+        return iseq.baseAddress.next()
+    }
+
+    @inline(__always)
+    mutating func internalCallSlow(sp: inout Sp, pc: Pc, immediate: Instruction.CallOperand) throws -> (Pc, CodeSlot) {
         var pc = pc
         let callee = immediate.callee
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)
