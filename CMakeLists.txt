@@ -1,8 +1,4 @@
-cmake_minimum_required(VERSION 3.19.6)
-
-if(POLICY CMP0157)
-  cmake_policy(SET CMP0157 NEW)
-endif()
+cmake_minimum_required(VERSION 3.29)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
 
@@ -12,18 +8,7 @@ set(SWIFT_VERSION 5)
 set(CMAKE_Swift_LANGUAGE_VERSION ${SWIFT_VERSION})
 
 # Enable whole module optimization for Release or RelWithDebInfo builds.
-if(POLICY CMP0157)
-  set(CMAKE_Swift_COMPILATION_MODE $<IF:$<CONFIG:Release,RelWithDebInfo>,wholemodule,incremental>)
-else()
-  add_compile_options($<$<AND:$<COMPILE_LANGUAGE:Swift>,$<CONFIG:Release,RelWithDebInfo>>:-wmo>)
-endif()
-
-if(CMAKE_VERSION VERSION_LESS 3.21)
-  get_property(parent_dir DIRECTORY PROPERTY PARENT_DIRECTORY)
-  if(NOT parent_dir)
-    set(PROJECT_IS_TOP_LEVEL TRUE)
-  endif()
-endif()
+set(CMAKE_Swift_COMPILATION_MODE $<IF:$<CONFIG:Release,RelWithDebInfo>,wholemodule,incremental>)
 
 # The subdirectory into which host libraries will be installed.
 set(SWIFT_HOST_LIBRARIES_SUBDIRECTORY "swift/host")

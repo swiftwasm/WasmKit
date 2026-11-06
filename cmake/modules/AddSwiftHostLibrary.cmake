@@ -86,11 +86,6 @@ function(add_wasmkit_library name)
       >)
   endif()
 
-  if(CMAKE_VERSION VERSION_LESS 3.26.0 AND WASMKIT_ENABLE_WMO_PRE_3_26)
-    target_compile_options(${name} PRIVATE
-        $<$<COMPILE_LANGUAGE:Swift>:-wmo>)
-  endif()
-
   target_compile_options(${name} PRIVATE
     $<$<COMPILE_LANGUAGE:Swift>:-color-diagnostics>
   )
