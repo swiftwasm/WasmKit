@@ -77,6 +77,42 @@ extension Execution {
         return pc.next()
     }
 
+    @inline(__always)
+    mutating func i64XorShiftReturn(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.I64XorShiftReturnOperand) -> (Pc, CodeSlot) {
+        let input = sp[i64: immediate.input]
+        let result = input ^ (input &>> immediate.shift)
+        sp[i64: immediate.result] = result
+        sp[immediate.dest] = sp[immediate.result]
+        return _return(sp: &sp, pc: pc, md: &md, ms: &ms)
+    }
+
+    @inline(__always)
+    mutating func i64XorShiftMulPairReturn(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.I64XorShiftMulPairReturnOperand) -> (Pc, CodeSlot) {
+        let input = sp[i64: immediate.input]
+        let first = (input ^ (input &>> UInt64(immediate.shift0))) &* sp[i64: immediate.multiplier0]
+        sp[i64: immediate.result0] = first
+        let second = (first ^ (first &>> UInt64(immediate.shift1))) &* sp[i64: immediate.multiplier1]
+        sp[i64: immediate.result1] = second
+        sp[i64: immediate.result] = second ^ (second &>> immediate.shift2)
+        sp[immediate.dest] = sp[immediate.result]
+        return _return(sp: &sp, pc: pc, md: &md, ms: &ms)
+    }
+
+    @inline(__always)
+    mutating func returnCopy(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CopyStackOperand) -> (Pc, CodeSlot) {
+        sp[immediate.dest] = sp[immediate.source]
+        return _return(sp: &sp, pc: pc, md: &md, ms: &ms)
+    }
+
+    @inline(__always)
+    mutating func returnCopy2(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CopyStack2Operand) -> (Pc, CodeSlot) {
+        let value0 = sp[immediate.source0]
+        let value1 = sp[immediate.source1]
+        sp[immediate.dest0] = value0
+        sp[immediate.dest1] = value1
+        return _return(sp: &sp, pc: pc, md: &md, ms: &ms)
+    }
+
     /// Returns to a caller in a different instance, switching `md`/`ms` back.
     ///
     /// Never emitted by the translator: ``_return`` dispatches here when the frame
@@ -127,7 +163,20 @@ extension Execution {
     }
 
     @inline(__always)
-    mutating func internalCall(sp: inout Sp, pc: Pc, immediate: Instruction.CallOperand) throws -> (Pc, CodeSlot) {
+    mutating func internalCall(sp: inout Sp, pc: Pc, immediate: Instruction.CallOperand) -> (Pc, CodeSlot) {
+        let (iseq, function) = immediate.callee.assumeCompiled()
+        let newSp = sp.advanced(by: immediate.spAddend)
+        guard pushSmallFrame(iseq: iseq, function: function, sp: sp, newSp: newSp, returnPC: pc) else {
+            // Revisit the same two-slot operand with the slow handler. No guest
+            // state changed, including the caller frame used for trap backtraces.
+            return (pc.advanced(by: -2), store.value.engine.internalCallSlowSlot)
+        }
+        sp = newSp
+        return iseq.baseAddress.next()
+    }
+
+    @inline(__always)
+    mutating func internalCallSlow(sp: inout Sp, pc: Pc, immediate: Instruction.CallOperand) throws -> (Pc, CodeSlot) {
         var pc = pc
         let callee = immediate.callee
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)
@@ -146,6 +195,50 @@ extension Execution {
             threadingModel: store.value.engine.configuration.threadingModel)
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)
         return pc.next()
+    }
+
+    @inline(__always)
+    mutating func compilingCopyCall(sp: inout Sp, pc: Pc, immediate: Instruction.CopyCallOperand) throws -> (Pc, CodeSlot) {
+        sp[immediate.dest] = sp[immediate.source]
+        let call = Instruction.CallOperand(rawCallee: immediate.rawCallee, arguments: immediate.arguments, spAddend: immediate.spAddend)
+        try call.callee.wasm.ensureCompiled(store: store)
+        pc.advanced(by: -4).pointee = Instruction.internalCopyCall(immediate).headSlotInline(
+            threadingModel: store.value.engine.configuration.threadingModel)
+        return try internalCallSlow(sp: &sp, pc: pc, immediate: call)
+    }
+
+    @inline(__always)
+    mutating func internalCopyCall(sp: inout Sp, pc: Pc, immediate: Instruction.CopyCallOperand) -> (Pc, CodeSlot) {
+        sp[immediate.dest] = sp[immediate.source]
+        let call = Instruction.CallOperand(rawCallee: immediate.rawCallee, arguments: immediate.arguments, spAddend: immediate.spAddend)
+        // The final two slots retain the ordinary call operand layout, so
+        // internalCall can redispatch a failed fast path without repeating copies.
+        return internalCall(sp: &sp, pc: pc, immediate: call)
+    }
+
+    @inline(__always)
+    mutating func compilingCopy2Call(sp: inout Sp, pc: Pc, immediate: Instruction.Copy2CallOperand) throws -> (Pc, CodeSlot) {
+        let value0 = sp[immediate.source0]
+        let value1 = sp[immediate.source1]
+        sp[immediate.dest0] = value0
+        sp[immediate.dest1] = value1
+        let call = Instruction.CallOperand(rawCallee: immediate.rawCallee, arguments: immediate.arguments, spAddend: immediate.spAddend)
+        try call.callee.wasm.ensureCompiled(store: store)
+        pc.advanced(by: -4).pointee = Instruction.internalCopy2Call(immediate).headSlotInline(
+            threadingModel: store.value.engine.configuration.threadingModel)
+        return try internalCallSlow(sp: &sp, pc: pc, immediate: call)
+    }
+
+    @inline(__always)
+    mutating func internalCopy2Call(sp: inout Sp, pc: Pc, immediate: Instruction.Copy2CallOperand) -> (Pc, CodeSlot) {
+        let value0 = sp[immediate.source0]
+        let value1 = sp[immediate.source1]
+        sp[immediate.dest0] = value0
+        sp[immediate.dest1] = value1
+        let call = Instruction.CallOperand(rawCallee: immediate.rawCallee, arguments: immediate.arguments, spAddend: immediate.spAddend)
+        // The final two slots retain the ordinary call operand layout, so
+        // internalCall can redispatch a failed fast path without repeating copies.
+        return internalCall(sp: &sp, pc: pc, immediate: call)
     }
 
     @inline(never)
