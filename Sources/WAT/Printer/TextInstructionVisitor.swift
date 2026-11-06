@@ -213,6 +213,8 @@ struct TextInstructionVisitor: AnyInstructionVisitor {
         case .tableSize(let tbl):
             emit("table.size\(tableSuffix(tbl))")
 
+        case .wideArithmetic(let op): emit(generatedMnemonic(for: op))
+
         case .atomicFence:
             emit("atomic.fence")
 
@@ -228,13 +230,24 @@ struct TextInstructionVisitor: AnyInstructionVisitor {
             let memarg = try memargText(m, defaultAlign: generatedDefaultAlign(for: op))
             emit("\(generatedMnemonic(for: op))\(memarg) \(lane)")
 
-        // Atomic memory instructions; GC instructions have no printer.
-        default:
+        case .memoryAtomicNotify, .memoryAtomicWait32, .memoryAtomicWait64, .i32AtomicRmwAdd, .i64AtomicRmwAdd, .i32AtomicRmw8AddU, .i32AtomicRmw16AddU, .i64AtomicRmw8AddU,
+            .i64AtomicRmw16AddU, .i64AtomicRmw32AddU, .i32AtomicRmwSub, .i64AtomicRmwSub, .i32AtomicRmw8SubU, .i32AtomicRmw16SubU, .i64AtomicRmw8SubU, .i64AtomicRmw16SubU,
+            .i64AtomicRmw32SubU, .i32AtomicRmwAnd, .i64AtomicRmwAnd, .i32AtomicRmw8AndU, .i32AtomicRmw16AndU, .i64AtomicRmw8AndU, .i64AtomicRmw16AndU, .i64AtomicRmw32AndU, .i32AtomicRmwOr,
+            .i64AtomicRmwOr, .i32AtomicRmw8OrU, .i32AtomicRmw16OrU, .i64AtomicRmw8OrU, .i64AtomicRmw16OrU, .i64AtomicRmw32OrU, .i32AtomicRmwXor, .i64AtomicRmwXor, .i32AtomicRmw8XorU,
+            .i32AtomicRmw16XorU, .i64AtomicRmw8XorU, .i64AtomicRmw16XorU, .i64AtomicRmw32XorU, .i32AtomicRmwXchg, .i64AtomicRmwXchg, .i32AtomicRmw8XchgU, .i32AtomicRmw16XchgU,
+            .i64AtomicRmw8XchgU, .i64AtomicRmw16XchgU, .i64AtomicRmw32XchgU, .i32AtomicRmwCmpxchg, .i64AtomicRmwCmpxchg, .i32AtomicRmw8CmpxchgU, .i32AtomicRmw16CmpxchgU,
+            .i64AtomicRmw8CmpxchgU, .i64AtomicRmw16CmpxchgU, .i64AtomicRmw32CmpxchgU:
             guard let (mnemonic, m, align) = generatedMemargInstruction(instruction) else {
                 throw WasmParserError("instruction not supported by wasm2wat", offset: binaryOffset)
             }
             let memarg = try memargText(m, defaultAlign: align)
             emit("\(mnemonic)\(memarg)")
+
+        // Do not add a `default:` to this switch.
+        case .refI31, .i31GetS, .i31GetU, .structNew, .structNewDefault, .structGet, .structGetS, .structGetU, .structSet, .arrayNew, .arrayNewDefault, .arrayNewFixed, .arrayGet, .arrayGetS,
+            .arrayGetU, .arraySet, .arrayLen, .refEq, .anyConvertExtern, .externConvertAny, .arrayNewData, .arrayNewElem, .arrayFill, .arrayCopy, .arrayInitData, .arrayInitElem, .refTest,
+            .refCast, .brOnCast, .brOnCastFail:
+            throw WasmParserError("instruction not supported by wasm2wat", offset: binaryOffset)
         }
     }
 

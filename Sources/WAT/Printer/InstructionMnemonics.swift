@@ -220,6 +220,15 @@ func generatedMnemonic(for op: Instruction.Conversion) -> String {
     }
 }
 
+func generatedMnemonic(for op: Instruction.WideArithmetic) -> String {
+    switch op {
+    case .i64Add128: return "i64.add128"
+    case .i64Sub128: return "i64.sub128"
+    case .i64MulWideS: return "i64.mul_wide_s"
+    case .i64MulWideU: return "i64.mul_wide_u"
+    }
+}
+
 func generatedMnemonic(for op: Instruction.Simd) -> String {
     switch op {
     case .i8x16Swizzle: return "i8x16.swizzle"
