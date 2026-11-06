@@ -2,7 +2,7 @@
 //
 // The reference runs every export with a plain call and a fixed fuel budget. The subject runs the
 // same exports as `ResumableCall`s, suspended by tiny fuel slices, by forced epoch deadlines and
-// by epoch ticks from the guest, and resumed until they finish. Both must agree on results,
+// by epoch ticks from the guest and by a host function that waits, and resumed until they finish. Both must agree on results,
 // traps, memory, globals and the fuel each call consumed.
 
 import WAT
@@ -69,6 +69,22 @@ struct Snapshot: Equatable {
             numbers[element] = numbers.count
             return numbers.count - 1
         }
+    }
+}
+
+/// What `env.park` returns for `value`, the same whether it answered at once or later.
+func parkAnswer(_ value: UInt32) -> UInt32 { value &* 3 &+ 1 }
+/// Whether `env.park` fails for `value`.
+func parkFails(_ value: UInt32) -> Bool { value & 7 == 5 }
+
+/// Finishes a call of `env.park` with `value`, in one of the ways a continuation can.
+func answerPark(_ continuation: HostContinuation, _ value: UInt32) {
+    if parkFails(value) {
+        continuation.resume(throwing: HostFailure(value: value))
+    } else if value & 1 == 0 {
+        continuation.resume(returning: [.i32(parkAnswer(value))])
+    } else {
+        continuation.resume { _ in [.i32(parkAnswer(value))] }
     }
 }
 
@@ -157,10 +173,17 @@ final class Host {
                             switch try call.resume() {
                             case .returned(let results):
                                 return results
+                            case .suspended(.waitingForHost):
+                                instance.answerLatestPark()
                             case .suspended:
                                 self.store.fuel = Fuel(remaining: 41)
                             }
                         }
+                        let dropped = call.suspension.flatMap { suspension -> (HostContinuation, UInt32)? in
+                            guard case .waitingForHost = suspension else { return nil }
+                            return instance.parked.popLast()
+                        }
+                        defer { dropped.map { answerPark($0.0, $0.1) } }
                         try call.resume(throwing: Cancelled())
                     } catch is Cancelled {
                         return [.i32(UInt32(bitPattern: -2))]
@@ -168,6 +191,17 @@ final class Host {
                         return [.i32(UInt32(bitPattern: -1))]
                     }
                 }
+            })
+        imports.define(
+            module: "env", name: "park",
+            Function.suspending(store: store, parameters: [.i32], results: [.i32]) { caller, args, continuation in
+                let value = args[0].i32
+                // A plain call cannot wait, so there it answers at once; so it does for some
+                // arguments in a resumable call.
+                guard caller.canSuspend, value & 7 != 1 else {
+                    return answerPark(continuation, value)
+                }
+                instance.parked.append((continuation, value))
             })
         imports.define(
             module: "env", name: "fail",
@@ -190,7 +224,17 @@ final class InstanceBox {
     var nestedCallsLeft = 0
     static let nestedCallBudget = 32
 
+    /// The calls of `env.park` waiting for an answer, with their arguments, latest last. A call
+    /// nested in a host function finishes before the host function returns, so the latest is
+    /// always the innermost call's.
+    var parked: [(HostContinuation, UInt32)] = []
+
     func startExportCall() { nestedCallsLeft = Self.nestedCallBudget }
+
+    func answerLatestPark() {
+        let (continuation, value) = parked.removeLast()
+        answerPark(continuation, value)
+    }
 
     /// Takes one nested call from the budget, or says there is none left.
     func takeNestedCall() -> Bool {
@@ -433,21 +477,44 @@ struct Subject {
     mutating func suspended(_ suspension: Suspension, _ context: inout Context) throws {
         let store = context.store
         if ResumableOracle.trace {
-            print("instance \(index) \(exports[next]) suspended \(suspension.reason) left \(store.fuel!.remaining) pool \(pool)")
+            print("instance \(index) \(exports[next]) suspended \(suspension) left \(store.fuel!.remaining) pool \(pool)")
         }
         let call = self.call!
-        if call.suspension?.reason != suspension.reason {
+        if call.suspension != suspension {
             throw context.finding("suspension reported \(String(describing: call.suspension)), resume returned \(suspension)")
         }
         if !diverged, context.rng.chance(2), !ResumableOracle.unsliced {
+            let dropped: (HostContinuation, UInt32)?
+            if case .waitingForHost = suspension { dropped = box.parked.popLast() } else { dropped = nil }
             do {
                 try call.resume(throwing: Cancelled())
             } catch is Cancelled {
+                // A continuation resumed after its call is cancelled does nothing.
+                dropped.map { answerPark($0.0, $0.1) }
                 diverged = true
                 return
             }
         }
-        switch suspension.reason {
+        switch suspension {
+        case .waitingForHost(let waiter):
+            // Answered here and continued at the next step, the way a plain call returns.
+            lastWasFuel = true
+            if waiter.isReadyToResume {
+                throw context.finding("waiting for a host function that already finished")
+            }
+            if context.rng.chance(10) {
+                let early: ResumableCall.Status
+                do { early = try call.resume() } catch {
+                    throw context.finding("resuming a call waiting for a host function threw \(error)")
+                }
+                guard case .suspended(.waitingForHost(waiter)) = early else {
+                    throw context.finding("resuming a call waiting for a host function did not keep it waiting")
+                }
+            }
+            box.answerLatestPark()
+            if !waiter.isReadyToResume {
+                throw context.finding("a host function's waiter is not ready once it finished")
+            }
         case .outOfFuel(let required):
             lastWasFuel = true
             let left = store.fuel!.remaining
@@ -464,7 +531,7 @@ struct Subject {
                 } catch {
                     throw context.finding("retrying a charge of \(required) with \(store.fuel!.remaining) threw \(error)")
                 }
-                guard case .suspended(let again) = retried, again.reason == .outOfFuel(required: required) else {
+                guard case .suspended(let again) = retried, again == .outOfFuel(required: required) else {
                     throw context.finding("retrying a charge of \(required) with \(store.fuel!.remaining) did not suspend again")
                 }
                 do { try call.resume(throwing: Cancelled()) } catch is Cancelled {}
