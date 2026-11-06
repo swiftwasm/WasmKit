@@ -2,6 +2,12 @@ import Foundation
 import WAT
 import WasmParser
 
+/// Assembles WAT source into a binary stream for tests that drive the
+/// binary-side parsers (`collectModule`, sub-parsers, etc.).
+func binaryStream(forWat wat: String) throws -> StaticByteStreamSource {
+    try StaticByteStreamSource(bytes: wat2wasm(wat))
+}
+
 enum TestSupport {
     struct Error: Swift.Error, CustomStringConvertible {
         let description: String
