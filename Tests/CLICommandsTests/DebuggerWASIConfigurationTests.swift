@@ -1,4 +1,4 @@
-#if WasmDebuggingSupport && (os(macOS) || os(Linux))
+#if WasmDebuggingSupport && (os(macOS) || os(Linux) || os(FreeBSD))
 
     import Foundation
     import GDBRemoteProtocol

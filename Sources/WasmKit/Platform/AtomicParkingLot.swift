@@ -137,24 +137,41 @@ struct ParkingDeadline {
         /// registry (where `unpark` finds it) and the parked thread (blocking in
         /// `wait()`). `woken` is only accessed under `pthread_mutex_lock(mutex)`.
         final class BlockingSlot: @unchecked Sendable {
-            private let mutex: UnsafeMutablePointer<pthread_mutex_t>
-            private let cond: UnsafeMutablePointer<pthread_cond_t>
+            #if os(FreeBSD)
+                private let mutex: UnsafeMutablePointer<pthread_mutex_t?>
+                private let cond: UnsafeMutablePointer<pthread_cond_t?>
+            #else
+                private let mutex: UnsafeMutablePointer<pthread_mutex_t>
+                private let cond: UnsafeMutablePointer<pthread_cond_t>
+            #endif
             private var woken: Bool
 
             init() {
                 mutex = .allocate(capacity: 1)
-                mutex.initialize(to: pthread_mutex_t())
+                #if os(FreeBSD)
+                    mutex.initialize(to: pthread_mutex_t(bitPattern: 0))
+                #else
+                    mutex.initialize(to: pthread_mutex_t())
+                #endif
                 pthread_mutex_init(mutex, nil)
 
                 cond = .allocate(capacity: 1)
-                cond.initialize(to: pthread_cond_t())
+                #if os(FreeBSD)
+                    cond.initialize(to: pthread_cond_t(bitPattern: 0))
+                #else
+                    cond.initialize(to: pthread_cond_t())
+                #endif
                 #if canImport(Darwin) || canImport(WASILibc)
                     // Darwin has no `pthread_condattr_setclock`; wasi-libc's `CLOCK_MONOTONIC`
                     // is a time64 clock object (not an importable constant). Both use the
                     // default clock, so the timed wait below reads `CLOCK_REALTIME` to match.
                     pthread_cond_init(cond, nil)
                 #else
-                    var attr = pthread_condattr_t()
+                    #if os(FreeBSD)
+                        var attr = pthread_condattr_t(bitPattern: 0)
+                    #else
+                        var attr = pthread_condattr_t()
+                    #endif
                     pthread_condattr_init(&attr)
                     pthread_condattr_setclock(&attr, CLOCK_MONOTONIC)
                     pthread_cond_init(cond, &attr)

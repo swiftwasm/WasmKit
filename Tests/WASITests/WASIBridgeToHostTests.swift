@@ -26,7 +26,7 @@ enum BridgeProbeError: Error, Equatable {
         #endif
     }
 
-    #if os(macOS) || os(Linux)
+    #if os(macOS) || os(Linux) || os(FreeBSD)
         // Windows opens a preopen `.readWrite`, which fails for a directory, so the first preopen
         // cannot succeed there and the second would not be the failure under test.
         @Test func failedPreopenAfterASuccessfulOneReleasesTheFirst() throws {

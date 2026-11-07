@@ -1,6 +1,6 @@
 #include "CWasmKitWASIThreads.h"
 
-#if defined(__APPLE__) || defined(__linux__)
+#if defined(__APPLE__) || defined(__linux__) || defined(__FreeBSD__)
 
 #include <errno.h>
 #include <pthread.h>

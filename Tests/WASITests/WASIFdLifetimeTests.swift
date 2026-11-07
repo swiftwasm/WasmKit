@@ -87,7 +87,7 @@ import WasmTypes
         }
     }
 
-    #if os(macOS) || os(Linux)
+    #if os(macOS) || os(Linux) || os(FreeBSD)
         /// The same contract for the host descriptors `withStdio(stdin:stdout:stderr:)`
         /// borrows: after the guest closes them, the host still has them open.
         @Test func closingBorrowedStdioLeavesTheHostDescriptorsOpen() throws {
