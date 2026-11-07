@@ -275,7 +275,7 @@ struct CustomPlatformInjectionTests {
         #expect(monotonic == 42_000)
 
         let memory = TestSupport.TestGuestMemory()
-        wasi.random_get(buffer: UnsafeGuestPointer<UInt8>(offset: 0x100), length: 4, memory: memory)
+        try wasi.random_get(buffer: UnsafeGuestPointer<UInt8>(offset: 0x100), length: 4, memory: memory)
         let randomBytes = memory.withUnsafeMutableBufferPointer(offset: 0x100, count: 4) { [UInt8]($0) }
         #expect(randomBytes == [1, 2, 3, 4])
 

@@ -88,6 +88,8 @@ enum TestSupport {
             self.data = Array(repeating: 0, count: size)
         }
 
+        var byteCount: Int { data.count }
+
         func withUnsafeMutableBufferPointer<T>(
             offset: UInt,
             count: Int,

@@ -6,6 +6,12 @@ public protocol GuestMemory {
         count: Int,
         _ body: (UnsafeMutableRawBufferPointer) throws -> T
     ) rethrows -> T
+
+    /// The current size of the memory in bytes.
+    ///
+    /// ``withUnsafeMutableBufferPointer(offset:count:_:)`` requires `offset + count` to be
+    /// at most this size, so a range that comes from the guest is checked against it first.
+    var byteCount: Int { get }
 }
 
 /// A pointer-referenceable type that is intended to be pointee of ``UnsafeGuestPointer``

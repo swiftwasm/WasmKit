@@ -14,3 +14,26 @@ extension GuestPointee {
         pointer = pointer.advanced(by: sizeInGuest)
     }
 }
+
+extension GuestMemory {
+    /// Throws `EFAULT` unless the `count` bytes at `pointer` lie inside this memory.
+    func checkBounds(_ pointer: UnsafeGuestRawPointer, count: UInt64) throws {
+        guard UInt64(pointer.offset) + count <= UInt64(byteCount) else {
+            throw WASIAbi.Errno.EFAULT
+        }
+    }
+}
+
+extension UnsafeGuestPointer {
+    /// Throws `EFAULT` unless the pointee lies inside `memory`.
+    func checkBounds<M: GuestMemory>(in memory: M) throws {
+        try memory.checkBounds(raw, count: UInt64(Pointee.sizeInGuest))
+    }
+}
+
+extension UnsafeGuestBufferPointer {
+    /// Throws `EFAULT` unless every element of the buffer lies inside `memory`.
+    func checkBounds<M: GuestMemory>(in memory: M) throws {
+        try memory.checkBounds(baseAddress.raw, count: UInt64(count) * UInt64(Pointee.sizeInGuest))
+    }
+}
