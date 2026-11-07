@@ -64,7 +64,7 @@ targets: [
 
 ## Supported Platforms
 
-WasmKit engine works on all major platforms supported by Swift. It is continuously tested on macOS, Ubuntu, Amazon Linux 2023, Android, and Windows,
+WasmKit engine works on all major platforms supported by Swift. It is continuously tested on macOS, Ubuntu, Amazon Linux 2023, Android, Windows, and FreeBSD,
 and should work on the following platforms:
 
 - macOS 15+, iOS 18+, tvOS 18+, watchOS 11+, visionOS 2+
@@ -72,6 +72,7 @@ and should work on the following platforms:
 - Android [API Level 30](https://developer.android.com/tools/releases/platforms)
 - Windows 10+
 - Bare-metal targets with Embedded Swift (see the [ESP32 example](./Examples/embedded-esp32))
+- FreeBSD 14.3+
 
 ## Implementation Status
 
