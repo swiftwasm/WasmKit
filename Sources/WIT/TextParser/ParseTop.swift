@@ -178,7 +178,7 @@ extension TopLevelUseSyntax {
 }
 
 extension UseSyntax {
-    static func parse(lexer: inout Lexer) throws -> SyntaxNode<UseSyntax> {
+    static func parse(lexer: inout Lexer, attributes: [AttributeSyntax] = []) throws -> SyntaxNode<UseSyntax> {
         try lexer.expect(.use)
         let from = try UsePathSyntax.parse(lexer: &lexer)
         try lexer.expect(.period)
@@ -197,7 +197,7 @@ extension UseSyntax {
             }
         }
         try lexer.expectSemicolon()
-        return .init(syntax: UseSyntax(attributes: [], from: from, names: names))
+        return .init(syntax: UseSyntax(attributes: attributes, from: from, names: names))
     }
 }
 
