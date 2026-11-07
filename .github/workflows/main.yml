@@ -358,3 +358,32 @@ jobs:
             swift run --package-path Examples/embedded-wat --swift-sdk "$sdk" -Xlinker "$unicode_lib")
           echo "$out" | tr '\n' ' ' | grep -qF '0x44 0x1f 0x85 0xeb 0x51 0xb8 0x1e 0x9 0x40' \
             || { echo "::error::embedded-wat smoke test produced wrong output"; echo "$out"; exit 1; }
+
+  build-freebsd:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build / Test
+        uses: vmactions/freebsd-vm@v1
+        env:
+          SWIFT_WEB_URL: "https://download.swift.org/tmp-ci-nightly/development/freebsd-14_ci_latest.tar.gz"
+        with:
+          envs: 'SWIFT_WEB_URL'
+          release: 14.3
+          arch: x86_64
+          sync: rsync
+          copyback: false
+          usesh: true
+          prepare: |
+            fetch -o /tmp/swift.tar.gz "$SWIFT_WEB_URL"
+            mkdir -p /opt/swift
+            tar -xzf /tmp/swift.tar.gz -C /opt/swift
+            pkg install -y git sqlite3 libuuid python3 curl brotli bash
+            git config --global init.defaultBranch 'main'
+            /opt/swift/usr/bin/swift --version
+            ./CI/install-wabt.sh
+          run: |
+            export PATH="/opt/swift/usr/bin:$PATH"
+            ./Vendor/checkout-dependency --category component-model
+            swift --version
+            swift test --traits FileSystem,MultiThread,ComponentModel,WasmDebuggingSupport,Disassembler
