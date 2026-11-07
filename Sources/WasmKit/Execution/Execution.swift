@@ -904,7 +904,7 @@ extension Execution {
         function: EntityHandle<HostFunctionEntity>, parameterArea: Sp,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
-        try invokeHostFunction(function: function, sp: sp, parameterArea: parameterArea)
+        try invokeHostFunction(function: function, sp: sp, parameterArea: parameterArea, pc: pc)
         // A host function may re-enter the guest and grow the caller's
         // default memory. A malloc-backed memory moves when it grows, so the
         // cached base and bound would otherwise be left dangling.
@@ -946,7 +946,7 @@ extension Execution {
             Self.moveArguments(from: argumentSlots, to: parameterArea, slotCount: layout.parameterSlotCount)
             saved.store(below: newSp)
             do {
-                try invokeHostFunction(function: host, sp: newSp, parameterArea: parameterArea)
+                try invokeHostFunction(function: host, sp: newSp, parameterArea: parameterArea, pc: pc)
             } catch let trap as Trap {
                 // The dispatch loop still holds this frame's `sp` and builds the trap's backtrace
                 // from it, but the moved arguments may cover the frame's saved slots. A trap ends
@@ -1076,12 +1076,47 @@ extension Execution {
         return (iseq.baseAddress, newSp)
     }
 
+    /// Executes the given host function, turning a ``SuspensionRequest`` into a suspension.
+    ///
+    /// - Parameters:
+    ///   - sp: The frame that continues after the call. For a tail call, the moved frame.
+    ///   - pc: Where that frame continues.
+    @inline(never)
+    private func invokeHostFunction(
+        function: EntityHandle<HostFunctionEntity>, sp: Sp, parameterArea: Sp, pc: Pc
+    ) throws {
+        do {
+            try callHostFunction(function: function, sp: sp, parameterArea: parameterArea)
+        } catch let request as SuspensionRequest {
+            throw Self.suspensionError(request, function: function, sp: sp, pc: pc, parameterArea: parameterArea, store: store)
+        }
+    }
+
+    /// Returns the ``SuspensionSignal`` for `request`, or a trap if the call cannot suspend.
+    @inline(never)
+    private static func suspensionError(
+        _ request: SuspensionRequest, function: EntityHandle<HostFunctionEntity>,
+        sp: Sp, pc: Pc, parameterArea: Sp, store: StoreRef
+    ) -> any Error {
+        guard store.value.isSuspendable else {
+            return Trap(.suspensionUnavailable)
+        }
+        // The host function has not written its results, so the arguments are still there.
+        let layout = function.layout
+        let arguments = function.parameterTypes.enumerated().map { index, type in
+            parameterArea.loadValue(at: layout.paramReg(index), type: type)
+        }
+        return SuspensionSignal(
+            reason: .hostCall(id: request.id, arguments: arguments), sp: sp, resumePC: pc,
+            hostCall: SuspendedHostCall(function: function, parameterArea: parameterArea))
+    }
+
     /// Executes the given host function.
     ///
     /// Note that this function does not modify neither the positions of the
     /// stack pointer nor the program counter.
-    @inline(never)
-    private func invokeHostFunction(
+    @inline(__always)
+    private func callHostFunction(
         function: EntityHandle<HostFunctionEntity>, sp: Sp, parameterArea: Sp
     ) throws {
         let parameterTypes = function.parameterTypes

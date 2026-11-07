@@ -480,6 +480,9 @@ struct Subject {
                 throw context.finding("suspended at epoch \(context.host.epoch) before the deadline \(context.host.deadline)")
             }
             context.host.setDeadline(ticks: context.rng.chance(50) ? .max : UInt64(context.rng.below(3)) + 1)
+        case .hostCall(let id, _):
+            // The host functions of generated programs never throw SuspensionRequest.
+            throw context.finding("suspended at a host call with id \(id)")
         }
     }
 
