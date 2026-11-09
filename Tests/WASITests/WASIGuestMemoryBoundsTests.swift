@@ -399,10 +399,12 @@ import WasmTypes
             #expect(guest.memory.read(count: 8, at: Address.result) == littleEndianBytes(near(13), near(7)))
             #expect(guest.memory.read(count: 13, at: near(13)) == Array("guest\0--flag\0".utf8))
 
-            // A zeroed subscription is a realtime clock with no timeout.
+            // A zeroed subscription is a realtime clock with no timeout. Windows
+            // answers `ENOTSUP` after the range passes the bounds check.
             guest.memory.write(Array(repeating: 0, count: 48), at: near(48))
             let polled = try guest.call("poll_oneoff", [.i32(near(48)), .i32(Address.events), .i32(1), .i32(Address.result)])
-            #expect(polled == success)
+            let unsupported = [Value.i32(UInt32(WASIAbi.Errno.ENOTSUP.rawValue))]
+            #expect(polled == (TestSupport.pollUnavailable ? unsupported : success))
 
             // The first entry, `a.txt`, fills the buffer, and `b.txt` follows it.
             let entry = UInt32(WASIAbi.Dirent.sizeInGuest) + 5
