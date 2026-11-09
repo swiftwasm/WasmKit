@@ -18,14 +18,25 @@ import WasmTypes
 /// bad buffer therefore stops the call before any data moves, and a read into
 /// one buffer cannot change where a later one points.
 @_spi(WASIPlatform) public struct GuestBuffers {
+    /// The most iovecs that one call accepts, which is `IOV_MAX` on Linux and
+    /// macOS.
+    static let maxCount = 1024
+
     /// The number of buffers in the vector.
     public let count: Int
 
     private let access: (Int, (UnsafeMutableRawBufferPointer) throws -> Int) throws -> Int
 
-    /// Throws ``WASIMemoryAccessError`` if the iovec array or any buffer it
-    /// describes does not lie inside `memory`.
+    /// Throws `EINVAL` if there are more than ``maxCount`` iovecs, and
+    /// ``WASIMemoryAccessError`` if the iovec array or any buffer it describes
+    /// does not lie inside `memory`.
+    ///
+    /// The count is checked first, as `readv` and `writev` do, so a guest
+    /// cannot make the host copy an iovec array as large as its memory.
     init<M: GuestMemory>(iovs: UnsafeGuestBufferPointer<WASIAbi.IOVec>, memory: M) throws {
+        guard iovs.count <= Self.maxCount else {
+            throw WASIAbi.Errno.EINVAL
+        }
         try iovs.checkBounds(in: memory)
         let iovecs = (0..<iovs.count).map { iovs.read(at: $0, in: memory) }
         for iovec in iovecs {

@@ -338,6 +338,36 @@ import WasmTypes
         }
     }
 
+    /// A call takes at most 1024 iovecs, like `readv` and `writev`. It answers
+    /// `EINVAL` for more, before it checks or copies them, and moves no data.
+    @Test func moreThan1024IOVecsAreRefused() throws {
+        let stdout = CustomPlatformInjectionTests.SinkFile()
+        try withGuest(stdout: stdout) { guest in
+            let iovecs: UInt32 = 0x1000
+            guest.memory.write(Array("h".utf8), at: Address.data)
+            for index in 0..<UInt32(1025) {
+                guest.memory.write(iovec: (Address.data, 1), at: iovecs + index * 8)
+            }
+            let success = [Value.i32(0)]
+            let invalid = [Value.i32(UInt32(WASIAbi.Errno.EINVAL.rawValue))]
+
+            let written = try guest.call("fd_write", [.i32(1), .i32(iovecs), .i32(1024), .i32(Address.result)])
+            #expect(written == success)
+            let refused = try guest.call("fd_write", [.i32(1), .i32(iovecs), .i32(1025), .i32(Address.result)])
+            #expect(refused == invalid)
+            #expect(stdout.captured.withLock { $0.count } == 1024)
+
+            let read = try guest.call("fd_read", [.i32(Descriptor.file), .i32(iovecs), .i32(1025), .i32(Address.result)])
+            #expect(read == invalid)
+            let position = try guest.wasi.fd_tell(fd: Descriptor.file)
+            #expect(position == 0)
+
+            // The array of this many iovecs would reach past the end of memory.
+            let huge = try guest.call("fd_write", [.i32(1), .i32(Address.end - 8), .i32(UInt32.max), .i32(Address.result)])
+            #expect(huge == invalid)
+        }
+    }
+
     /// The iovecs are read once, before the transfer, so a read into the first
     /// buffer that overwrites the second iovec does not change where the
     /// second buffer is.
