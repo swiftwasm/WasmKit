@@ -12,16 +12,32 @@ import WasmTypes
 ///
 /// Each buffer is resolved inside its own guest-memory access scope, one at a
 /// time, matching how vectored I/O was performed before the erasure existed.
+///
+/// The iovec array is copied out of guest memory once, like `readv` and
+/// `writev` do, and every buffer is checked before the first one is used. A
+/// bad buffer therefore stops the call before any data moves, and a read into
+/// one buffer cannot change where a later one points.
 @_spi(WASIPlatform) public struct GuestBuffers {
     /// The number of buffers in the vector.
     public let count: Int
 
     private let access: (Int, (UnsafeMutableRawBufferPointer) throws -> Int) throws -> Int
 
-    init<M: GuestMemory>(iovs: UnsafeGuestBufferPointer<WASIAbi.IOVec>, memory: M) {
-        self.count = Int(iovs.count)
+    /// Throws ``WASIMemoryAccessError`` if the iovec array or any buffer it
+    /// describes does not lie inside `memory`.
+    init<M: GuestMemory>(iovs: UnsafeGuestBufferPointer<WASIAbi.IOVec>, memory: M) throws {
+        try iovs.checkBounds(in: memory)
+        let iovecs = (0..<iovs.count).map { iovs.read(at: $0, in: memory) }
+        for iovec in iovecs {
+            try memory.checkBounds(iovec.buffer, count: UInt64(iovec.length))
+        }
+        self.count = iovecs.count
         self.access = { index, body in
-            let iovec = iovs.read(at: UInt32(index), in: memory)
+            let iovec = iovecs[index]
+            // An empty buffer may point past the end of memory, which cannot be mapped.
+            guard iovec.length > 0 else {
+                return try body(UnsafeMutableRawBufferPointer(start: nil, count: 0))
+            }
             return try iovec.withHostBufferPointer(in: memory) { try body($0) }
         }
     }

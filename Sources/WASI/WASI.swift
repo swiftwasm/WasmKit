@@ -598,23 +598,21 @@ import WasmTypes
             24
         }
 
-        public static func writeToGuest<M: GuestMemory>(unalignedAt pointer: UnsafeGuestRawPointer, end: UnsafeGuestRawPointer, in memory: M, value: Dirent) {
-            var pointer = pointer
-            guard pointer < end else { return }
-            DirCookie.writeToGuest(at: pointer, in: memory, value: value.dNext)
-            pointer = pointer.advanced(by: DirCookie.sizeInGuest)
-
-            guard pointer < end else { return }
-            Inode.writeToGuest(at: pointer, in: memory, value: value.dIno)
-            pointer = pointer.advanced(by: Inode.sizeInGuest)
-
-            guard pointer < end else { return }
-            DirNameLen.writeToGuest(at: pointer, in: memory, value: value.dirNameLen)
-            pointer = pointer.advanced(by: DirNameLen.sizeInGuest)
-
-            guard pointer < end else { return }
-            FileType.writeToGuest(at: pointer, in: memory, value: value.dType)
-            pointer = pointer.advanced(by: FileType.sizeInGuest)
+        /// Writes as many bytes of `value` as fit in the `count` bytes at
+        /// `pointer`. The padding after the last field is left as it is.
+        public static func writeToGuest<M: GuestMemory>(unalignedAt pointer: UnsafeGuestRawPointer, count: UInt32, in memory: M, value: Dirent) {
+            // Lay the fields out on the host first, so a buffer that ends inside
+            // a field gets only the bytes before its end.
+            var bytes: [UInt8] = []
+            withUnsafeBytes(of: value.dNext.littleEndian) { bytes.append(contentsOf: $0) }
+            withUnsafeBytes(of: value.dIno.littleEndian) { bytes.append(contentsOf: $0) }
+            withUnsafeBytes(of: value.dirNameLen.littleEndian) { bytes.append(contentsOf: $0) }
+            bytes.append(value.dType.rawValue)
+            let count = min(bytes.count, Int(count))
+            guard count > 0 else { return }
+            pointer.withHostPointer(in: memory, count: count) { hostBuffer in
+                hostBuffer.copyBytes(from: bytes[..<count])
+            }
         }
     }
 
@@ -810,6 +808,26 @@ public struct WASIExitCode: Error {
     public let code: UInt32
 }
 
+/// An error that stops a WASI call whose guest pointer or length reaches past
+/// the end of guest memory.
+///
+/// WASI preview 1 requires a function to trap, not to return `EFAULT`, when it
+/// needs to dereference such a pointer. The host function throws this error
+/// instead of returning an errno. The guest stops, and the embedder receives
+/// the error from the call that entered the guest.
+public struct WASIMemoryAccessError: Error, CustomStringConvertible, Sendable {
+    /// The guest address where the range starts.
+    public let offset: UInt32
+    /// The length of the range in bytes.
+    public let count: UInt64
+    /// The size of guest memory in bytes when the call checked the range.
+    public let memorySize: Int
+
+    public var description: String {
+        "out of bounds memory access in a WASI call: \(count) bytes at 0x\(String(offset, radix: 16)) in a memory of \(memorySize) bytes"
+    }
+}
+
 /// A WASI host function, specialised for the guest memory type it will be
 /// called with.
 ///
@@ -880,20 +898,22 @@ final class WASIImplementation: Sendable {
         argv: UnsafeGuestPointer<UnsafeGuestPointer<UInt8>>,
         argvBuffer: UnsafeGuestPointer<UInt8>,
         memory: M
-    ) {
-        var offsets = argv
-        var buffer = argvBuffer
-        for arg in args {
-            offsets.write(buffer, to: memory)
-            offsets += 1
-            let count = arg.utf8CString.withUnsafeBytes { bytes in
-                let count = UInt32(bytes.count)
-                buffer.raw.withHostPointer(in: memory, count: bytes.count) { hostDestBuffer in
+    ) throws {
+        let (argc, bufferSize) = args_sizes_get()
+        try UnsafeGuestBufferPointer(baseAddress: argv, count: argc).checkBounds(in: memory)
+        try UnsafeGuestBufferPointer(baseAddress: argvBuffer, count: bufferSize).checkBounds(in: memory)
+        // Each pointer is formed before its string is copied. The address past
+        // the last string does not fit in 32 bits when the buffer ends at 4 GiB.
+        var used: WASIAbi.Size = 0
+        for (index, arg) in args.enumerated() {
+            let string = argvBuffer + used
+            (argv + UInt32(index)).write(string, to: memory)
+            used += arg.utf8CString.withUnsafeBytes { bytes in
+                string.raw.withHostPointer(in: memory, count: bytes.count) { hostDestBuffer in
                     hostDestBuffer.copyMemory(from: bytes)
                 }
-                return count
+                return WASIAbi.Size(bytes.count)
             }
-            buffer += count
         }
     }
 
@@ -908,20 +928,21 @@ final class WASIImplementation: Sendable {
     }
 
     /// Read environment variable data.
-    func environ_get<M: GuestMemory>(environ: UnsafeGuestPointer<UnsafeGuestPointer<UInt8>>, environBuffer: UnsafeGuestPointer<UInt8>, memory: M) {
-        var offsets = environ
-        var buffer = environBuffer
-        for (key, value) in environment {
-            offsets.write(buffer, to: memory)
-            offsets += 1
-            let count = "\(key)=\(value)".utf8CString.withUnsafeBytes { bytes in
-                let count = UInt32(bytes.count)
-                buffer.raw.withHostPointer(in: memory, count: bytes.count) { hostDestBuffer in
+    func environ_get<M: GuestMemory>(environ: UnsafeGuestPointer<UnsafeGuestPointer<UInt8>>, environBuffer: UnsafeGuestPointer<UInt8>, memory: M) throws {
+        let (environCount, bufferSize) = environ_sizes_get()
+        try UnsafeGuestBufferPointer(baseAddress: environ, count: environCount).checkBounds(in: memory)
+        try UnsafeGuestBufferPointer(baseAddress: environBuffer, count: bufferSize).checkBounds(in: memory)
+        // Each pointer is formed before its string is copied, as in `args_get`.
+        var used: WASIAbi.Size = 0
+        for (index, (key, value)) in environment.enumerated() {
+            let string = environBuffer + used
+            (environ + UInt32(index)).write(string, to: memory)
+            used += "\(key)=\(value)".utf8CString.withUnsafeBytes { bytes in
+                string.raw.withHostPointer(in: memory, count: bytes.count) { hostDestBuffer in
                     hostDestBuffer.copyMemory(from: bytes)
                 }
-                return count
+                return WASIAbi.Size(bytes.count)
             }
-            buffer += count
         }
     }
 
@@ -1132,6 +1153,8 @@ final class WASIImplementation: Sendable {
             }
             // Map what is written, not `maxPathLength`: that is the capacity
             // the guest declares, which it need not have actually reserved.
+            try memory.checkBounds(path.raw, count: UInt64(bytes.count))
+            guard !bytes.isEmpty else { return }
             path.withHostPointer(in: memory, count: bytes.count) { buffer in
                 UnsafeMutableRawBufferPointer(buffer).copyBytes(from: bytes)
             }
@@ -1188,9 +1211,12 @@ final class WASIImplementation: Sendable {
                     // 1. Copy dirent to the buffer
                     // Copy dirent as much as possible even though the buffer doesn't have enough remaining space
                     let copyingBytes = min(WASIAbi.Dirent.sizeInGuest, totalBufferSize - bufferUsed)
+                    // A full buffer has no next byte, and its end address does not
+                    // fit in 32 bits when the buffer ends at 4 GiB.
+                    guard copyingBytes > 0 else { return totalBufferSize }
                     let rangeStart = buffer.baseAddress.raw.advanced(by: bufferUsed)
-                    let rangeEnd = rangeStart.advanced(by: copyingBytes)
-                    WASIAbi.Dirent.writeToGuest(unalignedAt: rangeStart, end: rangeEnd, in: memory, value: entry)
+                    try memory.checkBounds(rangeStart, count: UInt64(copyingBytes))
+                    WASIAbi.Dirent.writeToGuest(unalignedAt: rangeStart, count: copyingBytes, in: memory, value: entry)
                     bufferUsed += copyingBytes
 
                     // bail out if the remaining buffer space is not enough
@@ -1203,12 +1229,16 @@ final class WASIImplementation: Sendable {
                     // 2. Copy name string to the buffer
                     // Same truncation rule applied as above
                     let copyingBytes = min(entry.dirNameLen, totalBufferSize - bufferUsed)
-                    let rangeStart = buffer.baseAddress.raw.advanced(by: bufferUsed)
-                    name.withUTF8 { bytes in
-                        rangeStart.withHostPointer(in: memory, count: Int(copyingBytes)) { hostBuffer in
-                            hostBuffer.copyMemory(
-                                from: UnsafeRawBufferPointer(start: bytes.baseAddress, count: Int(copyingBytes))
-                            )
+                    // A full buffer has no next byte, as above.
+                    if copyingBytes > 0 {
+                        let rangeStart = buffer.baseAddress.raw.advanced(by: bufferUsed)
+                        try memory.checkBounds(rangeStart, count: UInt64(copyingBytes))
+                        name.withUTF8 { bytes in
+                            rangeStart.withHostPointer(in: memory, count: Int(copyingBytes)) { hostBuffer in
+                                hostBuffer.copyMemory(
+                                    from: UnsafeRawBufferPointer(start: bytes.baseAddress, count: Int(copyingBytes))
+                                )
+                            }
                         }
                     }
                     bufferUsed += copyingBytes
@@ -1387,6 +1417,7 @@ final class WASIImplementation: Sendable {
         if bytesWritten > 0 {
             // Map the prefix the link fills, not the whole buffer the guest
             // declared: the rest of it need not be addressable.
+            try memory.checkBounds(buffer.baseAddress.raw, count: UInt64(bytesWritten))
             buffer.baseAddress.withHostPointer(in: memory, count: bytesWritten) { hostBuffer in
                 linkBytes.withUnsafeBytes { linkBytes in
                     guard let source = linkBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
@@ -1432,6 +1463,8 @@ final class WASIImplementation: Sendable {
         memory: M
     ) throws -> WASIAbi.Size {
         guard !subscriptions.isEmpty else { throw WASIAbi.Errno.EINVAL }
+        try subscriptions.checkBounds(in: memory)
+        try events.checkBounds(in: memory)
         let materializedSubscriptions = (0..<subscriptions.count).map { subscriptions.read(at: $0, in: memory) }
         let table = fdTable.withLock { $0 }
         return try poll(subscriptions: materializedSubscriptions, events: events, table, memory: memory, now: { try self.clock_time_get(id: $0, precision: 0) })
@@ -1454,8 +1487,9 @@ final class WASIImplementation: Sendable {
     }
 
     /// Write high-quality random data into a buffer.
-    func random_get<M: GuestMemory>(buffer: UnsafeGuestPointer<UInt8>, length: WASIAbi.Size, memory: M) {
+    func random_get<M: GuestMemory>(buffer: UnsafeGuestPointer<UInt8>, length: WASIAbi.Size, memory: M) throws {
         guard length > 0 else { return }
+        try memory.checkBounds(buffer.raw, count: UInt64(length))
         buffer.withHostPointer(in: memory, count: Int(length)) { hostBuffer in
             self.randomGenerator.withLock { rng in
                 rng.fill(buffer: hostBuffer)
