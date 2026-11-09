@@ -45,6 +45,7 @@ import WAT
 @Suite struct Memory32LoadTests {
     @Test(arguments: [false, true])
     func compactLoadBounds(shared: Bool) throws {
+        guard !shared || SpectestTests.sharedMemorySupported else { return }
         let module = try parseWasm(
             bytes: wat2wasm(
                 """
