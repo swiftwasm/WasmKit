@@ -75,6 +75,12 @@ jobs:
           - os: macos-26
             xcode: Xcode_26.5
             test-args: "--sanitize address --traits FileSystem,MultiThread,ComponentModel,WasmDebuggingSupport,Disassembler"
+            
+          # Swift 6.4.2
+          - os: xcode-27
+            xcode: Xcode_27.2
+            test-args: "--sanitize address --traits FileSystem,MultiThread,ComponentModel,WasmDebuggingSupport,Disassembler"
+
 
     runs-on: ${{ matrix.os }}
     name: "build-macos (${{ matrix.xcode }})"
@@ -119,13 +125,13 @@ jobs:
             || { echo "::error::embedded-wat smoke test produced wrong output"; echo "$out"; exit 1; }
 
   build-xcode:
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v6
       - name: Prepare Xcode platforms
         run: |
           set -euxo pipefail
-          sudo xcode-select -s /Applications/Xcode_26.5.app
+          sudo xcode-select -s /Applications/Xcode_27.2.app
           sudo xcodebuild -runFirstLaunch || true
           for PLAT in iOS tvOS watchOS visionOS; do
             if ! xcodebuild -showsdks | grep -q "$PLAT"; then
@@ -229,13 +235,13 @@ jobs:
         uses: actions/deploy-pages@v5
 
   build-musl:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     strategy:
       matrix:
         include:
-          - swift: 6.3-noble
-            musl-swift-sdk-download: "https://download.swift.org/swift-6.3.3-release/static-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz"
-            musl-swift-sdk-checksum: 87c3eaf908e67c0e13a84367119e12273cec1d2cd3d81f7d74bb36722d6b607b
+          - swift: 6.4-resolute
+            musl-swift-sdk-download: "https://download.swift.org/swift-6.4.2-release/static-sdk/swift-6.4.2-RELEASE/swift-6.3.3-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz"
+            musl-swift-sdk-checksum: 3786b179936d9cc9e266dd506bd1654176358d7b25288e243359f4d17cc4dc5a
     steps:
       - uses: actions/checkout@v6
       - name: Configure container
@@ -261,6 +267,7 @@ jobs:
       matrix:
         include:
           - swift-version: "6.3"
+          - swift-version: "6.4"
           - swift-version: "nightly-main"
 
     steps:
@@ -283,8 +290,8 @@ jobs:
     steps:
       - uses: compnerd/gha-setup-swift@main
         with:
-          swift-version: swift-6.3.2-release
-          swift-build: 6.3.2-RELEASE
+          swift-version: swift-6.4.2-release
+          swift-build: 6.4.2-RELEASE
       - uses: actions/checkout@v6
       - run: python3 ./Vendor/checkout-dependency --category default
       # Run tests with SwiftPM
@@ -292,9 +299,9 @@ jobs:
         run: swift test
 
   build-cmake:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     container:
-      image: swift:6.3-noble
+      image: swift:6.4-resolute
     steps:
       - uses: actions/checkout@v6
       - name: Install Ninja
@@ -308,7 +315,7 @@ jobs:
       - run: ./build/bin/wasmkit --version
 
   build-embedded:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     container:
       image: swiftlang/swift:nightly-main-noble
     steps:
@@ -316,7 +323,7 @@ jobs:
       - run: ./Utilities/build-embedded.sh
 
   smoke-esp32:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     container:
       image: espressif/idf:v5.5
     steps:
@@ -337,15 +344,15 @@ jobs:
         run: SWIFT_TOOLCHAIN=/opt/swift ./Examples/embedded-esp32/smoke-test.sh --qemu
 
   build-wasi:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     container:
-      image: swift:6.3-noble
+      image: swift:6.4.2-resolute
     steps:
       - uses: actions/checkout@v6
       - name: Install jq
         run: apt-get update && apt-get install -y jq
       - name: Install Swift SDK
-        run: swift sdk install https://download.swift.org/swift-6.3.3-release/wasm-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_wasm.artifactbundle.tar.gz --checksum cabfa08b73bb8ac783927ecd15fa386e99d0c139c5f232445067bcf58379cae7
+        run: swift sdk install https://download.swift.org/swift-6.4.2-release/wasm-sdk/swift-6.4.2-RELEASE/swift-6.4.2-RELEASE_wasm.artifactbundle.tar.gz --checksum 83baca83553f8c443cda7b84800912e6e709c3acd2e7ebf277794ca5836c0da5
       - name: Build with the Swift SDK
         run: swift build --swift-sdk "$(swiftc -print-target-info | jq -r '.swiftCompilerTag')_wasm" --traits FileSystem,ComponentModel,Disassembler --explicit-target-dependency-import-check error --product wasmkit-cli
       - name: Build & smoke-test embedded-wat example with Embedded Swift
