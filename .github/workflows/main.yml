@@ -240,7 +240,7 @@ jobs:
       matrix:
         include:
           - swift: 6.4-resolute
-            musl-swift-sdk-download: "https://download.swift.org/swift-6.4.2-release/static-sdk/swift-6.4.2-RELEASE/swift-6.3.3-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz"
+            musl-swift-sdk-download: "https://download.swift.org/swift-6.4.2-release/static-sdk/swift-6.4.2-RELEASE/swift-6.4.2-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz"
             musl-swift-sdk-checksum: 3786b179936d9cc9e266dd506bd1654176358d7b25288e243359f4d17cc4dc5a
     steps:
       - uses: actions/checkout@v6
@@ -267,7 +267,7 @@ jobs:
       matrix:
         include:
           - swift-version: "6.3"
-          - swift-version: "6.4"
+          - swift-version: "6.4.2"
           - swift-version: "nightly-main"
 
     steps:
