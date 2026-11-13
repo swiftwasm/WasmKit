@@ -1,4 +1,4 @@
-#if os(macOS) || os(Linux)
+#if os(macOS) || os(Linux) || os(FreeBSD)
     import Foundation
     import Testing
     import WasmKit

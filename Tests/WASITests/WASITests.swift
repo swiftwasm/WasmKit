@@ -7,13 +7,13 @@ import WasmTypes
 
 #if os(macOS)
     import Darwin
-#elseif os(Linux)
+#elseif canImport(Glibc)
     import Glibc
 #endif
 
-#if os(macOS) || os(Linux)
+#if os(macOS) || os(Linux) || os(FreeBSD)
     private func currentOpenFileDescriptorCount() throws -> Int {
-        #if os(macOS)
+        #if os(macOS) || os(FreeBSD)
             let fdDirectory = "/dev/fd"
         #else
             let fdDirectory = "/proc/self/fd"
@@ -25,7 +25,7 @@ import WasmTypes
         extraDescriptors: Int,
         _ body: () throws -> Result
     ) throws -> Result {
-        #if os(macOS)
+        #if os(macOS) || os(FreeBSD)
             let nofileResource = RLIMIT_NOFILE
         #else
             let nofileResource = __rlimit_resource_t(RLIMIT_NOFILE.rawValue)
@@ -127,7 +127,11 @@ struct WASITests {
 
                 try assertResolve("link-hello.txt", followSymlink: true)
                 try assertNotResolve("link-hello.txt", followSymlink: false) { error in
-                    #expect(error == .ELOOP)
+                    #if os(FreeBSD)
+                        #expect(error == .EMLINK)
+                    #else
+                        #expect(error == .ELOOP)
+                    #endif
                 }
                 try assertNotResolve("link-hello.txt", followSymlink: true, directory: true) { error in
                     #expect(error == .ENOTDIR)
@@ -139,46 +143,74 @@ struct WASITests {
 
                 try assertResolve("link-world.dir", followSymlink: true)
                 try assertNotResolve("link-world.dir", followSymlink: false) { error in
-                    #expect(error == .ELOOP)
+                    #if os(FreeBSD)
+                        #expect(error == .EMLINK)
+                    #else
+                        #expect(error == .ELOOP)
+                    #endif
                 }
 
                 try assertNotResolve("link-external-secret-a.txt", followSymlink: true) { error in
                     #expect(error == .EPERM)
                 }
                 try assertNotResolve("link-external-secret-a.txt", followSymlink: false) { error in
-                    #expect(error == .ELOOP)
+                    #if os(FreeBSD)
+                        #expect(error == .EMLINK)
+                    #else
+                        #expect(error == .ELOOP)
+                    #endif
                 }
 
                 try assertNotResolve("link-external-non-existent.txt", followSymlink: true) { error in
                     #expect(error == .EPERM)
                 }
                 try assertNotResolve("link-external-non-existent.txt", followSymlink: false) { error in
-                    #expect(error == .ELOOP)
+                    #if os(FreeBSD)
+                        #expect(error == .EMLINK)
+                    #else
+                        #expect(error == .ELOOP)
+                    #endif
                 }
 
                 try assertNotResolve("link-updown-hello.txt", followSymlink: true) { error in
                     #expect(error == .EPERM)
                 }
                 try assertNotResolve("link-updown-hello.txt", followSymlink: false) { error in
-                    #expect(error == .ELOOP)
+                    #if os(FreeBSD)
+                        #expect(error == .EMLINK)
+                    #else
+                        #expect(error == .ELOOP)
+                    #endif
                 }
 
                 try assertNotResolve("link-secret-dir-b/secret-c.txt", followSymlink: true) { error in
                     #expect(error == .EPERM)
                 }
                 try assertNotResolve("link-secret-dir-b/secret-c.txt", followSymlink: false) { error in
-                    #expect(error == .ENOTDIR)
+                    #if os(FreeBSD)
+                        #expect(error == .EMLINK)
+                    #else
+                        #expect(error == .ENOTDIR)
+                    #endif
                 }
 
                 try assertNotResolve("link-root", followSymlink: true) { error in
                     #expect(error == .EPERM)
                 }
                 try assertNotResolve("link-root", followSymlink: false) { error in
-                    #expect(error == .ELOOP)
+                    #if os(FreeBSD)
+                        #expect(error == .EMLINK)
+                    #else
+                        #expect(error == .ELOOP)
+                    #endif
                 }
 
                 try assertNotResolve("link-loop.txt", followSymlink: false) { error in
-                    #expect(error == .ELOOP)
+                    #if os(FreeBSD)
+                        #expect(error == .EMLINK)
+                    #else
+                        #expect(error == .ELOOP)
+                    #endif
                 }
                 try assertNotResolve("link-loop.txt", followSymlink: true) { error in
                     #expect(error == .ELOOP)
@@ -1604,7 +1636,7 @@ struct WASITests {
         }
     #endif
 
-    #if os(macOS) || os(Linux)
+    #if os(macOS) || os(Linux) || os(FreeBSD)
         // https://github.com/swiftwasm/WasmKit/issues/275
         @Test
         func fileDescriptorLeakTest() throws {

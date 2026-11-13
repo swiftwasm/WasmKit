@@ -32,27 +32,47 @@ enum TestSupport {
         hostPreopensUnavailable ? [false] : [true, false]
     }
 
-    #if os(macOS) || os(Linux)
+    #if os(macOS) || os(Linux) || os(FreeBSD)
         /// Comparing paths rather than descriptor counts keeps assertions immune to whatever tests
         /// run in parallel.
         static func openDescriptorPaths() throws -> Set<String> {
-            #if os(macOS)
-                let fdDirectory = "/dev/fd"
-            #else
-                let fdDirectory = "/proc/self/fd"
-            #endif
             var paths: Set<String> = []
-            for entry in try FileManager.default.contentsOfDirectory(atPath: fdDirectory) {
-                var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+            #if os(macOS) || os(Linux)
                 #if os(macOS)
-                    guard let fd = Int32(entry), fcntl(fd, F_GETPATH, &buffer) != -1 else { continue }
+                    let fdDirectory = "/dev/fd"
                 #else
-                    let length = readlink("\(fdDirectory)/\(entry)", &buffer, buffer.count - 1)
-                    guard length > 0 else { continue }
-                    buffer[length] = 0
+                    let fdDirectory = "/proc/self/fd"
                 #endif
-                paths.insert(string(fromCString: buffer))
-            }
+                for entry in try FileManager.default.contentsOfDirectory(atPath: fdDirectory) {
+                    var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+                    #if os(macOS)
+                        guard let fd = Int32(entry), fcntl(fd, F_GETPATH, &buffer) != -1 else { continue }
+                    #else
+                        let length = readlink("\(fdDirectory)/\(entry)", &buffer, buffer.count - 1)
+                        guard length > 0 else { continue }
+                        buffer[length] = 0
+                    #endif
+                    paths.insert(string(fromCString: buffer))
+                }
+            #elseif os(FreeBSD)
+                var count: Int32 = 0
+                guard let files = kinfo_getfile(getpid(), &count) else {
+                    throw TestSupport.Error(errno: errno)
+                }
+                defer { free(files) }
+
+                for file in UnsafeBufferPointer(start: files, count: Int(count)) {
+                    guard file.kf_fd >= 0 else { continue }
+                    let pathCapacity = MemoryLayout.size(ofValue: file.kf_path)
+                    let path = withUnsafePointer(to: file.kf_path) {
+                        $0.withMemoryRebound(to: CChar.self, capacity: pathCapacity) {
+                            string(fromCString: UnsafeBufferPointer(start: $0, count: pathCapacity))
+                        }
+                    }
+                    guard !path.isEmpty else { continue }
+                    paths.insert(path)
+                }
+            #endif
             return paths
         }
 
@@ -64,7 +84,7 @@ enum TestSupport {
             return string(fromCString: buffer)
         }
 
-        private static func string(fromCString buffer: [CChar]) -> String {
+        private static func string(fromCString buffer: some Sequence<CChar>) -> String {
             String(decoding: buffer.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) }, as: UTF8.self)
         }
     #endif

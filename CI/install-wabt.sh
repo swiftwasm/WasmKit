@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # A CI script to install wabt for testing WAT library
 #
@@ -16,6 +16,8 @@ install_build_tools() {
   fi
   if [[ "$(uname)" == "Darwin" ]]; then
     brew install cmake ninja xz
+  elif [[ "$(uname)" == "FreeBSD" ]]; then
+    pkg install -y curl cmake ninja python3
   else
     apt update && apt install -y curl build-essential cmake ninja-build python3 xz-utils
   fi

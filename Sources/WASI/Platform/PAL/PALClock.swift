@@ -62,6 +62,12 @@ enum PlatformClock {
                 case .rawUptime: return CLOCK_UPTIME_RAW
                 case .uptime: return CLOCK_UPTIME_RAW
                 }
+            #elseif os(FreeBSD)
+                switch self {
+                case .monotonic: return CLOCK_MONOTONIC
+                case .realtime: return CLOCK_REALTIME
+                case .rawUptime, .uptime: return CLOCK_UPTIME
+                }
             #else
                 switch self {
                 case .monotonic: return CLOCK_MONOTONIC

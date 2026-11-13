@@ -126,7 +126,7 @@
 
     // SOCK_STREAM is an enum on Linux/Glibc but a plain constant elsewhere.
     private var socketStreamType: CInt {
-        #if canImport(Glibc)
+        #if canImport(Glibc) && !os(FreeBSD)
             return CInt(SOCK_STREAM.rawValue)
         #else
             return SOCK_STREAM
