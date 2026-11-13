@@ -3142,6 +3142,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         iseqBuilder.emit(._return(.init()))
         self.updateInstructionMapping(from: oldPC)
     }
+    /// Emits the return a tail call to a host function continues with.
+    ///
+    /// A tail call to a Wasm function jumps to the callee, but one to a host function returns to
+    /// the instruction after it, in the frame the call moved, which then has to return. The code
+    /// after a tail call is otherwise unreachable, so nothing else follows it there.
+    private mutating func emitReturnAfterHostTailCall() {
+        emit(._return(.init()))
+    }
+
     private mutating func markUnreachable() throws(WasmKitError) {
         try controlStack.markUnreachable()
         let currentFrame = try controlStack.currentFrame()
@@ -4147,6 +4156,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
         let (arguments, frameBase) = try popReturnCallArguments(calleeType: calleeType)
         emit(.returnCall(Instruction.ReturnCallOperand(callee: callee, arguments: arguments, frameBase: frameBase)))
+        if !callee.isWasm { emitReturnAfterHostTailCall() }
         try markUnreachable()
     }
 
@@ -4178,6 +4188,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             frameBase: frameBase
         )
         emit(.returnCallIndirect(operand))
+        emitReturnAfterHostTailCall()
         try markUnreachable()
     }
 
@@ -5303,6 +5314,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
         let (arguments, frameBase) = try popReturnCallArguments(calleeType: calleeType)
         emit(.returnCallRef(Instruction.ReturnCallRefOperand(callee: callee, arguments: arguments, frameBase: frameBase)))
+        emitReturnAfterHostTailCall()
         try markUnreachable()
     }
 

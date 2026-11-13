@@ -310,4 +310,57 @@ struct TailCallHostTrapTests {
         #expect(try guest.export("caught")([.i32(9)]) == [.i32(77)])
         #expect(guest.calls.arguments["wide"] == [Path.spill.arguments])
     }
+
+    /// A tail call is not always the last instruction of its function: code that follows it in a
+    /// block is never run, and the call returns to the tail caller's caller.
+    @Test(arguments: testedThreadingModels, Entry.allCases)
+    func aHostTailCallReturnsWhereverItIs(threadingModel: EngineConfiguration.ThreadingModel, entry: Entry) throws {
+        let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel, features: Self.features)))
+        var marks = 0
+        var imports = Imports()
+        imports.define(
+            module: "env", name: "seven",
+            Function(store: store, parameters: [.i32], results: [.i32]) { _, args in [.i32(args[0].i32 &+ 7)] })
+        imports.define(
+            module: "env", name: "mark",
+            Function(store: store, parameters: [], results: []) { _, _ in
+                marks += 1
+                return []
+            })
+        let instance = try parseWasm(
+            bytes: wat2wasm(
+                """
+                (module
+                  (import "env" "seven" (func $seven (param i32) (result i32)))
+                  (import "env" "mark" (func $mark))
+                  (func $tail (param i32) (result i32)
+                    (block $b (return_call $seven (local.get 0)))
+                    (call $mark)
+                    (i32.const 99))
+                  (func (export "root") (param i32) (result i32)
+                    (block $b (return_call $seven (local.get 0)))
+                    (call $mark)
+                    (i32.const 99))
+                  (func (export "nested") (param i32) (result i32)
+                    (i32.mul (call $tail (local.get 0)) (i32.const 3))))
+                """, features: Self.features),
+            features: Self.features
+        ).instantiate(store: store, imports: imports)
+        for (name, expected) in [("root", UInt32(8)), ("nested", 24)] {
+            let function = try #require(instance.exports[function: name])
+            let results: [Value]
+            switch entry {
+            case .synchronous:
+                results = try function([.i32(1)])
+            case .resumable:
+                guard case .returned(let returned) = try ResumableCall(function: function, arguments: [.i32(1)]).resume() else {
+                    Issue.record("expected \(name) to return")
+                    continue
+                }
+                results = returned
+            }
+            #expect(results == [.i32(expected)], "\(name)")
+        }
+        #expect(marks == 0)
+    }
 }
