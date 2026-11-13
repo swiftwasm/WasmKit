@@ -1,5 +1,6 @@
-/// The ids the printer writes for one index space, made from the name section's names.
-struct IdentifierTable {
+/// Resolves the indices of one index space to the `$id`s the printer writes, made from the
+/// name section's names. The printer's counterpart of the parser's ``NameToIndexResolver``.
+struct IndexToNameResolver {
     private var ids: [UInt32: String] = [:]
     private var namesWithoutIds: [UInt32: String] = [:]
 

@@ -37,13 +37,13 @@ struct WatPrinter {
 
     private func moduleNameText() -> String {
         guard let name = info.moduleName else { return "" }
-        return IdentifierTable.id(for: name).map { " " + $0 } ?? #" (@name "")"#
+        return IndexToNameResolver.id(for: name).map { " " + $0 } ?? #" (@name "")"#
     }
 
     private mutating func printTypes() throws {
         for (i, type) in info.types.enumerated() {
-            let name = info.typeIds.definition(UInt32(i))
-            try writeLine("  (type\(name) (;\(i);) (func\(signatureText(type, parameterIds: nil))))")
+            let name = info.typeNames.definition(UInt32(i))
+            try writeLine("  (type\(name) (;\(i);) (func\(signatureText(type, parameterNames: nil))))")
         }
     }
 
@@ -55,26 +55,26 @@ struct WatPrinter {
             case .function(let typeIndex):
                 let index = UInt32(next.functions)
                 next.functions += 1
-                let name = info.functionIds.definition(index) + info.functionIds.nameAnnotation(index)
-                descriptor = "(func\(name) (type \(info.typeIds.reference(typeIndex))))"
+                let name = info.functionNames.definition(index) + info.functionNames.nameAnnotation(index)
+                descriptor = "(func\(name) (type \(info.typeNames.reference(typeIndex))))"
             case .table(let type):
                 let index = UInt32(next.tables)
                 next.tables += 1
-                let name = info.tableIds.definition(index)
+                let name = info.tableNames.definition(index)
                 descriptor = "(table\(name) \(limitsText(type.limits)) \(info.text(of: type.elementType)))"
             case .memory(let limits):
                 let index = UInt32(next.memories)
                 next.memories += 1
-                descriptor = "(memory\(info.memoryIds.definition(index)) \(limitsText(limits)))"
+                descriptor = "(memory\(info.memoryNames.definition(index)) \(limitsText(limits)))"
             case .global(let type):
                 let index = UInt32(next.globals)
                 next.globals += 1
-                descriptor = "(global\(info.globalIds.definition(index)) \(globalTypeText(type)))"
+                descriptor = "(global\(info.globalNames.definition(index)) \(globalTypeText(type)))"
             case .tag(let typeIndex):
                 let index = UInt32(next.tags)
                 next.tags += 1
-                let name = info.tagIds.definition(index) + info.tagIds.nameAnnotation(index)
-                descriptor = "(tag\(name) (type \(info.typeIds.reference(typeIndex))))"
+                let name = info.tagNames.definition(index) + info.tagNames.nameAnnotation(index)
+                descriptor = "(tag\(name) (type \(info.typeNames.reference(typeIndex))))"
             }
             try writeLine("  (import \(nameLiteral(entry.module)) \(nameLiteral(entry.name)) \(descriptor))")
         }
@@ -94,10 +94,10 @@ struct WatPrinter {
 
     private mutating func printFunction(index: UInt32, typeIndex: TypeIndex, code: Code) throws {
         let type = typeIndex < info.types.count ? info.types[Int(typeIndex)] : FunctionType(parameters: [], results: [])
-        let locals = IdentifierTable(names: info.localNames[index] ?? [:])
-        let name = info.functionIds.definition(index) + info.functionIds.nameAnnotation(index)
-        let typeUse = "(type \(info.typeIds.reference(typeIndex)))"
-        try writeLine("  (func\(name) (;\(index);) \(typeUse)\(signatureText(type, parameterIds: locals))")
+        let locals = IndexToNameResolver(names: info.localNames[index] ?? [:])
+        let name = info.functionNames.definition(index) + info.functionNames.nameAnnotation(index)
+        let typeUse = "(type \(info.typeNames.reference(typeIndex)))"
+        try writeLine("  (func\(name) (;\(index);) \(typeUse)\(signatureText(type, parameterNames: locals))")
         for (offset, localType) in code.locals.enumerated() {
             let localIndex = UInt32(type.parameters.count + offset)
             try writeLine("    (local\(locals.definition(localIndex)) \(info.text(of: localType)))")
@@ -107,7 +107,7 @@ struct WatPrinter {
         var visitor = TextInstructionVisitor(
             info: info,
             locals: locals,
-            labelIds: (info.labelNames[index] ?? [:]).compactMapValues(IdentifierTable.id(for:)),
+            labelIds: (info.labelNames[index] ?? [:]).compactMapValues(IndexToNameResolver.id(for:)),
             indentLevel: 2,
             append: { pendingText += $0 }
         )
@@ -145,14 +145,14 @@ struct WatPrinter {
                 initializer = try " " + foldedConstExpression(expression)
             }
             let type = "\(limitsText(table.type.limits)) \(info.text(of: table.type.elementType))"
-            try writeLine("  (table\(info.tableIds.definition(index)) (;\(index);) \(type)\(initializer))")
+            try writeLine("  (table\(info.tableNames.definition(index)) (;\(index);) \(type)\(initializer))")
         }
     }
 
     private mutating func printMemories() throws {
         for (offset, memory) in info.memories.enumerated() {
             let index = UInt32(importCounts.memories + offset)
-            try writeLine("  (memory\(info.memoryIds.definition(index)) (;\(index);) \(limitsText(memory.type)))")
+            try writeLine("  (memory\(info.memoryNames.definition(index)) (;\(index);) \(limitsText(memory.type)))")
         }
     }
 
@@ -161,7 +161,7 @@ struct WatPrinter {
             let index = UInt32(importCounts.globals + offset)
             let initializer = try foldedConstExpression(global.initializer)
             try writeLine(
-                "  (global\(info.globalIds.definition(index)) (;\(index);) \(globalTypeText(global.type)) \(initializer))"
+                "  (global\(info.globalNames.definition(index)) (;\(index);) \(globalTypeText(global.type)) \(initializer))"
             )
         }
     }
@@ -169,8 +169,8 @@ struct WatPrinter {
     private mutating func printTags() throws {
         for (offset, tag) in info.tags.enumerated() {
             let index = UInt32(importCounts.tags + offset)
-            let name = info.tagIds.definition(index) + info.tagIds.nameAnnotation(index)
-            try writeLine("  (tag\(name) (;\(index);) (type \(info.typeIds.reference(tag.type))))")
+            let name = info.tagNames.definition(index) + info.tagNames.nameAnnotation(index)
+            try writeLine("  (tag\(name) (;\(index);) (type \(info.typeNames.reference(tag.type))))")
         }
     }
 
@@ -178,11 +178,11 @@ struct WatPrinter {
         for entry in info.exports {
             let descriptor: String
             switch entry.descriptor {
-            case .function(let i): descriptor = "(func \(info.functionIds.reference(i)))"
-            case .table(let i): descriptor = "(table \(info.tableIds.reference(i)))"
-            case .memory(let i): descriptor = "(memory \(info.memoryIds.reference(i)))"
-            case .global(let i): descriptor = "(global \(info.globalIds.reference(i)))"
-            case .tag(let i): descriptor = "(tag \(info.tagIds.reference(i)))"
+            case .function(let i): descriptor = "(func \(info.functionNames.reference(i)))"
+            case .table(let i): descriptor = "(table \(info.tableNames.reference(i)))"
+            case .memory(let i): descriptor = "(memory \(info.memoryNames.reference(i)))"
+            case .global(let i): descriptor = "(global \(info.globalNames.reference(i)))"
+            case .tag(let i): descriptor = "(tag \(info.tagNames.reference(i)))"
             }
             try writeLine("  (export \(nameLiteral(entry.name)) \(descriptor))")
         }
@@ -190,7 +190,7 @@ struct WatPrinter {
 
     private mutating func printStart() throws {
         if let start = info.start {
-            try writeLine("  (start \(info.functionIds.reference(start)))")
+            try writeLine("  (start \(info.functionNames.reference(start)))")
         }
     }
 
@@ -210,11 +210,11 @@ struct WatPrinter {
             return functionIndex
         }
 
-        var header = "  (elem\(info.elementIds.definition(index)) (;\(index);)"
+        var header = "  (elem\(info.elementNames.definition(index)) (;\(index);)"
         switch element.mode {
         case .active(let table, let offset):
             if table != 0 {
-                header += " (table \(info.tableIds.reference(table)))"
+                header += " (table \(info.tableNames.reference(table)))"
             }
             header += " \(try offsetText(offset))"
         case .passive:
@@ -226,7 +226,7 @@ struct WatPrinter {
         if element.type == indexListType, functionIndices.count == element.initializer.count {
             try append(" func")
             for functionIndex in functionIndices {
-                try append(" \(info.functionIds.reference(functionIndex))")
+                try append(" \(info.functionNames.reference(functionIndex))")
             }
         } else {
             try append(" \(info.text(of: element.type))")
@@ -248,12 +248,12 @@ struct WatPrinter {
     }
 
     private mutating func printDataSegment(_ segment: DataSegment, index: UInt32) throws {
-        var header = "  (data\(info.dataIds.definition(index)) (;\(index);)"
+        var header = "  (data\(info.dataNames.definition(index)) (;\(index);)"
         let bytes: ArraySlice<UInt8>
         switch segment {
         case .active(let active):
             if active.index != 0 {
-                header += " (memory \(info.memoryIds.reference(active.index)))"
+                header += " (memory \(info.memoryNames.reference(active.index)))"
             }
             header += " \(try offsetText(active.offset))"
             bytes = active.initializer
@@ -296,11 +296,11 @@ struct WatPrinter {
     }
 
     /// A `param` that binds an id declares exactly one parameter.
-    private func signatureText(_ type: FunctionType, parameterIds: IdentifierTable?) -> String {
+    private func signatureText(_ type: FunctionType, parameterNames: IndexToNameResolver?) -> String {
         var text = ""
         var unnamed: [String] = []
         for (index, parameter) in type.parameters.enumerated() {
-            guard let id = parameterIds?[UInt32(index)] else {
+            guard let id = parameterNames?[UInt32(index)] else {
                 unnamed.append(info.text(of: parameter))
                 continue
             }
@@ -338,7 +338,7 @@ struct WatPrinter {
     private func constExprTexts(_ expression: ConstExpression) throws(WasmParserError) -> [String] {
         var text = ""
         var visitor = TextInstructionVisitor(
-            info: info, locals: IdentifierTable(), labelIds: [:], indentLevel: 0,
+            info: info, locals: IndexToNameResolver(), labelIds: [:], indentLevel: 0,
             append: { text += $0 }
         )
         do throws(WasmParserError) {

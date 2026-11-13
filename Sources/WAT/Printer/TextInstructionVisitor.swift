@@ -14,7 +14,7 @@ struct TextInstructionVisitor: TextInstructionPrinter {
     // MARK: - Context
 
     let info: ModuleInfo
-    let locals: IdentifierTable
+    let locals: IndexToNameResolver
     /// Label ids by name-section label index, which numbers block, loop, if and
     /// try_table in order of appearance.
     let labelIds: [UInt32: String]
@@ -39,7 +39,7 @@ struct TextInstructionVisitor: TextInstructionPrinter {
 
     init(
         info: ModuleInfo,
-        locals: IdentifierTable,
+        locals: IndexToNameResolver,
         labelIds: [UInt32: String],
         indentLevel: Int,
         append: @escaping (String) -> Void
@@ -153,7 +153,7 @@ struct TextInstructionVisitor: TextInstructionPrinter {
         switch blockType {
         case .empty: return []
         case .type(let type): return ["(result \(info.text(of: type)))"]
-        case .funcType(let typeIndex): return ["(type \(info.typeIds.reference(typeIndex)))"]
+        case .funcType(let typeIndex): return ["(type \(info.typeNames.reference(typeIndex)))"]
         }
     }
 
@@ -162,9 +162,9 @@ struct TextInstructionVisitor: TextInstructionPrinter {
             + tryCatch.catches.map { clause in
                 switch clause {
                 case .catch(let tagIndex, let labelIndex):
-                    return "(catch \(info.tagIds.reference(tagIndex)) \(labelReference(labelIndex)))"
+                    return "(catch \(info.tagNames.reference(tagIndex)) \(labelReference(labelIndex)))"
                 case .catchRef(let tagIndex, let labelIndex):
-                    return "(catch_ref \(info.tagIds.reference(tagIndex)) \(labelReference(labelIndex)))"
+                    return "(catch_ref \(info.tagNames.reference(tagIndex)) \(labelReference(labelIndex)))"
                 case .catchAll(let labelIndex):
                     return "(catch_all \(labelReference(labelIndex)))"
                 case .catchAllRef(let labelIndex):
@@ -173,19 +173,19 @@ struct TextInstructionVisitor: TextInstructionPrinter {
             }
     }
 
-    func immediates(dataIndex: UInt32) -> [String] { [info.dataIds.reference(dataIndex)] }
-    func immediates(elemIndex: UInt32) -> [String] { [info.elementIds.reference(elemIndex)] }
-    func immediates(functionIndex: UInt32) -> [String] { [info.functionIds.reference(functionIndex)] }
-    func immediates(globalIndex: UInt32) -> [String] { [info.globalIds.reference(globalIndex)] }
+    func immediates(dataIndex: UInt32) -> [String] { [info.dataNames.reference(dataIndex)] }
+    func immediates(elemIndex: UInt32) -> [String] { [info.elementNames.reference(elemIndex)] }
+    func immediates(functionIndex: UInt32) -> [String] { [info.functionNames.reference(functionIndex)] }
+    func immediates(globalIndex: UInt32) -> [String] { [info.globalNames.reference(globalIndex)] }
     func immediates(localIndex: UInt32) -> [String] { [locals.reference(localIndex)] }
-    func immediates(tagIndex: UInt32) -> [String] { [info.tagIds.reference(tagIndex)] }
-    func immediates(typeIndex: UInt32) -> [String] { [info.typeIds.reference(typeIndex)] }
+    func immediates(tagIndex: UInt32) -> [String] { [info.tagNames.reference(tagIndex)] }
+    func immediates(typeIndex: UInt32) -> [String] { [info.typeNames.reference(typeIndex)] }
     func immediates(type: HeapType) -> [String] { [info.text(of: type)] }
     func immediates(relativeDepth: UInt32) -> [String] { [labelReference(relativeDepth)] }
     func immediates(lane: UInt8) -> [String] { [String(lane)] }
     func immediates(lanes: V128ShuffleMask) -> [String] { lanes.lanes.map { String($0) } }
-    func immediates(memory: UInt32) -> [String] { memory == 0 ? [] : [info.memoryIds.reference(memory)] }
-    func immediates(table: UInt32) -> [String] { table == 0 ? [] : [info.tableIds.reference(table)] }
+    func immediates(memory: UInt32) -> [String] { memory == 0 ? [] : [info.memoryNames.reference(memory)] }
+    func immediates(table: UInt32) -> [String] { table == 0 ? [] : [info.tableNames.reference(table)] }
     func immediates(targets: BrTable) -> [String] { (targets.labelIndices + [targets.defaultIndex]).map(labelReference) }
 
     func immediates(value: Int32) -> [String] { [String(value)] }
@@ -214,19 +214,19 @@ struct TextInstructionVisitor: TextInstructionPrinter {
     }
 
     func immediates(elemIndex: UInt32, table: UInt32) -> [String] {
-        [info.tableIds.reference(table)] + immediates(elemIndex: elemIndex)
+        [info.tableNames.reference(table)] + immediates(elemIndex: elemIndex)
     }
 
     func immediates(dstMem: UInt32, srcMem: UInt32) -> [String] {
-        dstMem == 0 && srcMem == 0 ? [] : [info.memoryIds.reference(dstMem), info.memoryIds.reference(srcMem)]
+        dstMem == 0 && srcMem == 0 ? [] : [info.memoryNames.reference(dstMem), info.memoryNames.reference(srcMem)]
     }
 
     func immediates(dstTable: UInt32, srcTable: UInt32) -> [String] {
-        dstTable == 0 && srcTable == 0 ? [] : [info.tableIds.reference(dstTable), info.tableIds.reference(srcTable)]
+        dstTable == 0 && srcTable == 0 ? [] : [info.tableNames.reference(dstTable), info.tableNames.reference(srcTable)]
     }
 
     func immediates(typeIndex: UInt32, tableIndex: UInt32) -> [String] {
-        immediates(table: tableIndex) + ["(type \(info.typeIds.reference(typeIndex)))"]
+        immediates(table: tableIndex) + ["(type \(info.typeNames.reference(typeIndex)))"]
     }
 
     func immediates(destType: UInt32, srcType: UInt32) -> [String] {

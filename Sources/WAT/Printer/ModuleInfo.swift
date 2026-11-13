@@ -25,14 +25,14 @@ struct ModuleInfo {
 
     // Names from the `name` custom section.
     var moduleName: String? = nil
-    var functionIds = IdentifierTable()
-    var typeIds = IdentifierTable()
-    var tableIds = IdentifierTable()
-    var memoryIds = IdentifierTable()
-    var globalIds = IdentifierTable()
-    var elementIds = IdentifierTable()
-    var dataIds = IdentifierTable()
-    var tagIds = IdentifierTable()
+    var functionNames = IndexToNameResolver()
+    var typeNames = IndexToNameResolver()
+    var tableNames = IndexToNameResolver()
+    var memoryNames = IndexToNameResolver()
+    var globalNames = IndexToNameResolver()
+    var elementNames = IndexToNameResolver()
+    var dataNames = IndexToNameResolver()
+    var tagNames = IndexToNameResolver()
     /// Local names by function index, then local index.
     var localNames: [UInt32: [UInt32: String]] = [:]
     /// Label names by function index, then label index.
@@ -118,7 +118,7 @@ extension ModuleInfo {
 
     func text(of type: HeapType) -> String {
         guard case .concrete(let typeIndex) = type else { return type.description }
-        return typeIds.reference(typeIndex)
+        return typeNames.reference(typeIndex)
     }
 }
 
@@ -136,16 +136,16 @@ private func parseNameSection(_ bytes: ArraySlice<UInt8>, into info: inout Modul
     for names in parsed {
         switch names {
         case .moduleName(let name): info.moduleName = name
-        case .functions(let map): info.functionIds = IdentifierTable(names: map)
+        case .functions(let map): info.functionNames = IndexToNameResolver(names: map)
         case .locals(let map): info.localNames = map
         case .labels(let map): info.labelNames = map
-        case .types(let map): info.typeIds = IdentifierTable(names: map)
-        case .tables(let map): info.tableIds = IdentifierTable(names: map)
-        case .memories(let map): info.memoryIds = IdentifierTable(names: map)
-        case .globals(let map): info.globalIds = IdentifierTable(names: map)
-        case .elements(let map): info.elementIds = IdentifierTable(names: map)
-        case .dataSegments(let map): info.dataIds = IdentifierTable(names: map)
-        case .tags(let map): info.tagIds = IdentifierTable(names: map)
+        case .types(let map): info.typeNames = IndexToNameResolver(names: map)
+        case .tables(let map): info.tableNames = IndexToNameResolver(names: map)
+        case .memories(let map): info.memoryNames = IndexToNameResolver(names: map)
+        case .globals(let map): info.globalNames = IndexToNameResolver(names: map)
+        case .elements(let map): info.elementNames = IndexToNameResolver(names: map)
+        case .dataSegments(let map): info.dataNames = IndexToNameResolver(names: map)
+        case .tags(let map): info.tagNames = IndexToNameResolver(names: map)
         }
     }
 }
