@@ -10,9 +10,8 @@ add_wasmkit_library(WAT
   Parser/WASTParser.swift
   Parser/WatParser.swift
   Printer/IdentifierTable.swift
-  Printer/InstructionMnemonics.swift
+  Printer/TextInstructionPrinter.swift
   Printer/ModuleInfo.swift
-  Printer/ModuleNames.swift
   Printer/TextFormatting.swift
   Printer/TextInstructionVisitor.swift
   Printer/WatPrinter.swift

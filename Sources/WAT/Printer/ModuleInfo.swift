@@ -25,18 +25,18 @@ struct ModuleInfo {
 
     // Names from the `name` custom section.
     var moduleName: String? = nil
-    var functionNames: [UInt32: String] = [:]
+    var functionIds = IdentifierTable()
+    var typeIds = IdentifierTable()
+    var tableIds = IdentifierTable()
+    var memoryIds = IdentifierTable()
+    var globalIds = IdentifierTable()
+    var elementIds = IdentifierTable()
+    var dataIds = IdentifierTable()
+    var tagIds = IdentifierTable()
     /// Local names by function index, then local index.
     var localNames: [UInt32: [UInt32: String]] = [:]
     /// Label names by function index, then label index.
     var labelNames: [UInt32: [UInt32: String]] = [:]
-    var typeNames: [UInt32: String] = [:]
-    var tableNames: [UInt32: String] = [:]
-    var memoryNames: [UInt32: String] = [:]
-    var globalNames: [UInt32: String] = [:]
-    var elementNames: [UInt32: String] = [:]
-    var dataNames: [UInt32: String] = [:]
-    var tagNames: [UInt32: String] = [:]
 
     init() {}
 
@@ -102,6 +102,26 @@ func collectModule<Source: ByteStreamSource>(
     return info
 }
 
+// MARK: - Type text
+
+extension ModuleInfo {
+    /// `type` in WAT, with a concrete heap type written as its type's id or index.
+    func text(of type: ValueType) -> String {
+        guard case .ref(let reference) = type else { return type.description }
+        return text(of: reference)
+    }
+
+    func text(of type: ReferenceType) -> String {
+        guard case .concrete = type.heapType else { return type.description }
+        return "(ref \(type.isNullable ? "null " : "")\(text(of: type.heapType)))"
+    }
+
+    func text(of type: HeapType) -> String {
+        guard case .concrete(let typeIndex) = type else { return type.description }
+        return typeIds.reference(typeIndex)
+    }
+}
+
 // MARK: - Name section decoding
 
 /// Ignores a malformed name section, as the spec allows for custom sections.
@@ -116,16 +136,16 @@ private func parseNameSection(_ bytes: ArraySlice<UInt8>, into info: inout Modul
     for names in parsed {
         switch names {
         case .moduleName(let name): info.moduleName = name
-        case .functions(let map): info.functionNames = map
+        case .functions(let map): info.functionIds = IdentifierTable(names: map)
         case .locals(let map): info.localNames = map
         case .labels(let map): info.labelNames = map
-        case .types(let map): info.typeNames = map
-        case .tables(let map): info.tableNames = map
-        case .memories(let map): info.memoryNames = map
-        case .globals(let map): info.globalNames = map
-        case .elements(let map): info.elementNames = map
-        case .dataSegments(let map): info.dataNames = map
-        case .tags(let map): info.tagNames = map
+        case .types(let map): info.typeIds = IdentifierTable(names: map)
+        case .tables(let map): info.tableIds = IdentifierTable(names: map)
+        case .memories(let map): info.memoryIds = IdentifierTable(names: map)
+        case .globals(let map): info.globalIds = IdentifierTable(names: map)
+        case .elements(let map): info.elementIds = IdentifierTable(names: map)
+        case .dataSegments(let map): info.dataIds = IdentifierTable(names: map)
+        case .tags(let map): info.tagIds = IdentifierTable(names: map)
         }
     }
 }

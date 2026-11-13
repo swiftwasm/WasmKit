@@ -9,16 +9,6 @@ struct Wasm2watErrorTests {
         return message.text
     }
 
-    @Test func unprintableInstructionsThrowAtTheirOffset() throws {
-        let binary = try wat2wasm("(module (func (result i32) i32.const 1 ref.i31 i31.get_s))", features: .all)
-        let error = try #require(throws: WasmParserError.self) {
-            _ = try wasm2wat(StaticByteStreamSource(bytes: binary), features: .all)
-        }
-        #expect(Self.messageText(error) == "instruction not supported by wasm2wat")
-        let location = try #require(error.location)
-        #expect(Array(binary[location...].prefix(2)) == [0xFB, 0x1C])
-    }
-
     @Test func undecodableInstructionsThrowAtTheirOffset() throws {
         let binary = try wat2wasm("(module (func (result i32) i32.const 1 ref.i31 i31.get_s))", features: .all)
         let error = try #require(throws: WasmParserError.self) {

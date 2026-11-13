@@ -2,14 +2,18 @@ import WasmParser
 import WasmTypes
 
 /// A visitor that emits WAT text for each WebAssembly instruction.
-struct TextInstructionVisitor: AnyInstructionVisitor {
+///
+/// The generated ``TextInstructionPrinter`` prints most instructions from their mnemonic and
+/// immediates. This type supplies the immediates' text, and implements the instructions that
+/// open or close a block or have no text name of their own.
+struct TextInstructionVisitor: TextInstructionPrinter {
     typealias VisitorError = WasmParserError
 
     var binaryOffset: Int = 0
 
     // MARK: - Context
 
-    let names: ModuleNames
+    let info: ModuleInfo
     let locals: IdentifierTable
     /// Label ids by name-section label index, which numbers block, loop, if and
     /// try_table in order of appearance.
@@ -34,221 +38,17 @@ struct TextInstructionVisitor: AnyInstructionVisitor {
     private var reachedFinalEnd = false
 
     init(
-        names: ModuleNames,
+        info: ModuleInfo,
         locals: IdentifierTable,
         labelIds: [UInt32: String],
         indentLevel: Int,
         append: @escaping (String) -> Void
     ) {
-        self.names = names
+        self.info = info
         self.locals = locals
         self.labelIds = labelIds
         self.indent = String(repeating: "  ", count: indentLevel)
         self.append = append
-    }
-
-    // MARK: - AnyInstructionVisitor
-
-    mutating func visit(_ instruction: Instruction) throws(WasmParserError) {
-        guard !reachedFinalEnd else {
-            throw WasmParserError("instruction after the final end of the expression", offset: binaryOffset)
-        }
-        switch instruction {
-        case .unreachable:
-            emit("unreachable")
-        case .nop:
-            emit("nop")
-        case .block(let blockType):
-            let label = pushLabel()
-            emit("block\(label)\(blockTypeSuffix(blockType))")
-            indent += "  "
-        case .loop(let blockType):
-            let label = pushLabel()
-            emit("loop\(label)\(blockTypeSuffix(blockType))")
-            indent += "  "
-        case .if(let blockType):
-            let label = pushLabel(acceptsElse: true)
-            emit("if\(label)\(blockTypeSuffix(blockType))")
-            indent += "  "
-        case .else:
-            guard labelStack.last?.acceptsElse == true else {
-                throw WasmParserError("else outside an if", offset: binaryOffset)
-            }
-            labelStack[labelStack.count - 1].acceptsElse = false
-            indent.removeLast(2)
-            emit("else")
-            indent += "  "
-        case .end:
-            if labelStack.isEmpty {
-                // The final `end` has no text: the closing paren of the enclosing form stands for it.
-                reachedFinalEnd = true
-                return
-            }
-            labelStack.removeLast()
-            indent.removeLast(2)
-            emit("end")
-        case .br(let d):
-            emit("br \(labelReference(d))")
-        case .brIf(let d):
-            emit("br_if \(labelReference(d))")
-        case .brTable(let tbl):
-            var parts = tbl.labelIndices.map { labelReference($0) }
-            parts.append(labelReference(tbl.defaultIndex))
-            emit("br_table \(parts.joined(separator: " "))")
-        case .return:
-            emit("return")
-        case .call(let fi):
-            emit("call \(names.functions.reference(fi))")
-        case .callIndirect(let ti, let tbl):
-            emit("call_indirect\(tableSuffix(tbl)) (type \(names.types.reference(ti)))")
-        case .returnCall(let fi):
-            emit("return_call \(names.functions.reference(fi))")
-        case .returnCallIndirect(let ti, let tbl):
-            emit("return_call_indirect\(tableSuffix(tbl)) (type \(names.types.reference(ti)))")
-        case .callRef(let ti):
-            emit("call_ref \(names.types.reference(ti))")
-        case .returnCallRef(let ti):
-            emit("return_call_ref \(names.types.reference(ti))")
-        case .drop:
-            emit("drop")
-        case .select:
-            emit("select")
-        case .typedSelect(let t):
-            emit("select (result \(names.valueType(t)))")
-
-        case .throw(let tagIndex):
-            emit("throw \(names.tags.reference(tagIndex))")
-        case .throwRef:
-            emit("throw_ref")
-        case .tryTable(let blockType, let tryCatch):
-            // Catch labels resolve outside the try_table's own label, so format
-            // them before pushing it.
-            let clauses = tryCatch.catches.map { " " + catchClauseText($0) }.joined()
-            let label = pushLabel()
-            emit("try_table\(label)\(blockTypeSuffix(blockType))\(clauses)")
-            indent += "  "
-
-        case .localGet(let i):
-            emit("local.get \(locals.reference(i))")
-        case .localSet(let i):
-            emit("local.set \(locals.reference(i))")
-        case .localTee(let i):
-            emit("local.tee \(locals.reference(i))")
-        case .globalGet(let i):
-            emit("global.get \(names.globals.reference(i))")
-        case .globalSet(let i):
-            emit("global.set \(names.globals.reference(i))")
-
-        case .load(let kind, let m):
-            let memarg = try memargText(m, naturalAlignment: kind.naturalAlignment)
-            emit("\(generatedMnemonic(for: kind))\(memarg)")
-        case .store(let kind, let m):
-            let memarg = try memargText(m, naturalAlignment: kind.naturalAlignment)
-            emit("\(generatedMnemonic(for: kind))\(memarg)")
-        case .memorySize(let mem):
-            emit("memory.size\(memorySuffix(mem))")
-        case .memoryGrow(let mem):
-            emit("memory.grow\(memorySuffix(mem))")
-
-        case .i32Const(let v):
-            emit("i32.const \(v)")
-        case .i64Const(let v):
-            emit("i64.const \(v)")
-        case .f32Const(let v):
-            emit("f32.const \(formatF32(v))")
-        case .f64Const(let v):
-            emit("f64.const \(formatF64(v))")
-
-        case .refNull(let ht):
-            emit("ref.null \(names.heapType(ht))")
-        case .refIsNull:
-            emit("ref.is_null")
-        case .refFunc(let fi):
-            emit("ref.func \(names.functions.reference(fi))")
-        case .refAsNonNull:
-            emit("ref.as_non_null")
-        case .brOnNull(let d):
-            emit("br_on_null \(labelReference(d))")
-        case .brOnNonNull(let d):
-            emit("br_on_non_null \(labelReference(d))")
-
-        case .i32Eqz: emit("i32.eqz")
-        case .i64Eqz: emit("i64.eqz")
-        case .cmp(let op): emit(generatedMnemonic(for: op))
-
-        case .unary(let op): emit(generatedMnemonic(for: op))
-        case .binary(let op): emit(generatedMnemonic(for: op))
-        case .conversion(let op): emit(generatedMnemonic(for: op))
-
-        case .memoryInit(let di, let mem):
-            emit("memory.init\(memorySuffix(mem)) \(names.data.reference(di))")
-        case .dataDrop(let di):
-            emit("data.drop \(names.data.reference(di))")
-        case .memoryCopy(let dst, let src):
-            if dst == 0 && src == 0 {
-                emit("memory.copy")
-            } else {
-                emit("memory.copy \(names.memories.reference(dst)) \(names.memories.reference(src))")
-            }
-        case .memoryFill(let mem):
-            emit("memory.fill\(memorySuffix(mem))")
-        case .tableInit(let ei, let tbl):
-            emit("table.init \(names.tables.reference(tbl)) \(names.elements.reference(ei))")
-        case .elemDrop(let ei):
-            emit("elem.drop \(names.elements.reference(ei))")
-        case .tableCopy(let dst, let src):
-            if dst == 0 && src == 0 {
-                emit("table.copy")
-            } else {
-                emit("table.copy \(names.tables.reference(dst)) \(names.tables.reference(src))")
-            }
-        case .tableFill(let tbl):
-            emit("table.fill\(tableSuffix(tbl))")
-        case .tableGet(let tbl):
-            emit("table.get\(tableSuffix(tbl))")
-        case .tableSet(let tbl):
-            emit("table.set\(tableSuffix(tbl))")
-        case .tableGrow(let tbl):
-            emit("table.grow\(tableSuffix(tbl))")
-        case .tableSize(let tbl):
-            emit("table.size\(tableSuffix(tbl))")
-
-        case .wideArithmetic(let op): emit(generatedMnemonic(for: op))
-
-        case .atomicFence:
-            emit("atomic.fence")
-
-        case .v128Const(let v):
-            let bytes = v.bytes.map { String($0) }.joined(separator: " ")
-            emit("v128.const i8x16 \(bytes)")
-        case .i8x16Shuffle(let mask):
-            let lanes = mask.lanes.map { String($0) }.joined(separator: " ")
-            emit("i8x16.shuffle \(lanes)")
-        case .simd(let op): emit(generatedMnemonic(for: op))
-        case .simdLane(let op, let lane): emit("\(generatedMnemonic(for: op)) \(lane)")
-        case .simdMemLane(let op, let m, let lane):
-            let memarg = try memargText(m, naturalAlignment: op.naturalAlignment)
-            emit("\(generatedMnemonic(for: op))\(memarg) \(lane)")
-
-        case .memoryAtomicNotify, .memoryAtomicWait32, .memoryAtomicWait64, .i32AtomicRmwAdd, .i64AtomicRmwAdd, .i32AtomicRmw8AddU, .i32AtomicRmw16AddU, .i64AtomicRmw8AddU,
-            .i64AtomicRmw16AddU, .i64AtomicRmw32AddU, .i32AtomicRmwSub, .i64AtomicRmwSub, .i32AtomicRmw8SubU, .i32AtomicRmw16SubU, .i64AtomicRmw8SubU, .i64AtomicRmw16SubU,
-            .i64AtomicRmw32SubU, .i32AtomicRmwAnd, .i64AtomicRmwAnd, .i32AtomicRmw8AndU, .i32AtomicRmw16AndU, .i64AtomicRmw8AndU, .i64AtomicRmw16AndU, .i64AtomicRmw32AndU, .i32AtomicRmwOr,
-            .i64AtomicRmwOr, .i32AtomicRmw8OrU, .i32AtomicRmw16OrU, .i64AtomicRmw8OrU, .i64AtomicRmw16OrU, .i64AtomicRmw32OrU, .i32AtomicRmwXor, .i64AtomicRmwXor, .i32AtomicRmw8XorU,
-            .i32AtomicRmw16XorU, .i64AtomicRmw8XorU, .i64AtomicRmw16XorU, .i64AtomicRmw32XorU, .i32AtomicRmwXchg, .i64AtomicRmwXchg, .i32AtomicRmw8XchgU, .i32AtomicRmw16XchgU,
-            .i64AtomicRmw8XchgU, .i64AtomicRmw16XchgU, .i64AtomicRmw32XchgU, .i32AtomicRmwCmpxchg, .i64AtomicRmwCmpxchg, .i32AtomicRmw8CmpxchgU, .i32AtomicRmw16CmpxchgU,
-            .i64AtomicRmw8CmpxchgU, .i64AtomicRmw16CmpxchgU, .i64AtomicRmw32CmpxchgU:
-            guard let (mnemonic, m, naturalAlignment) = generatedMemargInstruction(instruction) else {
-                throw WasmParserError("instruction not supported by wasm2wat", offset: binaryOffset)
-            }
-            let memarg = try memargText(m, naturalAlignment: naturalAlignment)
-            emit("\(mnemonic)\(memarg)")
-
-        // Do not add a `default:` to this switch.
-        case .refI31, .i31GetS, .i31GetU, .structNew, .structNewDefault, .structGet, .structGetS, .structGetU, .structSet, .arrayNew, .arrayNewDefault, .arrayNewFixed, .arrayGet, .arrayGetS,
-            .arrayGetU, .arraySet, .arrayLen, .refEq, .anyConvertExtern, .externConvertAny, .arrayNewData, .arrayNewElem, .arrayFill, .arrayCopy, .arrayInitData, .arrayInitElem, .refTest,
-            .refCast, .brOnCast, .brOnCastFail:
-            throw WasmParserError("instruction not supported by wasm2wat", offset: binaryOffset)
-        }
     }
 
     /// Throws if the expression ended before its final `end`.
@@ -258,21 +58,199 @@ struct TextInstructionVisitor: AnyInstructionVisitor {
         }
     }
 
-    // MARK: - Emit helper
+    // MARK: - TextInstructionPrinter
 
-    private func emit(_ text: String) {
+    mutating func printInstruction(_ mnemonic: String, _ immediates: [String]) throws(WasmParserError) {
+        try checkBeforeFinalEnd()
         append(indent)
-        append(text)
+        append(([mnemonic] + immediates).joined(separator: " "))
         append("\n")
     }
 
-    // MARK: - Label helpers
+    // MARK: - Blocks
 
-    private mutating func pushLabel(acceptsElse: Bool = false) -> String {
+    mutating func visitBlock(blockType: BlockType) throws(WasmParserError) {
+        try printBlockStart("block", immediates(blockType: blockType))
+    }
+
+    mutating func visitLoop(blockType: BlockType) throws(WasmParserError) {
+        try printBlockStart("loop", immediates(blockType: blockType))
+    }
+
+    mutating func visitIf(blockType: BlockType) throws(WasmParserError) {
+        try printBlockStart("if", immediates(blockType: blockType), acceptsElse: true)
+    }
+
+    mutating func visitTryTable(blockType: BlockType, tryCatch: TryCatch) throws(WasmParserError) {
+        // Catch labels resolve outside the try_table's own label, so print them before pushing it.
+        try printBlockStart("try_table", immediates(blockType: blockType, tryCatch: tryCatch))
+    }
+
+    mutating func visitElse() throws(WasmParserError) {
+        try checkBeforeFinalEnd()
+        guard labelStack.last?.acceptsElse == true else {
+            throw WasmParserError("else outside an if", offset: binaryOffset)
+        }
+        labelStack[labelStack.count - 1].acceptsElse = false
+        indent.removeLast(2)
+        try printInstruction("else")
+        indent += "  "
+    }
+
+    mutating func visitEnd() throws(WasmParserError) {
+        try checkBeforeFinalEnd()
+        guard !labelStack.isEmpty else {
+            // The final `end` has no text: the closing paren of the enclosing form stands for it.
+            reachedFinalEnd = true
+            return
+        }
+        labelStack.removeLast()
+        indent.removeLast(2)
+        try printInstruction("end")
+    }
+
+    private mutating func printBlockStart(
+        _ mnemonic: String, _ immediates: [String], acceptsElse: Bool = false
+    ) throws(WasmParserError) {
         let id = labelIds[nextLabelIndex]
         nextLabelIndex += 1
+        try printInstruction(mnemonic, (id.map { [$0] } ?? []) + immediates)
         labelStack.append(OpenLabel(id: id, acceptsElse: acceptsElse))
-        return id.map { " " + $0 } ?? ""
+        indent += "  "
+    }
+
+    private func checkBeforeFinalEnd() throws(WasmParserError) {
+        guard !reachedFinalEnd else {
+            throw WasmParserError("instruction after the final end of the expression", offset: binaryOffset)
+        }
+    }
+
+    // MARK: - Instructions without a text name
+
+    mutating func visitTypedSelect(type: ValueType) throws(WasmParserError) {
+        try printInstruction("select", ["(result \(info.text(of: type)))"])
+    }
+
+    mutating func visitRefTest(_ refTest: Instruction.RefTest, type: HeapType) throws(WasmParserError) {
+        let referenceType = ReferenceType(isNullable: refTest == .refTestNull, heapType: type)
+        try printInstruction("ref.test", [info.text(of: referenceType)])
+    }
+
+    mutating func visitRefCast(_ refCast: Instruction.RefCast, type: HeapType) throws(WasmParserError) {
+        let referenceType = ReferenceType(isNullable: refCast == .refCastNull, heapType: type)
+        try printInstruction("ref.cast", [info.text(of: referenceType)])
+    }
+
+    mutating func visitUnknown(_ opcode: [UInt8]) throws(WasmParserError) -> Bool {
+        false
+    }
+
+    // MARK: - Immediates
+
+    // Each returns the immediates' tokens, leaving out defaults such as memory 0 and table 0.
+
+    func immediates(blockType: BlockType) -> [String] {
+        switch blockType {
+        case .empty: return []
+        case .type(let type): return ["(result \(info.text(of: type)))"]
+        case .funcType(let typeIndex): return ["(type \(info.typeIds.reference(typeIndex)))"]
+        }
+    }
+
+    func immediates(blockType: BlockType, tryCatch: TryCatch) -> [String] {
+        immediates(blockType: blockType)
+            + tryCatch.catches.map { clause in
+                switch clause {
+                case .catch(let tagIndex, let labelIndex):
+                    return "(catch \(info.tagIds.reference(tagIndex)) \(labelReference(labelIndex)))"
+                case .catchRef(let tagIndex, let labelIndex):
+                    return "(catch_ref \(info.tagIds.reference(tagIndex)) \(labelReference(labelIndex)))"
+                case .catchAll(let labelIndex):
+                    return "(catch_all \(labelReference(labelIndex)))"
+                case .catchAllRef(let labelIndex):
+                    return "(catch_all_ref \(labelReference(labelIndex)))"
+                }
+            }
+    }
+
+    func immediates(dataIndex: UInt32) -> [String] { [info.dataIds.reference(dataIndex)] }
+    func immediates(elemIndex: UInt32) -> [String] { [info.elementIds.reference(elemIndex)] }
+    func immediates(functionIndex: UInt32) -> [String] { [info.functionIds.reference(functionIndex)] }
+    func immediates(globalIndex: UInt32) -> [String] { [info.globalIds.reference(globalIndex)] }
+    func immediates(localIndex: UInt32) -> [String] { [locals.reference(localIndex)] }
+    func immediates(tagIndex: UInt32) -> [String] { [info.tagIds.reference(tagIndex)] }
+    func immediates(typeIndex: UInt32) -> [String] { [info.typeIds.reference(typeIndex)] }
+    func immediates(type: HeapType) -> [String] { [info.text(of: type)] }
+    func immediates(relativeDepth: UInt32) -> [String] { [labelReference(relativeDepth)] }
+    func immediates(lane: UInt8) -> [String] { [String(lane)] }
+    func immediates(lanes: V128ShuffleMask) -> [String] { lanes.lanes.map { String($0) } }
+    func immediates(memory: UInt32) -> [String] { memory == 0 ? [] : [info.memoryIds.reference(memory)] }
+    func immediates(table: UInt32) -> [String] { table == 0 ? [] : [info.tableIds.reference(table)] }
+    func immediates(targets: BrTable) -> [String] { (targets.labelIndices + [targets.defaultIndex]).map(labelReference) }
+
+    func immediates(value: Int32) -> [String] { [String(value)] }
+    func immediates(value: Int64) -> [String] { [String(value)] }
+    func immediates(value: IEEE754.Float32) -> [String] { [formatF32(value)] }
+    func immediates(value: IEEE754.Float64) -> [String] { [formatF64(value)] }
+    func immediates(value: V128) -> [String] { ["i8x16"] + value.bytes.map { String($0) } }
+
+    func immediates(memarg: MemArg, naturalAlignment: Int) throws(WasmParserError) -> [String] {
+        // `align=` takes a u32.
+        guard memarg.align < 32 else {
+            throw WasmParserError("alignment 2^\(memarg.align) has no text form", offset: binaryOffset)
+        }
+        var tokens = immediates(memory: memarg.memory)
+        if memarg.offset != 0 { tokens.append("offset=\(memarg.offset)") }
+        if memarg.align != naturalAlignment { tokens.append("align=\(UInt32(1) << memarg.align)") }
+        return tokens
+    }
+
+    func immediates(memarg: MemArg, lane: UInt8, naturalAlignment: Int) throws(WasmParserError) -> [String] {
+        try immediates(memarg: memarg, naturalAlignment: naturalAlignment) + immediates(lane: lane)
+    }
+
+    func immediates(dataIndex: UInt32, memory: UInt32) -> [String] {
+        immediates(memory: memory) + immediates(dataIndex: dataIndex)
+    }
+
+    func immediates(elemIndex: UInt32, table: UInt32) -> [String] {
+        [info.tableIds.reference(table)] + immediates(elemIndex: elemIndex)
+    }
+
+    func immediates(dstMem: UInt32, srcMem: UInt32) -> [String] {
+        dstMem == 0 && srcMem == 0 ? [] : [info.memoryIds.reference(dstMem), info.memoryIds.reference(srcMem)]
+    }
+
+    func immediates(dstTable: UInt32, srcTable: UInt32) -> [String] {
+        dstTable == 0 && srcTable == 0 ? [] : [info.tableIds.reference(dstTable), info.tableIds.reference(srcTable)]
+    }
+
+    func immediates(typeIndex: UInt32, tableIndex: UInt32) -> [String] {
+        immediates(table: tableIndex) + ["(type \(info.typeIds.reference(typeIndex)))"]
+    }
+
+    func immediates(destType: UInt32, srcType: UInt32) -> [String] {
+        immediates(typeIndex: destType) + immediates(typeIndex: srcType)
+    }
+
+    func immediates(typeIndex: UInt32, dataIndex: UInt32) -> [String] {
+        immediates(typeIndex: typeIndex) + immediates(dataIndex: dataIndex)
+    }
+
+    func immediates(typeIndex: UInt32, elemIndex: UInt32) -> [String] {
+        immediates(typeIndex: typeIndex) + immediates(elemIndex: elemIndex)
+    }
+
+    func immediates(typeIndex: UInt32, fieldIndex: UInt32) -> [String] {
+        immediates(typeIndex: typeIndex) + [String(fieldIndex)]
+    }
+
+    func immediates(typeIndex: UInt32, size: UInt32) -> [String] {
+        immediates(typeIndex: typeIndex) + [String(size)]
+    }
+
+    func immediates(relativeDepth: UInt32, castFrom: ReferenceType, castTo: ReferenceType) -> [String] {
+        immediates(relativeDepth: relativeDepth) + [info.text(of: castFrom), info.text(of: castTo)]
     }
 
     /// Uses the depth when the target has no id or an inner label shadows it.
@@ -283,49 +261,5 @@ struct TextInstructionVisitor: AnyInstructionVisitor {
             return String(relativeDepth)
         }
         return id
-    }
-
-    private func catchClauseText(_ clause: CatchClause) -> String {
-        switch clause {
-        case .catch(let tagIndex, let labelIndex):
-            return "(catch \(names.tags.reference(tagIndex)) \(labelReference(labelIndex)))"
-        case .catchRef(let tagIndex, let labelIndex):
-            return "(catch_ref \(names.tags.reference(tagIndex)) \(labelReference(labelIndex)))"
-        case .catchAll(let labelIndex):
-            return "(catch_all \(labelReference(labelIndex)))"
-        case .catchAllRef(let labelIndex):
-            return "(catch_all_ref \(labelReference(labelIndex)))"
-        }
-    }
-
-    // MARK: - Operand helpers
-
-    private func memorySuffix(_ index: UInt32) -> String {
-        index == 0 ? "" : " " + names.memories.reference(index)
-    }
-
-    private func tableSuffix(_ index: UInt32) -> String {
-        index == 0 ? "" : " " + names.tables.reference(index)
-    }
-
-    private func blockTypeSuffix(_ bt: BlockType) -> String {
-        switch bt {
-        case .empty: return ""
-        case .type(let vt): return " (result \(names.valueType(vt)))"
-        case .funcType(let ti): return " (type \(names.types.reference(ti)))"
-        }
-    }
-
-    private func memargText(_ m: MemArg, naturalAlignment: Int) throws(WasmParserError) -> String {
-        // `align=` takes a u32.
-        guard m.align < 32 else {
-            throw WasmParserError("alignment 2^\(m.align) has no text form", offset: binaryOffset)
-        }
-        var parts: [String] = []
-        if m.memory != 0 { parts.append(names.memories.reference(m.memory)) }
-        if m.offset != 0 { parts.append("offset=\(m.offset)") }
-        if m.align != naturalAlignment { parts.append("align=\(UInt32(1) << m.align)") }
-        if parts.isEmpty { return "" }
-        return " " + parts.joined(separator: " ")
     }
 }

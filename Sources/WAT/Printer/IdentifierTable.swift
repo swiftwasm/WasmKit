@@ -3,7 +3,7 @@ struct IdentifierTable {
     private var ids: [UInt32: String] = [:]
     private var namesWithoutIds: [UInt32: String] = [:]
 
-    init(names: [UInt32: String]) {
+    init(names: [UInt32: String] = [:]) {
         var used: Set<String> = []
         for (index, name) in names.sorted(by: { $0.key < $1.key }) {
             if let id = Self.id(for: name), used.insert(name).inserted {

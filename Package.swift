@@ -39,7 +39,6 @@ let cliCommandsTestTarget = Target.testTarget(
     name: "CLICommandsTests",
     dependencies: [
         "CLICommands",
-        "CLITestSupport",
         "WasmTypes",
         "WAT",
         "WASI",
@@ -83,7 +82,6 @@ let package = Package(
     targets: [
         cliCommandsTarget,
         cliCommandsTestTarget,
-        .target(name: "CLITestSupport", path: "Tests/CLITestSupport", swiftSettings: swiftSettings),
         .executableTarget(
             name: "CLI",
             dependencies: ["CLICommands"],
@@ -194,7 +192,7 @@ let package = Package(
         ),
         .testTarget(
             name: "WasmKitWASIThreadsTests",
-            dependencies: ["WasmKitWASIThreads", "WasmKit", "WAT", "CLICommands", "CLITestSupport"],
+            dependencies: ["WasmKitWASIThreads", "WasmKit", "WAT", "CLICommands"],
             exclude: ["Fixtures"],
             swiftSettings: swiftSettings
         ),

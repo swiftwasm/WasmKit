@@ -484,36 +484,107 @@ enum WasmGen {
             import WasmParser
             import WasmTypes
 
+            /// An instruction printer that is responsible for printing mnemonics and immediates
+            /// in Wasm text format.
+            ///
+            /// Instructions without a name in the text format have no default and must be
+            /// implemented by the conforming type.
+            protocol TextInstructionPrinter: InstructionVisitor {
+                /// Prints an instruction: its mnemonic, then the tokens of its immediates.
+                mutating func printInstruction(_ mnemonic: String, _ immediates: [String]) throws(VisitorError)
+
+                // MARK: - Immediates printing
 
             """
 
-        let categorized = instructions.categorized
-
-        for cat in categorized where cat.sourceInstructions.count > 1 {
-            guard let categoryTypeName = cat.categoryTypeName else { continue }
-            guard cat.sourceInstructions.allSatisfy({ $0.name.text != nil }) else { continue }
-
-            code += "func generatedMnemonic(for op: Instruction.\(categoryTypeName)) -> String {\n"
-            code += "    switch op {\n"
-            for instr in cat.sourceInstructions {
-                code += "    case .\(instr.name.enumCase): return \"\(instr.name.text!)\"\n"
-            }
-            code += "    }\n"
-            code += "}\n\n"
+        // A category is printed by default only when every instruction in it has a text name.
+        let printable = instructions.categorized.filter { category in
+            category.sourceInstructions.allSatisfy { $0.name.text != nil }
         }
 
-        let nonCategorizedMemarg = instructions.filter { $0.category == nil && $0.naturalAlignment != nil }
-        if !nonCategorizedMemarg.isEmpty {
-            code += "func generatedMemargInstruction(_ instruction: Instruction) -> (mnemonic: String, memarg: MemArg, naturalAlignment: Int)? {\n"
-            code += "    switch instruction {\n"
-            for instr in nonCategorizedMemarg {
-                guard let text = instr.name.text else { continue }
-                code += "    case .\(instr.name.enumCase)(let m): return (\"\(text)\", m, \(instr.naturalAlignment!))\n"
+        func immediatesParameters(_ immediates: [Instruction.Immediate]) -> [String] {
+            var parameters = immediates.map { "\($0.label): \($0.type)" }
+            if immediates.contains(where: { $0.type == "MemArg" }) {
+                parameters.append("naturalAlignment: Int")
             }
-            code += "    default: return nil\n"
-            code += "    }\n"
-            code += "}\n"
+            return parameters
         }
+
+        var immediateTypes: Set<[Instruction.Immediate]> = []
+        for category in printable where !category.immediates.isEmpty {
+            immediateTypes.insert(category.immediates)
+        }
+        let immediateTypesArray = immediateTypes.sorted(by: {
+            if $0.count != $1.count {
+                return $0.count < $1.count
+            }
+            for (lhs, rhs) in zip($0, $1) where lhs != rhs {
+                return lhs < rhs
+            }
+            return false
+        })
+        for immediates in immediateTypesArray {
+            code += "    func immediates("
+            code += immediatesParameters(immediates).joined(separator: ", ")
+            code += ") throws(VisitorError) -> [String]\n"
+        }
+
+        code += """
+            }
+
+            // TextInstructionPrinter implements the InstructionVisitor protocol to print each instruction.
+            extension TextInstructionPrinter {
+                /// Prints an instruction that has no immediates.
+                mutating func printInstruction(_ mnemonic: String) throws(VisitorError) {
+                    try printInstruction(mnemonic, [])
+                }
+
+            """
+
+        for instruction in printable {
+            code += "    mutating func \(instruction.visitMethodName)("
+            code += instruction.associatedValues.map { i in
+                if i.argumentName == i.parameterName {
+                    return "\(i.parameterName): \(i.type)"
+                } else {
+                    return "\(i.argumentName ?? "_") \(i.parameterName): \(i.type)"
+                }
+            }.joined(separator: ", ")
+            code += ") throws(VisitorError) {"
+
+            let mnemonic: String
+            if let category = instruction.explicitCategory {
+                code += "\n"
+                code += "        let mnemonic: String\n"
+                code += "        switch \(category) {\n"
+                for sourceInstruction in instruction.sourceInstructions {
+                    code += "        case .\(sourceInstruction.name.enumCase): mnemonic = \"\(sourceInstruction.name.text!)\"\n"
+                }
+                code += "        }\n"
+                code += "        "
+                mnemonic = "mnemonic"
+            } else {
+                code += " "
+                mnemonic = "\"\(instruction.sourceInstructions[0].name.text!)\""
+            }
+
+            var arguments = [mnemonic]
+            if !instruction.immediates.isEmpty {
+                var immediateArguments = instruction.immediates.map { "\($0.label): \($0.label)" }
+                if instruction.immediates.contains(where: { $0.type == "MemArg" }) {
+                    if let category = instruction.explicitCategory {
+                        immediateArguments.append("naturalAlignment: \(category).naturalAlignment")
+                    } else {
+                        immediateArguments.append("naturalAlignment: \(instruction.sourceInstructions[0].naturalAlignment!)")
+                    }
+                }
+                arguments.append("immediates(" + immediateArguments.joined(separator: ", ") + ")")
+            }
+            code += "try printInstruction(\(arguments.joined(separator: ", ")))"
+            code += instruction.explicitCategory == nil ? " }\n" : "\n    }\n"
+        }
+
+        code += "}\n"
 
         return code
     }
@@ -962,7 +1033,7 @@ enum WasmGen {
                 header + generateBinaryInstructionEncoder(instructions)
             ),
             GeneratedFile(
-                projectSources + ["WAT", "Printer", "InstructionMnemonics.swift"],
+                projectSources + ["WAT", "Printer", "TextInstructionPrinter.swift"],
                 header + generateTextInstructionPrinter(instructions)
             ),
         ]

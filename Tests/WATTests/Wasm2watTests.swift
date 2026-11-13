@@ -64,6 +64,14 @@ struct Wasm2watTests {
         #expect(wat.contains("hello"))
     }
 
+    /// GC instructions print like any other; only GC type definitions are unsupported.
+    @Test func gcInstructionsRoundTrip() throws {
+        let binary = try wat2wasm("(module (func (result i32) i32.const 1 ref.i31 i31.get_s))", features: .all)
+        let text = try wasm2wat(StaticByteStreamSource(bytes: binary), features: .all)
+        #expect(text.contains("ref.i31"))
+        #expect(try wat2wasm(text, features: .all) == binary)
+    }
+
     /// The chunks `wasm2wat` passes to its `write` closure.
     private static func chunks(of binary: [UInt8]) throws -> [String] {
         var chunks: [String] = []
