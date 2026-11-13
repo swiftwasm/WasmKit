@@ -2,21 +2,19 @@ import WasmParser
 import WasmTypes
 
 /// Writes a `ModuleInfo` as WAT text through `write`, in chunks of about 64 KiB.
-///
-/// Errors thrown by `write` propagate unchanged; every other error is a `WasmParserError`.
 struct WatPrinter {
     private let info: ModuleInfo
     private let importCounts: ModuleInfo.ImportCounts
-    private let write: (String) throws -> Void
+    private let write: (String) throws(WasmParserError) -> Void
     private var buffer = ""
 
-    init(info: ModuleInfo, write: @escaping (String) throws -> Void) {
+    init(info: ModuleInfo, write: @escaping (String) throws(WasmParserError) -> Void) {
         self.info = info
         self.importCounts = info.importCounts
         self.write = write
     }
 
-    mutating func print() throws {
+    mutating func print() throws(WasmParserError) {
         try writeLine("(module\(moduleNameText())")
         try printTypes()
         try printImports()
@@ -40,14 +38,14 @@ struct WatPrinter {
         return IndexToNameResolver.id(for: name).map { " " + $0 } ?? #" (@name "")"#
     }
 
-    private mutating func printTypes() throws {
+    private mutating func printTypes() throws(WasmParserError) {
         for (i, type) in info.types.enumerated() {
             let name = info.typeNames.definition(UInt32(i))
             try writeLine("  (type\(name) (;\(i);) (func\(signatureText(type, parameterNames: nil))))")
         }
     }
 
-    private mutating func printImports() throws {
+    private mutating func printImports() throws(WasmParserError) {
         var next = ModuleInfo.ImportCounts()
         for entry in info.imports {
             let descriptor: String
@@ -80,7 +78,7 @@ struct WatPrinter {
         }
     }
 
-    private mutating func printFunctions() throws {
+    private mutating func printFunctions() throws(WasmParserError) {
         guard info.codes.count == info.functionTypeIndices.count else {
             throw WasmParserError(
                 "function/code section length mismatch (function: \(info.functionTypeIndices.count), code: \(info.codes.count))"
@@ -92,7 +90,7 @@ struct WatPrinter {
         }
     }
 
-    private mutating func printFunction(index: UInt32, typeIndex: TypeIndex, code: Code) throws {
+    private mutating func printFunction(index: UInt32, typeIndex: TypeIndex, code: Code) throws(WasmParserError) {
         let type = typeIndex < info.types.count ? info.types[Int(typeIndex)] : FunctionType(parameters: [], results: [])
         let locals = IndexToNameResolver(names: info.localNames[index] ?? [:])
         let name = info.functionNames.definition(index) + info.functionNames.nameAnnotation(index)
@@ -137,7 +135,7 @@ struct WatPrinter {
         }
     }
 
-    private mutating func printTables() throws {
+    private mutating func printTables() throws(WasmParserError) {
         for (offset, table) in info.tables.enumerated() {
             let index = UInt32(importCounts.tables + offset)
             var initializer = ""
@@ -149,14 +147,14 @@ struct WatPrinter {
         }
     }
 
-    private mutating func printMemories() throws {
+    private mutating func printMemories() throws(WasmParserError) {
         for (offset, memory) in info.memories.enumerated() {
             let index = UInt32(importCounts.memories + offset)
             try writeLine("  (memory\(info.memoryNames.definition(index)) (;\(index);) \(limitsText(memory.type)))")
         }
     }
 
-    private mutating func printGlobals() throws {
+    private mutating func printGlobals() throws(WasmParserError) {
         for (offset, global) in info.globals.enumerated() {
             let index = UInt32(importCounts.globals + offset)
             let initializer = try foldedConstExpression(global.initializer)
@@ -166,7 +164,7 @@ struct WatPrinter {
         }
     }
 
-    private mutating func printTags() throws {
+    private mutating func printTags() throws(WasmParserError) {
         for (offset, tag) in info.tags.enumerated() {
             let index = UInt32(importCounts.tags + offset)
             let name = info.tagNames.definition(index) + info.tagNames.nameAnnotation(index)
@@ -174,7 +172,7 @@ struct WatPrinter {
         }
     }
 
-    private mutating func printExports() throws {
+    private mutating func printExports() throws(WasmParserError) {
         for entry in info.exports {
             let descriptor: String
             switch entry.descriptor {
@@ -188,19 +186,19 @@ struct WatPrinter {
         }
     }
 
-    private mutating func printStart() throws {
+    private mutating func printStart() throws(WasmParserError) {
         if let start = info.start {
             try writeLine("  (start \(info.functionNames.reference(start)))")
         }
     }
 
-    private mutating func printElements() throws {
+    private mutating func printElements() throws(WasmParserError) {
         for (index, element) in info.elements.enumerated() {
             try printElement(element, index: UInt32(index))
         }
     }
 
-    private mutating func printElement(_ element: ElementSegment, index: UInt32) throws {
+    private mutating func printElement(_ element: ElementSegment, index: UInt32) throws(WasmParserError) {
         // The type a `func` index list has once assembled.
         let indexListType: ReferenceType =
             info.features.contains(.functionReferences) ? ReferenceType(isNullable: false, heapType: .funcRef) : .funcRef
@@ -237,7 +235,7 @@ struct WatPrinter {
         try writeLine(")")
     }
 
-    private mutating func printData() throws {
+    private mutating func printData() throws(WasmParserError) {
         if let declaredCount = info.dataCount, declaredCount != info.dataSegments.count {
             throw WasmParserError(
                 "DataCount section declares \(declaredCount) data segments but data section has \(info.dataSegments.count)")
@@ -247,7 +245,7 @@ struct WatPrinter {
         }
     }
 
-    private mutating func printDataSegment(_ segment: DataSegment, index: UInt32) throws {
+    private mutating func printDataSegment(_ segment: DataSegment, index: UInt32) throws(WasmParserError) {
         var header = "  (data\(info.dataNames.definition(index)) (;\(index);)"
         let bytes: ArraySlice<UInt8>
         switch segment {
@@ -273,19 +271,19 @@ struct WatPrinter {
     // MARK: - Helpers
 
     /// Appends `text` to the output, passing the output to `write` once about 64 KiB have accumulated.
-    private mutating func append(_ text: String) throws {
+    private mutating func append(_ text: String) throws(WasmParserError) {
         buffer += text
         if buffer.utf8.count >= 1 << 16 {
             try flush()
         }
     }
 
-    private mutating func writeLine(_ line: String) throws {
+    private mutating func writeLine(_ line: String) throws(WasmParserError) {
         try append(line)
         try append("\n")
     }
 
-    private mutating func flush() throws {
+    private mutating func flush() throws(WasmParserError) {
         guard !buffer.isEmpty else { return }
         try write(buffer)
         buffer.removeAll(keepingCapacity: true)

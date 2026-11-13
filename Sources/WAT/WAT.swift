@@ -598,8 +598,8 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
 /// - Parameters:
 ///   - stream: The raw bytes stream of a WebAssembly binary module, either `StaticByteStreamSource` or `FileHandleStreamSource`.
 ///   - features: The feature set to use while parsing the binary (default: `.default`).
-/// - Throws: `WasmParserError` for a malformed binary, and for GC type definitions and GC
-///   instructions, which this function cannot print.
+/// - Throws: `WasmParserError` for a malformed binary, and for GC type definitions, which this
+///   function cannot print.
 ///
 /// ```swift
 /// import WAT
@@ -615,13 +615,7 @@ public func wasm2wat<Source: ByteStreamSource>(
     let info = try collectModule(stream: stream, features: features)
     var text = ""
     var printer = WatPrinter(info: info, write: { text += $0 })
-    do {
-        try printer.print()
-    } catch let error as WasmParserError {
-        throw error
-    } catch {
-        preconditionFailure("appending to a String cannot fail: \(error)")
-    }
+    try printer.print()
     return text
 }
 
@@ -632,8 +626,8 @@ public func wasm2wat<Source: ByteStreamSource>(
 package func wasm2wat<Source: ByteStreamSource>(
     _ stream: Source,
     features: WasmFeatureSet,
-    write: @escaping (String) throws -> Void
-) throws {
+    write: @escaping (String) throws(WasmParserError) -> Void
+) throws(WasmParserError) {
     let info = try collectModule(stream: stream, features: features)
     var printer = WatPrinter(info: info, write: write)
     try printer.print()

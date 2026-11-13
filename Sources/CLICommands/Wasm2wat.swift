@@ -28,7 +28,9 @@ package struct Wasm2wat: ParsableCommand {
         if let output {
             let outputHandle = try CLIFile.createWrite(output)
             do {
-                try wasm2wat(source, features: .all) { try outputHandle.writeAll(Array($0.utf8)) }
+                try wasm2wat(source, features: .all) { text throws(WasmParserError) in
+                    try Self.write { try outputHandle.writeAll(Array(text.utf8)) }
+                }
             } catch {
                 // Report the conversion error rather than a failure to close.
                 try? outputHandle.close()
@@ -36,7 +38,18 @@ package struct Wasm2wat: ParsableCommand {
             }
             try outputHandle.close()
         } else {
-            try wasm2wat(source, features: .all) { try FileHandle.standardOutput.write(contentsOf: Data($0.utf8)) }
+            try wasm2wat(source, features: .all) { text throws(WasmParserError) in
+                try Self.write { try FileHandle.standardOutput.write(contentsOf: Data(text.utf8)) }
+            }
+        }
+    }
+
+    /// Runs `write`, reporting its failure as an I/O error the way WasmParser reports failed reads.
+    private static func write(_ write: () throws -> Void) throws(WasmParserError) {
+        do {
+            try write()
+        } catch {
+            throw WasmParserError("I/O error: \(error)")
         }
     }
 }
