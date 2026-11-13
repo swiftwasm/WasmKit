@@ -3,6 +3,7 @@ add_wasmkit_library(CLICommands
     Platform.swift
     Run.swift
     WAST.swift
+    Wasm2wat.swift
     Wat2wasm.swift
 )
 

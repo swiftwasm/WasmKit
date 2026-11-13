@@ -13,6 +13,9 @@ enum WasmGen {
         let opcode: [UInt8]
         let immediates: [Immediate]
         let category: String?
+        /// The log2 alignment a `MemArg` immediate's `align` defaults to in the text format,
+        /// given in `Instructions.json` as the third element of that immediate.
+        let naturalAlignment: Int?
 
         var visitMethodName: String {
             if let explicitCategory = category {
@@ -81,9 +84,32 @@ enum WasmGen {
             feature = try container.decode(String.self)
             name = try container.decode(Name.self)
             opcode = try decodeHexArray()
-            let rawImmediates = try container.decode([[String]].self)
-            immediates = rawImmediates.map { Immediate(label: $0[0], type: $0[1]) }
+            let rawImmediates = try container.decode([RawImmediate].self)
+            immediates = rawImmediates.map { Immediate(label: $0.label, type: $0.type) }
+            naturalAlignment = rawImmediates.lazy.compactMap(\.naturalAlignment).first
             category = try? container.decode(String.self)
+        }
+
+        /// `[label, type]`, or `[label, "MemArg", naturalAlignment]` for a memory access.
+        private struct RawImmediate: Decodable {
+            let label: String
+            let type: String
+            let naturalAlignment: Int?
+
+            init(from decoder: Decoder) throws {
+                var container = try decoder.unkeyedContainer()
+                label = try container.decode(String.self)
+                type = try container.decode(String.self)
+                if type == "MemArg" {
+                    naturalAlignment = try container.decode(Int.self)
+                } else {
+                    naturalAlignment = nil
+                }
+                guard container.isAtEnd else {
+                    throw DecodingError.dataCorruptedError(
+                        in: container, debugDescription: "Unexpected element in immediate \(label)")
+                }
+            }
         }
     }
 
@@ -225,6 +251,36 @@ enum WasmGen {
         return code
     }
 
+    /// `naturalAlignment` for each instruction category whose members access memory.
+    static func generateNaturalAlignments(_ instructions: InstructionSet) -> String {
+        var code = ""
+        for category in instructions.categorized {
+            guard let categoryTypeName = category.categoryTypeName,
+                category.sourceInstructions.contains(where: { $0.naturalAlignment != nil })
+            else { continue }
+            code += """
+
+                extension Instruction.\(categoryTypeName) {
+                    /// The alignment to the storage size of the memory access
+                    /// in log2 form.
+                    @_alwaysEmitIntoClient
+                    public var naturalAlignment: Int {
+                        switch self {
+
+                """
+            for instruction in category.sourceInstructions {
+                code += "        case .\(instruction.name.enumCase): return \(instruction.naturalAlignment!)\n"
+            }
+            code += """
+                        }
+                    }
+                }
+
+                """
+        }
+        return code
+    }
+
     static func buildInstructionInstanceFromContext(_ instruction: CategorizedInstruction) -> String {
         var code = ""
         if instruction.associatedValues.isEmpty {
@@ -353,7 +409,14 @@ enum WasmGen {
                 continue
             }
             code += "    case \"\(name)\":"
-            if !instruction.immediates.isEmpty {
+            if instruction.category == nil, let naturalAlignment = instruction.naturalAlignment {
+                // Only the memarg's default alignment differs between these instructions.
+                assert(instruction.immediates.map(\.type) == ["MemArg"], "\(name) has immediates besides its memarg")
+                code += "\n"
+                code += "        let \(instruction.immediates[0].label) = try expressionParser.memArg("
+                code += "naturalAlignment: \(naturalAlignment), wat: &wat)\n"
+                code += "        "
+            } else if !instruction.immediates.isEmpty {
                 code += "\n"
                 code += "        let ("
                 code += instruction.immediates.map(\.label).joined(separator: ", ")
@@ -413,6 +476,116 @@ enum WasmGen {
          }
          code += "}\n"
          */
+        return code
+    }
+
+    static func generateTextInstructionPrinter(_ instructions: InstructionSet) -> String {
+        var code = """
+            import WasmParser
+            import WasmTypes
+
+            /// An instruction printer that is responsible for printing mnemonics and immediates
+            /// in Wasm text format.
+            ///
+            /// Instructions without a name in the text format have no default and must be
+            /// implemented by the conforming type.
+            protocol TextInstructionPrinter: InstructionVisitor {
+                /// Prints an instruction: its mnemonic, then the tokens of its immediates.
+                mutating func printInstruction(_ mnemonic: String, _ immediates: [String]) throws(VisitorError)
+
+                // MARK: - Immediates printing
+
+            """
+
+        // A category is printed by default only when every instruction in it has a text name.
+        let printable = instructions.categorized.filter { category in
+            category.sourceInstructions.allSatisfy { $0.name.text != nil }
+        }
+
+        func immediatesParameters(_ immediates: [Instruction.Immediate]) -> [String] {
+            var parameters = immediates.map { "\($0.label): \($0.type)" }
+            if immediates.contains(where: { $0.type == "MemArg" }) {
+                parameters.append("naturalAlignment: Int")
+            }
+            return parameters
+        }
+
+        var immediateTypes: Set<[Instruction.Immediate]> = []
+        for category in printable where !category.immediates.isEmpty {
+            immediateTypes.insert(category.immediates)
+        }
+        let immediateTypesArray = immediateTypes.sorted(by: {
+            if $0.count != $1.count {
+                return $0.count < $1.count
+            }
+            for (lhs, rhs) in zip($0, $1) where lhs != rhs {
+                return lhs < rhs
+            }
+            return false
+        })
+        for immediates in immediateTypesArray {
+            code += "    func immediates("
+            code += immediatesParameters(immediates).joined(separator: ", ")
+            code += ") throws(VisitorError) -> [String]\n"
+        }
+
+        code += """
+            }
+
+            // TextInstructionPrinter implements the InstructionVisitor protocol to print each instruction.
+            extension TextInstructionPrinter {
+                /// Prints an instruction that has no immediates.
+                mutating func printInstruction(_ mnemonic: String) throws(VisitorError) {
+                    try printInstruction(mnemonic, [])
+                }
+
+            """
+
+        for instruction in printable {
+            code += "    mutating func \(instruction.visitMethodName)("
+            code += instruction.associatedValues.map { i in
+                if i.argumentName == i.parameterName {
+                    return "\(i.parameterName): \(i.type)"
+                } else {
+                    return "\(i.argumentName ?? "_") \(i.parameterName): \(i.type)"
+                }
+            }.joined(separator: ", ")
+            code += ") throws(VisitorError) {"
+
+            let mnemonic: String
+            if let category = instruction.explicitCategory {
+                code += "\n"
+                code += "        let mnemonic: String\n"
+                code += "        switch \(category) {\n"
+                for sourceInstruction in instruction.sourceInstructions {
+                    code += "        case .\(sourceInstruction.name.enumCase): mnemonic = \"\(sourceInstruction.name.text!)\"\n"
+                }
+                code += "        }\n"
+                code += "        "
+                mnemonic = "mnemonic"
+            } else {
+                code += " "
+                mnemonic = "\"\(instruction.sourceInstructions[0].name.text!)\""
+            }
+
+            var arguments = [mnemonic]
+            if !instruction.immediates.isEmpty {
+                var immediateArguments = instruction.immediates.map { "\($0.label): \($0.label)" }
+                if instruction.immediates.contains(where: { $0.type == "MemArg" }) {
+                    if let category = instruction.explicitCategory {
+                        immediateArguments.append("naturalAlignment: \(category).naturalAlignment")
+                    } else {
+                        immediateArguments.append("naturalAlignment: \(instruction.sourceInstructions[0].naturalAlignment!)")
+                    }
+                }
+                arguments.append("immediates(" + immediateArguments.joined(separator: ", ") + ")")
+            }
+            code += "try printInstruction(\(arguments.joined(separator: ", ")))"
+            code += instruction.explicitCategory == nil ? " }\n" : "\n    }\n"
+        }
+
+        code += "}\n"
+
         return code
     }
 
@@ -769,8 +942,11 @@ enum WasmGen {
                 header: "Immediates",
                 value: { i in
                     return "["
-                        + i.immediates.map { i in
-                            "[\"\(i.label)\", \"\(i.type)\"]"
+                        + i.immediates.map { immediate in
+                            if immediate.type == "MemArg", let alignment = i.naturalAlignment {
+                                return "[\"\(immediate.label)\", \"\(immediate.type)\", \(alignment)]"
+                            }
+                            return "[\"\(immediate.label)\", \"\(immediate.type)\"]"
                         }.joined(separator: ", ") + "]"
                 }),
             ColumnInfo(
@@ -842,6 +1018,7 @@ enum WasmGen {
                     + "\n\n"
                     + generateVisitorProtocol(instructions)
                     + "\n"
+                    + generateNaturalAlignments(instructions)
             ),
             GeneratedFile(
                 projectSources + ["WasmParser", "BinaryInstructionDecoder.swift"],
@@ -854,6 +1031,10 @@ enum WasmGen {
             GeneratedFile(
                 projectSources + ["WAT", "BinaryEncoding", "BinaryInstructionEncoder.swift"],
                 header + generateBinaryInstructionEncoder(instructions)
+            ),
+            GeneratedFile(
+                projectSources + ["WAT", "Printer", "TextInstructionPrinter.swift"],
+                header + generateTextInstructionPrinter(instructions)
             ),
         ]
 

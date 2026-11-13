@@ -588,3 +588,47 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
         parser: parser
     )
 }
+
+// MARK: - wasm2wat
+
+/// Converts a WebAssembly binary into its WebAssembly Text (WAT) representation.
+///
+/// Names from the `name` custom section become identifiers. Every other custom section is dropped.
+///
+/// - Parameters:
+///   - stream: The raw bytes stream of a WebAssembly binary module, either `StaticByteStreamSource` or `FileHandleStreamSource`.
+///   - features: The feature set to use while parsing the binary (default: `.default`).
+/// - Throws: `WasmParserError` for a malformed binary, and for GC type definitions, which this
+///   function cannot print.
+///
+/// ```swift
+/// import WAT
+///
+/// let wasm = ...  // A stream of valid .wasm binary data
+/// let wat = try wasm2wat(wasm)
+/// print(wat)
+/// ```
+public func wasm2wat<Source: ByteStreamSource>(
+    _ stream: Source,
+    features: WasmFeatureSet = .default
+) throws(WasmParserError) -> String {
+    let info = try collectModule(stream: stream, features: features)
+    var text = ""
+    var printer = WatPrinter(info: info, write: { text += $0 })
+    try printer.print()
+    return text
+}
+
+/// Writes the WAT text of the binary module read from `stream` through `write`, in chunks of about
+/// 64 KiB, never holding the whole text in memory.
+///
+/// - Throws: `WasmParserError` for a malformed or unprintable binary, and any error `write` throws.
+package func wasm2wat<Source: ByteStreamSource>(
+    _ stream: Source,
+    features: WasmFeatureSet,
+    write: @escaping (String) throws(WasmParserError) -> Void
+) throws(WasmParserError) {
+    let info = try collectModule(stream: stream, features: features)
+    var printer = WatPrinter(info: info, write: write)
+    try printer.print()
+}

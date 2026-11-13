@@ -404,160 +404,160 @@ func parseTextInstruction<V: InstructionVisitor>(
         let (memarg) = try expressionParser.visitStore(.i64AtomicStore32, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitStore(.i64AtomicStore32, memarg: memarg) }
     case "memory.atomic.notify":
-        let (memarg) = try expressionParser.visitMemoryAtomicNotify(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 2, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitMemoryAtomicNotify(memarg: memarg) }
     case "memory.atomic.wait32":
-        let (memarg) = try expressionParser.visitMemoryAtomicWait32(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 2, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitMemoryAtomicWait32(memarg: memarg) }
     case "memory.atomic.wait64":
-        let (memarg) = try expressionParser.visitMemoryAtomicWait64(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 3, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitMemoryAtomicWait64(memarg: memarg) }
     case "i32.atomic.rmw.add":
-        let (memarg) = try expressionParser.visitI32AtomicRmwAdd(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 2, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmwAdd(memarg: memarg) }
     case "i64.atomic.rmw.add":
-        let (memarg) = try expressionParser.visitI64AtomicRmwAdd(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 3, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmwAdd(memarg: memarg) }
     case "i32.atomic.rmw8.add_u":
-        let (memarg) = try expressionParser.visitI32AtomicRmw8AddU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 0, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmw8AddU(memarg: memarg) }
     case "i32.atomic.rmw16.add_u":
-        let (memarg) = try expressionParser.visitI32AtomicRmw16AddU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 1, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmw16AddU(memarg: memarg) }
     case "i64.atomic.rmw8.add_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw8AddU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 0, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw8AddU(memarg: memarg) }
     case "i64.atomic.rmw16.add_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw16AddU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 1, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw16AddU(memarg: memarg) }
     case "i64.atomic.rmw32.add_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw32AddU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 2, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw32AddU(memarg: memarg) }
     case "i32.atomic.rmw.sub":
-        let (memarg) = try expressionParser.visitI32AtomicRmwSub(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 2, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmwSub(memarg: memarg) }
     case "i64.atomic.rmw.sub":
-        let (memarg) = try expressionParser.visitI64AtomicRmwSub(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 3, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmwSub(memarg: memarg) }
     case "i32.atomic.rmw8.sub_u":
-        let (memarg) = try expressionParser.visitI32AtomicRmw8SubU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 0, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmw8SubU(memarg: memarg) }
     case "i32.atomic.rmw16.sub_u":
-        let (memarg) = try expressionParser.visitI32AtomicRmw16SubU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 1, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmw16SubU(memarg: memarg) }
     case "i64.atomic.rmw8.sub_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw8SubU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 0, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw8SubU(memarg: memarg) }
     case "i64.atomic.rmw16.sub_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw16SubU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 1, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw16SubU(memarg: memarg) }
     case "i64.atomic.rmw32.sub_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw32SubU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 2, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw32SubU(memarg: memarg) }
     case "i32.atomic.rmw.and":
-        let (memarg) = try expressionParser.visitI32AtomicRmwAnd(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 2, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmwAnd(memarg: memarg) }
     case "i64.atomic.rmw.and":
-        let (memarg) = try expressionParser.visitI64AtomicRmwAnd(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 3, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmwAnd(memarg: memarg) }
     case "i32.atomic.rmw8.and_u":
-        let (memarg) = try expressionParser.visitI32AtomicRmw8AndU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 0, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmw8AndU(memarg: memarg) }
     case "i32.atomic.rmw16.and_u":
-        let (memarg) = try expressionParser.visitI32AtomicRmw16AndU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 1, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmw16AndU(memarg: memarg) }
     case "i64.atomic.rmw8.and_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw8AndU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 0, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw8AndU(memarg: memarg) }
     case "i64.atomic.rmw16.and_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw16AndU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 1, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw16AndU(memarg: memarg) }
     case "i64.atomic.rmw32.and_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw32AndU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 2, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw32AndU(memarg: memarg) }
     case "i32.atomic.rmw.or":
-        let (memarg) = try expressionParser.visitI32AtomicRmwOr(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 2, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmwOr(memarg: memarg) }
     case "i64.atomic.rmw.or":
-        let (memarg) = try expressionParser.visitI64AtomicRmwOr(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 3, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmwOr(memarg: memarg) }
     case "i32.atomic.rmw8.or_u":
-        let (memarg) = try expressionParser.visitI32AtomicRmw8OrU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 0, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmw8OrU(memarg: memarg) }
     case "i32.atomic.rmw16.or_u":
-        let (memarg) = try expressionParser.visitI32AtomicRmw16OrU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 1, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmw16OrU(memarg: memarg) }
     case "i64.atomic.rmw8.or_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw8OrU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 0, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw8OrU(memarg: memarg) }
     case "i64.atomic.rmw16.or_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw16OrU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 1, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw16OrU(memarg: memarg) }
     case "i64.atomic.rmw32.or_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw32OrU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 2, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw32OrU(memarg: memarg) }
     case "i32.atomic.rmw.xor":
-        let (memarg) = try expressionParser.visitI32AtomicRmwXor(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 2, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmwXor(memarg: memarg) }
     case "i64.atomic.rmw.xor":
-        let (memarg) = try expressionParser.visitI64AtomicRmwXor(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 3, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmwXor(memarg: memarg) }
     case "i32.atomic.rmw8.xor_u":
-        let (memarg) = try expressionParser.visitI32AtomicRmw8XorU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 0, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmw8XorU(memarg: memarg) }
     case "i32.atomic.rmw16.xor_u":
-        let (memarg) = try expressionParser.visitI32AtomicRmw16XorU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 1, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmw16XorU(memarg: memarg) }
     case "i64.atomic.rmw8.xor_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw8XorU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 0, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw8XorU(memarg: memarg) }
     case "i64.atomic.rmw16.xor_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw16XorU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 1, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw16XorU(memarg: memarg) }
     case "i64.atomic.rmw32.xor_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw32XorU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 2, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw32XorU(memarg: memarg) }
     case "i32.atomic.rmw.xchg":
-        let (memarg) = try expressionParser.visitI32AtomicRmwXchg(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 2, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmwXchg(memarg: memarg) }
     case "i64.atomic.rmw.xchg":
-        let (memarg) = try expressionParser.visitI64AtomicRmwXchg(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 3, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmwXchg(memarg: memarg) }
     case "i32.atomic.rmw8.xchg_u":
-        let (memarg) = try expressionParser.visitI32AtomicRmw8XchgU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 0, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmw8XchgU(memarg: memarg) }
     case "i32.atomic.rmw16.xchg_u":
-        let (memarg) = try expressionParser.visitI32AtomicRmw16XchgU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 1, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmw16XchgU(memarg: memarg) }
     case "i64.atomic.rmw8.xchg_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw8XchgU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 0, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw8XchgU(memarg: memarg) }
     case "i64.atomic.rmw16.xchg_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw16XchgU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 1, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw16XchgU(memarg: memarg) }
     case "i64.atomic.rmw32.xchg_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw32XchgU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 2, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw32XchgU(memarg: memarg) }
     case "i32.atomic.rmw.cmpxchg":
-        let (memarg) = try expressionParser.visitI32AtomicRmwCmpxchg(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 2, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmwCmpxchg(memarg: memarg) }
     case "i64.atomic.rmw.cmpxchg":
-        let (memarg) = try expressionParser.visitI64AtomicRmwCmpxchg(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 3, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmwCmpxchg(memarg: memarg) }
     case "i32.atomic.rmw8.cmpxchg_u":
-        let (memarg) = try expressionParser.visitI32AtomicRmw8CmpxchgU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 0, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmw8CmpxchgU(memarg: memarg) }
     case "i32.atomic.rmw16.cmpxchg_u":
-        let (memarg) = try expressionParser.visitI32AtomicRmw16CmpxchgU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 1, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI32AtomicRmw16CmpxchgU(memarg: memarg) }
     case "i64.atomic.rmw8.cmpxchg_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw8CmpxchgU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 0, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw8CmpxchgU(memarg: memarg) }
     case "i64.atomic.rmw16.cmpxchg_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw16CmpxchgU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 1, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw16CmpxchgU(memarg: memarg) }
     case "i64.atomic.rmw32.cmpxchg_u":
-        let (memarg) = try expressionParser.visitI64AtomicRmw32CmpxchgU(wat: &wat)
+        let memarg = try expressionParser.memArg(naturalAlignment: 2, wat: &wat)
         return { visitor throws(V.VisitorError) in return try visitor.visitI64AtomicRmw32CmpxchgU(memarg: memarg) }
     case "v128.load":
         let (memarg) = try expressionParser.visitLoad(.v128Load, wat: &wat)

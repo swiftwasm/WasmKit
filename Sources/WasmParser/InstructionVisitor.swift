@@ -1400,3 +1400,92 @@ extension InstructionVisitor where Self: ~Copyable {
     public mutating func visitUnknown(_ opcode: [UInt8]) throws(VisitorError) -> Bool { false }
 }
 
+
+extension Instruction.Load {
+    /// The alignment to the storage size of the memory access
+    /// in log2 form.
+    @_alwaysEmitIntoClient
+    public var naturalAlignment: Int {
+        switch self {
+        case .i32Load: return 2
+        case .i64Load: return 3
+        case .f32Load: return 2
+        case .f64Load: return 3
+        case .i32Load8S: return 0
+        case .i32Load8U: return 0
+        case .i32Load16S: return 1
+        case .i32Load16U: return 1
+        case .i64Load8S: return 0
+        case .i64Load8U: return 0
+        case .i64Load16S: return 1
+        case .i64Load16U: return 1
+        case .i64Load32S: return 2
+        case .i64Load32U: return 2
+        case .i32AtomicLoad: return 2
+        case .i64AtomicLoad: return 3
+        case .i32AtomicLoad8U: return 0
+        case .i32AtomicLoad16U: return 1
+        case .i64AtomicLoad8U: return 0
+        case .i64AtomicLoad16U: return 1
+        case .i64AtomicLoad32U: return 2
+        case .v128Load: return 4
+        case .v128Load8X8S: return 3
+        case .v128Load8X8U: return 3
+        case .v128Load16X4S: return 3
+        case .v128Load16X4U: return 3
+        case .v128Load32X2S: return 3
+        case .v128Load32X2U: return 3
+        case .v128Load8Splat: return 0
+        case .v128Load16Splat: return 1
+        case .v128Load32Splat: return 2
+        case .v128Load64Splat: return 3
+        case .v128Load32Zero: return 2
+        case .v128Load64Zero: return 3
+        }
+    }
+}
+
+extension Instruction.Store {
+    /// The alignment to the storage size of the memory access
+    /// in log2 form.
+    @_alwaysEmitIntoClient
+    public var naturalAlignment: Int {
+        switch self {
+        case .i32Store: return 2
+        case .i64Store: return 3
+        case .f32Store: return 2
+        case .f64Store: return 3
+        case .i32Store8: return 0
+        case .i32Store16: return 1
+        case .i64Store8: return 0
+        case .i64Store16: return 1
+        case .i64Store32: return 2
+        case .i32AtomicStore: return 2
+        case .i64AtomicStore: return 3
+        case .i32AtomicStore8: return 0
+        case .i32AtomicStore16: return 1
+        case .i64AtomicStore8: return 0
+        case .i64AtomicStore16: return 1
+        case .i64AtomicStore32: return 2
+        case .v128Store: return 4
+        }
+    }
+}
+
+extension Instruction.SimdMemLane {
+    /// The alignment to the storage size of the memory access
+    /// in log2 form.
+    @_alwaysEmitIntoClient
+    public var naturalAlignment: Int {
+        switch self {
+        case .v128Load8Lane: return 0
+        case .v128Load16Lane: return 1
+        case .v128Load32Lane: return 2
+        case .v128Load64Lane: return 3
+        case .v128Store8Lane: return 0
+        case .v128Store16Lane: return 1
+        case .v128Store32Lane: return 2
+        case .v128Store64Lane: return 3
+        }
+    }
+}

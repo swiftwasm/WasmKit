@@ -331,68 +331,63 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
             }
             try parser.expect(.leftParen)
             let keyword = try parser.expectKeyword()
+            if keyword == "if" {
+                foldedStack.append(try foldedIf(visitor: &visitor, wat: &wat))
+                continue
+            }
             let visit = try parseTextInstruction(keyword: keyword, wat: &wat)
             let suspense: Suspense
             switch keyword {
-            case "if":
-                // Special handling for "if" because of its special order
-                // Usually given (A (B) (C (D)) (E)), we visit B, D, C, E, A
-                // But for "if" (if (B) (then (C (D))) (else (E))), we want to visit B, "if", D, C, E
-
-                // Condition may be absent
-                if try !parser.takeParenBlockStart("then") {
-                    // Visit condition instructions
-                    while true {
-                        guard try foldedInstruction(visitor: &visitor, wat: &wat) else {
-                            break
-                        }
-                        if try parser.takeParenBlockStart("then") {
-                            break
-                        }
-                    }
-                }
-                // Visit "if"
-                _ = try visit(&visitor)
-                // Visit "then" block
-                try parse(visitor: &visitor, wat: &wat)
-                try parser.expect(.rightParen)
-                // Visit "else" block if present
-                if try parser.takeParenBlockStart("else") {
-                    // Visit only when "else" block has child expr
-                    if try parser.peek(.rightParen) == nil {
-                        _ = try visitor.visitElse()
-                        try parse(visitor: &visitor, wat: &wat)
-                    }
-                    try parser.expect(.rightParen)
-                }
-                suspense = Suspense(visit: { visitor, this throws(WatParserError) in
-                    // An unfolded `end` inside the folded block already popped this
-                    // label, which means the source has a surplus `end`.
-                    guard this.labelStack.pop() else {
-                        throw WatParserError("unexpected `end`: no block is open here", location: nil)
-                    }
-                    return try visitor.visitEnd()
-                })
             case "block", "loop", "try_table":
                 // Visit the block instruction itself
                 _ = try visit(&visitor)
                 // Visit child expr here because folded "block", "loop", and "try_table"
                 // allows unfolded child instructions unlike others.
                 try parse(visitor: &visitor, wat: &wat)
-                suspense = Suspense(visit: { visitor, this throws(WatParserError) in
-                    // An unfolded `end` inside the folded block already popped this
-                    // label, which means the source has a surplus `end`.
-                    guard this.labelStack.pop() else {
-                        throw WatParserError("unexpected `end`: no block is open here", location: nil)
-                    }
-                    return try visitor.visitEnd()
-                })
+                suspense = Self.blockEnd
             default:
                 suspense = Suspense(visit: { visitor, _ throws(WatParserError) in try visit(&visitor) })
             }
             foldedStack.append(suspense)
         } while !foldedStack.isEmpty
         return true
+    }
+
+    private mutating func foldedIf(visitor: inout Visitor, wat: inout Wat) throws(WatParserError) -> Suspense {
+        let label = try parser.takeId()
+        let type = try blockType(wat: &wat)
+        while try !parser.takeParenBlockStart("then") {
+            guard try foldedInstruction(visitor: &visitor, wat: &wat) else {
+                throw WatParserError(
+                    "expected a folded instruction or `(then ...)` in a folded `if`", location: parser.lexer.location())
+            }
+        }
+        // The label precedes the condition in the text but is in scope only in the `then` and `else` bodies.
+        pushLabel(label)
+        try visitor.visitIf(blockType: type)
+        try parse(visitor: &visitor, wat: &wat)
+        try parser.expect(.rightParen)
+        if try parser.takeParenBlockStart("else") {
+            if try parser.peek(.rightParen) == nil {
+                _ = try visitor.visitElse()
+                try parse(visitor: &visitor, wat: &wat)
+            }
+            try parser.expect(.rightParen)
+        }
+        guard try parser.peek(.rightParen) != nil else {
+            throw WatParserError("expected `)` to close the folded `if`", location: parser.lexer.location())
+        }
+        return Self.blockEnd
+    }
+
+    private static var blockEnd: Suspense {
+        Suspense(visit: { visitor, this throws(WatParserError) in
+            // An unfolded `end` inside the folded block already popped this label.
+            guard this.labelStack.pop() else {
+                throw WatParserError("unexpected `end`: no block is open here", location: nil)
+            }
+            return try visitor.visitEnd()
+        })
     }
 
     /// Parse a single instruction without consuming the surrounding parentheses and instruction keyword.
@@ -586,11 +581,12 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
     }
 
     /// Parses an optional memory index or name, then the memarg's `offset=` and `align=`.
-    private mutating func memArg(defaultAlign: UInt32, wat: inout Wat) throws(WatParserError) -> MemArg {
-        try memArg(defaultAlign: defaultAlign, memory: memoryIndex(wat: &wat))
+    /// `align` defaults to `naturalAlignment`, in log2 form.
+    mutating func memArg(naturalAlignment: Int, wat: inout Wat) throws(WatParserError) -> MemArg {
+        try memArg(naturalAlignment: naturalAlignment, memory: memoryIndex(wat: &wat))
     }
 
-    private mutating func memArg(defaultAlign: UInt32, memory: UInt32) throws(WatParserError) -> MemArg {
+    private mutating func memArg(naturalAlignment: Int, memory: UInt32) throws(WatParserError) -> MemArg {
         var offset: UInt64 = 0
         let offsetPrefix = "offset="
         if let maybeOffset = try parser.peekKeyword(), maybeOffset.starts(with: offsetPrefix) {
@@ -602,7 +598,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
                 throw WatParserError("memory offset must be less than or equal to \(UInt32.max)", location: subParser.lexer.location())
             }
         }
-        var align: UInt32 = defaultAlign
+        var align = UInt32(naturalAlignment)
         let alignPrefix = "align="
         if let maybeAlign = try parser.peekKeyword(), maybeAlign.starts(with: alignPrefix) {
             try parser.consume()
@@ -616,43 +612,27 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
         }
         return MemArg(offset: offset, align: align, memory: memory)
     }
-
-    private mutating func visitLoad(defaultAlign: UInt32, wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try memArg(defaultAlign: defaultAlign, wat: &wat)
-    }
-
-    private mutating func visitStore(defaultAlign: UInt32, wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try memArg(defaultAlign: defaultAlign, wat: &wat)
-    }
 }
 
 extension ExpressionParser {
     mutating func visitBlock(wat: inout Wat) throws(WatParserError) -> BlockType {
-        let label = try parser.takeId()
-        self.labelStack.push(label)
-        if let label {
-            collectedLabelNames.append((nextLabelIndex, label.value))
-        }
-        nextLabelIndex += 1
+        pushLabel(try parser.takeId())
         return try blockType(wat: &wat)
     }
     mutating func visitLoop(wat: inout Wat) throws(WatParserError) -> BlockType {
-        let label = try parser.takeId()
-        self.labelStack.push(label)
-        if let label {
-            collectedLabelNames.append((nextLabelIndex, label.value))
-        }
-        nextLabelIndex += 1
+        pushLabel(try parser.takeId())
         return try blockType(wat: &wat)
     }
     mutating func visitIf(wat: inout Wat) throws(WatParserError) -> BlockType {
-        let label = try parser.takeId()
-        self.labelStack.push(label)
+        pushLabel(try parser.takeId())
+        return try blockType(wat: &wat)
+    }
+    private mutating func pushLabel(_ label: Name?) {
+        labelStack.push(label)
         if let label {
             collectedLabelNames.append((nextLabelIndex, label.value))
         }
         nextLabelIndex += 1
-        return try blockType(wat: &wat)
     }
     mutating func visitBr(wat: inout Wat) throws(WatParserError) -> UInt32 {
         return try labelIndex()
@@ -716,7 +696,7 @@ extension ExpressionParser {
         // Push the try_table's label AFTER parsing catch clauses, since catch clause
         // labels are resolved from the enclosing scope (the try_table's own label
         // is only in scope for the body instructions).
-        self.labelStack.push(label)
+        pushLabel(label)
         return (bt, TryCatch(catches: catches))
     }
     mutating func visitBrOnNull(wat: inout Wat) throws(WatParserError) -> UInt32 {
@@ -832,166 +812,10 @@ extension ExpressionParser {
         return try globalIndex(wat: &wat)
     }
     mutating func visitLoad(_ load: Instruction.Load, wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: UInt32(load.naturalAlignment), wat: &wat)
+        return try memArg(naturalAlignment: load.naturalAlignment, wat: &wat)
     }
     mutating func visitStore(_ store: Instruction.Store, wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitStore(defaultAlign: UInt32(store.naturalAlignment), wat: &wat)
-    }
-    mutating func visitMemoryAtomicNotify(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 2, wat: &wat)
-    }
-    mutating func visitMemoryAtomicWait32(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 2, wat: &wat)
-    }
-    mutating func visitMemoryAtomicWait64(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 3, wat: &wat)
-    }
-    mutating func visitI32AtomicRmwAdd(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 2, wat: &wat)
-    }
-    mutating func visitI64AtomicRmwAdd(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 3, wat: &wat)
-    }
-    mutating func visitI32AtomicRmw8AddU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 0, wat: &wat)
-    }
-    mutating func visitI32AtomicRmw16AddU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 1, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw8AddU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 0, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw16AddU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 1, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw32AddU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 2, wat: &wat)
-    }
-    mutating func visitI32AtomicRmwSub(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 2, wat: &wat)
-    }
-    mutating func visitI64AtomicRmwSub(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 3, wat: &wat)
-    }
-    mutating func visitI32AtomicRmw8SubU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 0, wat: &wat)
-    }
-    mutating func visitI32AtomicRmw16SubU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 1, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw8SubU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 0, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw16SubU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 1, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw32SubU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 2, wat: &wat)
-    }
-    mutating func visitI32AtomicRmwAnd(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 2, wat: &wat)
-    }
-    mutating func visitI64AtomicRmwAnd(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 3, wat: &wat)
-    }
-    mutating func visitI32AtomicRmw8AndU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 0, wat: &wat)
-    }
-    mutating func visitI32AtomicRmw16AndU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 1, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw8AndU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 0, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw16AndU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 1, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw32AndU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 2, wat: &wat)
-    }
-    mutating func visitI32AtomicRmwOr(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 2, wat: &wat)
-    }
-    mutating func visitI64AtomicRmwOr(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 3, wat: &wat)
-    }
-    mutating func visitI32AtomicRmw8OrU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 0, wat: &wat)
-    }
-    mutating func visitI32AtomicRmw16OrU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 1, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw8OrU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 0, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw16OrU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 1, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw32OrU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 2, wat: &wat)
-    }
-    mutating func visitI32AtomicRmwXor(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 2, wat: &wat)
-    }
-    mutating func visitI64AtomicRmwXor(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 3, wat: &wat)
-    }
-    mutating func visitI32AtomicRmw8XorU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 0, wat: &wat)
-    }
-    mutating func visitI32AtomicRmw16XorU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 1, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw8XorU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 0, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw16XorU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 1, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw32XorU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 2, wat: &wat)
-    }
-    mutating func visitI32AtomicRmwXchg(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 2, wat: &wat)
-    }
-    mutating func visitI64AtomicRmwXchg(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 3, wat: &wat)
-    }
-    mutating func visitI32AtomicRmw8XchgU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 0, wat: &wat)
-    }
-    mutating func visitI32AtomicRmw16XchgU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 1, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw8XchgU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 0, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw16XchgU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 1, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw32XchgU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 2, wat: &wat)
-    }
-    mutating func visitI32AtomicRmwCmpxchg(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 2, wat: &wat)
-    }
-    mutating func visitI64AtomicRmwCmpxchg(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 3, wat: &wat)
-    }
-    mutating func visitI32AtomicRmw8CmpxchgU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 0, wat: &wat)
-    }
-    mutating func visitI32AtomicRmw16CmpxchgU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 1, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw8CmpxchgU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 0, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw16CmpxchgU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 1, wat: &wat)
-    }
-    mutating func visitI64AtomicRmw32CmpxchgU(wat: inout Wat) throws(WatParserError) -> MemArg {
-        return try visitLoad(defaultAlign: 2, wat: &wat)
+        return try memArg(naturalAlignment: store.naturalAlignment, wat: &wat)
     }
     mutating func visitMemorySize(wat: inout Wat) throws(WatParserError) -> UInt32 {
         return try memoryIndex(wat: &wat)
@@ -1092,13 +916,6 @@ extension ExpressionParser {
         return try parser.expectUnsignedInt(UInt8.self)
     }
     mutating func visitSimdMemLane(_ op: Instruction.SimdMemLane, wat: inout Wat) throws(WatParserError) -> (memarg: MemArg, lane: UInt8) {
-        let defaultAlign: UInt32
-        switch op {
-        case .v128Load8Lane, .v128Store8Lane: defaultAlign = 0
-        case .v128Load16Lane, .v128Store16Lane: defaultAlign = 1
-        case .v128Load32Lane, .v128Store32Lane: defaultAlign = 2
-        case .v128Load64Lane, .v128Store64Lane: defaultAlign = 3
-        }
         // A leading integer is the memory index only if the lane or the memarg
         // follows it: `v128.load8_lane 1 1` names memory 1, `v128.load8_lane 1`
         // only lane 1 of memory 0.
@@ -1119,7 +936,7 @@ extension ExpressionParser {
                 }
             }
         }
-        let memarg = try memArg(defaultAlign: defaultAlign, memory: memory)
+        let memarg = try memArg(naturalAlignment: op.naturalAlignment, memory: memory)
         let lane = try parser.expectUnsignedInt(UInt8.self)
         return (memarg: memarg, lane: lane)
     }

@@ -1562,6 +1562,8 @@ public enum ParsedNames {
     case elements(NameMap)
     /// Subsection 9: Data segment names.
     case dataSegments(NameMap)
+    /// Subsection 11: Tag names.
+    case tags(NameMap)
 }
 
 /// A parser for the name custom section.
@@ -1603,6 +1605,7 @@ public struct NameSectionParser<Source: ByteStreamSource> {
         case 7: return .globals(try parseNameMap(stream: &stream))
         case 8: return .elements(try parseNameMap(stream: &stream))
         case 9: return .dataSegments(try parseNameMap(stream: &stream))
+        case 11: return .tags(try parseNameMap(stream: &stream))
         default:
             _ = try stream.consume(count: Int(size))
             return nil

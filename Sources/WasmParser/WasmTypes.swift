@@ -446,38 +446,6 @@ extension RawUnsignedInteger {
 }
 
 extension Instruction.Load {
-    /// The alignment to the storage size of the memory access
-    /// in log2 form.
-    @_alwaysEmitIntoClient
-    public var naturalAlignment: Int {
-        switch self {
-        case .i32Load, .i32AtomicLoad: return 2
-        case .i64Load, .i64AtomicLoad: return 3
-        case .f32Load: return 2
-        case .f64Load: return 3
-        case .v128Load: return 4
-        case .v128Load8X8S, .v128Load8X8U: return 3
-        case .v128Load16X4S, .v128Load16X4U: return 3
-        case .v128Load32X2S, .v128Load32X2U: return 3
-        case .v128Load8Splat: return 0
-        case .v128Load16Splat: return 1
-        case .v128Load32Splat: return 2
-        case .v128Load64Splat: return 3
-        case .v128Load32Zero: return 2
-        case .v128Load64Zero: return 3
-        case .i32Load8S: return 0
-        case .i32Load8U, .i32AtomicLoad8U: return 0
-        case .i32Load16S: return 1
-        case .i32Load16U, .i32AtomicLoad16U: return 1
-        case .i64Load8S: return 0
-        case .i64Load8U, .i64AtomicLoad8U: return 0
-        case .i64Load16S: return 1
-        case .i64Load16U, .i64AtomicLoad16U: return 1
-        case .i64Load32S: return 2
-        case .i64Load32U, .i64AtomicLoad32U: return 2
-        }
-    }
-
     /// The type of the value loaded from memory
     @_alwaysEmitIntoClient
     public var type: ValueType {
@@ -505,24 +473,6 @@ extension Instruction.Load {
 }
 
 extension Instruction.Store {
-    /// The alignment to the storage size of the memory access
-    /// in log2 form.
-    @_alwaysEmitIntoClient
-    public var naturalAlignment: Int {
-        switch self {
-        case .i32Store, .i32AtomicStore: return 2
-        case .i64Store, .i64AtomicStore: return 3
-        case .f32Store: return 2
-        case .f64Store: return 3
-        case .v128Store: return 4
-        case .i32Store8, .i32AtomicStore8: return 0
-        case .i32Store16, .i32AtomicStore16: return 1
-        case .i64Store8, .i64AtomicStore8: return 0
-        case .i64Store16, .i64AtomicStore16: return 1
-        case .i64Store32, .i64AtomicStore32: return 2
-        }
-    }
-
     /// The type of the value stored to memory
     @_alwaysEmitIntoClient
     public var type: ValueType {
