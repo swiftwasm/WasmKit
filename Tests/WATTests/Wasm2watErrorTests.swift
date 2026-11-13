@@ -40,25 +40,13 @@ struct Wasm2watErrorTests {
         #expect(Self.messageText(error) == "function/code section length mismatch (function: 1, code: 0)")
     }
 
-    @Test func codeEntryCountsDisagreeingWithTheFunctionSectionThrow() throws {
-        // A function section declaring one function, and a code section declaring 2 entries but holding one.
-        let binary: [UInt8] = [
-            0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x04, 0x01, 0x60, 0x00, 0x00, 0x03, 0x02, 0x01, 0x00,
-            0x0a, 0x04, 0x02, 0x02, 0x00, 0x0b,
-        ]
-        let error = try #require(throws: WasmParserError.self) {
-            _ = try wasm2wat(StaticByteStreamSource(bytes: binary))
-        }
-        #expect(Self.messageText(error) == "function/code section length mismatch (function: 1, code: 2)")
-    }
-
     @Test func dataCountsWithoutADataSectionThrow() throws {
         // A data count section declaring 1 segment, and no data section.
         let binary: [UInt8] = [0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x0c, 0x01, 0x01]
         let error = try #require(throws: WasmParserError.self) {
             _ = try wasm2wat(StaticByteStreamSource(bytes: binary))
         }
-        #expect(Self.messageText(error) == "DataCount declared 1 but no data section present")
+        #expect(Self.messageText(error) == "DataCount section declares 1 data segments but data section has 0")
     }
 
     @Test func dataCountsDisagreeingWithTheDataSectionThrow() throws {

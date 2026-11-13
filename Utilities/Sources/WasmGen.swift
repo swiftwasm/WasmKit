@@ -13,7 +13,9 @@ enum WasmGen {
         let opcode: [UInt8]
         let immediates: [Immediate]
         let category: String?
-        let defaultAlign: UInt32?
+        /// The log2 alignment a `MemArg` immediate's `align` defaults to in the text format,
+        /// given in `Instructions.json` as the third element of that immediate.
+        let naturalAlignment: Int?
 
         var visitMethodName: String {
             if let explicitCategory = category {
@@ -82,10 +84,32 @@ enum WasmGen {
             feature = try container.decode(String.self)
             name = try container.decode(Name.self)
             opcode = try decodeHexArray()
-            let rawImmediates = try container.decode([[String]].self)
-            immediates = rawImmediates.map { Immediate(label: $0[0], type: $0[1]) }
-            category = try container.decodeIfPresent(String.self)
-            defaultAlign = container.isAtEnd ? nil : try container.decode(UInt32.self)
+            let rawImmediates = try container.decode([RawImmediate].self)
+            immediates = rawImmediates.map { Immediate(label: $0.label, type: $0.type) }
+            naturalAlignment = rawImmediates.lazy.compactMap(\.naturalAlignment).first
+            category = try? container.decode(String.self)
+        }
+
+        /// `[label, type]`, or `[label, "MemArg", naturalAlignment]` for a memory access.
+        private struct RawImmediate: Decodable {
+            let label: String
+            let type: String
+            let naturalAlignment: Int?
+
+            init(from decoder: Decoder) throws {
+                var container = try decoder.unkeyedContainer()
+                label = try container.decode(String.self)
+                type = try container.decode(String.self)
+                if type == "MemArg" {
+                    naturalAlignment = try container.decode(Int.self)
+                } else {
+                    naturalAlignment = nil
+                }
+                guard container.isAtEnd else {
+                    throw DecodingError.dataCorruptedError(
+                        in: container, debugDescription: "Unexpected element in immediate \(label)")
+                }
+            }
         }
     }
 
@@ -227,6 +251,36 @@ enum WasmGen {
         return code
     }
 
+    /// `naturalAlignment` for each instruction category whose members access memory.
+    static func generateNaturalAlignments(_ instructions: InstructionSet) -> String {
+        var code = ""
+        for category in instructions.categorized {
+            guard let categoryTypeName = category.categoryTypeName,
+                category.sourceInstructions.contains(where: { $0.naturalAlignment != nil })
+            else { continue }
+            code += """
+
+                extension Instruction.\(categoryTypeName) {
+                    /// The alignment to the storage size of the memory access
+                    /// in log2 form.
+                    @_alwaysEmitIntoClient
+                    public var naturalAlignment: Int {
+                        switch self {
+
+                """
+            for instruction in category.sourceInstructions {
+                code += "        case .\(instruction.name.enumCase): return \(instruction.naturalAlignment!)\n"
+            }
+            code += """
+                        }
+                    }
+                }
+
+                """
+        }
+        return code
+    }
+
     static func buildInstructionInstanceFromContext(_ instruction: CategorizedInstruction) -> String {
         var code = ""
         if instruction.associatedValues.isEmpty {
@@ -355,7 +409,14 @@ enum WasmGen {
                 continue
             }
             code += "    case \"\(name)\":"
-            if !instruction.immediates.isEmpty {
+            if instruction.category == nil, let naturalAlignment = instruction.naturalAlignment {
+                // Only the memarg's default alignment differs between these instructions.
+                assert(instruction.immediates.map(\.type) == ["MemArg"], "\(name) has immediates besides its memarg")
+                code += "\n"
+                code += "        let \(instruction.immediates[0].label) = try expressionParser.memArg("
+                code += "naturalAlignment: \(naturalAlignment), wat: &wat)\n"
+                code += "        "
+            } else if !instruction.immediates.isEmpty {
                 code += "\n"
                 code += "        let ("
                 code += instruction.immediates.map(\.label).joined(separator: ", ")
@@ -439,28 +500,15 @@ enum WasmGen {
             }
             code += "    }\n"
             code += "}\n\n"
-
-            let hasMemarg = cat.sourceInstructions.contains(where: { $0.defaultAlign != nil })
-            if hasMemarg {
-                code += "func generatedDefaultAlign(for op: Instruction.\(categoryTypeName)) -> UInt32 {\n"
-                code += "    switch op {\n"
-                for instr in cat.sourceInstructions {
-                    if let align = instr.defaultAlign {
-                        code += "    case .\(instr.name.enumCase): return \(align)\n"
-                    }
-                }
-                code += "    }\n"
-                code += "}\n\n"
-            }
         }
 
-        let nonCategorizedMemarg = instructions.filter { $0.category == nil && $0.defaultAlign != nil }
+        let nonCategorizedMemarg = instructions.filter { $0.category == nil && $0.naturalAlignment != nil }
         if !nonCategorizedMemarg.isEmpty {
-            code += "func generatedMemargInstruction(_ instruction: Instruction) -> (mnemonic: String, memarg: MemArg, defaultAlign: UInt32)? {\n"
+            code += "func generatedMemargInstruction(_ instruction: Instruction) -> (mnemonic: String, memarg: MemArg, naturalAlignment: Int)? {\n"
             code += "    switch instruction {\n"
             for instr in nonCategorizedMemarg {
                 guard let text = instr.name.text else { continue }
-                code += "    case .\(instr.name.enumCase)(let m): return (\"\(text)\", m, \(instr.defaultAlign!))\n"
+                code += "    case .\(instr.name.enumCase)(let m): return (\"\(text)\", m, \(instr.naturalAlignment!))\n"
             }
             code += "    default: return nil\n"
             code += "    }\n"
@@ -803,7 +851,6 @@ enum WasmGen {
         struct ColumnInfo {
             var header: String
             var maxWidth: Int = 0
-            var isOptional: Bool = false
             var value: (Instruction) -> String
         }
 
@@ -824,8 +871,11 @@ enum WasmGen {
                 header: "Immediates",
                 value: { i in
                     return "["
-                        + i.immediates.map { i in
-                            "[\"\(i.label)\", \"\(i.type)\"]"
+                        + i.immediates.map { immediate in
+                            if immediate.type == "MemArg", let alignment = i.naturalAlignment {
+                                return "[\"\(immediate.label)\", \"\(immediate.type)\", \(alignment)]"
+                            }
+                            return "[\"\(immediate.label)\", \"\(immediate.type)\"]"
                         }.joined(separator: ", ") + "]"
                 }),
             ColumnInfo(
@@ -835,16 +885,6 @@ enum WasmGen {
                         return "\"" + category + "\""
                     } else {
                         return "null"
-                    }
-                }),
-            ColumnInfo(
-                header: "DefaultAlign",
-                isOptional: true,
-                value: { i in
-                    if let defaultAlign = i.defaultAlign {
-                        return String(defaultAlign)
-                    } else {
-                        return ""
                     }
                 }),
         ]
@@ -859,17 +899,10 @@ enum WasmGen {
 
         for (index, instruction) in instructions.enumerated() {
             json += "  ["
-            var lastColumnIndex = columns.lastIndex(where: { !$0.isOptional })!
-            for (columnIndex, column) in columns.enumerated() where column.isOptional {
-                if !column.value(instruction).isEmpty {
-                    lastColumnIndex = columnIndex
-                }
-            }
-            for columnIndex in 0...lastColumnIndex {
-                let column = columns[columnIndex]
+            for (columnIndex, column) in columns.enumerated() {
                 let value = column.value(instruction)
                 json += value.padding(toLength: column.maxWidth, withPad: " ", startingAt: 0)
-                if columnIndex != lastColumnIndex {
+                if columnIndex != columns.count - 1 {
                     json += ", "
                 }
             }
@@ -914,6 +947,7 @@ enum WasmGen {
                     + "\n\n"
                     + generateVisitorProtocol(instructions)
                     + "\n"
+                    + generateNaturalAlignments(instructions)
             ),
             GeneratedFile(
                 projectSources + ["WasmParser", "BinaryInstructionDecoder.swift"],

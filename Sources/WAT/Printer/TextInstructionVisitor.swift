@@ -140,10 +140,10 @@ struct TextInstructionVisitor: AnyInstructionVisitor {
             emit("global.set \(names.globals.reference(i))")
 
         case .load(let kind, let m):
-            let memarg = try memargText(m, defaultAlign: UInt32(kind.naturalAlignment))
+            let memarg = try memargText(m, naturalAlignment: kind.naturalAlignment)
             emit("\(generatedMnemonic(for: kind))\(memarg)")
         case .store(let kind, let m):
-            let memarg = try memargText(m, defaultAlign: UInt32(kind.naturalAlignment))
+            let memarg = try memargText(m, naturalAlignment: kind.naturalAlignment)
             emit("\(generatedMnemonic(for: kind))\(memarg)")
         case .memorySize(let mem):
             emit("memory.size\(memorySuffix(mem))")
@@ -227,7 +227,7 @@ struct TextInstructionVisitor: AnyInstructionVisitor {
         case .simd(let op): emit(generatedMnemonic(for: op))
         case .simdLane(let op, let lane): emit("\(generatedMnemonic(for: op)) \(lane)")
         case .simdMemLane(let op, let m, let lane):
-            let memarg = try memargText(m, defaultAlign: generatedDefaultAlign(for: op))
+            let memarg = try memargText(m, naturalAlignment: op.naturalAlignment)
             emit("\(generatedMnemonic(for: op))\(memarg) \(lane)")
 
         case .memoryAtomicNotify, .memoryAtomicWait32, .memoryAtomicWait64, .i32AtomicRmwAdd, .i64AtomicRmwAdd, .i32AtomicRmw8AddU, .i32AtomicRmw16AddU, .i64AtomicRmw8AddU,
@@ -237,10 +237,10 @@ struct TextInstructionVisitor: AnyInstructionVisitor {
             .i32AtomicRmw16XorU, .i64AtomicRmw8XorU, .i64AtomicRmw16XorU, .i64AtomicRmw32XorU, .i32AtomicRmwXchg, .i64AtomicRmwXchg, .i32AtomicRmw8XchgU, .i32AtomicRmw16XchgU,
             .i64AtomicRmw8XchgU, .i64AtomicRmw16XchgU, .i64AtomicRmw32XchgU, .i32AtomicRmwCmpxchg, .i64AtomicRmwCmpxchg, .i32AtomicRmw8CmpxchgU, .i32AtomicRmw16CmpxchgU,
             .i64AtomicRmw8CmpxchgU, .i64AtomicRmw16CmpxchgU, .i64AtomicRmw32CmpxchgU:
-            guard let (mnemonic, m, align) = generatedMemargInstruction(instruction) else {
+            guard let (mnemonic, m, naturalAlignment) = generatedMemargInstruction(instruction) else {
                 throw WasmParserError("instruction not supported by wasm2wat", offset: binaryOffset)
             }
-            let memarg = try memargText(m, defaultAlign: align)
+            let memarg = try memargText(m, naturalAlignment: naturalAlignment)
             emit("\(mnemonic)\(memarg)")
 
         // Do not add a `default:` to this switch.
@@ -316,7 +316,7 @@ struct TextInstructionVisitor: AnyInstructionVisitor {
         }
     }
 
-    private func memargText(_ m: MemArg, defaultAlign: UInt32) throws(WasmParserError) -> String {
+    private func memargText(_ m: MemArg, naturalAlignment: Int) throws(WasmParserError) -> String {
         // `align=` takes a u32.
         guard m.align < 32 else {
             throw WasmParserError("alignment 2^\(m.align) has no text form", offset: binaryOffset)
@@ -324,7 +324,7 @@ struct TextInstructionVisitor: AnyInstructionVisitor {
         var parts: [String] = []
         if m.memory != 0 { parts.append(names.memories.reference(m.memory)) }
         if m.offset != 0 { parts.append("offset=\(m.offset)") }
-        if m.align != defaultAlign { parts.append("align=\(UInt32(1) << m.align)") }
+        if m.align != naturalAlignment { parts.append("align=\(UInt32(1) << m.align)") }
         if parts.isEmpty { return "" }
         return " " + parts.joined(separator: " ")
     }

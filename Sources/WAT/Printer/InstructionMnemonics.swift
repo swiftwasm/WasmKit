@@ -484,20 +484,7 @@ func generatedMnemonic(for op: Instruction.SimdMemLane) -> String {
     }
 }
 
-func generatedDefaultAlign(for op: Instruction.SimdMemLane) -> UInt32 {
-    switch op {
-    case .v128Load8Lane: return 0
-    case .v128Load16Lane: return 1
-    case .v128Load32Lane: return 2
-    case .v128Load64Lane: return 3
-    case .v128Store8Lane: return 0
-    case .v128Store16Lane: return 1
-    case .v128Store32Lane: return 2
-    case .v128Store64Lane: return 3
-    }
-}
-
-func generatedMemargInstruction(_ instruction: Instruction) -> (mnemonic: String, memarg: MemArg, defaultAlign: UInt32)? {
+func generatedMemargInstruction(_ instruction: Instruction) -> (mnemonic: String, memarg: MemArg, naturalAlignment: Int)? {
     switch instruction {
     case .memoryAtomicNotify(let m): return ("memory.atomic.notify", m, 2)
     case .memoryAtomicWait32(let m): return ("memory.atomic.wait32", m, 2)

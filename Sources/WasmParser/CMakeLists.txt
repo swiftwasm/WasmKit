@@ -5,9 +5,7 @@ add_wasmkit_library(WasmParser
   BinaryInstructionDecoder.swift
   InstructionVisitor.swift
   LEB.swift
-  Parser+Streaming.swift
   ParsingLimits.swift
-  RawSection.swift
   WasmParserError.swift
   WasmParser.swift
   WasmTypes.swift

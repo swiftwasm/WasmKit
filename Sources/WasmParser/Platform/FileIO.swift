@@ -43,30 +43,17 @@
         /// Reads up to `maxLength` bytes from the current offset of `fd`.
         /// A result shorter than `maxLength` means end-of-file was reached.
         static func readBytes(_ fd: CInt, upToCount maxLength: Int) throws(WasmParserError) -> [UInt8] {
-            try readBytes(upToCount: maxLength) { rawRead(fd, into: $0) }
-        }
-
-        /// Reads up to `maxLength` bytes through `read`.
-        static func readBytes(
-            upToCount maxLength: Int, using read: (UnsafeMutableRawBufferPointer) -> Int
-        ) throws(WasmParserError) -> [UInt8] {
-            let chunk = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: min(maxLength, 1 << 16))
-            defer { chunk.deallocate() }
-            var result: [UInt8] = []
-            // One `read` from a pipe can return fewer bytes than remain before end-of-file.
-            while result.count < maxLength {
-                let space = UnsafeMutableBufferPointer(rebasing: chunk.prefix(maxLength - result.count))
-                let readCount = read(UnsafeMutableRawBufferPointer(space))
-                guard readCount >= 0 else {
-                    throw WasmParserError("I/O error: \(errorMessage(CInt(-readCount)))", offset: 0)
-                }
-                if readCount == 0 { break }
-                result.append(contentsOf: UnsafeBufferPointer(rebasing: space.prefix(readCount)))
+            var result = [UInt8](repeating: 0, count: maxLength)
+            let readCount = result.withUnsafeMutableBytes { rawRead(fd, into: $0) }
+            guard readCount >= 0 else {
+                throw WasmParserError("I/O error: \(errorMessage(CInt(-readCount)))", offset: 0)
             }
+            result.removeLast(maxLength - readCount)
             return result
         }
 
-        /// Returns the number of bytes read (>= 0), or a negative errno value on failure.
+        /// Returns the number of bytes read (>= 0), or a negative errno value
+        /// on failure.
         private static func rawRead(_ fd: CInt, into buffer: UnsafeMutableRawBufferPointer) -> Int {
             guard let base = buffer.baseAddress, buffer.count > 0 else { return 0 }
             #if os(Windows)

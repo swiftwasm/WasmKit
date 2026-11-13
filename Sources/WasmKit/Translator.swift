@@ -5149,14 +5149,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let isMemory64 = try beginMemoryAccess(memarg.memory)
         defer { endMemoryAccess(memarg.memory) }
         guard let opcode = SIMDOpcode.fromSimdMemLane(simdMemLane) else { preconditionFailure("missing SIMDOpcode mapping: \(simdMemLane)") }
-        let naturalAlignment: Int
-        let laneCount: UInt8
-        switch simdMemLane {
-        case .v128Load8Lane, .v128Store8Lane: (naturalAlignment, laneCount) = (0, 16)
-        case .v128Load16Lane, .v128Store16Lane: (naturalAlignment, laneCount) = (1, 8)
-        case .v128Load32Lane, .v128Store32Lane: (naturalAlignment, laneCount) = (2, 4)
-        case .v128Load64Lane, .v128Store64Lane: (naturalAlignment, laneCount) = (3, 2)
-        }
+        let naturalAlignment = simdMemLane.naturalAlignment
+        // A lane is as wide as the memory access, `1 << naturalAlignment` bytes of the 16.
+        let laneCount = UInt8(16 >> naturalAlignment)
         if lane >= laneCount {
             throw WasmKitError(message: .invalidLaneIndex(lane: lane, laneCount: laneCount))
         }

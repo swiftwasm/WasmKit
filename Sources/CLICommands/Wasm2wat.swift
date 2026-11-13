@@ -1,4 +1,5 @@
 import ArgumentParser
+import Foundation
 import WAT
 import WasmParser
 
@@ -24,14 +25,18 @@ package struct Wasm2wat: ParsableCommand {
 
     package func run() throws {
         let source = try FileHandleStreamSource(filePath: path)
-        if let outputPath = output {
-            try CLIFile.write(to: outputPath) { outputHandle in
-                try wasm2wat(source, features: .all, to: &outputHandle)
+        if let output {
+            let outputHandle = try CLIFile.createWrite(output)
+            do {
+                try wasm2wat(source, features: .all) { try outputHandle.writeAll(Array($0.utf8)) }
+            } catch {
+                // Report the conversion error rather than a failure to close.
+                try? outputHandle.close()
+                throw error
             }
+            try outputHandle.close()
         } else {
-            var standardOutput = CLIFile.standardOutput
-            try wasm2wat(source, features: .all, to: &standardOutput)
-            try standardOutput.flush()
+            try wasm2wat(source, features: .all) { try FileHandle.standardOutput.write(contentsOf: Data($0.utf8)) }
         }
     }
 }

@@ -1,5 +1,4 @@
 add_wasmkit_library(CLICommands
-    CLIFile+WriteStrategy.swift
     Explore.swift
     Platform.swift
     Run.swift

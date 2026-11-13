@@ -6,9 +6,7 @@ import WasmParser
 @Suite
 struct Wasm2watTests {
     private static func printed(_ wat: String) throws -> String {
-        var printer = WatPrinter(info: try collectModule(stream: binaryStream(forWat: wat)), output: "")
-        try printer.print()
-        return printer.output
+        try wasm2wat(StaticByteStreamSource(bytes: wat2wasm(wat)))
     }
 
     @Test func printEmptyModule() throws {
@@ -66,47 +64,38 @@ struct Wasm2watTests {
         #expect(wat.contains("hello"))
     }
 
-    private struct RecordingOutput: TextOutputStream {
-        var pieces: [String] = []
-        mutating func write(_ string: String) { pieces.append(string) }
-    }
-
-    @Test func outputArrivesOneFieldAtATime() throws {
-        let binary = try wat2wasm("(module (func (drop (i32.const 1))) (func (drop (i32.const 2))))")
-        var output = RecordingOutput()
-        try wasm2wat(StaticByteStreamSource(bytes: binary), features: .default, to: &output)
-        #expect(output.pieces.joined() == (try wasm2wat(StaticByteStreamSource(bytes: binary))))
-        #expect(!output.pieces.contains { $0.contains("i32.const 1") && $0.contains("i32.const 2") })
+    /// The chunks `wasm2wat` passes to its `write` closure.
+    private static func chunks(of binary: [UInt8]) throws -> [String] {
+        var chunks: [String] = []
+        try wasm2wat(StaticByteStreamSource(bytes: binary), features: .default) { chunks.append($0) }
+        return chunks
     }
 
     @Test func largeFunctionBodyArrivesInPieces() throws {
         let instructionCount = 50_000
         let binary = try wat2wasm("(module (func \(String(repeating: "nop ", count: instructionCount))))")
-        var output = RecordingOutput()
-        try wasm2wat(StaticByteStreamSource(bytes: binary), features: .default, to: &output)
-        #expect(try wat2wasm(output.pieces.joined()) == binary)
+        let chunks = try Self.chunks(of: binary)
+        #expect(try wat2wasm(chunks.joined()) == binary)
         // A piece holds up to 64 KiB of body text plus the line that crossed that size.
         let line = "    nop\n".utf8.count
-        #expect(output.pieces.allSatisfy { $0.utf8.count <= (1 << 16) + line })
+        #expect(chunks.allSatisfy { $0.utf8.count <= (1 << 16) + line })
     }
 
     @Test func largeDataSegmentArrivesInPieces() throws {
         let binary = try wat2wasm(#"(module (memory 1) (data (i32.const 0) "\#(String(repeating: #"\00"#, count: 100_000))"))"#)
-        var output = RecordingOutput()
-        try wasm2wat(StaticByteStreamSource(bytes: binary), features: .default, to: &output)
-        #expect(try wat2wasm(output.pieces.joined()) == binary)
+        let chunks = try Self.chunks(of: binary)
+        #expect(try wat2wasm(chunks.joined()) == binary)
         // A piece holds up to 64 KiB of text plus the string that crossed that size: 16 KiB of bytes
         // escaped as `\00`, its quotes and the space before it.
-        #expect(output.pieces.allSatisfy { $0.utf8.count <= (1 << 16) + 3 * (1 << 14) + 3 })
+        #expect(chunks.allSatisfy { $0.utf8.count <= (1 << 16) + 3 * (1 << 14) + 3 })
     }
 
     @Test(arguments: zip(["func", "funcref"], [" 0", " (item ref.null func)"]))
     func largeElementSegmentArrivesInPieces(type: String, item: String) throws {
         let binary = try wat2wasm("(module (func) (elem \(type)\(String(repeating: item, count: 40_000))))")
-        var output = RecordingOutput()
-        try wasm2wat(StaticByteStreamSource(bytes: binary), features: .default, to: &output)
-        #expect(try wat2wasm(output.pieces.joined()) == binary)
-        #expect(output.pieces.allSatisfy { $0.utf8.count <= (1 << 16) + item.utf8.count })
+        let chunks = try Self.chunks(of: binary)
+        #expect(try wat2wasm(chunks.joined()) == binary)
+        #expect(chunks.allSatisfy { $0.utf8.count <= (1 << 16) + item.utf8.count })
     }
 
     /// A load from the second memory, which `.default` misreads.

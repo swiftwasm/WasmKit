@@ -150,11 +150,6 @@ extension WasmParserError.Message {
         Self("Section size mismatch for section \(sectionID): expected \(expected) but got \(actual)")
     }
 
-    @usableFromInline
-    static func sectionExceedsModule(sectionID: UInt8, size: UInt32) -> Self {
-        Self("Section \(sectionID) declares \(size) bytes, more than remain in the module")
-    }
-
     @usableFromInline static func unknownCanonOptionTag(_ tag: UInt8) -> Self {
         Self("Unknown canonical option tag: \(tag)")
     }

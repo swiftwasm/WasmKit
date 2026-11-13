@@ -612,20 +612,29 @@ public func wasm2wat<Source: ByteStreamSource>(
     _ stream: Source,
     features: WasmFeatureSet = .default
 ) throws(WasmParserError) -> String {
+    let info = try collectModule(stream: stream, features: features)
     var text = ""
-    try wasm2wat(stream, features: features, to: &text)
+    var printer = WatPrinter(info: info, write: { text += $0 })
+    do {
+        try printer.print()
+    } catch let error as WasmParserError {
+        throw error
+    } catch {
+        preconditionFailure("appending to a String cannot fail: \(error)")
+    }
     return text
 }
 
-/// Writes the WAT text of the binary module read from `stream` to `output` in pieces, never holding the
-/// whole text in memory.
-package func wasm2wat<Source: ByteStreamSource, Output: TextOutputStream>(
+/// Writes the WAT text of the binary module read from `stream` through `write`, in chunks of about
+/// 64 KiB, never holding the whole text in memory.
+///
+/// - Throws: `WasmParserError` for a malformed or unprintable binary, and any error `write` throws.
+package func wasm2wat<Source: ByteStreamSource>(
     _ stream: Source,
     features: WasmFeatureSet,
-    to output: inout Output
-) throws(WasmParserError) {
+    write: @escaping (String) throws -> Void
+) throws {
     let info = try collectModule(stream: stream, features: features)
-    var printer = WatPrinter(info: info, output: output)
-    defer { output = printer.output }
+    var printer = WatPrinter(info: info, write: write)
     try printer.print()
 }

@@ -18,7 +18,7 @@ import WasmParser
         }
 
         guard case .tags(let tagNames) = try #require(parsed.last) else {
-            Issue.record("Expected function names, got \(parsed)")
+            Issue.record("Expected tag names, got \(parsed)")
             return
         }
         #expect(functionNames == [0: "f"])

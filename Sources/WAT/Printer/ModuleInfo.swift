@@ -3,7 +3,7 @@ import WasmTypes
 
 /// The sections of a WebAssembly binary module, as the printer needs them.
 ///
-/// Code, data and element sections stay in memory undecoded until printed.
+/// Function bodies stay undecoded until printed.
 struct ModuleInfo {
     var types: [FunctionType] = []
     var imports: [Import] = []
@@ -15,9 +15,9 @@ struct ModuleInfo {
     var start: FunctionIndex? = nil
     var tags: [Tag] = []
 
-    var codeSection: RawSection? = nil
-    var dataSection: RawSection? = nil
-    var elementSection: RawSection? = nil
+    var codes: [Code] = []
+    var elements: [ElementSegment] = []
+    var dataSegments: [DataSegment] = []
 
     var dataCount: UInt32? = nil
 
@@ -69,69 +69,34 @@ func collectModule<Source: ByteStreamSource>(
     var info = ModuleInfo()
     info.features = features
     var parser = WasmParser.Parser(stream: stream, features: features)
-    while let section = try parser.parseNextRawSection() {
-        switch section.kind {
-        case .custom:
-            let custom = try section.parse { parser throws(WasmParserError) in
-                try parser.parseCustomSection(size: UInt32(section.body.count))
-            }
+    while let payload = try parser.parseNext() {
+        switch payload {
+        case .header: break
+        case .customSection(let custom):
             if custom.name == "name" {
                 parseNameSection(custom.bytes, into: &info)
             }
-        case .type:
-            info.types = try section.parse { parser throws(WasmParserError) in
-                try parser.parseTypeSection().map { group throws(WasmParserError) in
-                    guard let subType = group.types.first, group.types.count == 1,
-                        subType.isFinal, subType.supertypes.isEmpty, case .function(let type) = subType.body
-                    else {
-                        throw WasmParserError("GC type definitions are not supported")
-                    }
-                    return type
+        case .typeSection(let groups):
+            info.types = try groups.map { group throws(WasmParserError) in
+                guard let subType = group.types.first, group.types.count == 1,
+                    subType.isFinal, subType.supertypes.isEmpty, case .function(let type) = subType.body
+                else {
+                    throw WasmParserError("GC type definitions are not supported")
                 }
+                return type
             }
-        case .`import`:
-            info.imports = try section.parse { parser throws(WasmParserError) in
-                try parser.parseImportSection()
-            }
-        case .function:
-            info.functionTypeIndices = try section.parse { parser throws(WasmParserError) in
-                try parser.parseFunctionSection()
-            }
-        case .table:
-            info.tables = try section.parse { parser throws(WasmParserError) in
-                try parser.parseTableSection()
-            }
-        case .memory:
-            info.memories = try section.parse { parser throws(WasmParserError) in
-                try parser.parseMemorySection()
-            }
-        case .global:
-            info.globals = try section.parse { parser throws(WasmParserError) in
-                try parser.parseGlobalSection()
-            }
-        case .export:
-            info.exports = try section.parse { parser throws(WasmParserError) in
-                try parser.parseExportSection()
-            }
-        case .start:
-            info.start = try section.parse { parser throws(WasmParserError) in
-                try parser.parseStartSection()
-            }
-        case .element:
-            info.elementSection = section
-        case .code:
-            info.codeSection = section
-        case .data:
-            info.dataSection = section
-        case .dataCount:
-            // `parseDataCountSection` is internal to WasmParser.
-            info.dataCount = try section.parse { parser throws(WasmParserError) in
-                try parser.parseUnsigned(UInt32.self)
-            }
-        case .tag:
-            info.tags = try section.parse { parser throws(WasmParserError) in
-                try parser.parseTagSection()
-            }
+        case .importSection(let imports): info.imports = imports
+        case .functionSection(let typeIndices): info.functionTypeIndices = typeIndices
+        case .tableSection(let tables): info.tables = tables
+        case .memorySection(let memories): info.memories = memories
+        case .globalSection(let globals): info.globals = globals
+        case .tagSection(let tags): info.tags = tags
+        case .exportSection(let exports): info.exports = exports
+        case .startSection(let start): info.start = start
+        case .elementSection(let elements): info.elements = elements
+        case .codeSection(let codes): info.codes = codes
+        case .dataSection(let dataSegments): info.dataSegments = dataSegments
+        case .dataCount(let count): info.dataCount = count
         }
     }
     return info
