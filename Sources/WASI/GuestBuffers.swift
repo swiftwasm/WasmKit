@@ -33,20 +33,23 @@ import WasmTypes
     /// The count is checked first, as `readv` and `writev` do, so a guest
     /// cannot make the host copy an iovec array as large as its memory.
     ///
-    /// Also throws `EINVAL` if the buffers hold more bytes in total than a
-    /// ``WASIAbi/Size`` can count. The call reports the number of bytes it
-    /// transferred as a `size`, so a larger total could not be reported.
-    /// Buffers may overlap, so a small memory can describe such a total. POSIX
-    /// `readv` and `writev` fail the same way, before any data moves, when the
-    /// total overflows their result.
+    /// The call reports the bytes it transferred as a ``WASIAbi/Size``, but
+    /// buffers may overlap, so even a small memory can describe a larger total.
+    /// Only the leading buffers whose lengths fit in a `size` together are
+    /// kept, and the call transfers less than asked, as a read or write may.
+    /// The first buffer always fits, because an iovec length is a `size`.
     init<M: GuestMemory>(iovs: UnsafeGuestBufferPointer<WASIAbi.IOVec>, memory: M) throws {
         guard iovs.count <= Self.maxCount else {
             throw WASIAbi.Errno.EINVAL
         }
-        let iovecs = try (0..<iovs.count).map { try iovs.read(at: $0, in: memory) }
-        let total = iovecs.reduce(UInt64(0)) { $0 + UInt64($1.length) }
-        guard total <= UInt64(WASIAbi.Size.max) else {
-            throw WASIAbi.Errno.EINVAL
+        var iovecs = try (0..<iovs.count).map { try iovs.read(at: $0, in: memory) }
+        var total: UInt64 = 0
+        for (index, iovec) in iovecs.enumerated() {
+            total += UInt64(iovec.length)
+            if total > UInt64(WASIAbi.Size.max) {
+                iovecs.removeSubrange(index...)
+                break
+            }
         }
         self.count = iovecs.count
         self.access = { index, body in

@@ -46,14 +46,27 @@ import WasmTypes
         }
     }
 
-    @Test func aWriteOfMoreThanSizeMaxBytesIsInvalid() throws {
+    /// The call transfers the buffers before the one that would take the total
+    /// past what a `size` counts, and reports a short write.
+    @Test func aWriteOfMoreThanSizeMaxBytesIsShort() throws {
         let memory = TestSupport.TestGuestMemory(size: Int(Self.memorySize))
         let iovs = try writeOverlappingIOVecs(
             last: WASIAbi.IOVec(buffer: .init(offset: 0), length: Self.memorySize), to: memory)
         try withWASI { wasi in
-            #expect(throws: WASIAbi.Errno.EINVAL) {
-                try wasi.fd_write(fileDescriptor: 1, ioVectors: iovs, memory: memory)
-            }
+            let written = try wasi.fd_write(fileDescriptor: 1, ioVectors: iovs, memory: memory)
+            #expect(written == WASIAbi.Size.max - Self.memorySize + 1)
+        }
+    }
+
+    /// A buffer the call does not transfer is never dereferenced, so it may
+    /// lie outside memory.
+    @Test func aBufferPastTheShortWriteIsNotUsed() throws {
+        let memory = TestSupport.TestGuestMemory(size: Int(Self.memorySize))
+        let iovs = try writeOverlappingIOVecs(
+            last: WASIAbi.IOVec(buffer: .init(offset: Self.memorySize), length: Self.memorySize), to: memory)
+        try withWASI { wasi in
+            let written = try wasi.fd_write(fileDescriptor: 1, ioVectors: iovs, memory: memory)
+            #expect(written == WASIAbi.Size.max - Self.memorySize + 1)
         }
     }
 }
