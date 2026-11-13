@@ -88,13 +88,16 @@ enum TestSupport {
             self.data = Array(repeating: 0, count: size)
         }
 
+        struct OutOfBounds: Swift.Error {}
+
         func withUnsafeMutableBufferPointer<T>(
             offset: UInt,
             count: Int,
             _ body: (UnsafeMutableRawBufferPointer) throws -> T
-        ) rethrows -> T {
-            guard offset + UInt(count) <= data.count else {
-                fatalError("Memory access out of bounds")
+        ) throws -> T {
+            guard count > 0 else { return try body(.init(start: nil, count: 0)) }
+            guard count <= data.count, offset <= UInt(data.count - count) else {
+                throw OutOfBounds()
             }
             return try data.withUnsafeMutableBytes { buffer in
                 let start = buffer.baseAddress!.advanced(by: Int(offset))
@@ -127,7 +130,7 @@ enum TestSupport {
                     buffer: UnsafeGuestRawPointer(offset: dataReadOffset),
                     length: UInt32(buffer.count)
                 )
-                WASIAbi.IOVec.writeToGuest(
+                try! WASIAbi.IOVec.writeToGuest(
                     at: UnsafeGuestRawPointer(offset: iovecWriteOffset),
                     in: self,
                     value: iovec
@@ -152,7 +155,7 @@ enum TestSupport {
                     buffer: UnsafeGuestRawPointer(offset: currentDataOffset),
                     length: UInt32(size)
                 )
-                WASIAbi.IOVec.writeToGuest(
+                try! WASIAbi.IOVec.writeToGuest(
                     at: UnsafeGuestRawPointer(offset: iovecWriteOffset),
                     in: self,
                     value: iovec
@@ -171,10 +174,10 @@ enum TestSupport {
             var result: [[UInt8]] = []
 
             for i in 0..<Int(iovecs.count) {
-                let iovec = (iovecs.baseAddress + UInt32(i)).read(from: self)
+                let iovec = try! (iovecs.baseAddress + UInt32(i)).read(from: self)
                 var buffer = [UInt8](repeating: 0, count: Int(iovec.length))
 
-                iovec.buffer.withHostPointer(in: self, count: Int(iovec.length)) { hostBuffer in
+                try! iovec.buffer.withHostPointer(in: self, count: Int(iovec.length)) { hostBuffer in
                     buffer.withUnsafeMutableBytes { destBuffer in
                         destBuffer.copyMemory(from: UnsafeRawBufferPointer(hostBuffer))
                     }

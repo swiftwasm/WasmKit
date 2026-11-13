@@ -356,7 +356,7 @@ final class Runner {
 
     private func writeMemory(_ instance: Instance, at pointer: UInt32, _ bytes: [UInt8]) {
         let memory = instance.exports[memory: "memory"]!
-        memory.withUnsafeMutableBufferPointer(offset: UInt(pointer), count: bytes.count) { buffer in
+        try! memory.withUnsafeMutableBufferPointer(offset: UInt(pointer), count: bytes.count) { buffer in
             bytes.withUnsafeBytes { source in
                 buffer.baseAddress!.copyMemory(from: source.baseAddress!, byteCount: source.count)
             }
@@ -365,7 +365,7 @@ final class Runner {
 
     func readMemory(_ instance: Instance, at pointer: UInt32, count: Int) -> [UInt8] {
         let memory = instance.exports[memory: "memory"]!
-        return memory.withUnsafeMutableBufferPointer(offset: UInt(pointer), count: count) { buffer in
+        return try! memory.withUnsafeMutableBufferPointer(offset: UInt(pointer), count: count) { buffer in
             Array(buffer.bindMemory(to: UInt8.self))
         }
     }

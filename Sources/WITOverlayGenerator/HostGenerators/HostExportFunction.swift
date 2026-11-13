@@ -41,7 +41,7 @@ struct HostStaticCanonicalLifting: StaticCanonicalLifting {
     func liftString(pointer: Operand, length: Operand, encoding: String) throws -> Operand {
         let bufferPointer = liftBufferPointer(liftPointer(pointer, pointeeTypeName: "UInt8"), length: length)
         let liftedVar = builder.variable("stringLifted")
-        printer.write(line: "let \(liftedVar) = \(bufferPointer).withHostPointer(in: \(context.contextVar).guestMemory) { String(decoding: $0, as: UTF8.self) }")
+        printer.write(line: "let \(liftedVar) = try \(bufferPointer).withHostPointer(in: \(context.contextVar).guestMemory) { String(decoding: $0, as: UTF8.self) }")
         return .variable(liftedVar)
     }
 

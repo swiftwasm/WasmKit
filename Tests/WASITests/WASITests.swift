@@ -411,7 +411,6 @@ struct WASITests {
 
         // Test union size and alignment end-to-end
         let start = UnsafeGuestRawPointer(offset: 0)
-        var pointer = start
         let read = WASIAbi.Subscription.Union.fdRead(.init(0))
         let write = WASIAbi.Subscription.Union.fdWrite(.init(0))
         let writeOffset = WASIAbi.Subscription.sizeInGuest
@@ -421,25 +420,18 @@ struct WASITests {
         let event = WASIAbi.Event(userData: 3, error: .EIO, eventType: .fdRead, fdReadWrite: .init(nBytes: 37, flags: [.hangup]))
         let eventOffset = clockOffset + WASIAbi.Subscription.sizeInGuest
         let finalOffset = eventOffset + WASIAbi.Event.sizeInGuest
-        WASIAbi.Subscription.writeToGuest(at: &pointer, in: memory, value: .init(userData: 1, union: read))
-        #expect(pointer.offset == writeOffset)
-        WASIAbi.Subscription.writeToGuest(at: &pointer, in: memory, value: .init(userData: 2, union: write))
-        #expect(pointer.offset == clockOffset)
-        WASIAbi.Subscription.writeToGuest(at: &pointer, in: memory, value: .init(userData: 3, union: clock))
-        #expect(pointer.offset == eventOffset)
-        WASIAbi.Event.writeToGuest(at: &pointer, in: memory, value: event)
-        #expect(pointer.offset == finalOffset)
+        // Each value starts where the previous one ends.
+        try WASIAbi.Subscription.writeToGuest(at: start, in: memory, value: .init(userData: 1, union: read))
+        try WASIAbi.Subscription.writeToGuest(at: start.advanced(by: writeOffset), in: memory, value: .init(userData: 2, union: write))
+        try WASIAbi.Subscription.writeToGuest(at: start.advanced(by: clockOffset), in: memory, value: .init(userData: 3, union: clock))
+        try WASIAbi.Event.writeToGuest(at: start.advanced(by: eventOffset), in: memory, value: event)
+        #expect(finalOffset == 176)
 
         // Test that reading back yields same result
-        pointer = start
-        #expect(WASIAbi.Subscription.readFromGuest(&pointer, in: memory) == .init(userData: 1, union: read))
-        #expect(pointer.offset == writeOffset)
-        #expect(WASIAbi.Subscription.readFromGuest(&pointer, in: memory) == .init(userData: 2, union: write))
-        #expect(pointer.offset == clockOffset)
-        #expect(WASIAbi.Subscription.readFromGuest(&pointer, in: memory) == .init(userData: 3, union: clock))
-        #expect(pointer.offset == eventOffset)
-        #expect(WASIAbi.Event.readFromGuest(&pointer, in: memory) == event)
-        #expect(pointer.offset == finalOffset)
+        #expect(try WASIAbi.Subscription.readFromGuest(start, in: memory) == .init(userData: 1, union: read))
+        #expect(try WASIAbi.Subscription.readFromGuest(start.advanced(by: writeOffset), in: memory) == .init(userData: 2, union: write))
+        #expect(try WASIAbi.Subscription.readFromGuest(start.advanced(by: clockOffset), in: memory) == .init(userData: 3, union: clock))
+        #expect(try WASIAbi.Event.readFromGuest(start.advanced(by: eventOffset), in: memory) == event)
 
         #if !os(Windows)
             let elapsed = try ContinuousClock().measure {
@@ -1653,7 +1645,7 @@ struct WASITests {
                     let stat = try wasi.path_filestat_get(dirFd: dir2Fd, flags: .SYMLINK_FOLLOW, path: "foo/quux")
                     #expect(stat.size == 5)  // hello
                     let count = try Int(wasi.path_readlink(fd: dir2Fd, path: "foo/quux", buffer: buffer, memory: memory))
-                    buffer.withHostPointer(in: memory) { ptr in
+                    try buffer.withHostPointer(in: memory) { ptr in
                         #expect(String(decoding: ptr[..<count], as: UTF8.self) == "baz")
                     }
                     try wasi.path_unlink_file(dirFd: dir2Fd, path: "foo/baz")

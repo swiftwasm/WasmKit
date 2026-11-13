@@ -69,14 +69,14 @@ import WasmTypes
         let memory = TestSupport.TestGuestMemory()
         let input = UnsafeGuestBufferPointer<WASIAbi.Subscription>(baseAddress: .init(offset: 0), count: UInt32(subscriptions.count))
         for (index, subscription) in subscriptions.enumerated() {
-            input.write(at: UInt32(index), subscription, to: memory)
+            try input.write(at: UInt32(index), subscription, to: memory)
         }
         let output = UnsafeGuestBufferPointer<WASIAbi.Event>(baseAddress: .init(offset: 4096), count: input.count)
         var count: WASIAbi.Size = 0
         let elapsed = try ContinuousClock().measure {
             count = try wasi.poll_oneoff(subscriptions: input, events: output, memory: memory)
         }
-        return ((0..<count).map { output.read(at: $0, in: memory) }, elapsed)
+        return (try (0..<count).map { try output.read(at: $0, in: memory) }, elapsed)
     }
 
     // MARK: - Waiting
