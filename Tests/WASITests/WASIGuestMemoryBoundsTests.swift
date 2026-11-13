@@ -135,13 +135,17 @@ import WasmTypes
         let function: String
         let argument: String
         let arguments: [Value]
+        /// Whether the call reaches the pointer only after it polls. Where
+        /// polling is unavailable, the call answers `ENOTSUP` first.
+        let afterPolling: Bool
 
         var testDescription: String { "\(function) \(argument)" }
 
-        init(_ function: String, _ argument: String, _ arguments: [Value]) {
+        init(_ function: String, _ argument: String, _ arguments: [Value], afterPolling: Bool = false) {
             self.function = function
             self.argument = argument
             self.arguments = arguments
+            self.afterPolling = afterPolling
         }
     }
 
@@ -219,15 +223,22 @@ import WasmTypes
             PointerCase("path_unlink_file", "path", [dir, end, .i32(5)]),
             PointerCase("poll_oneoff", "in", [end, events, .i32(1), result]),
             PointerCase("poll_oneoff", "second subscription", [.i32(Address.end - 48), events, .i32(2), result]),
-            PointerCase("poll_oneoff", "out", [subscriptions, end, .i32(1), result]),
-            PointerCase("poll_oneoff", "second event", [subscriptions, .i32(Address.end - 32), .i32(2), result]),
-            PointerCase("poll_oneoff", "nevents", [subscriptions, events, .i32(1), end]),
+            PointerCase("poll_oneoff", "out", [subscriptions, end, .i32(1), result], afterPolling: true),
+            PointerCase("poll_oneoff", "second event", [subscriptions, .i32(Address.end - 32), .i32(2), result], afterPolling: true),
+            PointerCase("poll_oneoff", "nevents", [subscriptions, events, .i32(1), end], afterPolling: true),
         ]
     }()
 
     @Test(arguments: WASIGuestMemoryBoundsTests.pointerCases)
     func aPointerOutsideMemoryStopsTheGuest(_ pointerCase: PointerCase) throws {
         try withGuest { guest in
+            // A pointer that the call never reaches is not an error.
+            if pointerCase.afterPolling && TestSupport.pollUnavailable {
+                let unsupported = [Value.i32(UInt32(WASIAbi.Errno.ENOTSUP.rawValue))]
+                let result = try guest.call(pointerCase.function, pointerCase.arguments)
+                #expect(result == unsupported)
+                return
+            }
             expectOutOfBounds {
                 try guest.call(pointerCase.function, pointerCase.arguments)
             }
