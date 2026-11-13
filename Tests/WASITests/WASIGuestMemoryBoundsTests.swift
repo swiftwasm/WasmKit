@@ -6,8 +6,8 @@ import WasmTypes
 @_spi(WASIPlatform) @testable import WASI
 
 /// A guest can pass any pointer to a `wasi_snapshot_preview1` call. One that
-/// the call would dereference outside its memory stops the guest with
-/// `WASIMemoryAccessError`, and the host keeps running.
+/// the call would dereference outside its memory stops the guest with the
+/// memory's out-of-bounds error, and the host keeps running.
 @Suite struct WASIGuestMemoryBoundsTests {
 
     /// Addresses in a guest memory of one page.
@@ -190,6 +190,8 @@ import WasmTypes
             PointerCase("fd_pwrite", "iovec buffer", [file, .i32(Address.iovsOutside), .i32(1), .i64(0), result]),
             PointerCase("fd_pwrite", "nwritten", [file, iovs, .i32(1), .i64(0), end]),
             PointerCase("fd_fdstat_get", "stat", [file, end]),
+            // The fields of a `fdstat` are aligned, so it spans 24 bytes, not 19.
+            PointerCase("fd_fdstat_get", "stat across the end", [file, .i32(Address.end - 20)]),
             PointerCase("fd_seek", "newoffset", [file, .i64(1), .i32(0), end]),
             PointerCase("fd_tell", "offset", [file, end]),
             PointerCase("fd_tell", "offset across the end", [file, .i32(Address.end - 4)]),
@@ -209,7 +211,6 @@ import WasmTypes
             PointerCase("path_open", "path", [dir, .i32(0), end, .i32(5), .i32(0), .i64(0), .i64(0), .i32(0), result]),
             PointerCase("path_open", "fd", [dir, .i32(0), path, .i32(5), .i32(0), .i64(0), .i64(0), .i32(0), end]),
             PointerCase("path_readlink", "path", [dir, end, .i32(4), result, .i32(16), result]),
-            PointerCase("path_readlink", "bufused", [dir, link, .i32(4), result, .i32(16), end]),
             PointerCase("path_remove_directory", "path", [dir, end, .i32(3)]),
             PointerCase("path_rename", "old_path", [dir, end, .i32(5), dir, link, .i32(4)]),
             PointerCase("path_rename", "new_path", [dir, path, .i32(5), dir, end, .i32(4)]),
@@ -227,37 +228,30 @@ import WasmTypes
     @Test(arguments: WASIGuestMemoryBoundsTests.pointerCases)
     func aPointerOutsideMemoryStopsTheGuest(_ pointerCase: PointerCase) throws {
         try withGuest { guest in
-            #expect(throws: WASIMemoryAccessError.self) {
+            expectOutOfBounds {
                 try guest.call(pointerCase.function, pointerCase.arguments)
             }
         }
     }
 
-    /// The in-memory file system has no symbolic links, so this one call runs
-    /// against a host directory.
+    /// The in-memory file system has no symbolic links, so `path_readlink`
+    /// fails there before it writes anything. These calls run against a host
+    /// directory instead.
     @Test(.disabled(if: TestSupport.hostPreopensUnavailable, "host preopens are not available on this platform"))
-    func aLinkBufferOutsideMemoryStopsTheGuest() throws {
+    func aLinkBufferOrBufusedOutsideMemoryStopsTheGuest() throws {
         let directory = try TestSupport.TemporaryDirectory()
         try directory.createFile(at: "a.txt", contents: "hello")
         try directory.createSymlink(at: "link", to: "a.txt")
         try withGuest(hostDirectory: directory) { guest in
-            #expect(throws: WASIMemoryAccessError.self) {
+            expectOutOfBounds {
                 try guest.call(
                     "path_readlink",
                     [.i32(Descriptor.directory), .i32(Address.link), .i32(4), .i32(Address.end), .i32(16), .i32(Address.result)])
             }
-        }
-    }
-
-    @Test func theErrorDescribesTheRange() throws {
-        try withGuest { guest in
-            do {
-                _ = try guest.call("random_get", [.i32(Address.end - 3), .i32(4)])
-                Issue.record("random_get returned")
-            } catch let error as WASIMemoryAccessError {
-                #expect(error.offset == Address.end - 3)
-                #expect(error.count == 4)
-                #expect(error.memorySize == Int(Address.end))
+            expectOutOfBounds {
+                try guest.call(
+                    "path_readlink",
+                    [.i32(Descriptor.directory), .i32(Address.link), .i32(4), .i32(Address.result), .i32(16), .i32(Address.end)])
             }
         }
     }
@@ -289,57 +283,8 @@ import WasmTypes
         }
     }
 
-    /// The result pointers are checked before the call runs, so a stopped call
-    /// creates no file, opens no descriptor, and moves no position.
-    @Test func aStoppedCallLeavesNoEffect() throws {
-        try withGuest { guest in
-            let end = Value.i32(Address.end)
-            let create = Value.i32(UInt32(WASIAbi.Oflags.CREAT.rawValue))
-            #expect(throws: WASIMemoryAccessError.self) {
-                try guest.call(
-                    "path_open",
-                    [.i32(Descriptor.directory), .i32(0), .i32(Address.newPath), .i32(7), create, .i64(0), .i64(0), .i32(0), end])
-            }
-            #expect(throws: WASIAbi.Errno.ENOENT) {
-                _ = try guest.wasi.path_filestat_get(dirFd: Descriptor.directory, flags: [], path: "new.txt")
-            }
-            #expect(throws: WASIAbi.Errno.EBADF) {
-                _ = try guest.wasi.fd_fdstat_get(fileDescriptor: Descriptor.file + 1)
-            }
-
-            let file = Value.i32(Descriptor.file)
-            #expect(throws: WASIMemoryAccessError.self) {
-                try guest.call("fd_seek", [file, .i64(2), .i32(0), end])
-            }
-            #expect(throws: WASIMemoryAccessError.self) {
-                try guest.call("fd_read", [file, .i32(Address.iovs), .i32(1), end])
-            }
-            let position = try guest.wasi.fd_tell(fd: Descriptor.file)
-            #expect(position == 0)
-        }
-    }
-
-    /// Every iovec is checked before any data moves, so a bad second buffer
-    /// stops the call before the first one is written or read.
-    @Test func aBadIOVecStopsTheCallBeforeAnyTransfer() throws {
-        let stdout = CustomPlatformInjectionTests.SinkFile()
-        try withGuest(stdout: stdout) { guest in
-            guest.memory.write(Array("hello".utf8), at: Address.data)
-            #expect(throws: WASIMemoryAccessError.self) {
-                try guest.call("fd_write", [.i32(1), .i32(Address.iovsThenOutside), .i32(2), .i32(Address.result)])
-            }
-            #expect(stdout.captured.withLock { $0 }.isEmpty)
-
-            #expect(throws: WASIMemoryAccessError.self) {
-                try guest.call("fd_read", [.i32(Descriptor.file), .i32(Address.iovsThenOutside), .i32(2), .i32(Address.result)])
-            }
-            let position = try guest.wasi.fd_tell(fd: Descriptor.file)
-            #expect(position == 0)
-        }
-    }
-
     /// A call takes at most 1024 iovecs, like `readv` and `writev`. It answers
-    /// `EINVAL` for more, before it checks or copies them, and moves no data.
+    /// `EINVAL` for more, before it reads or copies them, and moves no data.
     @Test func moreThan1024IOVecsAreRefused() throws {
         let stdout = CustomPlatformInjectionTests.SinkFile()
         try withGuest(stdout: stdout) { guest in
@@ -445,6 +390,39 @@ import WasmTypes
         }
     }
 
+    /// An address past 4 GiB stops the guest. It does not wrap around to the
+    /// start of memory, where the access would succeed, and it does not stop
+    /// the host.
+    @Test(.enabled(if: Int.bitWidth == 64, "a 4 GiB memory needs a 64-bit host"))
+    func aRangeAcrossFourGiBStopsTheGuest() throws {
+        let top = UInt64(1) << 32
+        func near(_ distance: UInt64) -> UInt32 { UInt32(top - distance) }
+        try withGuest(in: FourGiBMemory(), files: ["b.txt": Array("b".utf8)]) { guest in
+            let file = Value.i32(Descriptor.file)
+            let directory = Value.i32(Descriptor.directory)
+            let cases: [(String, [Value])] = [
+                // A struct whose last fields would lie past 4 GiB.
+                ("fd_fdstat_get", [file, .i32(near(20))]),
+                ("fd_filestat_get", [file, .i32(near(60))]),
+                ("poll_oneoff", [.i32(near(40)), .i32(Address.events), .i32(1), .i32(Address.result)]),
+                // The second subscription and the second event of an array.
+                ("poll_oneoff", [.i32(near(48)), .i32(Address.events), .i32(2), .i32(Address.result)]),
+                // The second argument pointer, and the second argument string.
+                ("args_get", [.i32(near(4)), .i32(Address.data)]),
+                ("args_get", [.i32(Address.result), .i32(near(8))]),
+                // The second entry of a directory listing.
+                ("fd_readdir", [directory, .i32(near(32)), .i32(128), .i64(0), .i32(Address.result)]),
+                // The second iovec of an array.
+                ("fd_write", [file, .i32(near(8)), .i32(2), .i32(Address.result)]),
+            ]
+            for (function, arguments) in cases {
+                #expect(throws: FourGiBMemory.OutOfBounds.self, "\(function) \(arguments)") {
+                    try guest.call(function, arguments)
+                }
+            }
+        }
+    }
+
     /// The embedder receives the error from the call that entered the guest,
     /// and the instance can be called again.
     @Test func theEmbedderReceivesTheError() throws {
@@ -461,7 +439,7 @@ import WasmTypes
             let instance = try parseWasm(bytes: Self.writerModule).instantiate(store: store, imports: imports)
             let write = try #require(instance.exports[function: "write"])
 
-            #expect(throws: WASIMemoryAccessError.self) {
+            expectOutOfBounds {
                 try write([.i32(Address.end), .i32(1)])
             }
             #expect(try write([.i32(0), .i32(0)]) == [.i32(0)])
@@ -499,20 +477,24 @@ import WasmTypes
 
 /// A 4 GiB guest memory that keeps only its first and last pages.
 private final class FourGiBMemory: GuestMemory {
+    struct OutOfBounds: Error {}
+
     private static let pageSize = 0x1_0000
     private static let lastPage = (1 << 32) - pageSize
+    private static let byteCount = 1 << 32
     private var first = [UInt8](repeating: 0, count: pageSize)
     private var last = [UInt8](repeating: 0, count: pageSize)
-
-    var byteCount: Int { 1 << 32 }
 
     func withUnsafeMutableBufferPointer<T>(
         offset: UInt,
         count: Int,
         _ body: (UnsafeMutableRawBufferPointer) throws -> T
-    ) rethrows -> T {
+    ) throws -> T {
+        guard count > 0 else { return try body(.init(start: nil, count: 0)) }
+        guard count <= Self.byteCount, offset <= UInt(Self.byteCount - count) else {
+            throw OutOfBounds()
+        }
         let offset = Int(offset)
-        precondition(offset + count <= byteCount, "Memory access out of bounds")
         if offset + count <= Self.pageSize {
             return try first.withUnsafeMutableBytes { try body(.init(rebasing: $0[offset..<offset + count])) }
         }
@@ -526,9 +508,22 @@ private func littleEndianBytes(_ values: UInt32...) -> [UInt8] {
     values.flatMap { withUnsafeBytes(of: $0.littleEndian, Array.init) }
 }
 
+/// Expects `body` to throw the error of ``Memory`` for an out-of-bounds access.
+private func expectOutOfBounds(
+    sourceLocation: SourceLocation = #_sourceLocation,
+    _ body: () throws -> some Any
+) {
+    let error = #expect(throws: Trap.self, sourceLocation: sourceLocation) { try body() }
+    guard let error else { return }
+    guard case .memoryOutOfBounds = error.reason else {
+        Issue.record("Expected an out-of-bounds trap, got \(error)", sourceLocation: sourceLocation)
+        return
+    }
+}
+
 extension GuestMemory {
     fileprivate func write(_ bytes: [UInt8], at offset: UInt32) {
-        withUnsafeMutableBufferPointer(offset: UInt(offset), count: bytes.count) { $0.copyBytes(from: bytes) }
+        try! withUnsafeMutableBufferPointer(offset: UInt(offset), count: bytes.count) { $0.copyBytes(from: bytes) }
     }
 
     fileprivate func write(iovec: (buffer: UInt32, length: UInt32), at offset: UInt32) {
@@ -536,6 +531,6 @@ extension GuestMemory {
     }
 
     fileprivate func read(count: Int, at offset: UInt32) -> [UInt8] {
-        withUnsafeMutableBufferPointer(offset: UInt(offset), count: count) { Array($0) }
+        try! withUnsafeMutableBufferPointer(offset: UInt(offset), count: count) { Array($0) }
     }
 }

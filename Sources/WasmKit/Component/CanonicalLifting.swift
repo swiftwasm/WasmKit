@@ -16,9 +16,13 @@ public enum CanonicalLifting {
     ) throws -> [Element] {
         var elements = [Element]()
         elements.reserveCapacity(Int(elementSize))
-        let guestPointer = UnsafeGuestRawPointer(offset: pointer)
         for i in 0..<length {
-            let element = try loadElement(guestPointer.advanced(by: i * elementSize))
+            // The guest chooses `pointer` and `length`, so the address may reach past 4 GiB.
+            let elementPointer = try UnsafeGuestRawPointer(
+                address: UInt64(pointer) + UInt64(i) * UInt64(elementSize),
+                accessing: Int(elementSize), in: context.guestMemory
+            )
+            let element = try loadElement(elementPointer)
             elements.append(element)
         }
         return elements

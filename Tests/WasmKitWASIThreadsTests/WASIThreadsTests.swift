@@ -28,15 +28,15 @@
             )
             let first = Memory(store: Store(engine: engine), sharedMemory: shared)
             let second = Memory(store: Store(engine: engine), sharedMemory: shared)
-            first.withUnsafeMutableBufferPointer(offset: 0, count: 1) { $0[0] = 42 }
-            let value = second.withUnsafeBufferPointer(offset: 0, count: 1) { $0[0] }
+            try first.withUnsafeMutableBufferPointer(offset: 0, count: 1) { $0[0] = 42 }
+            let value = try second.withUnsafeBufferPointer(offset: 0, count: 1) { $0[0] }
             #expect(value == 42)
 
             #expect(try shared.grow(by: 1) == 1)
             #expect(first.byteCount == 2 * 65_536)
             #expect(second.byteCount == 2 * 65_536)
-            second.withUnsafeMutableBufferPointer(offset: 65_536, count: 1) { $0[0] = 24 }
-            #expect(first.withUnsafeBufferPointer(offset: 65_536, count: 1) { $0[0] } == 24)
+            try second.withUnsafeMutableBufferPointer(offset: 65_536, count: 1) { $0[0] = 24 }
+            #expect(try first.withUnsafeBufferPointer(offset: 65_536, count: 1) { $0[0] } == 24)
         }
 
         @Test func sharedMemoryAtomicWaitAndNotifyCrossStoreBoundaries() throws {
@@ -128,7 +128,7 @@
             while Date() < deadline {
                 result =
                     threads.sharedMemory.byteCount > 0
-                    ? Memory(store: store, sharedMemory: threads.sharedMemory).withUnsafeBufferPointer(offset: 0, count: 4) {
+                    ? try Memory(store: store, sharedMemory: threads.sharedMemory).withUnsafeBufferPointer(offset: 0, count: 4) {
                         $0.baseAddress!.assumingMemoryBound(to: Atomic<UInt32>.self).pointee.load(ordering: .acquiring)
                     }
                     : 0
@@ -180,7 +180,7 @@
 
                 var count: UInt32 = 0
                 while Date() < deadline {
-                    count = memory.withUnsafeBufferPointer(offset: 0, count: 4) {
+                    count = try memory.withUnsafeBufferPointer(offset: 0, count: 4) {
                         $0.baseAddress!.assumingMemoryBound(to: Atomic<UInt32>.self).pointee.load(ordering: .acquiring)
                     }
                     if count == expected { break }

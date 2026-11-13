@@ -12,7 +12,7 @@ public enum CanonicalLowering {
         let newBuffer = try context.realloc(
             old: 0, oldSize: 0, oldAlign: 1, newSize: UInt32(bytes.count)
         )
-        newBuffer.withHostPointer(in: context.guestMemory, count: bytes.count) { newBuffer in
+        try newBuffer.withHostPointer(in: context.guestMemory, count: bytes.count) { newBuffer in
             newBuffer.copyBytes(from: bytes)
         }
         return (newBuffer.offset, UInt32(bytes.count))
@@ -37,7 +37,11 @@ public enum CanonicalLowering {
             old: 0, oldSize: 0, oldAlign: elementAlignment, newSize: byteLength
         )
         for (i, element) in value.enumerated() {
-            try storeElement(element, newBuffer.advanced(by: elementSize * UInt32(i)))
+            // `realloc` is guest code, so the buffer it returns may reach past 4 GiB.
+            let elementPointer = try newBuffer.advanced(
+                by: elementSize * UInt32(i), accessing: Int(elementSize), in: context.guestMemory
+            )
+            try storeElement(element, elementPointer)
         }
         return (newBuffer.offset, UInt32(value.count))
     }

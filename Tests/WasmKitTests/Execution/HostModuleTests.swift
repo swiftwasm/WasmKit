@@ -25,7 +25,7 @@ struct HostModuleTests {
                 """))
         #expect(throws: Never.self) { try module.instantiate(store: store, imports: imports) }
         // Ensure the allocated address is valid
-        _ = memory.withUnsafeBufferPointer(offset: 0, count: 4) {
+        _ = try memory.withUnsafeBufferPointer(offset: 0, count: 4) {
             $0
         }
     }

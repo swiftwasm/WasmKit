@@ -53,7 +53,7 @@ struct Example {
         let ptr = Int(try alloc([Value(signed: Int32(messageBytes.count))])[0].i32)
 
         let memory = instance.exports[memory: "memory"]!
-        memory.withUnsafeMutableBufferPointer(offset: UInt(ptr), count: messageBytes.count) { buffer in
+        try memory.withUnsafeMutableBufferPointer(offset: UInt(ptr), count: messageBytes.count) { buffer in
             messageBytes.withUnsafeBytes { src in
                 buffer.baseAddress!.copyMemory(from: src.baseAddress!, byteCount: src.count)
             }

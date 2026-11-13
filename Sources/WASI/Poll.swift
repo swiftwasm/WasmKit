@@ -77,12 +77,12 @@ func poll<M: GuestMemory>(
         let waitWrite = pollSubscriptions[i].waitWrite
         let hangup: WASIAbi.Event.FdReadWrite.Flags = state.contains(.hangup) ? [.hangup] : []
         if state.contains(.readable) || (!waitWrite && state.contains(.hangup)) {
-            events.write(at: .init(eventIndex), .init(userData: fdUserData[i], error: .SUCCESS, eventType: .fdRead, fdReadWrite: .init(nBytes: 0, flags: hangup)), to: memory)
+            try events.write(at: .init(eventIndex), .init(userData: fdUserData[i], error: .SUCCESS, eventType: .fdRead, fdReadWrite: .init(nBytes: 0, flags: hangup)), to: memory)
         } else if state.contains(.writable) || (waitWrite && state.contains(.hangup)) {
-            events.write(at: .init(eventIndex), .init(userData: fdUserData[i], error: .SUCCESS, eventType: .fdWrite, fdReadWrite: .init(nBytes: 0, flags: hangup)), to: memory)
+            try events.write(at: .init(eventIndex), .init(userData: fdUserData[i], error: .SUCCESS, eventType: .fdWrite, fdReadWrite: .init(nBytes: 0, flags: hangup)), to: memory)
         } else if state.contains(.error) {
             let eventType: WASIAbi.EventType = waitWrite ? .fdWrite : .fdRead
-            events.write(at: .init(eventIndex), .init(userData: fdUserData[i], error: .EBADF, eventType: eventType, fdReadWrite: .init(nBytes: 0, flags: [])), to: memory)
+            try events.write(at: .init(eventIndex), .init(userData: fdUserData[i], error: .EBADF, eventType: eventType, fdReadWrite: .init(nBytes: 0, flags: [])), to: memory)
         }
     }
     // A ready descriptor ends the call with its own events, without clocks.
@@ -98,7 +98,7 @@ func poll<M: GuestMemory>(
         waited = roundedUpToMilliseconds(timeout ?? 0)
     }
     for clock in clocks where clock.remaining <= waited {
-        events.write(at: updatedEvents, .init(userData: clock.userData, error: .SUCCESS, eventType: .clock, fdReadWrite: .init(nBytes: 0, flags: .init(rawValue: 0))), to: memory)
+        try events.write(at: updatedEvents, .init(userData: clock.userData, error: .SUCCESS, eventType: .clock, fdReadWrite: .init(nBytes: 0, flags: .init(rawValue: 0))), to: memory)
         updatedEvents += 1
     }
     return updatedEvents

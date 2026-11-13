@@ -20,7 +20,7 @@ struct StaticCanonicalStoring: CanonicalStoring {
     private func storeByteSwappable(at pointer: Pointer, value: Operand, type: String) {
         let boundPointer = "\(pointer).assumingMemoryBound(to: \(type).self)"
         if let contextVarName {
-            printer.write(line: "\(boundPointer).write(\(type)(\(value)), to: \(contextVarName).guestMemory)")
+            printer.write(line: "try \(boundPointer).write(\(type)(\(value)), to: \(contextVarName).guestMemory)")
         } else {
             printer.write(line: "\(boundPointer).pointee = \(type)(\(value))")
         }

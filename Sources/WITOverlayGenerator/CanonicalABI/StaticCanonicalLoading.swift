@@ -19,7 +19,7 @@ struct StaticCanonicalLoading: CanonicalLoading {
         let boundPointer = "\(pointer).assumingMemoryBound(to: \(type).self)"
         let loadedVar = builder.variable("loaded")
         if let contextVarName {
-            printer.write(line: "let \(loadedVar) = \(boundPointer).read(from: \(contextVarName).guestMemory)")
+            printer.write(line: "let \(loadedVar) = try \(boundPointer).read(from: \(contextVarName).guestMemory)")
         } else {
             printer.write(line: "let \(loadedVar) = \(boundPointer).pointee")
         }

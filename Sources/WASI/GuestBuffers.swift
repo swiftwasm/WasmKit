@@ -14,9 +14,9 @@ import WasmTypes
 /// time, matching how vectored I/O was performed before the erasure existed.
 ///
 /// The iovec array is copied out of guest memory once, like `readv` and
-/// `writev` do, and every buffer is checked before the first one is used. A
-/// bad buffer therefore stops the call before any data moves, and a read into
-/// one buffer cannot change where a later one points.
+/// `writev` do, so a read into one buffer cannot change where a later one
+/// points. A buffer outside guest memory throws the memory's error when it is
+/// used, after the buffers before it have been transferred.
 @_spi(WASIPlatform) public struct GuestBuffers {
     /// The most iovecs that one call accepts, which is `IOV_MAX` on Linux and
     /// macOS.
@@ -27,9 +27,8 @@ import WasmTypes
 
     private let access: (Int, (UnsafeMutableRawBufferPointer) throws -> Int) throws -> Int
 
-    /// Throws `EINVAL` if there are more than ``maxCount`` iovecs, and
-    /// ``WASIMemoryAccessError`` if the iovec array or any buffer it describes
-    /// does not lie inside `memory`.
+    /// Throws `EINVAL` if there are more than ``maxCount`` iovecs, and the
+    /// error of `memory` if the iovec array does not lie inside it.
     ///
     /// The count is checked first, as `readv` and `writev` do, so a guest
     /// cannot make the host copy an iovec array as large as its memory.
@@ -37,19 +36,10 @@ import WasmTypes
         guard iovs.count <= Self.maxCount else {
             throw WASIAbi.Errno.EINVAL
         }
-        try iovs.checkBounds(in: memory)
-        let iovecs = (0..<iovs.count).map { iovs.read(at: $0, in: memory) }
-        for iovec in iovecs {
-            try memory.checkBounds(iovec.buffer, count: UInt64(iovec.length))
-        }
+        let iovecs = try (0..<iovs.count).map { try iovs.read(at: $0, in: memory) }
         self.count = iovecs.count
         self.access = { index, body in
-            let iovec = iovecs[index]
-            // An empty buffer may point past the end of memory, which cannot be mapped.
-            guard iovec.length > 0 else {
-                return try body(UnsafeMutableRawBufferPointer(start: nil, count: 0))
-            }
-            return try iovec.withHostBufferPointer(in: memory) { try body($0) }
+            try iovecs[index].withHostBufferPointer(in: memory) { try body($0) }
         }
     }
 

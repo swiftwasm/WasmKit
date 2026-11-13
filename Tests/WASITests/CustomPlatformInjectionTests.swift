@@ -276,7 +276,7 @@ struct CustomPlatformInjectionTests {
 
         let memory = TestSupport.TestGuestMemory()
         try wasi.random_get(buffer: UnsafeGuestPointer<UInt8>(offset: 0x100), length: 4, memory: memory)
-        let randomBytes = memory.withUnsafeMutableBufferPointer(offset: 0x100, count: 4) { [UInt8]($0) }
+        let randomBytes = try memory.withUnsafeMutableBufferPointer(offset: 0x100, count: 4) { [UInt8]($0) }
         #expect(randomBytes == [1, 2, 3, 4])
 
         try bridge.close()

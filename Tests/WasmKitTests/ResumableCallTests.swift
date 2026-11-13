@@ -191,7 +191,7 @@ struct ResumableCallTests {
         """
 
     private static func byte(of memory: WasmKit.Memory, at offset: UInt) -> UInt8 {
-        memory.withUnsafeBufferPointer(offset: offset, count: 1) { $0[0] }
+        try! memory.withUnsafeBufferPointer(offset: offset, count: 1) { $0[0] }
     }
 
     @Test(arguments: testedThreadingModels)
