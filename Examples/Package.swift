@@ -1,10 +1,10 @@
-// swift-tools-version:5.8
+// swift-tools-version:6.0
 
 import PackageDescription
 
 let package = Package(
     name: "Examples",
-    platforms: [.macOS(.v10_13), .iOS(.v12)],
+    platforms: [.macOS(.v15), .iOS(.v18)],
     dependencies: [
         .package(path: "../")
     ],
@@ -18,6 +18,10 @@ let package = Package(
             .product(name: "WAT", package: "WasmKit")
         ]),
         .executableTarget(name: "StringPassing", dependencies: [
+            .product(name: "WasmKit", package: "WasmKit"),
+            .product(name: "WAT", package: "WasmKit")
+        ]),
+        .executableTarget(name: "HostCallSuspension", dependencies: [
             .product(name: "WasmKit", package: "WasmKit"),
             .product(name: "WAT", package: "WasmKit")
         ]),

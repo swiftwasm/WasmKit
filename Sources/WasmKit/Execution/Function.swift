@@ -255,10 +255,15 @@ extension InternalFunction {
         let caller = Caller(instanceHandle: nil, store: store)
         var results = [Value](repeating: .i32(0), count: resolvedType.results.count)
         let implementation = entity.implementation
-        try arguments.withUnsafeBufferPointer { parameters in
-            try results.withUnsafeMutableBufferPointer { out in
-                try implementation(caller, parameters, out)
+        do {
+            try arguments.withUnsafeBufferPointer { parameters in
+                try results.withUnsafeMutableBufferPointer { out in
+                    try implementation(caller, parameters, out)
+                }
             }
+        } catch is SuspensionRequest {
+            // No guest called this host function. Rethrown, the request could suspend an outer call.
+            throw Trap(.suspensionUnavailable)
         }
         try check(functionType: resolvedType, results: results)
         return results
