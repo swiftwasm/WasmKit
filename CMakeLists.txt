@@ -28,6 +28,12 @@ set(CMAKE_MACOSX_RPATH YES)
 
 set(BUILD_SHARED_LIBS OFF)
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  # Swift autolinks a module built with `-static` as `lib<name>.lib` on
+  # Windows, while CMake names static libraries `<name>.lib` there.
+  set(CMAKE_STATIC_LIBRARY_PREFIX_Swift "lib")
+endif()
+
 include(AddSwiftHostLibrary)
 
 set(CMAKE_Swift_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
