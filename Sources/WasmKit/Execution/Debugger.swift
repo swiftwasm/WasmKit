@@ -114,7 +114,7 @@
             self.functionAddresses = instance.handle.functions.enumerated().compactMap {
                 guard $0.element.isWasm, $0.element.wasm.instance == instance.handle else { return nil }
                 switch $0.element.wasm.code {
-                case .uncompiled(let wasm), .debuggable(let wasm, _):
+                case .uncompiled(let wasm), .debuggable(_, let wasm):
                     return (address: wasm.originalBodyAddress, instanceFunctionIndex: $0.offset)
                 case .compiled:
                     fatalError()
@@ -149,7 +149,7 @@
             precondition(function.handle.isWasm)
 
             switch function.handle.wasm.code {
-            case .debuggable(let wasm, _):
+            case .debuggable(_, let wasm):
                 return wasm.originalAddress
             case .uncompiled:
                 try function.handle.wasm.ensureCompiled(store: StoreRef(self.store))
@@ -504,7 +504,7 @@
 
             try currentFunction.ensureCompiled(store: StoreRef(store))
 
-            guard case .debuggable(let wasm, _) = currentFunction.code else {
+            guard case .debuggable(_, let wasm) = currentFunction.code else {
                 fatalError()
             }
 

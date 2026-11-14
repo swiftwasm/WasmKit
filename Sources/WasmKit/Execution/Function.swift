@@ -213,11 +213,12 @@ struct InternalFunction: Equatable, Hashable {
         return InternalFunction(bitPattern: handle.bitPattern | 0b1)
     }
 
+    // A function reference is never null, so these do not check.
     var wasm: EntityHandle<WasmFunctionEntity> {
-        EntityHandle(unsafe: UnsafeMutablePointer(bitPattern: bitPattern & ~0b0)!)
+        EntityHandle(unsafe: UnsafeMutablePointer(bitPattern: bitPattern & ~0b0).unsafelyUnwrapped)
     }
     var host: EntityHandle<HostFunctionEntity> {
-        EntityHandle(unsafe: UnsafeMutablePointer(bitPattern: bitPattern & ~0b1)!)
+        EntityHandle(unsafe: UnsafeMutablePointer(bitPattern: bitPattern & ~0b1).unsafelyUnwrapped)
     }
 }
 
@@ -290,10 +291,7 @@ extension InternalFunction {
     /// callee must use this instead of ``assumeCompiled()``.
     func compiledIseq() -> InstructionSequence? {
         guard isWasm else { return nil }
-        switch self.wasm.code {
-        case .compiled(let iseq), .debuggable(_, let iseq): return iseq
-        case .uncompiled: return nil
-        }
+        return self.wasm.code.instructionSequence
     }
 
     /// - Precondition: the callee is a wasm function and is already compiled.
@@ -304,12 +302,9 @@ extension InternalFunction {
         function: EntityHandle<WasmFunctionEntity>
     ) {
         let entity = self.wasm
-        switch entity.code {
-        case .compiled(let iseq), .debuggable(_, let iseq):
-            return (iseq, entity)
-        case .uncompiled:
-            preconditionFailure()
-        }
+        // Unchecked: this runs on every internal call. Both compiled cases
+        // keep the sequence first in their payload, so this is a single load.
+        return (entity.code.instructionSequence.unsafelyUnwrapped, entity)
     }
 }
 
@@ -335,7 +330,7 @@ struct WasmFunctionEntity {
         switch code {
         case .uncompiled(let code):
             return try compile(store: store, code: code)
-        case .compiled(let iseq), .debuggable(_, let iseq):
+        case .compiled(let iseq), .debuggable(let iseq, _):
             return iseq
         }
     }
@@ -376,13 +371,13 @@ extension EntityHandle<WasmFunctionEntity> {
             return try self.withValue {
                 let iseq = try $0.compile(store: store, code: code)
                 if $0.instance.isDebuggable {
-                    $0.code = .debuggable(code, iseq)
+                    $0.code = .debuggable(iseq, code)
                 } else {
                     $0.code = .compiled(iseq)
                 }
                 return iseq
             }
-        case .compiled(let iseq), .debuggable(_, let iseq):
+        case .compiled(let iseq), .debuggable(let iseq, _):
             return iseq
         }
     }
@@ -461,7 +456,16 @@ struct InstructionSequence {
 enum CodeBody {
     case uncompiled(InternalUncompiledCode)
     case compiled(InstructionSequence)
-    case debuggable(InternalUncompiledCode, InstructionSequence)
+    /// The sequence comes first, as in `compiled`, so that reading it does not
+    /// depend on which of the two cases this is.
+    case debuggable(InstructionSequence, InternalUncompiledCode)
+
+    var instructionSequence: InstructionSequence? {
+        switch self {
+        case .compiled(let iseq), .debuggable(let iseq, _): return iseq
+        case .uncompiled: return nil
+        }
+    }
 }
 
 extension Reference {

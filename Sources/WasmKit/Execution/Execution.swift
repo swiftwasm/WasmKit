@@ -191,10 +191,9 @@ struct Execution: ~Copyable {
         sp: Sp, newSp: Sp, returnPC: Pc
     ) -> Bool {
         // `compilingCall` only rewrites itself to `internalCall` for a small
-        // frame; the check keeps this sound for any other `internalCall`.
-        guard _fastPath(iseq.hasSmallFrameInit),
-            _fastPath(newSp.advanced(by: iseq.maxStackHeight) < stackEnd)
-        else { return false }
+        // frame, so only the stack bound is left to check per call.
+        assert(iseq.hasSmallFrameInit)
+        guard _fastPath(newSp.advanced(by: iseq.maxStackHeight) < stackEnd) else { return false }
         initializeSmallFrame(sp: newSp, iseq: iseq)
         newSp.previousSP = sp
         newSp.setReturnPC(returnPC, needsMemoryRestore: false)
