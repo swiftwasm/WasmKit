@@ -1912,6 +1912,17 @@ extension VMGen {
             },
         ]
         instructions += wideArithmeticInsts
+        instructions.append(Instruction(name: "i64XorShiftImm", documentation: "result = x ^ (x >> shift)") {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "input", type: .VReg)
+            $0.field(name: "shift", type: .UInt32)
+        })
+        instructions.append(Instruction(name: "i64XorShiftMulImm", documentation: "result = (x ^ (x >> shift)) * multiplier, wrapping") {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "input", type: .VReg)
+            $0.field(name: "multiplier", type: .VReg)
+            $0.field(name: "shift", type: .UInt16)
+        })
         instructions.append(Instruction(name: "i32AddImmGlobalSet", documentation: "Add an immediate and store the result in a register and a global") {
             $0.field(name: "rawGlobal", type: .UInt64)
             $0.field(name: "result", type: .VReg)
@@ -1942,6 +1953,33 @@ extension VMGen {
         instructions.append(Instruction(name: "internalCopyCall", documentation: "Copy argument slots and call an internal function", isControl: true, mayUpdateFrame: true, immediateLayout: .copyCall))
         instructions.append(Instruction(name: "compilingCopy2Call", documentation: "Copy argument slots and call an internal function", isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .copy2Call))
         instructions.append(Instruction(name: "internalCopy2Call", documentation: "Copy argument slots and call an internal function", isControl: true, mayUpdateFrame: true, immediateLayout: .copy2Call))
+        instructions.append(Instruction(name: "i64XorShiftReturn", documentation: "Compute xor-shift, copy its result, and return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "input", type: .VReg)
+            $0.field(name: "shift", type: .UInt32)
+            $0.field(name: "dest", type: .LVReg)
+        })
+        instructions.append(Instruction(name: "i64XorShiftMulPair", documentation: "Two dependent wrapping xor-shift-multiply operations, retaining both results") {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "intermediate", type: .VReg)
+            $0.field(name: "input", type: .VReg)
+            $0.field(name: "multiplier0", type: .VReg)
+            $0.field(name: "multiplier1", type: .VReg)
+            $0.field(name: "shift0", type: .UInt16)
+            $0.field(name: "shift1", type: .UInt16)
+        })
+        instructions.append(Instruction(name: "i64XorShiftMulPairReturn", documentation: "Two ordered xor-shift-multiply operations followed by xor-shift and return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+            $0.field(name: "result0", type: .VReg)
+            $0.field(name: "result1", type: .VReg)
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "input", type: .VReg)
+            $0.field(name: "multiplier0", type: .VReg)
+            $0.field(name: "multiplier1", type: .VReg)
+            $0.field(name: "shift0", type: .UInt16)
+            $0.field(name: "shift1", type: .UInt16)
+            $0.field(name: "shift2", type: .UInt32)
+            $0.field(name: "dest", type: .LVReg)
+        })
         var addBranch = Instruction(name: "i32AddImmBrIf", documentation: "Wrapping immediate add retaining its result followed by a conditional branch", isControl: true) {
             $0.field(name: "result", type: .VReg)
             $0.field(name: "lhs", type: .VReg)

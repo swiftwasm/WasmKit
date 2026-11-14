@@ -454,17 +454,22 @@ extension Execution {
         case 739: return self.execute_i64Sub128(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 740: return self.execute_i64MulWideS(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 741: return self.execute_i64MulWideU(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 742: return self.execute_i32AddImmGlobalSet(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 743: return self.execute_i32GlobalAddSet(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 744: return self.execute_i32GlobalSubSet(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 745: return try self.executeToken_i32AddImmLoad(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 746: return try self.executeToken_i32LoadMemory32(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 747: return self.execute_returnCopy(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 748: return self.execute_returnCopy2(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 749: return try self.execute_compilingCopyCall(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 750: return self.execute_internalCopyCall(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 751: return try self.execute_compilingCopy2Call(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        case 752: return self.execute_internalCopy2Call(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 742: return self.execute_i64XorShiftImm(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 743: return self.execute_i64XorShiftMulImm(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 744: return self.execute_i32AddImmGlobalSet(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 745: return self.execute_i32GlobalAddSet(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 746: return self.execute_i32GlobalSubSet(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 747: return try self.executeToken_i32AddImmLoad(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 748: return try self.executeToken_i32LoadMemory32(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 749: return self.execute_returnCopy(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 750: return self.execute_returnCopy2(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 751: return try self.execute_compilingCopyCall(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 752: return self.execute_internalCopyCall(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 753: return try self.execute_compilingCopy2Call(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 754: return self.execute_internalCopy2Call(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 755: return self.execute_i64XorShiftReturn(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 756: return self.execute_i64XorShiftMulPair(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 757: return self.execute_i64XorShiftMulPairReturn(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -7292,6 +7297,25 @@ extension Execution {
         self.i64MulWideU(sp: sp.pointee, immediate: immediate)
         return next
     }
+    @_silgen_name("wasmkit_execute_i64XorShiftImm") @inline(__always)
+    mutating func execute_i64XorShiftImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.I64XorShiftImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let input = sp.pointee[i64: immediate.input]
+sp.pointee[i64: immediate.result] = input ^ (input &>> UInt64(immediate.shift))
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64XorShiftMulImm") @inline(__always)
+    mutating func execute_i64XorShiftMulImm(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.I64XorShiftMulImmOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let input = sp.pointee[i64: immediate.input]
+let mixed = input ^ (input &>> UInt64(immediate.shift))
+sp.pointee[i64: immediate.result] = mixed &* sp.pointee[i64: immediate.multiplier]
+        return next
+    }
     @_silgen_name("wasmkit_execute_i32AddImmGlobalSet") @inline(__always)
     mutating func execute_i32AddImmGlobalSet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
         let immediate = Instruction.I32AddImmGlobalSetOperand.load(from: &pc.pointee)
@@ -7372,6 +7396,31 @@ extension Execution {
         let immediate = Instruction.Copy2CallOperand.load(from: &pc.pointee)
         let next: CodeSlot
         (pc.pointee, next) = self.internalCopy2Call(sp: &sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64XorShiftReturn") @inline(__always)
+    mutating func execute_i64XorShiftReturn(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.I64XorShiftReturnOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.i64XorShiftReturn(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64XorShiftMulPair") @inline(__always)
+    mutating func execute_i64XorShiftMulPair(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.I64XorShiftMulPairOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        let input = sp.pointee[i64: immediate.input]
+let first = (input ^ (input &>> UInt64(immediate.shift0))) &* sp.pointee[i64: immediate.multiplier0]
+sp.pointee[i64: immediate.intermediate] = first
+sp.pointee[i64: immediate.result] = (first ^ (first &>> UInt64(immediate.shift1))) &* sp.pointee[i64: immediate.multiplier1]
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i64XorShiftMulPairReturn") @inline(__always)
+    mutating func execute_i64XorShiftMulPairReturn(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.I64XorShiftMulPairReturnOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.i64XorShiftMulPairReturn(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee, immediate: immediate)
         return next
     }
     @_silgen_name("wasmkit_execute_i32AddImmBrIf") @inline(__always)
