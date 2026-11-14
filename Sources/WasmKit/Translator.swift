@@ -2075,15 +2075,6 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             else { return nil }
             return (prior.operand, prior.position)
         }
-        /// A pair may be followed by temporary instructions that later fuse
-        /// into the final xor-shift. Only consume it after checking adjacency.
-        private var lastXorMultiplyPair: (operand: Instruction.I64XorShiftMulPairOperand, position: MetaProgramCounter, end: MetaProgramCounter)?
-        fileprivate func xorMultiplyPair(before position: MetaProgramCounter, input: VReg) -> (operand: Instruction.I64XorShiftMulPairOperand, position: MetaProgramCounter)? {
-            guard let prior = lastXorMultiplyPair, prior.end.offsetFromHead == position.offsetFromHead,
-                prior.operand.result == input, canRewind(to: prior.position)
-            else { return nil }
-            return (prior.operand, prior.position)
-        }
         /// An adjacent arithmetic result and copy eligible for a return fusion.
         private var lastXorReturnProducer: (operand: Instruction.I64XorShiftImmOperand, position: MetaProgramCounter, end: MetaProgramCounter)?
         private var lastArithmeticReturn: (operand: Instruction.I64XorShiftReturnOperand, position: MetaProgramCounter, end: MetaProgramCounter)?
@@ -2303,9 +2294,6 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             if let prior = lastXorMultiply, prior.end.offsetFromHead > position.offsetFromHead {
                 lastXorMultiply = nil
             }
-            if let prior = lastXorMultiplyPair, prior.end.offsetFromHead > position.offsetFromHead {
-                lastXorMultiplyPair = nil
-            }
             instructions.removeLast(instructions.count - position.offsetFromHead)
             resetLastEmission()
             lastAccAndSlot = nil
@@ -2384,13 +2372,6 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             lastXorReturnProducer = nil
             let newInstruction = resultRelink(newResult)
             assign(at: lastEmission.position.offsetFromHead, newInstruction)
-            if let prior = lastXorMultiplyPair, prior.position.offsetFromHead == lastEmission.position.offsetFromHead {
-                if case .i64XorShiftMulPair(let operand) = newInstruction {
-                    lastXorMultiplyPair = (operand, prior.position, prior.end)
-                } else {
-                    lastXorMultiplyPair = nil
-                }
-            }
             if let prior = lastXorMultiply, prior.position.offsetFromHead == lastEmission.position.offsetFromHead {
                 if case .i64XorShiftMulImm(let operand) = newInstruction {
                     lastXorMultiply = (operand, prior.position, prior.end)
@@ -2445,9 +2426,6 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             for slot in slots { emitSlot(slot) }
             if case .i64XorShiftMulImm(let operand) = instruction {
                 lastXorMultiply = (operand, position, insertingPC)
-            }
-            if case .i64XorShiftMulPair(let operand) = instruction {
-                lastXorMultiplyPair = (operand, position, insertingPC)
             }
             let producer = lastXorReturnProducer
             lastXorReturnProducer = nil
@@ -3280,21 +3258,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
     private mutating func emitReturnInstruction() {
         if !module.isDebuggable, let arithmetic = iseqBuilder.arithmeticReturn {
-            if let pair = iseqBuilder.xorMultiplyPair(before: arithmetic.position, input: arithmetic.operand.input) {
-                iseqBuilder.rewind(to: pair.position)
-                rewindInstructionMapping(to: pair.position)
-                emit(
-                    .i64XorShiftMulPairReturn(
-                        .init(
-                            result0: pair.operand.intermediate, result1: pair.operand.result, result: arithmetic.operand.result,
-                            input: pair.operand.input, multiplier0: pair.operand.multiplier0, multiplier1: pair.operand.multiplier1,
-                            shift0: pair.operand.shift0, shift1: pair.operand.shift1, shift2: arithmetic.operand.shift,
-                            dest: arithmetic.operand.dest)))
-            } else {
-                iseqBuilder.rewind(to: arithmetic.position)
-                rewindInstructionMapping(to: arithmetic.position)
-                emit(.i64XorShiftReturn(arithmetic.operand))
-            }
+            iseqBuilder.rewind(to: arithmetic.position)
+            rewindInstructionMapping(to: arithmetic.position)
+            emit(.i64XorShiftReturn(arithmetic.operand))
         } else if !module.isDebuggable, let copy = iseqBuilder.returnCopy {
             iseqBuilder.rewind(to: copy.position)
             rewindInstructionMapping(to: copy.position)
