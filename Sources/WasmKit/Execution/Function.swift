@@ -410,6 +410,18 @@ struct InstructionSequence {
     /// from `sp`. Never above the saved slots, `-24`.
     let frameInitOffset: Int
 
+    /// The largest frame-initialization image, in bytes, that a call copies
+    /// with fixed-size moves instead of `memcpy`.
+    static let smallFrameInitByteCount = 128
+
+    /// Whether the frame-initialization image is at most
+    /// ``smallFrameInitByteCount`` bytes, so `internalCall` can enter the
+    /// function without the throwing `internalCallSlow` path.
+    var hasSmallFrameInit: Bool {
+        let savedSlotsOffset = -StackLayout.numberOfSavingSlots * MemoryLayout<UntypedValue>.stride
+        return frameInitOffset >= savedSlotsOffset - Self.smallFrameInitByteCount
+    }
+
     /// The frame-initialization image as a buffer.
     var frameInit: UnsafeBufferPointer<UntypedValue> {
         let savedSlotsOffset = -StackLayout.numberOfSavingSlots * MemoryLayout<UntypedValue>.stride

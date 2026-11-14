@@ -122,16 +122,16 @@ struct Execution: ~Copyable {
     /// costs several times the copy itself.
     @inline(__always)
     private func initializeFrame(sp: Sp, iseq: InstructionSequence) {
-        let savedSlots = -StackLayout.numberOfSavingSlots * MemoryLayout<UntypedValue>.stride
-        if iseq.frameInitOffset < savedSlots - 128 {
+        if iseq.hasSmallFrameInit {
+            initializeSmallFrame(sp: sp, iseq: iseq)
+        } else {
             // `copyMemory` rather than `update(from:count:)`: the latter emits
             // an overlap check that is dead here (the image lives in the iseq
             // allocation, never on the VM stack).
+            let savedSlots = -StackLayout.numberOfSavingSlots * MemoryLayout<UntypedValue>.stride
             (UnsafeMutableRawPointer(sp) + iseq.frameInitOffset).copyMemory(
                 from: iseq.frameInitAnchor + iseq.frameInitOffset,
                 byteCount: savedSlots &- iseq.frameInitOffset)
-        } else {
-            initializeSmallFrame(sp: sp, iseq: iseq)
         }
     }
 
@@ -190,8 +190,9 @@ struct Execution: ~Copyable {
         iseq: InstructionSequence, function: EntityHandle<WasmFunctionEntity>,
         sp: Sp, newSp: Sp, returnPC: Pc
     ) -> Bool {
-        let savedSlots = -StackLayout.numberOfSavingSlots * MemoryLayout<UntypedValue>.stride
-        guard _fastPath(iseq.frameInitOffset >= savedSlots - 128),
+        // `compilingCall` only rewrites itself to `internalCall` for a small
+        // frame; the check keeps this sound for any other `internalCall`.
+        guard _fastPath(iseq.hasSmallFrameInit),
             _fastPath(newSp.advanced(by: iseq.maxStackHeight) < stackEnd)
         else { return false }
         initializeSmallFrame(sp: newSp, iseq: iseq)

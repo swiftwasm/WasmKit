@@ -154,7 +154,11 @@ extension Execution {
         let headSlotPc = pc.advanced(by: -3)
         let callee = immediate.callee
         try callee.wasm.ensureCompiled(store: store)
-        let replaced = Instruction.internalCall(immediate)
+        // A large frame would make every `internalCall` fail its fast path and
+        // dispatch again to `internalCallSlow`, so go there directly.
+        let replaced: Instruction =
+            callee.assumeCompiled().0.hasSmallFrameInit
+            ? .internalCall(immediate) : .internalCallSlow(immediate)
         headSlotPc.pointee = replaced.headSlotInline(
             threadingModel: store.value.engine.configuration.threadingModel)
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)
