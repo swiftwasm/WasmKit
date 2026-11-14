@@ -1912,6 +1912,44 @@ extension VMGen {
             },
         ]
         instructions += wideArithmeticInsts
+        instructions.append(Instruction(name: "i32AddImmGlobalSet", documentation: "Add an immediate and store the result in a register and a global") {
+            $0.field(name: "rawGlobal", type: .UInt64)
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "lhs", type: .VReg)
+            $0.field(name: "imm", type: .Int32)
+        })
+        instructions.append(Instruction(name: "i32GlobalAddSet", documentation: "Read a global, add a register, and write both destinations") {
+            $0.field(name: "rawGlobal", type: .UInt64)
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "rhs", type: .VReg)
+        })
+        instructions.append(Instruction(name: "i32GlobalSubSet", documentation: "Read a global, subtract a register, and write both destinations", immediate: "I32GlobalAddSetOperand"))
+        var addLoad = Instruction(name: "i32AddImmLoad", documentation: "Add a wrapping address immediate and load i32", useCurrentMemory: .read) {
+            $0.field(name: "lhs", type: .VReg)
+            $0.field(name: "pointer", type: .VReg)
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "imm", type: .Int32)
+            $0.field(name: "offset", type: .UInt32)
+        }
+        addLoad.mayDispatchToTrap = true
+        instructions.append(addLoad)
+        var load32 = Instruction(name: "i32LoadMemory32", documentation: "Load i32 with a 32-bit address and static offset", useCurrentMemory: .read, immediateLayout: .accMemoryPointerResult)
+        load32.mayDispatchToTrap = true
+        instructions.append(load32)
+        instructions.append(Instruction(name: "returnCopy", documentation: "Copy a result slot and return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write, immediate: "CopyStackOperand"))
+        instructions.append(Instruction(name: "returnCopy2", documentation: "Copy two independent result slots and return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write, immediate: "CopyStack2Operand"))
+        instructions.append(Instruction(name: "compilingCopyCall", documentation: "Copy argument slots and call an internal function", isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .copyCall))
+        instructions.append(Instruction(name: "internalCopyCall", documentation: "Copy argument slots and call an internal function", isControl: true, mayUpdateFrame: true, immediateLayout: .copyCall))
+        instructions.append(Instruction(name: "compilingCopy2Call", documentation: "Copy argument slots and call an internal function", isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .copy2Call))
+        instructions.append(Instruction(name: "internalCopy2Call", documentation: "Copy argument slots and call an internal function", isControl: true, mayUpdateFrame: true, immediateLayout: .copy2Call))
+        var addBranch = Instruction(name: "i32AddImmBrIf", documentation: "Wrapping immediate add retaining its result followed by a conditional branch", isControl: true) {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "lhs", type: .VReg)
+            $0.field(name: "imm", type: .Int32)
+            $0.field(name: "offset", type: .Int32)
+        }
+        addBranch.useIreg = .write
+        instructions.append(addBranch)
         return instructions
     }
 

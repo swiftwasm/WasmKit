@@ -142,7 +142,8 @@ struct WideArithmeticTests {
             try #require(localRegisters.count == 2)
             let multiply = try #require(lines.first { $0.contains("i64.mul_wide_s") })
             #expect(multiply.contains("reg:\(localRegisters[0]), reg:\(localRegisters[1]) = i64.mul_wide_s"))
-            #expect(lines.filter { $0.contains(" = copy ") }.count == 1, "only the copy of the function's result remains")
+            #expect(lines.filter { $0.contains(" = copy ") }.isEmpty)
+            #expect(lines.contains { $0.contains("returnCopy") }, "only the copy of the function's result remains, fused into its return")
         }
     #endif
 }

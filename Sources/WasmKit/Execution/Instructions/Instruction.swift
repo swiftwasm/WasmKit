@@ -2430,6 +2430,30 @@ enum Instruction {
     case i64MulWideS(Instruction.MulWideOperand)
     /// WebAssembly Core Instruction `i64.mul_wide_u`
     case i64MulWideU(Instruction.MulWideOperand)
+    /// Add an immediate and store the result in a register and a global
+    case i32AddImmGlobalSet(Instruction.I32AddImmGlobalSetOperand)
+    /// Read a global, add a register, and write both destinations
+    case i32GlobalAddSet(Instruction.I32GlobalAddSetOperand)
+    /// Read a global, subtract a register, and write both destinations
+    case i32GlobalSubSet(Instruction.I32GlobalAddSetOperand)
+    /// Add a wrapping address immediate and load i32
+    case i32AddImmLoad(Instruction.I32AddImmLoadOperand)
+    /// Load i32 with a 32-bit address and static offset
+    case i32LoadMemory32(Instruction.AccMemoryPointerResultOperand)
+    /// Copy a result slot and return
+    case returnCopy(Instruction.CopyStackOperand)
+    /// Copy two independent result slots and return
+    case returnCopy2(Instruction.CopyStack2Operand)
+    /// Copy argument slots and call an internal function
+    case compilingCopyCall(Instruction.CopyCallOperand)
+    /// Copy argument slots and call an internal function
+    case internalCopyCall(Instruction.CopyCallOperand)
+    /// Copy argument slots and call an internal function
+    case compilingCopy2Call(Instruction.Copy2CallOperand)
+    /// Copy argument slots and call an internal function
+    case internalCopy2Call(Instruction.Copy2CallOperand)
+    /// Wrapping immediate add retaining its result followed by a conditional branch
+    case i32AddImmBrIf(Instruction.I32AddImmBrIfOperand)
 }
 
 extension Instruction {
@@ -3751,6 +3775,127 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.lhs, $0.rhs, $0.low, $0.high) as (VReg, VReg, VReg, VReg), to: CodeSlot.self) }
         }
     }
+
+    struct I32AddImmGlobalSetOperand: InstructionImmediate {
+        var rawGlobal: UInt64
+        var result: VReg
+        var lhs: VReg
+        var imm: Int32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let rawGlobal = pc.read(UInt64.self)
+                let word1 = pc.read(UInt64.self)
+                let result = VReg(byteOffset: Int16(truncatingIfNeeded: word1))
+                let lhs = VReg(byteOffset: Int16(truncatingIfNeeded: word1 >> 16))
+                let imm = Int32(truncatingIfNeeded: word1 >> 32)
+                return Self(rawGlobal: rawGlobal, result: result, lhs: lhs, imm: imm)
+            #else
+                let (rawGlobal) = pc.read((UInt64).self)
+                let (result, lhs, imm) = pc.read((VReg, VReg, Int32).self)
+                return Self(rawGlobal: rawGlobal, result: result, lhs: lhs, imm: imm)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.rawGlobal }
+            emitSlot { unsafeBitCast(($0.result, $0.lhs, $0.imm) as (VReg, VReg, Int32), to: CodeSlot.self) }
+        }
+    }
+
+    struct I32GlobalAddSetOperand: InstructionImmediate {
+        var rawGlobal: UInt64
+        var result: VReg
+        var rhs: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            #if _endian(little)
+                let rawGlobal = pc.read(UInt64.self)
+                let word1 = pc.read(UInt64.self)
+                let result = VReg(byteOffset: Int16(truncatingIfNeeded: word1))
+                let rhs = VReg(byteOffset: Int16(truncatingIfNeeded: word1 >> 16))
+                return Self(rawGlobal: rawGlobal, result: result, rhs: rhs)
+            #else
+                let (rawGlobal) = pc.read((UInt64).self)
+                let (result, rhs, _, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
+                return Self(rawGlobal: rawGlobal, result: result, rhs: rhs)
+            #endif
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.rawGlobal }
+            emitSlot { unsafeBitCast(($0.result, $0.rhs, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct I32AddImmLoadOperand: InstructionImmediate {
+        var lhs: VReg
+        var pointer: VReg
+        var result: VReg
+        var imm: Int32
+        var offset: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (lhs, pointer, result, _, _) = pc.read((VReg, VReg, VReg, UInt8, UInt8).self)
+            let (imm, offset) = pc.read((Int32, UInt32).self)
+            return Self(lhs: lhs, pointer: pointer, result: result, imm: imm, offset: offset)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.lhs, $0.pointer, $0.result, 0, 0) as (VReg, VReg, VReg, UInt8, UInt8), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.imm, $0.offset) as (Int32, UInt32), to: CodeSlot.self) }
+        }
+    }
+
+    struct CopyCallOperand: InstructionImmediate {
+        var source: LVReg
+        var dest: LVReg
+        var rawCallee: UInt64
+        var arguments: VReg
+        var spAddend: LVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (source, dest) = pc.read((LVReg, LVReg).self)
+            let (rawCallee) = pc.read((UInt64).self)
+            let (arguments, spAddend) = pc.read((VReg, LVReg).self)
+            return Self(source: source, dest: dest, rawCallee: rawCallee, arguments: arguments, spAddend: spAddend)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.source, $0.dest) as (LVReg, LVReg), to: CodeSlot.self) }
+            emitSlot { $0.rawCallee }
+            emitSlot { unsafeBitCast(($0.arguments, $0.spAddend) as (VReg, LVReg), to: CodeSlot.self) }
+        }
+    }
+
+    struct Copy2CallOperand: InstructionImmediate {
+        var source0: VReg
+        var dest0: VReg
+        var source1: VReg
+        var dest1: VReg
+        var rawCallee: UInt64
+        var arguments: VReg
+        var spAddend: LVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (source0, dest0, source1, dest1) = pc.read((VReg, VReg, VReg, VReg).self)
+            let (rawCallee) = pc.read((UInt64).self)
+            let (arguments, spAddend) = pc.read((VReg, LVReg).self)
+            return Self(source0: source0, dest0: dest0, source1: source1, dest1: dest1, rawCallee: rawCallee, arguments: arguments, spAddend: spAddend)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.source0, $0.dest0, $0.source1, $0.dest1) as (VReg, VReg, VReg, VReg), to: CodeSlot.self) }
+            emitSlot { $0.rawCallee }
+            emitSlot { unsafeBitCast(($0.arguments, $0.spAddend) as (VReg, LVReg), to: CodeSlot.self) }
+        }
+    }
+
+    struct I32AddImmBrIfOperand: InstructionImmediate {
+        var result: VReg
+        var lhs: VReg
+        var imm: Int32
+        var offset: Int32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (result, lhs, imm) = pc.read((VReg, VReg, Int32).self)
+            let (offset, _, _, _, _) = pc.read((Int32, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(result: result, lhs: lhs, imm: imm, offset: offset)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.result, $0.lhs, $0.imm) as (VReg, VReg, Int32), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.offset, 0, 0, 0, 0) as (Int32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -4486,6 +4631,18 @@ extension Instruction {
         case .i64Sub128(let immediate): return immediate
         case .i64MulWideS(let immediate): return immediate
         case .i64MulWideU(let immediate): return immediate
+        case .i32AddImmGlobalSet(let immediate): return immediate
+        case .i32GlobalAddSet(let immediate): return immediate
+        case .i32GlobalSubSet(let immediate): return immediate
+        case .i32AddImmLoad(let immediate): return immediate
+        case .i32LoadMemory32(let immediate): return immediate
+        case .returnCopy(let immediate): return immediate
+        case .returnCopy2(let immediate): return immediate
+        case .compilingCopyCall(let immediate): return immediate
+        case .internalCopyCall(let immediate): return immediate
+        case .compilingCopy2Call(let immediate): return immediate
+        case .internalCopy2Call(let immediate): return immediate
+        case .i32AddImmBrIf(let immediate): return immediate
         default: return nil
         }
     }
@@ -5225,6 +5382,18 @@ extension Instruction {
         case .i64Sub128(let immediate): immediate.emit(to: emit)
         case .i64MulWideS(let immediate): immediate.emit(to: emit)
         case .i64MulWideU(let immediate): immediate.emit(to: emit)
+        case .i32AddImmGlobalSet(let immediate): immediate.emit(to: emit)
+        case .i32GlobalAddSet(let immediate): immediate.emit(to: emit)
+        case .i32GlobalSubSet(let immediate): immediate.emit(to: emit)
+        case .i32AddImmLoad(let immediate): immediate.emit(to: emit)
+        case .i32LoadMemory32(let immediate): immediate.emit(to: emit)
+        case .returnCopy(let immediate): immediate.emit(to: emit)
+        case .returnCopy2(let immediate): immediate.emit(to: emit)
+        case .compilingCopyCall(let immediate): immediate.emit(to: emit)
+        case .internalCopyCall(let immediate): immediate.emit(to: emit)
+        case .compilingCopy2Call(let immediate): immediate.emit(to: emit)
+        case .internalCopy2Call(let immediate): immediate.emit(to: emit)
+        case .i32AddImmBrIf(let immediate): immediate.emit(to: emit)
         default: return
         }
     }
@@ -5976,19 +6145,31 @@ extension Instruction {
         case .i64Add128: return 738
         case .i64Sub128: return 739
         case .i64MulWideS: return 740
-        default: return 741  // .i64MulWideU
+        case .i64MulWideU: return 741
+        case .i32AddImmGlobalSet: return 742
+        case .i32GlobalAddSet: return 743
+        case .i32GlobalSubSet: return 744
+        case .i32AddImmLoad: return 745
+        case .i32LoadMemory32: return 746
+        case .returnCopy: return 747
+        case .returnCopy2: return 748
+        case .compilingCopyCall: return 749
+        case .internalCopyCall: return 750
+        case .compilingCopy2Call: return 751
+        case .internalCopy2Call: return 752
+        default: return 753  // .i32AddImmBrIf
         }
     }
 }
 extension Instruction {
     /// The number of opcodes, trap pseudo-instructions included.
-    static let opcodeCount = 742
+    static let opcodeCount = 754
 
     /// Whether only the direct-threaded dispatcher implements this instruction;
     /// `Execution.doExecute` has no case for it.
     var isDirectThreadedOnly: Bool {
         switch opcodeID {
-        case 366, 367, 368, 369, 370, 371, 372, 373, 374, 375, 376, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 387, 388, 389, 390, 391, 392, 393, 394, 395, 396, 397, 398, 399, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 432, 433, 434, 435, 436, 437, 438, 439, 440, 441, 442, 443, 444, 445, 446, 447, 448, 449, 450, 451, 452, 453, 454, 455, 456, 457, 458, 459, 460, 461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494, 495, 496, 497, 498, 499, 500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510, 511, 512, 513, 514, 515, 516, 517, 518, 519, 520, 521, 522, 523, 524, 525, 526, 527, 528, 529, 530, 531, 532, 533, 534, 535, 536, 537, 538, 539, 540, 541, 542, 543, 544, 545, 546, 547, 548, 549, 550, 551, 552, 553, 554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565, 566, 567, 568, 569, 570, 571, 572, 573, 574, 575, 576, 577, 578, 579, 580, 581, 582, 583, 584, 585, 586, 587, 588, 589, 590, 591, 592, 593, 594, 595, 596, 597, 598, 599, 600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611, 612, 613, 614, 615, 616, 617, 618, 619, 620, 621, 622, 623, 624, 625, 626, 627, 628, 629, 630, 631, 632, 633, 634, 635, 636, 637, 638, 639, 640, 641, 642, 643, 644, 645, 646, 647, 648, 649, 650, 651, 652, 653, 654, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703, 704, 705, 706, 707, 708, 709, 710, 711, 712: return true
+        case 366, 367, 368, 369, 370, 371, 372, 373, 374, 375, 376, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 387, 388, 389, 390, 391, 392, 393, 394, 395, 396, 397, 398, 399, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 432, 433, 434, 435, 436, 437, 438, 439, 440, 441, 442, 443, 444, 445, 446, 447, 448, 449, 450, 451, 452, 453, 454, 455, 456, 457, 458, 459, 460, 461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490, 491, 492, 493, 494, 495, 496, 497, 498, 499, 500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510, 511, 512, 513, 514, 515, 516, 517, 518, 519, 520, 521, 522, 523, 524, 525, 526, 527, 528, 529, 530, 531, 532, 533, 534, 535, 536, 537, 538, 539, 540, 541, 542, 543, 544, 545, 546, 547, 548, 549, 550, 551, 552, 553, 554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565, 566, 567, 568, 569, 570, 571, 572, 573, 574, 575, 576, 577, 578, 579, 580, 581, 582, 583, 584, 585, 586, 587, 588, 589, 590, 591, 592, 593, 594, 595, 596, 597, 598, 599, 600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611, 612, 613, 614, 615, 616, 617, 618, 619, 620, 621, 622, 623, 624, 625, 626, 627, 628, 629, 630, 631, 632, 633, 634, 635, 636, 637, 638, 639, 640, 641, 642, 643, 644, 645, 646, 647, 648, 649, 650, 651, 652, 653, 654, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703, 704, 705, 706, 707, 708, 709, 710, 711, 712, 753: return true
         default: return false
         }
     }
@@ -6747,6 +6928,18 @@ extension Instruction {
         case 739: return .i64Sub128(Instruction.Binary128Operand.load(from: &pc))
         case 740: return .i64MulWideS(Instruction.MulWideOperand.load(from: &pc))
         case 741: return .i64MulWideU(Instruction.MulWideOperand.load(from: &pc))
+        case 742: return .i32AddImmGlobalSet(Instruction.I32AddImmGlobalSetOperand.load(from: &pc))
+        case 743: return .i32GlobalAddSet(Instruction.I32GlobalAddSetOperand.load(from: &pc))
+        case 744: return .i32GlobalSubSet(Instruction.I32GlobalAddSetOperand.load(from: &pc))
+        case 745: return .i32AddImmLoad(Instruction.I32AddImmLoadOperand.load(from: &pc))
+        case 746: return .i32LoadMemory32(Instruction.AccMemoryPointerResultOperand.load(from: &pc))
+        case 747: return .returnCopy(Instruction.CopyStackOperand.load(from: &pc))
+        case 748: return .returnCopy2(Instruction.CopyStack2Operand.load(from: &pc))
+        case 749: return .compilingCopyCall(Instruction.CopyCallOperand.load(from: &pc))
+        case 750: return .internalCopyCall(Instruction.CopyCallOperand.load(from: &pc))
+        case 751: return .compilingCopy2Call(Instruction.Copy2CallOperand.load(from: &pc))
+        case 752: return .internalCopy2Call(Instruction.Copy2CallOperand.load(from: &pc))
+        case 753: return .i32AddImmBrIf(Instruction.I32AddImmBrIfOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -7503,6 +7696,18 @@ extension Instruction {
         case 739: return "i64Sub128"
         case 740: return "i64MulWideS"
         case 741: return "i64MulWideU"
+        case 742: return "i32AddImmGlobalSet"
+        case 743: return "i32GlobalAddSet"
+        case 744: return "i32GlobalSubSet"
+        case 745: return "i32AddImmLoad"
+        case 746: return "i32LoadMemory32"
+        case 747: return "returnCopy"
+        case 748: return "returnCopy2"
+        case 749: return "compilingCopyCall"
+        case 750: return "internalCopyCall"
+        case 751: return "compilingCopy2Call"
+        case 752: return "internalCopy2Call"
+        case 753: return "i32AddImmBrIf"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }

@@ -2052,6 +2052,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// the slot stays written, so it only has to be the last thing in the
         /// buffer, which ``accProducer`` checks.
         private var lastAccAndSlot: AccProducer?
+        // A relinked binary retains its local write when fused with global.set.
+        private var relinkedGlobalUpdate: BinaryEmission?
+        fileprivate var globalUpdateEmission: BinaryEmission? { binaryEmission ?? relinkedGlobalUpdate }
         /// Whether to emit instructions only the direct-threaded dispatcher
         /// implements (`Instruction.isDirectThreadedOnly`), such as the
         /// accumulator forms. Off under token threading, and for a debuggable
@@ -2063,6 +2066,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         /// the accumulator on untouched once fused with a following write of
         /// the producer's result.
         private var copyAfterAcc: (producer: AccProducer, source: VReg, dest: VReg, end: MetaProgramCounter)?
+        /// The last emitted copy instruction, for fusing it into a following
+        /// `return` or internal call.
+        private var lastReturnCopy: (instruction: Instruction, position: MetaProgramCounter, end: MetaProgramCounter)?
+        fileprivate var returnCopy: (instruction: Instruction, position: MetaProgramCounter)? {
+            guard let copy = lastReturnCopy, copy.end.offsetFromHead == insertingPC.offsetFromHead,
+                canRewind(to: copy.position)
+            else { return nil }
+            return (copy.instruction, copy.position)
+        }
         /// The last emitted single copy, for pairing it with the next one.
         private var lastCopy: (source: VReg, dest: VReg, position: MetaProgramCounter, end: MetaProgramCounter)?
         /// The highest offset any label has been pinned at.
@@ -2263,8 +2275,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             instructions.removeLast(instructions.count - position.offsetFromHead)
             resetLastEmission()
             lastAccAndSlot = nil
+            relinkedGlobalUpdate = nil
             copyAfterAcc = nil
             lastCopy = nil
+            lastReturnCopy = nil
         }
 
         /// Records a single copy just emitted at `position`.
@@ -2322,6 +2336,14 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             if let relinkedResult = lastEmission.relinkedResult, relinkedResult != value {
                 return false
             }
+            if let candidate = binaryEmission {
+                let op = candidate.operation
+                relinkedGlobalUpdate = BinaryEmission(
+                    position: candidate.position, end: candidate.end,
+                    operation: BinaryOperation(
+                        type: op.type, op: op.op, lhs: op.lhs, rhs: op.rhs,
+                        result: newResult, rhsConstant: op.rhsConstant), prefix: candidate.prefix)
+            }
             let newInstruction = resultRelink(newResult)
             assign(at: lastEmission.position.offsetFromHead, newInstruction)
             if emitsDirectOnlyInstructions, let form = lastAcc?.producer, form.hasAccAndSlotForm {
@@ -2362,12 +2384,18 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             fusable: (condition: FusableCondition, result: VReg, start: MetaProgramCounter?)? = nil,
             binary: BinaryOperation? = nil
         ) {
+            relinkedGlobalUpdate = nil
             let position = insertingPC
             trace("emitInstruction: \(instruction)")
             emitSlot(headSlot(of: instruction))
             var slots: [CodeSlot] = []
             instruction.emitImmediate(to: { slots.append($0) })
             for slot in slots { emitSlot(slot) }
+            switch instruction {
+            case .copyStack(let operand): lastReturnCopy = (.returnCopy(operand), position, insertingPC)
+            case .copyStack2(let operand): lastReturnCopy = (.returnCopy2(operand), position, insertingPC)
+            default: lastReturnCopy = nil
+            }
             self.lastEmission = LastEmission(
                 position: position, end: insertingPC,
                 resultRelink: resultRelink,
@@ -3176,6 +3204,16 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
         return emittedCopy
     }
+    private mutating func emitReturnInstruction() {
+        if !module.isDebuggable, let copy = iseqBuilder.returnCopy {
+            iseqBuilder.rewind(to: copy.position)
+            rewindInstructionMapping(to: copy.position)
+            emit(copy.instruction)
+        } else {
+            emit(._return(.init()))
+        }
+    }
+
     private mutating func translateReturn() throws(WasmKitError) {
         if isIntercepting {
             // Emit `onExit` instruction before every `return` instruction
@@ -3189,9 +3227,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             emit(.catchHandlersEnd(Instruction.CatchHandlersEndOperand(count: handlersToUnwind)))
         }
         try visitReturnLike()
-        let oldPC = iseqBuilder.insertingPC
-        iseqBuilder.emit(._return(.init()))
-        self.updateInstructionMapping(from: oldPC)
+        emitReturnInstruction()
     }
     /// Emits the return a tail call to a host function continues with.
     ///
@@ -3250,9 +3286,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // Check dangling labels
         try iseqBuilder.assertDanglingLabels()
 
-        let oldPC = iseqBuilder.insertingPC
-        iseqBuilder.emit(._return(.init()))
-        self.updateInstructionMapping(from: oldPC)
+        emitReturnInstruction()
         // The function body's region closes here rather than in `visitEnd`, which returns for the
         // root frame without popping it.
         if let region = fuelRegion {
@@ -3851,6 +3885,18 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                 return
             }
             if let producer = accConditionProducer(accCandidate, condition: condition) {
+                if case .binaryImm(.i32, .add, let lhs, let imm, let result) = producer.form {
+                    iseqBuilder.rewind(to: producer.position)
+                    self.rewindInstructionMapping(to: producer.position)
+                    let oldPC = iseqBuilder.insertingPC
+                    iseqBuilder.emitWithLabel(Instruction.i32AddImmBrIf, frame.continuation) { _, selfPC, continuation in
+                        Instruction.I32AddImmBrIfOperand(
+                            result: result, lhs: lhs, imm: imm,
+                            offset: Int32(continuation.offsetFromHead - selfPC.offsetFromHead))
+                    }
+                    self.updateInstructionMapping(from: oldPC)
+                    return
+                }
                 rewindProducerIntoAccumulator(producer)
                 let oldPC = iseqBuilder.insertingPC
                 iseqBuilder.emitWithLabel(Instruction.brIfAcc, frame.continuation) { _, selfPC, continuation in
@@ -4154,7 +4200,31 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             }
             spAddend = LVReg(slotIndex: spAddendSlotIndex)
             if module.isSameInstance(wasm.instance) {
-                emit(.compilingCall(Instruction.CallOperand(callee: callee, arguments: arguments, spAddend: spAddend)))
+                let call = Instruction.CallOperand(callee: callee, arguments: arguments, spAddend: spAddend)
+                if !module.isDebuggable, let copy = iseqBuilder.returnCopy {
+                    let fused: Instruction?
+                    switch copy.instruction {
+                    case .returnCopy(let operand):
+                        fused = .compilingCopyCall(
+                            .init(
+                                source: operand.source, dest: operand.dest,
+                                rawCallee: call.rawCallee, arguments: arguments, spAddend: spAddend))
+                    case .returnCopy2(let operand):
+                        fused = .compilingCopy2Call(
+                            .init(
+                                source0: operand.source0, dest0: operand.dest0,
+                                source1: operand.source1, dest1: operand.dest1,
+                                rawCallee: call.rawCallee, arguments: arguments, spAddend: spAddend))
+                    default: fused = nil
+                    }
+                    if let fused {
+                        iseqBuilder.rewind(to: copy.position)
+                        rewindInstructionMapping(to: copy.position)
+                        emit(fused)
+                        return
+                    }
+                }
+                emit(.compilingCall(call))
                 return
             }
         }
@@ -4640,12 +4710,41 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
     mutating func visitGlobalSet(globalIndex: UInt32) throws(WasmKitError) -> Output {
         let type = try module.globalType(globalIndex)
+        let producer = iseqBuilder.accProducer
+        let update = iseqBuilder.globalUpdateEmission
         guard let value = try popVRegOperand(type) else { return }
         guard let global = module.resolveGlobal(globalIndex) else {
             // Skip actual code emission if validation-only mode
             return
         }
         try validator.validateGlobalSet(global.globalType)
+        if type == .i32, let update, update.operation.type == .i32,
+            update.operation.result == value, update.operation.rhsConstant == nil,
+            update.operation.op == .add || update.operation.op == .sub,
+            case .globalGet(.i32, let sourceGlobal, let sourceResult) = update.prefix,
+            sourceGlobal.bitPattern == global.bitPattern, sourceResult == update.operation.lhs,
+            update.end.offsetFromHead - update.position.offsetFromHead == 4,
+            iseqBuilder.canRewind(to: update)
+        {
+            iseqBuilder.rewind(to: update.position)
+            rewindInstructionMapping(to: update.position)
+            let operand = Instruction.I32GlobalAddSetOperand(rawGlobal: UInt64(UInt(bitPattern: global.bitPattern)), result: value, rhs: update.operation.rhs)
+            if update.operation.op == .add {
+                emit(.i32GlobalAddSet(operand))
+            } else {
+                emit(.i32GlobalSubSet(operand))
+            }
+            return
+        }
+        if type == .i32, let producer,
+            case .binaryImm(.i32, .add, let lhs, let imm, let result) = producer.form,
+            result == value, iseqBuilder.canRewind(to: producer)
+        {
+            iseqBuilder.rewind(to: producer.position)
+            rewindInstructionMapping(to: producer.position)
+            emit(.i32AddImmGlobalSet(.init(rawGlobal: UInt64(UInt(bitPattern: global.bitPattern)), result: result, lhs: lhs, imm: imm)))
+            return
+        }
         let operand = Instruction.GlobalAndVRegOperand(reg: LLVReg(value), global: global)
         emit(type == .v128 ? .globalSetV128(operand) : .globalSet(operand))
     }
@@ -4801,6 +4900,18 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let pointer = try popVRegOperand(.address(isMemory64: false))
         let result = valueStack.push(load.type)
         guard let pointer else { return }
+        if load == .i32Load, let accCandidate,
+            case .binaryImm(.i32, .add, let lhs, let imm, let address) = accCandidate.form,
+            address == pointer, iseqBuilder.canRewind(to: accCandidate)
+        {
+            iseqBuilder.rewind(to: accCandidate.position)
+            rewindInstructionMapping(to: accCandidate.position)
+            let make = { (result: VReg) in
+                Instruction.i32AddImmLoad(.init(lhs: lhs, pointer: pointer, result: result, imm: imm, offset: offset))
+            }
+            emit(make(result), resultRelink: { newResult in make(newResult) })
+            return
+        }
         if let accCandidate, accCandidate.form.type == .i32, accCandidate.form.result == pointer,
             accCandidate.producing(into: .integer) != nil, iseqBuilder.canRewind(to: accCandidate)
         {
@@ -4827,12 +4938,20 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             emit(make(result), resultRelink: { newResult in make(newResult) })
             return
         }
-        emit(
-            forms.plain(Instruction.LoadOperand(offset: UInt64(offset), pointer: pointer, result: result)),
-            resultRelink: { newResult in
-                forms.plain(Instruction.LoadOperand(offset: UInt64(offset), pointer: pointer, result: newResult))
-            }
-        )
+        if load == .i32Load {
+            emit(
+                .i32LoadMemory32(.init(pointer: pointer, result: result, offset: offset)),
+                resultRelink: { newResult in
+                    .i32LoadMemory32(.init(pointer: pointer, result: newResult, offset: offset))
+                })
+        } else {
+            emit(
+                forms.plain(Instruction.LoadOperand(offset: UInt64(offset), pointer: pointer, result: result)),
+                resultRelink: { newResult in
+                    forms.plain(Instruction.LoadOperand(offset: UInt64(offset), pointer: pointer, result: newResult))
+                }
+            )
+        }
         iseqBuilder.recordAcc(AccRecords(producer: .load(load, pointer: pointer, offset: offset, result: result)))
     }
 
