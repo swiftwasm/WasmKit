@@ -94,17 +94,28 @@ public struct Function: Equatable {
         _ body: @escaping Implementation, results: [ValueType]
     ) -> RawImplementation {
         { caller, parameters, out in
-            let produced = try body(caller, Array(parameters))
-            guard produced.count == results.count else {
+            try write(body(caller, Array(parameters)), to: out, types: results)
+        }
+    }
+
+    /// Checks results an array-based host function returned and writes them to `out`.
+    static func write(_ produced: [Value], to out: UnsafeMutableBufferPointer<Value>, types results: [ValueType]) throws {
+        try checkResults(produced, types: results)
+        for index in 0..<produced.count {
+            out[index] = produced[index]
+        }
+    }
+
+    /// Checks results a host function returned against its result types.
+    static func checkResults(_ produced: [Value], types results: [ValueType]) throws {
+        guard produced.count == results.count else {
+            throw Trap(.resultTypesMismatch(expected: results, got: produced))
+        }
+        for index in 0..<produced.count {
+            do {
+                try produced[index].checkType(results[index])
+            } catch {
                 throw Trap(.resultTypesMismatch(expected: results, got: produced))
-            }
-            for index in 0..<produced.count {
-                do {
-                    try produced[index].checkType(results[index])
-                } catch {
-                    throw Trap(.resultTypesMismatch(expected: results, got: produced))
-                }
-                out[index] = produced[index]
             }
         }
     }
@@ -248,10 +259,17 @@ extension InternalFunction {
         }
     }
 
-    func invokeHost(_ arguments: [Value], store: Store) throws -> [Value] {
+    /// Calls a host function directly, not from a guest.
+    ///
+    /// - Parameter suspendable: Whether the function may suspend the call: only when it is the
+    ///   root of a ``ResumableCall``.
+    func invokeHost(_ arguments: [Value], store: Store, suspendable: Bool = false) throws -> [Value] {
         let entity = host
         let resolvedType = store.engine.resolveType(entity.type)
         try check(functionType: resolvedType, parameters: arguments)
+        let wasSuspendable = store.isSuspendable
+        store.isSuspendable = suspendable
+        defer { store.isSuspendable = wasSuspendable }
         let caller = Caller(instanceHandle: nil, store: store)
         var results = [Value](repeating: .i32(0), count: resolvedType.results.count)
         let implementation = entity.implementation

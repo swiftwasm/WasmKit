@@ -42,8 +42,8 @@ struct ResumableCallTests {
                 return (results, suspensions, paid)
             case .suspended(let suspension):
                 suspensions += 1
-                guard case .outOfFuel(let required) = suspension.reason else {
-                    Issue.record("unexpected suspension \(suspension.reason)")
+                guard case .outOfFuel(let required) = suspension else {
+                    Issue.record("unexpected suspension \(suspension)")
                     return ([], suspensions, paid)
                 }
                 // The failed charge deducted nothing, so whatever was left still counts.
@@ -163,7 +163,7 @@ struct ResumableCallTests {
         var status = try call.resume()
         var grown = 0
         while case .suspended(let suspension) = status {
-            guard case .outOfFuel(let required) = suspension.reason else { break }
+            guard case .outOfFuel(let required) = suspension else { break }
             // Grow one page at a time, so that the memory moves under the suspended guest.
             store.fuel = nil
             if grown < 63 {
@@ -207,7 +207,7 @@ struct ResumableCallTests {
             Issue.record("expected a suspension")
             return
         }
-        #expect(suspension.reason == .outOfFuel(required: 100))
+        #expect(suspension == .outOfFuel(required: 100))
         #expect(Self.byte(of: memory, at: 0) == 0)
         #expect(try #require(store.fuel).remaining == 0)
         store.fuel = Fuel(remaining: 100)
@@ -286,7 +286,7 @@ struct ResumableCallTests {
         let call = try ResumableCall(function: try #require(instance.exports[function: "fill"]), arguments: [.i32(65536 + 64)])
         store.fuel = Fuel(remaining: 100)
         guard case .suspended(let suspension) = try call.resume(),
-            case .outOfFuel(let required) = suspension.reason
+            case .outOfFuel(let required) = suspension
         else {
             Issue.record("expected a suspension")
             return
@@ -313,7 +313,7 @@ struct ResumableCallTests {
         let call = try ResumableCall(function: try #require(instance.exports[function: name]))
         store.fuel = Fuel(remaining: 100)
         guard case .suspended(let suspension) = try call.resume(),
-            case .outOfFuel(let required) = suspension.reason
+            case .outOfFuel(let required) = suspension
         else {
             Issue.record("expected a suspension")
             return
@@ -471,7 +471,7 @@ struct ResumableCallTests {
                 Issue.record("expected a suspension")
                 return
             }
-            #expect(suspension.reason == .epochDeadlineReached)
+            #expect(suspension == .epochDeadlineReached)
         }
         store.setEpochDeadline(ticksBeyondCurrent: 1)
         guard case .returned(let results) = try call.resume() else {
@@ -517,7 +517,7 @@ struct ResumableCallTests {
                 #expect(suspensions == 99)
                 return
             case .suspended(let suspension):
-                #expect(suspension.reason == .epochDeadlineReached)
+                #expect(suspension == .epochDeadlineReached)
                 suspensions += 1
             }
         }
@@ -601,7 +601,7 @@ struct ResumableCallTests {
                 return
             }
             ticked.wait()
-            #expect(suspension.reason == .epochDeadlineReached)
+            #expect(suspension == .epochDeadlineReached)
             #expect(throws: Trap.self) { try call.resume(throwing: Trap(.message(.init("cancelled")))) }
         }
     #endif
@@ -738,4 +738,354 @@ struct ResumableCallTests {
         }
         #expect(results == [.i32(50)])
     }
+}
+
+// MARK: - Host functions that wait
+
+/// The continuations a waiting host function was given, and its arguments, in call order.
+private final class Waits: @unchecked Sendable {
+    var continuations: [HostContinuation] = []
+    var arguments: [UInt32] = []
+
+    /// Resumes the oldest unanswered continuation with twice its argument.
+    func answer() {
+        let index = answered
+        answered += 1
+        continuations[index].resume(returning: [.i32(arguments[index] &* 2)])
+    }
+    private var answered = 0
+}
+
+extension ResumableCallTests {
+    static let waiting = """
+        (module
+          (import "env" "wait" (func $wait (param i32) (result i32)))
+          (memory (export "mem") 1)
+          (tag $e (export "e"))
+          (table 1 funcref) (elem (i32.const 0) $wait)
+          (func (export "f") (param i32) (result i32) (i32.add (call $wait (local.get 0)) (i32.const 1)))
+          (func (export "indirect") (param i32) (result i32)
+            (i32.add (call_indirect (param i32) (result i32) (local.get 0) (i32.const 0)) (i32.const 1)))
+          (func (export "tail") (param i32) (result i32) (return_call $wait (local.get 0)))
+          (func (export "twice") (param i32) (result i32)
+            (i32.add (call $wait (local.get 0)) (call $wait (i32.const 10))))
+          (func (export "load") (param i32) (result i32) (i32.load (call $wait (local.get 0))))
+          (func (export "catching") (param i32) (result i32)
+            (block $h (try_table (catch $e $h) (return (call $wait (local.get 0))))) (i32.const -1))
+          (func (export "throwE") (throw $e))
+          (func (export "grow") (param i32) (result i32) (memory.grow (local.get 0))))
+        """
+
+    /// An instance of ``waiting`` whose `wait` keeps its continuation in `waits`.
+    private static func waitingInstance(store: Store, _ waits: Waits) throws -> Instance {
+        let wait = Function.suspending(store: store, parameters: [.i32], results: [.i32]) { _, arguments, continuation in
+            waits.continuations.append(continuation)
+            waits.arguments.append(arguments[0].i32)
+        }
+        return try instantiate(waiting, store: store, imports: ["env": ["wait": wait]])
+    }
+
+    private static func waiter(of status: ResumableCall.Status) -> HostWaiter? {
+        guard case .suspended(.waitingForHost(let waiter)) = status else { return nil }
+        return waiter
+    }
+
+    @Test(arguments: testedThreadingModels)
+    func hostFunctionWaitsForItsContinuation(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let store = Self.makeStore(threadingModel: threadingModel)
+        let waits = Waits()
+        let f = try #require(try Self.waitingInstance(store: store, waits).exports[function: "f"])
+        let call = try ResumableCall(function: f, arguments: [.i32(20)])
+        let waiter = try #require(Self.waiter(of: try call.resume()))
+        #expect(!waiter.isReadyToResume)
+        #expect(call.suspension == .waitingForHost(waiter))
+        // Resumed before the host function finishes, the call keeps waiting.
+        #expect(Self.waiter(of: try call.resume()) == waiter)
+
+        waits.answer()
+        #expect(waiter.isReadyToResume)
+        guard case .returned(let results) = try call.resume() else {
+            Issue.record("expected the call to return")
+            return
+        }
+        #expect(results == [.i32(41)])
+        #expect(waits.continuations.count == 1)
+    }
+
+    @Test(arguments: testedThreadingModels)
+    func hostFunctionWaitsWhereverItIsCalledFrom(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let store = Self.makeStore(threadingModel: threadingModel)
+        let waits = Waits()
+        let instance = try Self.waitingInstance(store: store, waits)
+        for (name, expected) in [("f", 41), ("indirect", 41), ("tail", 40)] {
+            let call = try ResumableCall(function: try #require(instance.exports[function: name]), arguments: [.i32(20)])
+            #expect(Self.waiter(of: try call.resume()) != nil, "\(name)")
+            waits.answer()
+            guard case .returned(let results) = try call.resume() else {
+                Issue.record("expected \(name) to return")
+                continue
+            }
+            #expect(results == [.i32(UInt32(expected))], "\(name)")
+        }
+
+        // A host function the call is of waits too.
+        let root = Function.suspending(store: store, parameters: [.i32], results: [.i32]) { _, arguments, continuation in
+            waits.continuations.append(continuation)
+            waits.arguments.append(arguments[0].i32)
+        }
+        let call = try ResumableCall(function: root, arguments: [.i32(7)])
+        let waiter = try #require(Self.waiter(of: try call.resume()))
+        #expect(Self.waiter(of: try call.resume()) == waiter)
+        waits.answer()
+        guard case .returned(let results) = try call.resume() else {
+            Issue.record("expected the root host function to return")
+            return
+        }
+        #expect(results == [.i32(14)])
+    }
+
+    @Test(arguments: testedThreadingModels)
+    func eachWaitHasAWaiterOfItsOwn(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let store = Self.makeStore(threadingModel: threadingModel)
+        let waits = Waits()
+        let twice = try #require(try Self.waitingInstance(store: store, waits).exports[function: "twice"])
+        let call = try ResumableCall(function: twice, arguments: [.i32(1)])
+        let first = try #require(Self.waiter(of: try call.resume()))
+        waits.answer()
+        let second = try #require(Self.waiter(of: try call.resume()))
+        #expect(first != second)
+        #expect(first.isReadyToResume)
+        #expect(!second.isReadyToResume)
+        waits.answer()
+        guard case .returned(let results) = try call.resume() else {
+            Issue.record("expected the call to return")
+            return
+        }
+        #expect(results == [.i32(22)])
+    }
+
+    @Test(arguments: testedThreadingModels)
+    func completionWritesAMemoryThatGrewWhileWaiting(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let store = Self.makeStore(threadingModel: threadingModel, fuelMetering: false)
+        let waits = Waits()
+        let instance = try Self.waitingInstance(store: store, waits)
+        let call = try ResumableCall(function: try #require(instance.exports[function: "load"]), arguments: [.i32(0)])
+        #expect(Self.waiter(of: try call.resume()) != nil)
+
+        let grown = try #require(instance.exports[function: "grow"])
+        #expect(try grown([.i32(1)]) == [.i32(1)])
+        waits.continuations[0].resume { caller in
+            let memory = try #require(caller.instance?.exports[memory: "mem"])
+            memory.withUnsafeMutableBufferPointer(offset: 65536, count: 4) { $0.storeBytes(of: UInt32(0xABCD), as: UInt32.self) }
+            return [.i32(65536)]
+        }
+        guard case .returned(let results) = try call.resume() else {
+            Issue.record("expected the call to return")
+            return
+        }
+        #expect(results == [.i32(0xABCD)])
+    }
+
+    @Test(arguments: testedThreadingModels)
+    func completingBeforeReturningContinuesAtOnce(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let store = Self.makeStore(threadingModel: threadingModel, fuelMetering: false)
+        let wait = Function.suspending(store: store, parameters: [.i32], results: [.i32]) { _, arguments, continuation in
+            continuation.resume(returning: [.i32(arguments[0].i32 + 100)])
+        }
+        let f = try #require(try Self.instantiate(Self.waiting, store: store, imports: ["env": ["wait": wait]]).exports[function: "f"])
+        let call = try ResumableCall(function: f, arguments: [.i32(1)])
+        guard case .returned(let results) = try call.resume() else {
+            Issue.record("expected the call to return without waiting")
+            return
+        }
+        #expect(results == [.i32(102)])
+        // A plain call can use it too.
+        #expect(try f([.i32(1)]) == [.i32(102)])
+    }
+
+    @Test(arguments: testedThreadingModels)
+    func plainCallCannotWait(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let store = Self.makeStore(threadingModel: threadingModel, fuelMetering: false)
+        let waits = Waits()
+        let f = try #require(try Self.waitingInstance(store: store, waits).exports[function: "f"])
+        #expect {
+            try f([.i32(1)])
+        } throws: { error in
+            (error as? Trap)?.reason.description == "a host function left a call waiting that cannot be suspended"
+        }
+        // Its continuation has nothing left to finish.
+        waits.answer()
+    }
+
+    @Test(arguments: testedThreadingModels)
+    func errorsFromTheContinuationAreThrownFromTheCall(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let store = Self.makeStore(threadingModel: threadingModel, fuelMetering: false)
+        let waits = Waits()
+        let instance = try Self.waitingInstance(store: store, waits)
+        var caught: WasmKitException?
+        do { try instance.exports[function: "throwE"]!() } catch let exception as WasmKitException { caught = exception }
+        let exception = try #require(caught)
+
+        // The guest can catch a WebAssembly exception.
+        let catching = try ResumableCall(function: try #require(instance.exports[function: "catching"]), arguments: [.i32(1)])
+        #expect(Self.waiter(of: try catching.resume()) != nil)
+        waits.continuations[0].resume(throwing: exception)
+        guard case .returned(let results) = try catching.resume() else {
+            Issue.record("expected the guest to catch the exception")
+            return
+        }
+        #expect(results == [.i32(UInt32(bitPattern: -1))])
+
+        // A trap ends the call, with the backtrace of the host call.
+        let trapping = try ResumableCall(function: try #require(instance.exports[function: "f"]), arguments: [.i32(1)])
+        #expect(Self.waiter(of: try trapping.resume()) != nil)
+        waits.continuations[1].resume(throwing: Trap(.message(.init("host trap"))))
+        do {
+            _ = try trapping.resume()
+            Issue.record("expected a trap")
+        } catch let trap as Trap {
+            #expect(trap.reason.description == "host trap")
+            #expect(trap.backtrace?.symbols.isEmpty == false)
+        }
+        #expect(trapping.isFinished)
+
+        // So do results of the wrong type.
+        let mistyped = try ResumableCall(function: try #require(instance.exports[function: "f"]), arguments: [.i32(1)])
+        #expect(Self.waiter(of: try mistyped.resume()) != nil)
+        waits.continuations[2].resume(returning: [.i64(1)])
+        #expect(throws: Trap.self) { try mistyped.resume() }
+    }
+
+    @Test(arguments: testedThreadingModels)
+    func cancellingAWaitDropsItsContinuation(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let store = Self.makeStore(threadingModel: threadingModel, fuelMetering: false)
+        let waits = Waits()
+        let f = try #require(try Self.waitingInstance(store: store, waits).exports[function: "f"])
+        let call = try ResumableCall(function: f, arguments: [.i32(1)])
+        let waiter = try #require(Self.waiter(of: try call.resume()))
+        let fired = Counter()
+        waiter.onReady { fired.increment() }
+        do {
+            try call.resume(throwing: Trap(.message(.init("cancelled"))))
+        } catch let trap as Trap {
+            #expect(trap.backtrace?.symbols.isEmpty == false)
+        }
+        #expect(call.isFinished)
+        waits.answer()
+        #expect(fired.value == 0)
+        #expect(!waiter.isReadyToResume)
+
+        // Dropping a waiting call cancels its wait too.
+        var dropped: ResumableCall? = try ResumableCall(function: f, arguments: [.i32(1)])
+        let droppedWaiter = try #require(Self.waiter(of: try dropped!.resume()))
+        dropped = nil
+        waits.answer()
+        #expect(!droppedWaiter.isReadyToResume)
+    }
+
+    @Test(arguments: testedThreadingModels)
+    func onReadyIsCalledOnceTheContinuationIsResumed(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let store = Self.makeStore(threadingModel: threadingModel, fuelMetering: false)
+        let waits = Waits()
+        let f = try #require(try Self.waitingInstance(store: store, waits).exports[function: "f"])
+        let call = try ResumableCall(function: f, arguments: [.i32(1)])
+        let waiter = try #require(Self.waiter(of: try call.resume()))
+        let before = Counter()
+        waiter.onReady { before.increment() }
+        #expect(before.value == 0)
+        waits.answer()
+        #expect(before.value == 1)
+        let after = Counter()
+        waiter.onReady { after.increment() }
+        #expect(after.value == 1)
+        guard case .returned = try call.resume() else {
+            Issue.record("expected the call to return")
+            return
+        }
+        #expect(before.value == 1)
+    }
+
+    @Test(arguments: testedThreadingModels)
+    func hostFunctionCannotResumeACallSuspendedOutsideIt(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let store = Self.makeStore(threadingModel: threadingModel, fuelMetering: false)
+        let waits = Waits()
+        let f = try #require(try Self.waitingInstance(store: store, waits).exports[function: "f"])
+        let outer = try ResumableCall(function: f, arguments: [.i32(1)])
+        #expect(Self.waiter(of: try outer.resume()) != nil)
+        waits.answer()
+
+        var refused = false
+        let h = Function(store: store, parameters: []) { _, _ in
+            do { _ = try outer.resume() } catch is ResumableCallError { refused = true }
+            return []
+        }
+        let g = try #require(
+            try Self.instantiate(#"(module (import "env" "h" (func $h)) (func (export "g") (call $h)))"#, store: store, imports: ["env": ["h": h]])
+                .exports[function: "g"])
+        guard case .returned = try ResumableCall(function: g).resume() else {
+            Issue.record("expected the call to return")
+            return
+        }
+        #expect(refused)
+        guard case .returned(let results) = try outer.resume() else {
+            Issue.record("expected the call to return")
+            return
+        }
+        #expect(results == [.i32(3)])
+    }
+
+    @Test(arguments: testedThreadingModels)
+    func fuelAndWaitsMix(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let store = Self.makeStore(threadingModel: threadingModel)
+        let waits = Waits()
+        let twice = try #require(try Self.waitingInstance(store: store, waits).exports[function: "twice"])
+        let call = try ResumableCall(function: twice, arguments: [.i32(5)])
+        store.fuel = Fuel(remaining: 1)
+        var fuelStops = 0
+        var hostWaits = 0
+        while true {
+            switch try call.resume() {
+            case .returned(let results):
+                #expect(results == [.i32(30)])
+                #expect(fuelStops > 0)
+                #expect(hostWaits == 2)
+                return
+            case .suspended(.outOfFuel(let required)):
+                fuelStops += 1
+                store.fuel = Fuel(remaining: required)
+            case .suspended(.epochDeadlineReached):
+                Issue.record("unexpected epoch deadline")
+                return
+            case .suspended(.waitingForHost):
+                hostWaits += 1
+                waits.answer()
+            }
+        }
+    }
+
+    #if canImport(Foundation)
+        @Test(arguments: testedThreadingModels)
+        func continuationResumedOnAnotherThreadCallsOnReadyThere(threadingModel: EngineConfiguration.ThreadingModel) throws {
+            let store = Self.makeStore(threadingModel: threadingModel, fuelMetering: false)
+            let waits = Waits()
+            let f = try #require(try Self.waitingInstance(store: store, waits).exports[function: "f"])
+            let call = try ResumableCall(function: f, arguments: [.i32(20)])
+            let waiter = try #require(Self.waiter(of: try call.resume()))
+            let ready = DispatchSemaphore(value: 0)
+            waiter.onReady { ready.signal() }
+            let continuation = waits.continuations[0]
+            Thread { continuation.resume(returning: [.i32(40)]) }.start()
+            ready.wait()
+            guard case .returned(let results) = try call.resume() else {
+                Issue.record("expected the call to return")
+                return
+            }
+            #expect(results == [.i32(41)])
+        }
+    #endif
+}
+
+private final class Counter: @unchecked Sendable {
+    private(set) var value = 0
+    func increment() { value += 1 }
 }
