@@ -707,14 +707,20 @@
                     if exits.contains(where: { $0.pc == hit.pc && $0.sp == hit.sp }) || savedHead == self.breakpointHeadSlot {
                         return (hit.sp, hit.pc.advanced(by: 1), savedHead)
                     }
-                    // Another frame got to the same code: run past it and keep waiting.
+                    // Another frame got to the same code: run past it and keep waiting. An instruction
+                    // can hand over to a handler that is not in its slot without leaving it, as
+                    // `internalCall` does for a large callee frame, so step until the run loop can
+                    // take over from a slot other than the breakpoint's.
                     sp = hit.sp
                     var next = hit.pc.advanced(by: 1)
-                    _ = try self.execution.stepInstruction(
-                        head: savedHead, threadingModel: self.threadingModel,
-                        sp: &sp, pc: &next, md: &self.md, ms: &self.ms
-                    )
-                    pc = next.advanced(by: -1)
+                    var head = savedHead
+                    repeat {
+                        head = try self.execution.stepInstruction(
+                            head: head, threadingModel: self.threadingModel,
+                            sp: &sp, pc: &next, md: &self.md, ms: &self.ms
+                        )
+                        pc = next.advanced(by: -1)
+                    } while pc == hit.pc || (pc.pointee != head && pc.pointee != self.breakpointHeadSlot)
                 }
             }
         }
