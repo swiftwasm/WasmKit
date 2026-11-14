@@ -36,6 +36,29 @@
             #expect(listing.contains("store"))
             #expect(listing.contains("return"))
         }
+
+        /// Constants consumed as immediates release their pool reservations, so
+        /// 40 distinct ones fit a pool of about 15 slots without spilling to
+        /// `const64`. Values are covered by `ExtraSuite/const_slot_reclaim.wast`.
+        @Test
+        func immediateConstantsDoNotSpill() throws {
+            let additions = (1...40).map { "local.get 0 i64.const \($0) i64.add local.set 0" }.joined(separator: "\n")
+            let module = try parseWasm(
+                bytes: try wat2wasm(
+                    """
+                    (module (func (export "add") (param i64) (result i64)
+                      \(additions) local.get 0))
+                    """
+                )
+            )
+            let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: .direct)))
+            let instance = try module.instantiate(store: store)
+
+            var listing = ""
+            try instance.dumpFunctions(to: &listing, module: module)
+            // `const64` has no custom form, so it prints under its case name.
+            #expect(!listing.contains("const64("))
+        }
     }
 
 #endif
