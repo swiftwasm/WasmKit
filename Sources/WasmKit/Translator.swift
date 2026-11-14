@@ -560,6 +560,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             self.frames.last?.reachable ?? false
         }
 
+        /// The value-stack height where the frame on top of the stack starts.
+        var currentValueStackHeight: Int {
+            self.frames.last?.valueStackHeight ?? 0
+        }
+
         /// Records the fuel region opened by the frame on top of the stack.
         fileprivate mutating func setCurrentFuelRegion(_ region: FuelRegion, enclosing: FuelRegion?) {
             guard !self.frames.isEmpty else { return }
@@ -688,9 +693,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             self.slotHeight += type.stackSlotCount
             maxSlotHeight = max(maxSlotHeight, slotHeight)
         }
-        /// Constants not yet materialized into physical stack slots.
-        var liveConstants: [UntypedValue] {
-            values.compactMap {
+        /// The constants on the stack from `height` up, whether or not they
+        /// already have a constant-pool slot.
+        func constants(from height: Int) -> some Sequence<UntypedValue> {
+            values[height...].lazy.compactMap {
                 guard case .const(_, let value) = $0 else { return nil }
                 return value
             }
@@ -2585,47 +2591,73 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
     struct ConstSlots {
         private(set) var values: [UntypedValue]
-        private var indexByValue: [UntypedValue: Int]
+        /// The slot of each reserved constant, or ``unallocated`` until it gets one.
+        private var slotByValue: [UntypedValue: Int]
         let stackLayout: StackLayout
 
         init(stackLayout: StackLayout) {
             self.values = []
-            self.indexByValue = [:]
+            self.slotByValue = [:]
             self.stackLayout = stackLayout
         }
 
-        /// Constants that may still be given a slot. Capped at the pool size, so
-        /// ``allocate(_:)`` cannot run out.
-        private var reserved: Set<UntypedValue> = []
+        private static var unallocated: Int { -1 }
+
+        /// The reserved constants without a slot, plus any allocated since the
+        /// last release, which drops them.
+        private var pendingValues: [UntypedValue] = []
+        /// The reserved constants without a slot. Together with ``values``,
+        /// capped at the pool size, so ``allocate(_:)`` cannot run out.
+        private var pendingCount = 0
 
         /// Reserves pool space for `value`; `false` when the pool is full.
         mutating func reserve(_ value: UntypedValue) -> Bool {
             // NOTE: Share the same const slot for exactly the same bit pattern
             // values even having different types
-            if reserved.contains(value) { return true }
-            guard reserved.count < stackLayout.constantSlotSize else { return false }
-            reserved.insert(value)
+            if slotByValue[value] != nil { return true }
+            guard values.count + pendingCount < stackLayout.constantSlotSize else { return false }
+            slotByValue[value] = Self.unallocated
+            pendingValues.append(value)
+            pendingCount += 1
             return true
         }
 
-        var hasUnallocatedReservations: Bool { reserved.count > values.count }
+        var hasPendingReservations: Bool { pendingCount > 0 }
 
-        /// Releases reservations of constants that are neither allocated nor on
-        /// the value stack. Call only between operators, with no popped value
-        /// source in flight.
-        mutating func reclaimUnusedReservations(keepingLive live: [UntypedValue]) {
-            reserved = Set(values)
-            reserved.formUnion(live)
-            assert(reserved.count <= stackLayout.constantSlotSize)
+        /// Releases the reservations of constants that are not in `live`.
+        ///
+        /// `live` must hold every unallocated constant that may still be
+        /// allocated, so call this only between operators, with no popped value
+        /// source in flight. Outside the value stack, only a fused binary
+        /// operation's `rhsConstant` holds a constant, and it reserves again
+        /// before allocating.
+        mutating func releasePendingReservations(keeping live: some Sequence<UntypedValue>) {
+            var kept = 0
+            for i in pendingValues.indices {
+                let value = pendingValues[i]
+                guard slotByValue[value] == Self.unallocated else { continue }
+                if live.contains(value) {
+                    pendingValues[kept] = value
+                    kept += 1
+                } else {
+                    slotByValue[value] = nil
+                }
+            }
+            pendingValues.removeLast(pendingValues.count - kept)
+            pendingCount = kept
         }
 
         /// The slot of a reserved constant, assigned on first use.
         mutating func allocate(_ value: UntypedValue) -> Int {
-            if let allocated = indexByValue[value] { return allocated }
-            assert(reserved.contains(value), "allocating a constant that was never reserved")
+            let slot = slotByValue[value]
+            if let slot, slot != Self.unallocated { return slot }
+            assert(slot != nil, "allocating a constant that was never reserved")
             let constSlotIndex = values.count
+            // A slot past the pool would overlap the locals.
+            precondition(constSlotIndex < stackLayout.constantSlotSize, "constant pool overflow")
+            if slot != nil { pendingCount -= 1 }
             values.append(value)
-            indexByValue[value] = constSlotIndex
+            slotByValue[value] = constSlotIndex
             return constSlotIndex
         }
     }
@@ -5213,6 +5245,11 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
 
+    /// The most values above the current frame that a failed constant
+    /// reservation scans to release the stale ones. Bounds the translation
+    /// cost per constant; unrelated to the pool size.
+    private static var maxReservationReclaimScan: Int { 128 }
+
     private mutating func visitConst(_ type: ValueType, _ value: Value) {
         // A constant is pushed without emitting anything. The consumer decides
         // how it materializes: as an instruction immediate, or, when read as a
@@ -5220,10 +5257,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         // constant, it is written to its stack slot here instead.
         let value = UntypedValue(value)
         var reserved = constantSlots.reserve(value)
-        // Reclaiming scans the value stack, so deep stacks skip it.
-        if !reserved, constantSlots.hasUnallocatedReservations, valueStack.valueHeight <= 128 {
-            constantSlots.reclaimUnusedReservations(keepingLive: valueStack.liveConstants)
-            reserved = constantSlots.reserve(value)
+        if !reserved, constantSlots.hasPendingReservations {
+            // Constants consumed as immediates or dropped keep their reservation
+            // until here. Entering a block materializes the whole stack, so only
+            // the current frame's values can still be constants.
+            let frameHeight = controlStack.currentValueStackHeight
+            if valueStack.valueHeight - frameHeight <= Self.maxReservationReclaimScan {
+                constantSlots.releasePendingReservations(keeping: valueStack.constants(from: frameHeight))
+                reserved = constantSlots.reserve(value)
+            }
         }
         if reserved {
             valueStack.pushConst(value, type: type)
