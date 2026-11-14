@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.29)
 
+# CMake 4.1+ can emit each Swift module as `<name>.swiftmodule/<triple>.swiftmodule`
+# itself; `add_wasmkit_library` then stops passing its own `-emit-module-path`,
+# which newer CMake would override with its own.
+if(POLICY CMP0195)
+  cmake_policy(SET CMP0195 NEW)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
 
 project(WasmKit LANGUAGES C Swift)
@@ -20,6 +27,12 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_MACOSX_RPATH YES)
 
 set(BUILD_SHARED_LIBS OFF)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  # Swift autolinks a module built with `-static` as `lib<name>.lib` on
+  # Windows, while CMake names static libraries `<name>.lib` there.
+  set(CMAKE_STATIC_LIBRARY_PREFIX_Swift "lib")
+endif()
 
 include(AddSwiftHostLibrary)
 

@@ -74,10 +74,21 @@ function(add_wasmkit_library name)
   target_compile_options("${name}" PRIVATE
     $<$<COMPILE_LANGUAGE:Swift>:
       -package-name;WasmKitPackage;
-      -module-name;${name};
-      -emit-module-path;${module_file};
-      -emit-module-source-info-path;${module_sourceinfo_file}
+      -module-name;${name}
     >)
+  set(module_directory_policy OLD)
+  if(POLICY CMP0195)
+    cmake_policy(GET CMP0195 module_directory_policy)
+  endif()
+  if(NOT module_directory_policy STREQUAL "NEW")
+    # Before CMP0195, CMake emits a flat `${name}.swiftmodule` file; emit the
+    # module directory layout ourselves. Our flags come after CMake's here.
+    target_compile_options("${name}" PRIVATE
+      $<$<COMPILE_LANGUAGE:Swift>:
+        -emit-module-path;${module_file};
+        -emit-module-source-info-path;${module_sourceinfo_file}
+      >)
+  endif()
   if(SWIFT_MODULE_ABI_NAME_PREFIX)
     # ABI name prefix. this can be used to avoid name conflicts.
     target_compile_options("${name}" PRIVATE

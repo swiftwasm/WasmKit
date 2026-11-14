@@ -44,9 +44,14 @@
 #define WASMKIT_TC_OPTION_swiftasynccc 1
 #define WASMKIT_TC_OPTION_musttail 2
 
-#if defined(__clang__) && __has_attribute(musttail)
-#  define WASMKIT_HAS_MUSTTAIL 1
-#else
+// Nested so that compilers without `__has_attribute`, such as MSVC's C
+// compiler, never parse the call.
+#if defined(__clang__)
+#  if __has_attribute(musttail)
+#    define WASMKIT_HAS_MUSTTAIL 1
+#  endif
+#endif
+#ifndef WASMKIT_HAS_MUSTTAIL
 #  define WASMKIT_HAS_MUSTTAIL 0
 #endif
 

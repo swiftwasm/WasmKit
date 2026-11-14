@@ -6,9 +6,16 @@
 // <stdint.h> must precede <stdatomic.h>: some bare-metal C libraries (newlib)
 // declare the atomic typedefs in terms of int_least8_t and friends without
 // including <stdint.h> themselves.
+#if !(defined(_MSC_VER) && !defined(__clang__))
 #include <stdatomic.h>
+#endif
 
 #include "Platform.h"
+
+// MSVC's C compiler has no `__atomic` builtins, and its <stdatomic.h> needs
+// `/experimental:c11atomics`. These helpers are only called from Swift, which
+// imports this header through Clang.
+#if !(defined(_MSC_VER) && !defined(__clang__))
 
 // MARK: - Hardware Atomic Operations for Wasm Shared Memory
 
@@ -70,6 +77,8 @@ static inline uint64_t wasmkit_epoch_load(const uint64_t *WASMKIT_NONNULL counte
 static inline void wasmkit_epoch_increment(uint64_t *WASMKIT_NONNULL counter) {
     __atomic_fetch_add(counter, 1, __ATOMIC_RELAXED);
 }
+
+#endif
 
 // MARK: - Execution Parameters
 // See ExecutionContext.swift for more information about each execution
