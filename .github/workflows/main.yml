@@ -297,6 +297,21 @@ jobs:
       # Run tests with SwiftPM
       - name: Run tests with SwiftPM
         run: swift test
+      # SwiftPM always compiles C targets with Clang, so this is the only build
+      # where MSVC's `cl` compiles `_CWasmKit` and `CWasmKitWASIThreads`.
+      - name: Build with CMake and MSVC's C compiler
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          # `cl` is only on PATH inside a Visual Studio developer shell.
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          Import-Module "$vs\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
+          cmake --version
+          cmake -G Ninja -B ./build-cmake -DCMAKE_C_COMPILER=cl
+          $id = (Select-String -Path ./build-cmake/CMakeFiles/*/CMakeCCompiler.cmake -Pattern '^set\(CMAKE_C_COMPILER_ID "(.*)"\)').Matches.Groups[1].Value
+          if ($id -ne 'MSVC') { throw "C compiler is '$id', not MSVC" }
+          cmake --build ./build-cmake
+          ./build-cmake/bin/wasmkit.exe --version
 
   build-cmake:
     runs-on: ubuntu-26.04
