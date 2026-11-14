@@ -687,6 +687,8 @@ extension Instruction {
             case .returnCall(let op):
                 target.write("return_call \(callee(op.callee)), args: \(reg(op.arguments)), base: \(reg(op.frameBase))")
             case .i32Load(let op): load("i32.load", op)
+            case .i32LoadMemory32(let op):
+                load("i32.load", .init(offset: UInt64(op.offset), pointer: op.pointer, result: op.result))
             case .i64Load(let op): load("i64.load", op)
             case .f32Load(let op): load("f32.load", op)
             case .f64Load(let op): load("f64.load", op)

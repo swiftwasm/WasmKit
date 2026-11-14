@@ -77,6 +77,21 @@ extension Execution {
         return pc.next()
     }
 
+    @inline(__always)
+    mutating func returnCopy(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CopyStackOperand) -> (Pc, CodeSlot) {
+        sp[immediate.dest] = sp[immediate.source]
+        return _return(sp: &sp, pc: pc, md: &md, ms: &ms)
+    }
+
+    @inline(__always)
+    mutating func returnCopy2(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CopyStack2Operand) -> (Pc, CodeSlot) {
+        let value0 = sp[immediate.source0]
+        let value1 = sp[immediate.source1]
+        sp[immediate.dest0] = value0
+        sp[immediate.dest1] = value1
+        return _return(sp: &sp, pc: pc, md: &md, ms: &ms)
+    }
+
     /// Returns to a caller in a different instance, switching `md`/`ms` back.
     ///
     /// Never emitted by the translator: ``_return`` dispatches here when the frame
@@ -163,6 +178,58 @@ extension Execution {
             threadingModel: store.value.engine.configuration.threadingModel)
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)
         return pc.next()
+    }
+
+    @inline(__always)
+    mutating func compilingCopyCall(sp: inout Sp, pc: Pc, immediate: Instruction.CopyCallOperand) throws -> (Pc, CodeSlot) {
+        sp[immediate.dest] = sp[immediate.source]
+        let call = Instruction.CallOperand(rawCallee: immediate.rawCallee, arguments: immediate.arguments, spAddend: immediate.spAddend)
+        let iseq = try call.callee.wasm.ensureCompiled(store: store)
+        // `internalCopyCall` enters through `internalCall`'s fast path, which only
+        // takes a small frame. A large one stays here, on the slow path.
+        if iseq.hasSmallFrameInit {
+            pc.advanced(by: -4).pointee = Instruction.internalCopyCall(immediate).headSlotInline(
+                threadingModel: store.value.engine.configuration.threadingModel)
+        }
+        return try internalCallSlow(sp: &sp, pc: pc, immediate: call)
+    }
+
+    @inline(__always)
+    mutating func internalCopyCall(sp: inout Sp, pc: Pc, immediate: Instruction.CopyCallOperand) -> (Pc, CodeSlot) {
+        sp[immediate.dest] = sp[immediate.source]
+        let call = Instruction.CallOperand(rawCallee: immediate.rawCallee, arguments: immediate.arguments, spAddend: immediate.spAddend)
+        // The final two slots retain the ordinary call operand layout, so
+        // internalCall can redispatch a failed fast path without repeating copies.
+        return internalCall(sp: &sp, pc: pc, immediate: call)
+    }
+
+    @inline(__always)
+    mutating func compilingCopy2Call(sp: inout Sp, pc: Pc, immediate: Instruction.Copy2CallOperand) throws -> (Pc, CodeSlot) {
+        let value0 = sp[immediate.source0]
+        let value1 = sp[immediate.source1]
+        sp[immediate.dest0] = value0
+        sp[immediate.dest1] = value1
+        let call = Instruction.CallOperand(rawCallee: immediate.rawCallee, arguments: immediate.arguments, spAddend: immediate.spAddend)
+        let iseq = try call.callee.wasm.ensureCompiled(store: store)
+        // `internalCopy2Call` enters through `internalCall`'s fast path, which only
+        // takes a small frame. A large one stays here, on the slow path.
+        if iseq.hasSmallFrameInit {
+            pc.advanced(by: -4).pointee = Instruction.internalCopy2Call(immediate).headSlotInline(
+                threadingModel: store.value.engine.configuration.threadingModel)
+        }
+        return try internalCallSlow(sp: &sp, pc: pc, immediate: call)
+    }
+
+    @inline(__always)
+    mutating func internalCopy2Call(sp: inout Sp, pc: Pc, immediate: Instruction.Copy2CallOperand) -> (Pc, CodeSlot) {
+        let value0 = sp[immediate.source0]
+        let value1 = sp[immediate.source1]
+        sp[immediate.dest0] = value0
+        sp[immediate.dest1] = value1
+        let call = Instruction.CallOperand(rawCallee: immediate.rawCallee, arguments: immediate.arguments, spAddend: immediate.spAddend)
+        // The final two slots retain the ordinary call operand layout, so
+        // internalCall can redispatch a failed fast path without repeating copies.
+        return internalCall(sp: &sp, pc: pc, immediate: call)
     }
 
     @inline(never)

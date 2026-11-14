@@ -454,6 +454,17 @@ extension Execution {
         case 739: return self.execute_i64Sub128(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 740: return self.execute_i64MulWideS(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 741: return self.execute_i64MulWideU(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 742: return self.execute_i32AddImmGlobalSet(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 743: return self.execute_i32GlobalAddSet(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 744: return self.execute_i32GlobalSubSet(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 745: return try self.executeToken_i32AddImmLoad(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 746: return try self.executeToken_i32LoadMemory32(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 747: return self.execute_returnCopy(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 748: return self.execute_returnCopy2(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 749: return try self.execute_compilingCopyCall(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 750: return self.execute_internalCopyCall(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 751: return try self.execute_compilingCopy2Call(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 752: return self.execute_internalCopy2Call(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -1271,6 +1282,22 @@ extension Execution {
     @inline(__always)
     mutating func executeToken_checkEpoch(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         if let trap = checkEpoch(sp: sp.pointee, pc: pc.pointee) { try trap.raise() }
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        return next
+    }
+    @inline(__always)
+    mutating func executeToken_i32AddImmLoad(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
+        let immediate = Instruction.I32AddImmLoadOperand.load(from: &pc.pointee)
+        if let trap = self.memoryLoadAddingImmediate(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate) { try trap.raise() }
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        return next
+    }
+    @inline(__always)
+    mutating func executeToken_i32LoadMemory32(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerResultOperand.load(from: &pc.pointee)
+        if let trap = self.memoryLoad32(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate) { try trap.raise() }
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -7263,6 +7290,95 @@ extension Execution {
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         self.i64MulWideU(sp: sp.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32AddImmGlobalSet") @inline(__always)
+    mutating func execute_i32AddImmGlobalSet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.I32AddImmGlobalSetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        self.i32AddImmGlobalSet(sp: sp.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32GlobalAddSet") @inline(__always)
+    mutating func execute_i32GlobalAddSet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.I32GlobalAddSetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        self.i32GlobalAddSet(sp: sp.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32GlobalSubSet") @inline(__always)
+    mutating func execute_i32GlobalSubSet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.I32GlobalAddSetOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        self.i32GlobalSubSet(sp: sp.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32AddImmLoad") @inline(__always)
+    mutating func execute_i32AddImmLoad(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.I32AddImmLoadOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = self.memoryLoadAddingImmediate(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32LoadMemory32") @inline(__always)
+    mutating func execute_i32LoadMemory32(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.AccMemoryPointerResultOperand.load(from: &pc.pointee)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        if let trap = self.memoryLoad32(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate) { return trap.directThreadedHeadSlot }
+        return next
+    }
+    @_silgen_name("wasmkit_execute_returnCopy") @inline(__always)
+    mutating func execute_returnCopy(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.CopyStackOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.returnCopy(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_returnCopy2") @inline(__always)
+    mutating func execute_returnCopy2(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.CopyStack2Operand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.returnCopy2(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_compilingCopyCall") @inline(__always)
+    mutating func execute_compilingCopyCall(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
+        let immediate = Instruction.CopyCallOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = try self.compilingCopyCall(sp: &sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_internalCopyCall") @inline(__always)
+    mutating func execute_internalCopyCall(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.CopyCallOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.internalCopyCall(sp: &sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_compilingCopy2Call") @inline(__always)
+    mutating func execute_compilingCopy2Call(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
+        let immediate = Instruction.Copy2CallOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = try self.compilingCopy2Call(sp: &sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_internalCopy2Call") @inline(__always)
+    mutating func execute_internalCopy2Call(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        let immediate = Instruction.Copy2CallOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.internalCopy2Call(sp: &sp.pointee, pc: pc.pointee, immediate: immediate)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_i32AddImmBrIf") @inline(__always)
+    mutating func execute_i32AddImmBrIf(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>, ireg: UnsafeMutablePointer<UInt64>) -> CodeSlot {
+        let immediate = Instruction.I32AddImmBrIfOperand.load(from: &pc.pointee)
+        let next: CodeSlot
+        (pc.pointee, next) = self.i32AddImmBrIf(sp: sp.pointee, pc: pc.pointee, ireg: &ireg.pointee, immediate: immediate)
         return next
     }
 }
