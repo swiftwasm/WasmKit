@@ -184,9 +184,13 @@ extension Execution {
     mutating func compilingCopyCall(sp: inout Sp, pc: Pc, immediate: Instruction.CopyCallOperand) throws -> (Pc, CodeSlot) {
         sp[immediate.dest] = sp[immediate.source]
         let call = Instruction.CallOperand(rawCallee: immediate.rawCallee, arguments: immediate.arguments, spAddend: immediate.spAddend)
-        try call.callee.wasm.ensureCompiled(store: store)
-        pc.advanced(by: -4).pointee = Instruction.internalCopyCall(immediate).headSlotInline(
-            threadingModel: store.value.engine.configuration.threadingModel)
+        let iseq = try call.callee.wasm.ensureCompiled(store: store)
+        // `internalCopyCall` enters through `internalCall`'s fast path, which only
+        // takes a small frame. A large one stays here, on the slow path.
+        if iseq.hasSmallFrameInit {
+            pc.advanced(by: -4).pointee = Instruction.internalCopyCall(immediate).headSlotInline(
+                threadingModel: store.value.engine.configuration.threadingModel)
+        }
         return try internalCallSlow(sp: &sp, pc: pc, immediate: call)
     }
 
@@ -206,9 +210,13 @@ extension Execution {
         sp[immediate.dest0] = value0
         sp[immediate.dest1] = value1
         let call = Instruction.CallOperand(rawCallee: immediate.rawCallee, arguments: immediate.arguments, spAddend: immediate.spAddend)
-        try call.callee.wasm.ensureCompiled(store: store)
-        pc.advanced(by: -4).pointee = Instruction.internalCopy2Call(immediate).headSlotInline(
-            threadingModel: store.value.engine.configuration.threadingModel)
+        let iseq = try call.callee.wasm.ensureCompiled(store: store)
+        // `internalCopy2Call` enters through `internalCall`'s fast path, which only
+        // takes a small frame. A large one stays here, on the slow path.
+        if iseq.hasSmallFrameInit {
+            pc.advanced(by: -4).pointee = Instruction.internalCopy2Call(immediate).headSlotInline(
+                threadingModel: store.value.engine.configuration.threadingModel)
+        }
         return try internalCallSlow(sp: &sp, pc: pc, immediate: call)
     }
 
