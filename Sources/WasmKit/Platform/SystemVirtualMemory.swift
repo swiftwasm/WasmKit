@@ -73,7 +73,7 @@
             #elseif os(Windows)
                 return VirtualAlloc(nil, SIZE_T(reservationBytes), DWORD(MEM_RESERVE), DWORD(PAGE_NOACCESS))
             #else
-                #if os(Linux)
+                #if os(Linux) || os(Android)
                     let mapAnon = MAP_ANONYMOUS
                     let mapNoReserve = MAP_NORESERVE
                 #else

@@ -1,4 +1,4 @@
-#if os(macOS) || os(iOS) || os(Linux)
+#if os(macOS) || os(iOS) || os(Linux) || os(Android)
     import Foundation
     import Synchronization
     import Testing

@@ -130,7 +130,7 @@ public final class WASIThreads: @unchecked Sendable {
         processControl: WASIThreadsProcessControl,
         childImports: @escaping ChildImportsBuilder
     ) throws {
-        #if os(macOS) || os(iOS) || os(Linux)
+        #if os(macOS) || os(iOS) || os(Linux) || os(Android)
             #if MultiThread && (arch(x86_64) || arch(arm64))
                 guard configuration.maximumThreads >= 1 else { throw WASIThreadsError.invalidMaximumThreads }
                 let minimumStackSize = Int(wasmkit_wasi_threads_min_stack_size())
@@ -178,7 +178,7 @@ public final class WASIThreads: @unchecked Sendable {
     /// Creates the imports for one store, including the module's shared memory
     /// import and `wasi.thread-spawn`.
     public func makeImports(store: Store) throws -> Imports {
-        #if os(macOS) || os(iOS) || os(Linux)
+        #if os(macOS) || os(iOS) || os(Linux) || os(Android)
             var imports = try childImports(store)
             imports.define(
                 module: sharedMemoryImport.module, name: sharedMemoryImport.name,
