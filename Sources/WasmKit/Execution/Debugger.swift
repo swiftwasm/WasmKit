@@ -114,7 +114,7 @@
             self.functionAddresses = instance.handle.functions.enumerated().compactMap {
                 guard $0.element.isWasm, $0.element.wasm.instance == instance.handle else { return nil }
                 switch $0.element.wasm.code {
-                case .uncompiled(let wasm), .debuggable(let wasm, _):
+                case .uncompiled(let wasm), .debuggable(_, let wasm):
                     return (address: wasm.originalBodyAddress, instanceFunctionIndex: $0.offset)
                 case .compiled:
                     fatalError()
@@ -149,7 +149,7 @@
             precondition(function.handle.isWasm)
 
             switch function.handle.wasm.code {
-            case .debuggable(let wasm, _):
+            case .debuggable(_, let wasm):
                 return wasm.originalAddress
             case .uncompiled:
                 try function.handle.wasm.ensureCompiled(store: StoreRef(self.store))
@@ -504,7 +504,7 @@
 
             try currentFunction.ensureCompiled(store: StoreRef(store))
 
-            guard case .debuggable(let wasm, _) = currentFunction.code else {
+            guard case .debuggable(_, let wasm) = currentFunction.code else {
                 fatalError()
             }
 
@@ -707,14 +707,20 @@
                     if exits.contains(where: { $0.pc == hit.pc && $0.sp == hit.sp }) || savedHead == self.breakpointHeadSlot {
                         return (hit.sp, hit.pc.advanced(by: 1), savedHead)
                     }
-                    // Another frame got to the same code: run past it and keep waiting.
+                    // Another frame got to the same code: run past it and keep waiting. An instruction
+                    // can hand over to a handler that is not in its slot without leaving it, as
+                    // `internalCall` does for a large callee frame, so step until the run loop can
+                    // take over from a slot other than the breakpoint's.
                     sp = hit.sp
                     var next = hit.pc.advanced(by: 1)
-                    _ = try self.execution.stepInstruction(
-                        head: savedHead, threadingModel: self.threadingModel,
-                        sp: &sp, pc: &next, md: &self.md, ms: &self.ms
-                    )
-                    pc = next.advanced(by: -1)
+                    var head = savedHead
+                    repeat {
+                        head = try self.execution.stepInstruction(
+                            head: head, threadingModel: self.threadingModel,
+                            sp: &sp, pc: &next, md: &self.md, ms: &self.ms
+                        )
+                        pc = next.advanced(by: -1)
+                    } while pc == hit.pc || (pc.pointee != head && pc.pointee != self.breakpointHeadSlot)
                 }
             }
         }

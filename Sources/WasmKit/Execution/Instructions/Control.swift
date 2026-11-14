@@ -127,7 +127,20 @@ extension Execution {
     }
 
     @inline(__always)
-    mutating func internalCall(sp: inout Sp, pc: Pc, immediate: Instruction.CallOperand) throws -> (Pc, CodeSlot) {
+    mutating func internalCall(sp: inout Sp, pc: Pc, immediate: Instruction.CallOperand) -> (Pc, CodeSlot) {
+        let (iseq, function) = immediate.callee.assumeCompiled()
+        let newSp = sp.advanced(by: immediate.spAddend)
+        guard pushSmallFrame(iseq: iseq, function: function, sp: sp, newSp: newSp, returnPC: pc) else {
+            // Revisit the same two-slot operand with the slow handler. No guest
+            // state changed, including the caller frame used for trap backtraces.
+            return (pc.advanced(by: -2), store.value.engine.internalCallSlowSlot)
+        }
+        sp = newSp
+        return iseq.baseAddress.next()
+    }
+
+    @inline(__always)
+    mutating func internalCallSlow(sp: inout Sp, pc: Pc, immediate: Instruction.CallOperand) throws -> (Pc, CodeSlot) {
         var pc = pc
         let callee = immediate.callee
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)
@@ -141,7 +154,11 @@ extension Execution {
         let headSlotPc = pc.advanced(by: -3)
         let callee = immediate.callee
         try callee.wasm.ensureCompiled(store: store)
-        let replaced = Instruction.internalCall(immediate)
+        // A large frame would make every `internalCall` fail its fast path and
+        // dispatch again to `internalCallSlow`, so go there directly.
+        let replaced: Instruction =
+            callee.assumeCompiled().0.hasSmallFrameInit
+            ? .internalCall(immediate) : .internalCallSlow(immediate)
         headSlotPc.pointee = replaced.headSlotInline(
             threadingModel: store.value.engine.configuration.threadingModel)
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)

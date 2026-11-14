@@ -122,6 +122,21 @@ struct Execution: ~Copyable {
     /// costs several times the copy itself.
     @inline(__always)
     private func initializeFrame(sp: Sp, iseq: InstructionSequence) {
+        if iseq.hasSmallFrameInit {
+            initializeSmallFrame(sp: sp, iseq: iseq)
+        } else {
+            // `copyMemory` rather than `update(from:count:)`: the latter emits
+            // an overlap check that is dead here (the image lives in the iseq
+            // allocation, never on the VM stack).
+            let savedSlots = -StackLayout.numberOfSavingSlots * MemoryLayout<UntypedValue>.stride
+            (UnsafeMutableRawPointer(sp) + iseq.frameInitOffset).copyMemory(
+                from: iseq.frameInitAnchor + iseq.frameInitOffset,
+                byteCount: savedSlots &- iseq.frameInitOffset)
+        }
+    }
+
+    @inline(__always)
+    private func initializeSmallFrame(sp: Sp, iseq: InstructionSequence) {
         // The image has the same offsets from its anchor as from `sp`: it starts
         // at `offset` and ends at the saved slots, `savedSlots`. The head is
         // copied at the register offset and the tail at constant ones, so no
@@ -134,13 +149,6 @@ struct Execution: ~Copyable {
         // looped so that no loop remains for the optimizer to turn back into a
         // `memcpy` call.
         if offset <= savedSlots - 64 {
-            if offset < savedSlots - 128 {
-                // `copyMemory` rather than `update(from:count:)`: the latter emits
-                // an overlap check that is dead here (the image lives in the iseq
-                // allocation, never on the VM stack).
-                (dst + offset).copyMemory(from: src + offset, byteCount: savedSlots &- offset)
-                return
-            }
             Self.copy64(dst, src, offset)
             Self.copy64(dst, src, savedSlots - 64)
         } else if offset <= savedSlots - 32 {
@@ -173,6 +181,24 @@ struct Execution: ~Copyable {
     private static func copy64(_ dst: UnsafeMutableRawPointer, _ src: UnsafeRawPointer, _ o: Int) {
         copy32(dst, src, o)
         copy32(dst, src, o &+ 32)
+    }
+
+    /// Fast path for small internal calls. A failed check leaves the frame
+    /// untouched so the normal handler can perform the large copy or raise a trap.
+    @inline(__always)
+    func pushSmallFrame(
+        iseq: InstructionSequence, function: EntityHandle<WasmFunctionEntity>,
+        sp: Sp, newSp: Sp, returnPC: Pc
+    ) -> Bool {
+        // `compilingCall` only rewrites itself to `internalCall` for a small
+        // frame, so only the stack bound is left to check per call.
+        assert(iseq.hasSmallFrameInit)
+        guard _fastPath(newSp.advanced(by: iseq.maxStackHeight) < stackEnd) else { return false }
+        initializeSmallFrame(sp: newSp, iseq: iseq)
+        newSp.previousSP = sp
+        newSp.setReturnPC(returnPC, needsMemoryRestore: false)
+        newSp.currentFunction = function
+        return true
     }
 
     /// Pushes a new call frame to the VM stack.

@@ -172,6 +172,40 @@
             (i32.mul (local.get 0) (i32.const 3))))
         """
 
+    /// `$f` calls `g` from another instance, which calls `$f` back through a table, and then
+    /// `$big`, whose frame is too large for `internalCall`'s small-frame path.
+    ///
+    ///   $f: +0 local.get $n  +2 ref.func $f  +4 call $g  +6 call $big  +8 end
+    private let reenteringCallWAT = """
+        (module
+          (import "other" "g" (func $g (param i32 funcref) (result i32)))
+          (func $big (param i32) (result i32)
+            (local i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64 i64)
+            local.get 0)
+          (func $f (param $n i32) (result i32)
+            local.get $n
+            ref.func $f
+            call $g
+            call $big)
+          (elem declare func $f)
+          (func (export "_start") (result i32)
+            (drop (call $f (i32.const 0)))
+            (call $f (i32.const 1))))
+        """
+
+    /// Calls `$k` with `$n - 1` while `$n` is non-zero.
+    private let callBackWAT = """
+        (module
+          (type $t (func (param i32) (result i32)))
+          (table 1 funcref)
+          (func (export "g") (param $n i32) (param $k funcref) (result i32)
+            (if (result i32) (local.get $n)
+              (then
+                (table.set (i32.const 0) (local.get $k))
+                (call_indirect (type $t) (i32.sub (local.get $n) (i32.const 1)) (i32.const 0)))
+              (else (i32.const 0)))))
+        """
+
     /// `_start` calls `$pad`, which lies below it in the module, and then `boom` from another
     /// instance, which traps.
     ///
@@ -393,6 +427,46 @@
                 return
             }
             #expect(values == [.i32(13)])
+        }
+
+        /// While a step waits for a call into another instance to return, a nested frame can reach
+        /// the same return address. Running past it there must not stop at the same instruction
+        /// again when that instruction hands over to another handler without moving `pc`, as
+        /// `internalCall` does for a callee with a large frame.
+        @Test(arguments: testedThreadingModels)
+        func stepOverACallThatReentersRunsPastTheNestedReturn(
+            threadingModel: EngineConfiguration.ThreadingModel
+        ) throws {
+            let store = makeStore(threadingModel)
+            let other = try parseWasm(bytes: try wat2wasm(callBackWAT)).instantiate(store: store)
+            var imports = Imports()
+            imports.define(module: "other", name: "g", try #require(other.exports[function: "g"]))
+
+            let module = try parseWasm(bytes: try wat2wasm(reenteringCallWAT))
+            var debugger = try Debugger(module: module, store: store, imports: imports)
+            let base = module.functions[1].code.originalAddress
+            let bp = try debugger.enableBreakpoint(address: base + 4)
+
+            // The first call to `$f` runs `call $big` once, so it is an `internalCall` by the second.
+            // Step rather than run past it: `run` disarms the breakpoint it resumes from.
+            try debugger.run()
+            #expect(try stoppedPc(debugger) == bp)
+            try debugger.step()
+            #expect(try stoppedPc(debugger) == base + 6)
+            try debugger.run()
+            #expect(try stoppedPc(debugger) == bp)
+
+            // Without the breakpoint, the nested `$f` runs on to the return address of `call $g`.
+            try debugger.disableBreakpoint(address: bp)
+            try debugger.step()
+            #expect(try stoppedPc(debugger) == base + 6)
+
+            try debugger.run()
+            guard case .entrypointReturned(let values) = debugger.state else {
+                Issue.record("expected entrypointReturned, got \(debugger.state)")
+                return
+            }
+            #expect(values == [.i32(0)])
         }
 
         /// Execution comes back from another instance at an exception handler too: a step over a

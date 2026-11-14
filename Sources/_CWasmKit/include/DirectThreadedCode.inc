@@ -64,6 +64,14 @@ WASMKIT_TC_CC static inline void wasmkit_tc_internalCall(Sp sp, Pc pc, Md md, Ms
     SWIFT_CC(swift) uint64_t wasmkit_execute_internalCall(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
     void * _Nullable error = NULL; uint64_t next;
     INLINE_CALL next = wasmkit_execute_internalCall(&sp, &pc, &md, &ms, state, &error);
+    WASMKIT_DEAD_ACCUMULATOR(uint64_t, dead_ireg);
+    WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
+    WASMKIT_TC_MUSTTAIL return ((wasmkit_tc_exec)next)(sp, pc, md, ms, dead_ireg, dead_freg, state);
+}
+WASMKIT_TC_CC static inline void wasmkit_tc_internalCallSlow(Sp sp, Pc pc, Md md, Ms ms, uint64_t ireg, double freg, WASMKIT_TC_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_internalCallSlow(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_internalCallSlow(&sp, &pc, &md, &ms, state, &error);
     if (error) return wasmkit_execution_state_set_error(error, sp, pc, state);
     WASMKIT_DEAD_ACCUMULATOR(uint64_t, dead_ireg);
     WASMKIT_DEAD_ACCUMULATOR(double, dead_freg);
@@ -5153,6 +5161,7 @@ static const uintptr_t wasmkit_tc_exec_handlers[] = {
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_call),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_compilingCall),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_internalCall),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_internalCallSlow),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_callIndirect),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_returnCall),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_returnCallIndirect),

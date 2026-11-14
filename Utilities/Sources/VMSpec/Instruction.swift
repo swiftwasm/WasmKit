@@ -1663,6 +1663,19 @@ extension VMGen {
 
                 This instruction can skip switching the current instance.
                 """,
+                isControl: true, mayUpdateFrame: true, immediateLayout: .call
+            ),
+            Instruction(
+                name: "internalCallSlow",
+                documentation: """
+                    Call a function in the same instance that `internalCall` cannot enter
+
+                    Never emitted by the translator. `compilingCall` rewrites itself to this
+                    instead of `internalCall` when the callee's frame image is too large for
+                    `internalCall`'s fixed-size copy, and `internalCall` dispatches to this when
+                    the new frame would exhaust the stack. It receives the `pc` of the operand
+                    `internalCall` was given, so it reads the same operand.
+                    """,
                 isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .call
             ),
             Instruction(name: "callIndirect", documentation: "WebAssembly Core Instruction `call_indirect`",
