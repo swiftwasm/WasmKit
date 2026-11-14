@@ -96,7 +96,16 @@
 #  include <TargetConditionals.h>
 #endif
 
-#if defined(__linux__) || (defined(__APPLE__) && (TARGET_OS_OSX || TARGET_OS_IOS))
+// Guard pages need the 4 GiB wasm32 reservation, so 64-bit only. `__linux__`
+// covers Android.
+//
+// The Swift side cannot read this macro from `#if`, so it repeats the list as
+// `(os(macOS) || os(iOS) || os(Linux) || os(Android)) && !$Embedded` plus
+// `arch(x86_64) || arch(arm64)`. Keep the two in step: where only this one is
+// on, the engine reports `.mprotect` and installs the trap guard while every
+// memory is malloc-backed.
+#if (defined(__linux__) || (defined(__APPLE__) && (TARGET_OS_OSX || TARGET_OS_IOS))) \
+    && (defined(__x86_64__) || defined(__aarch64__)) && defined(__LP64__)
 #  define WASMKIT_MPROTECT_BOUND_CHECKING 1
 #else
 #  define WASMKIT_MPROTECT_BOUND_CHECKING 0
