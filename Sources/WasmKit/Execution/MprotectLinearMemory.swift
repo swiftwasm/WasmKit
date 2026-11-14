@@ -1,4 +1,4 @@
-#if (os(macOS) || os(iOS) || os(Linux)) && !$Embedded
+#if (os(macOS) || os(iOS) || os(Linux) || os(Android)) && !$Embedded
 
     #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
         import Darwin
@@ -6,6 +6,8 @@
         import Musl
     #elseif canImport(Glibc)
         import Glibc
+    #elseif canImport(Android)
+        import Android
     #endif
 
     struct MprotectLinearMemory {
