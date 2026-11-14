@@ -13,7 +13,10 @@ import WasmKit
 /// Output is CSV on stdout:
 ///
 ///     execute/<name>,<mean_ms>,<min_ms>,<iters>
+///     extra/<name>,<mean_ms>,<min_ms>,<iters>
 ///     coremark,<score>
+///
+/// `extra/*` cases are not part of wasmi-benchmarks; see ``ExtraCase``.
 @main
 struct WasmiBenchmarks {
     static func main() throws {
@@ -166,6 +169,9 @@ final class Runner {
         for rustCase in rustCases where shouldRun(rustCase.name) {
             try run(rustCase)
         }
+        for extraCase in extraCases where shouldRun(extraCase.name) {
+            try run(extraCase)
+        }
     }
 
     private func shouldRun(_ name: String) -> Bool {
@@ -227,6 +233,10 @@ final class Runner {
                 try runner.expect(instance, "output", data, i32: 2)
             },
         ]
+    }
+
+    private var extraCases: [ExtraCase] {
+        [.splitmix64]
     }
 
     // MARK: Engine and module loading
@@ -300,6 +310,14 @@ final class Runner {
         _ = try instance.exports[function: "teardown"]!([data])
     }
 
+    private func run(_ extraCase: ExtraCase) throws {
+        let store = makeStore()
+        let instance = try parseWasm(bytes: try wat2wasm(extraCase.wat)).instantiate(store: store)
+        let run = instance.exports[function: "run"]!
+        try measure(extraCase.name, group: "extra") { _ = try run([extraCase.input]) }
+        expect(try run([extraCase.input]), [extraCase.expected], "\(extraCase.name).run")
+    }
+
     /// CoreMark reports its own score, so it is run exactly once instead of being timed.
     private func runCoreMark() throws {
         let store = makeStore()
@@ -320,7 +338,7 @@ final class Runner {
 
     /// Criterion-like: warm up for ~1 s, then measure for ~2 s and at least 10
     /// iterations. Reports the mean and the minimum wall time of one `run`.
-    private func measure(_ name: String, _ body: () throws -> Void) rethrows {
+    private func measure(_ name: String, group: String = "execute", _ body: () throws -> Void) rethrows {
         let warmupNanoseconds: UInt64 = 1_000_000_000
         let measureNanoseconds: UInt64 = 2_000_000_000
         let minimumIterations = 10
@@ -343,8 +361,8 @@ final class Runner {
         let meanMilliseconds = Double(elapsed) / Double(iterations) / 1e6
         emit(
             String(
-                format: "execute/%@,%.3f,%.3f,%d",
-                name, meanMilliseconds, Double(minimum) / 1e6, iterations))
+                format: "%@/%@,%.3f,%.3f,%d",
+                group, name, meanMilliseconds, Double(minimum) / 1e6, iterations))
     }
 
     private func emit(_ line: String) {

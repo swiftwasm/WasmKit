@@ -109,6 +109,17 @@ up for ~1 s and then measured for ~2 s (at least 10 iterations), which mirrors
 what criterion does. For CoreMark the single column is the score reported by the
 guest, where higher is better.
 
+### Extra cases
+
+Cases that are not part of wasmi-benchmarks are printed as `extra/<name>`,
+with the same columns as `execute/*`, and live in
+`Sources/WasmiBenchmarks/ExtraCases.swift`. Leave them out when comparing
+against wasmi's numbers.
+
+| Case | What it covers |
+|---|---|
+| `extra/splitmix64` | SplitMix64's mixing step (`x ^ (x >> k)` and a multiply, twice, then `x ^ (x >> 31)`) folded 1,000,000 times through a non-inlined call: a small integer hash or random-number generator in a hot loop |
+
 ### Comparing against wasmi, wasm3 and stitch
 
 Only numbers taken from the same machine in the same session are comparable. Run
