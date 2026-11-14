@@ -1663,8 +1663,10 @@ extension VMGen {
 
                 This instruction can skip switching the current instance.
                 """,
-                isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .call
+                isControl: true, mayUpdateFrame: true, immediateLayout: .call
             ),
+            Instruction(name: "internalCallSlow", documentation: "Large-frame or trapping internal call",
+                        isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .call),
             Instruction(name: "callIndirect", documentation: "WebAssembly Core Instruction `call_indirect`",
                         isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
                 $0.field(name: "tableIndex", type: .UInt32)
@@ -1899,6 +1901,82 @@ extension VMGen {
             },
         ]
         instructions += wideArithmeticInsts
+        instructions.append(Instruction(name: "i64XorShiftImm", documentation: "result = x ^ (x >> shift)") {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "input", type: .VReg)
+            $0.field(name: "shift", type: .UInt32)
+        })
+        instructions.append(Instruction(name: "i64XorShiftMulImm", documentation: "result = (x ^ (x >> shift)) * multiplier, wrapping") {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "input", type: .VReg)
+            $0.field(name: "multiplier", type: .VReg)
+            $0.field(name: "shift", type: .UInt16)
+        })
+        instructions.append(Instruction(name: "i32AddImmGlobalSet", documentation: "Add an immediate and store the result in a register and a global") {
+            $0.field(name: "rawGlobal", type: .UInt64)
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "lhs", type: .VReg)
+            $0.field(name: "imm", type: .Int32)
+        })
+        instructions.append(Instruction(name: "i32GlobalAddSet", documentation: "Read a global, add a register, and write both destinations") {
+            $0.field(name: "rawGlobal", type: .UInt64)
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "rhs", type: .VReg)
+        })
+        instructions.append(Instruction(name: "i32GlobalSubSet", documentation: "Read a global, subtract a register, and write both destinations", immediate: "I32GlobalAddSetOperand"))
+        var addLoad = Instruction(name: "i32AddImmLoad", documentation: "Add a wrapping address immediate and load i32", useCurrentMemory: .read) {
+            $0.field(name: "lhs", type: .VReg)
+            $0.field(name: "pointer", type: .VReg)
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "imm", type: .Int32)
+            $0.field(name: "offset", type: .UInt32)
+        }
+        addLoad.mayDispatchToTrap = true
+        instructions.append(addLoad)
+        var load32 = Instruction(name: "i32LoadMemory32", documentation: "Load i32 with a 32-bit address and static offset", useCurrentMemory: .read, immediateLayout: .accMemoryPointerResult)
+        load32.mayDispatchToTrap = true
+        instructions.append(load32)
+        instructions.append(Instruction(name: "returnCopy", documentation: "Copy a result slot and return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write, immediate: "CopyStackOperand"))
+        instructions.append(Instruction(name: "returnCopy2", documentation: "Copy two independent result slots and return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write, immediate: "CopyStack2Operand"))
+        instructions.append(Instruction(name: "compilingCopyCall", documentation: "Copy argument slots and call an internal function", isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .copyCall))
+        instructions.append(Instruction(name: "internalCopyCall", documentation: "Copy argument slots and call an internal function", isControl: true, mayUpdateFrame: true, immediateLayout: .copyCall))
+        instructions.append(Instruction(name: "compilingCopy2Call", documentation: "Copy argument slots and call an internal function", isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .copy2Call))
+        instructions.append(Instruction(name: "internalCopy2Call", documentation: "Copy argument slots and call an internal function", isControl: true, mayUpdateFrame: true, immediateLayout: .copy2Call))
+        instructions.append(Instruction(name: "i64XorShiftReturn", documentation: "Compute xor-shift, copy its result, and return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "input", type: .VReg)
+            $0.field(name: "shift", type: .UInt32)
+            $0.field(name: "dest", type: .LVReg)
+        })
+        instructions.append(Instruction(name: "i64XorShiftMulPair", documentation: "Two dependent wrapping xor-shift-multiply operations, retaining both results") {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "intermediate", type: .VReg)
+            $0.field(name: "input", type: .VReg)
+            $0.field(name: "multiplier0", type: .VReg)
+            $0.field(name: "multiplier1", type: .VReg)
+            $0.field(name: "shift0", type: .UInt16)
+            $0.field(name: "shift1", type: .UInt16)
+        })
+        instructions.append(Instruction(name: "i64XorShiftMulPairReturn", documentation: "Two ordered xor-shift-multiply operations followed by xor-shift and return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+            $0.field(name: "result0", type: .VReg)
+            $0.field(name: "result1", type: .VReg)
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "input", type: .VReg)
+            $0.field(name: "multiplier0", type: .VReg)
+            $0.field(name: "multiplier1", type: .VReg)
+            $0.field(name: "shift0", type: .UInt16)
+            $0.field(name: "shift1", type: .UInt16)
+            $0.field(name: "shift2", type: .UInt32)
+            $0.field(name: "dest", type: .LVReg)
+        })
+        var addBranch = Instruction(name: "i32AddImmBrIf", documentation: "Wrapping immediate add retaining its result followed by a conditional branch", isControl: true) {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "lhs", type: .VReg)
+            $0.field(name: "imm", type: .Int32)
+            $0.field(name: "offset", type: .Int32)
+        }
+        addBranch.useIreg = .write
+        instructions.append(addBranch)
         return instructions
     }
 

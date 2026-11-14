@@ -122,6 +122,12 @@ enum VMGen {
 
     static func generateBasicInstImplementations() -> [String: String] {
         var inlineImpls: [String: String] = [:]
+        inlineImpls["i32LoadMemory32"] = """
+            if let trap = self.memoryLoad32(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate) { %TRAP% }
+            """
+        inlineImpls["i32AddImmLoad"] = """
+            if let trap = self.memoryLoadAddingImmediate(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate) { %TRAP% }
+            """
         for op in intBinOps + floatBinOps {
             inlineImpls[op.instruction.name] = """
             sp.pointee[\(op.resultSlot): immediate.result] = \(op.mayThrow ? "try " : "")sp.pointee[\(op.lhsSlot): immediate.lhs].\(camelCase(pascalCase: op.op))(sp.pointee[\(op.rhsSlot): immediate.rhs])
@@ -147,6 +153,21 @@ enum VMGen {
                         sp.pointee[\(op.type): immediate.result] = \(second)
                 """
         }
+        inlineImpls["i64XorShiftImm"] = """
+            let input = sp.pointee[i64: immediate.input]
+            sp.pointee[i64: immediate.result] = input ^ (input &>> UInt64(immediate.shift))
+            """
+        inlineImpls["i64XorShiftMulImm"] = """
+            let input = sp.pointee[i64: immediate.input]
+            let mixed = input ^ (input &>> UInt64(immediate.shift))
+            sp.pointee[i64: immediate.result] = mixed &* sp.pointee[i64: immediate.multiplier]
+            """
+        inlineImpls["i64XorShiftMulPair"] = """
+            let input = sp.pointee[i64: immediate.input]
+            let first = (input ^ (input &>> UInt64(immediate.shift0))) &* sp.pointee[i64: immediate.multiplier0]
+            sp.pointee[i64: immediate.intermediate] = first
+            sp.pointee[i64: immediate.result] = (first ^ (first &>> UInt64(immediate.shift1))) &* sp.pointee[i64: immediate.multiplier1]
+            """
         for op in intAccBinOps {
             let load = op.type == "i32" ? "UInt32(truncatingIfNeeded: ireg.pointee)" : "ireg.pointee"
             func store(_ expression: String) -> String {
