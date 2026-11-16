@@ -19,7 +19,7 @@ struct Example {
             let store = Store(engine: engine)
             // Instantiate a parsed module importing WASI
             var imports = Imports()
-            wasi.link(to: &imports, store: store)
+            try wasi.link(to: &imports, store: store)
             let instance = try module.instantiate(store: store, imports: imports)
             return try wasi.start(instance)
         }

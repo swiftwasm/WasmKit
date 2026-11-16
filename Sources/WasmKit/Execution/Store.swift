@@ -96,7 +96,7 @@ public final class Store {
     /// Create a new store associated with the given engine.
     public init(engine: Engine) {
         self.engine = engine
-        self.allocator = StoreAllocator(funcTypeInterner: engine.funcTypeInterner)
+        self.allocator = StoreAllocator(typeRegistry: engine.typeRegistry)
         self.isFuelMetered = engine.configuration.fuelMetering
         self.epochCounter = UnsafePointer(engine.epochTicker.counter.address)
     }
@@ -166,7 +166,7 @@ public struct Caller: ~Copyable {
 struct HostFunctionEntity {
     let type: InternedFuncType
     /// The signature, resolved once here rather than looked up through the
-    /// engine's interner on every call. On a small device the lookup and the
+    /// engine's type registry on every call. On a small device the lookup and the
     /// retain traffic on the type's arrays cost more than the call they
     /// preface.
     let parameterTypes: [ValueType]

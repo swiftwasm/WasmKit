@@ -147,7 +147,7 @@ struct RuntimeTestHarness {
             let wasi = try WASIBridgeToHost(args: [compiled.path])
             try wasi.runAndClose { wasi in
                 var imports = Imports()
-                wasi.link(to: &imports, store: store)
+                try wasi.link(to: &imports, store: store)
                 link(&imports, store)
 
                 let module = try parseWasm(filePath: compiled.path)

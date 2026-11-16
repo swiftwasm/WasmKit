@@ -323,7 +323,7 @@ final class Runner {
         let store = makeStore()
         let module = try loadWasm("res/wasm/coremark.wasm")
         let start = Self.now()
-        let clockMs = Function(store: store, parameters: [], results: [.i32]) { _, _ in
+        let clockMs = try Function(store: store, parameters: [], results: [.i32]) { _, _ in
             [Value(signed: Int32(truncatingIfNeeded: (Self.now() - start) / 1_000_000))]
         }
         let instance = try module.instantiate(store: store, imports: ["env": ["clock_ms": clockMs]])

@@ -33,7 +33,7 @@
             var imports = Imports()
             imports.define(
                 module: "env", name: "host",
-                Function(store: store, parameters: [.i32], results: [.i32]) { _, args in
+                try Function(store: store, parameters: [.i32], results: [.i32]) { _, args in
                     [.i32(args[0].i32 &+ 1)]
                 })
 

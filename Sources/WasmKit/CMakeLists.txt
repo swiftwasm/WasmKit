@@ -9,6 +9,7 @@ add_wasmkit_library(WasmKit
   Validator.swift
   TypeCanonicalization.swift
   TypeMatching.swift
+  TypeRegistry.swift
   WasmKitError.swift
   ResourceLimiter.swift
   Execution/SharedMemory.swift

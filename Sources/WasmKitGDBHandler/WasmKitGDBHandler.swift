@@ -152,7 +152,7 @@
 
             let store = Store(engine: Engine(configuration: engineConfiguration))
             var imports = Imports()
-            wasi.link(to: &imports, store: store)
+            try wasi.link(to: &imports, store: store)
             self.wasi = wasi
 
             do {

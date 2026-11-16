@@ -197,7 +197,7 @@ struct IntegrationTests {
             let engine = Engine()
             let store = Store(engine: engine)
             var imports = Imports()
-            wasi.link(to: &imports, store: store)
+            try wasi.link(to: &imports, store: store)
             let module = try parseWasm(filePath: path.path)
             let instance = try module.instantiate(store: store, imports: imports)
             let exitCode = try wasi.start(instance)

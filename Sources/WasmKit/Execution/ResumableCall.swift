@@ -163,7 +163,7 @@ public final class ResumableCall {
     public init(function: Function, arguments: [Value] = [], on stack: consuming ExecutionStack) throws {
         let type = function.type
         guard arguments.count == type.parameters.count,
-            zip(arguments, type.parameters).allSatisfy({ $0.matches($1) })
+            zip(arguments, type.parameters).allSatisfy({ $0.matches($1, in: function.store.allocator.typeRegistry) })
         else {
             throw Trap(.parameterTypesMismatch(expected: type.parameters, got: arguments))
         }

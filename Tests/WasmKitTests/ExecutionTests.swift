@@ -80,7 +80,7 @@ struct ExecutionTests {
         var imports = Imports()
         imports.define(
             module: "env", name: "sum5",
-            Function(store: store, parameters: Array(repeating: .i64, count: 5), results: [.i64]) { _, args in
+            try Function(store: store, parameters: Array(repeating: .i64, count: 5), results: [.i64]) { _, args in
                 [.i64(args.reduce(0) { $0 + $1.i64 })]
             })
         let instance = try module.instantiate(store: store, imports: imports)
@@ -223,5 +223,24 @@ struct ExecutionTests {
             error?.description.contains("expected `if` control frame on top of the stack for `else`") == true,
             "expected a validation error, got \(error.map(String.init(describing:)) ?? "no error")"
         )
+    }
+
+    @Test
+    func rejectsFunctionImportOfStructType() throws {
+        // (module (type (struct)) (import "m" "f" (func (type 0))))
+        let module = try parseWasm(
+            bytes: [
+                0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
+                0x01, 0x03, 0x01, 0x5F, 0x00,
+                0x02, 0x07, 0x01, 0x01, 0x6D, 0x01, 0x66, 0x00, 0x00,
+            ],
+            features: [.referenceTypes, .exceptionHandling, .gc]
+        )
+        let store = Store(engine: Engine())
+        let function = try Function(store: store, parameters: []) { _, _ in [] }
+        let error = try #require(throws: WasmKitError.self) {
+            try module.instantiate(store: store, imports: ["m": ["f": function]])
+        }
+        #expect(error.description == "Type index 0 does not define a function type")
     }
 }

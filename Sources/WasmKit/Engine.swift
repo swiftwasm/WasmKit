@@ -13,7 +13,7 @@ public final class Engine {
     /// The engine configuration.
     public let configuration: EngineConfiguration
     let interceptor: EngineInterceptor?
-    let funcTypeInterner: Interner<FunctionType>
+    let typeRegistry: TypeRegistry
 
     /// The head slot of the `returnCrossInstance` handler under this engine's
     /// threading model.
@@ -61,7 +61,7 @@ public final class Engine {
 
         self.configuration = configuration
         self.interceptor = interceptor
-        self.funcTypeInterner = Interner()
+        self.typeRegistry = TypeRegistry(capacity: configuration.maxTypeCount)
         self.internalCallSlowSlot = Instruction.internalCallSlow(
             .init(rawCallee: 0, arguments: .zero, spAddend: LVReg(slotIndex: 0))
         ).headSlot(threadingModel: configuration.threadingModel)
@@ -75,7 +75,7 @@ public final class Engine {
     public func instantiate(module: Module) -> Instance { fatalError() }
 }
 
-// `configuration` is immutable and `funcTypeInterner` synchronizes its mutable
+// `configuration` is immutable and `typeRegistry` synchronizes its mutable
 // state. Concurrent clients must reject engines with interceptors, whose
 // implementations are not currently Sendable.
 extension Engine: @unchecked Sendable {}
@@ -198,6 +198,18 @@ public struct EngineConfiguration: Sendable {
     /// Like ``fuelMetering``, this is a translation-time property.
     public var epochInterruption: Bool
 
+    /// The number of distinct types the engine can hold. (Default: 65,536 on 32-bit platforms, and
+    /// the maximum, 134,217,728, on 64-bit platforms)
+    ///
+    /// Creating an ``Engine`` traps if the value is less than 1 or more than 134,217,728.
+    ///
+    /// A type counts once however many modules and host functions use it, and stays counted for
+    /// the lifetime of the engine. Past the limit, instantiating a module with a new type throws,
+    /// and so does creating a ``Function`` or ``Tag`` with a new signature. Creating the engine
+    /// allocates one pointer for every 256 types on 32-bit platforms, and for every 4,096 types on
+    /// 64-bit platforms.
+    public var maxTypeCount: Int
+
     /// FIXME: Make it public once we add mprotect-based bounds checking with JIT.
     /// Extra reserved bytes after the 4 GiB wasm32 address space for future
     /// unchecked constant-offset accesses in JIT code.
@@ -218,6 +230,8 @@ public struct EngineConfiguration: Sendable {
     /// runs, so that execution can be bounded with ``Store/fuel``.
     /// - Parameter epochInterruption: Whether translated code checks the engine's epoch, so that
     /// another thread can stop execution with ``Engine/epochTicker``.
+    /// - Parameter maxTypeCount: The number of distinct types the engine can hold. If `nil`, the
+    /// default for the platform will be used.
     public init(
         threadingModel: ThreadingModel? = nil,
         compilationMode: CompilationMode? = nil,
@@ -226,6 +240,7 @@ public struct EngineConfiguration: Sendable {
         memoryBoundsChecking: MemoryBoundsChecking? = nil,
         fuelMetering: Bool = false,
         epochInterruption: Bool = false,
+        maxTypeCount: Int? = nil,
     ) {
         self.threadingModel = threadingModel ?? .defaultForCurrentPlatform
         self.compilationMode = compilationMode ?? .lazy
@@ -234,14 +249,15 @@ public struct EngineConfiguration: Sendable {
         self.memoryBoundsChecking = memoryBoundsChecking ?? .defaultForCurrentPlatform
         self.fuelMetering = fuelMetering
         self.epochInterruption = epochInterruption
+        self.maxTypeCount = maxTypeCount ?? TypeRegistry.defaultCapacity
     }
 }
 
 extension Engine {
     func resolveType(_ type: InternedFuncType) -> FunctionType {
-        return funcTypeInterner.resolve(type)
+        return typeRegistry.resolve(type)
     }
-    func internType(_ type: FunctionType) -> InternedFuncType {
-        return funcTypeInterner.intern(type)
+    func internType(_ type: FunctionType) throws(WasmKitError) -> InternedFuncType {
+        return try typeRegistry.intern(type)
     }
 }

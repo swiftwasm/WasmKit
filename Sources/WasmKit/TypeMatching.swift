@@ -1,29 +1,31 @@
 import WasmTypes
 
-// Subtyping between canonical types (see TypeCanonicalization.swift), as
-// defined by the typed function references proposal:
+// Subtyping between canonical types (see TypeCanonicalization.swift and
+// TypeRegistry.swift):
 //
 // - A numeric or vector type matches only itself.
 // - `(ref null? ht1) <: (ref null ht2)` and `(ref ht1) <: (ref ht2)` iff
 //   `ht1 <: ht2`; a nullable reference never matches a non-nullable one.
-// - A concrete heap type is a subtype of `func`; two concrete heap types match
-//   iff they are the same canonical type.
+// - Heap types form four hierarchies: `any` (with `eq`, `i31`, `struct`,
+//   `array`, the struct and array types, and `none`), `func` (with the
+//   function types and `nofunc`), `extern` (with `noextern`) and `exn` (with
+//   `noexn`). A concrete type is a subtype of the types it declares as
+//   supertypes, directly or not.
 
 extension HeapType {
-    func isSubtype(of other: HeapType) -> Bool {
+    /// Subtyping of canonical heap types. Only two different concrete types
+    /// need `registry`, to look up their declared supertypes.
+    func isSubtype(of other: HeapType, in registry: TypeRegistry) -> Bool {
         if self == other { return true }
-        switch (self, other) {
-        case (.concrete, .abstract(.funcRef)): return true
-        default: return false
-        }
+        return registry.isSubtype(self, of: other)
     }
 }
 
 extension ReferenceType {
-    func isSubtype(of other: ReferenceType) -> Bool {
+    func isSubtype(of other: ReferenceType, in registry: TypeRegistry) -> Bool {
         if self == other { return true }
         guard other.isNullable || !isNullable else { return false }
-        return heapType.isSubtype(of: other.heapType)
+        return heapType.isSubtype(of: other.heapType, in: registry)
     }
 }
 
@@ -35,17 +37,17 @@ extension ValueType {
         return referenceType.isNullable
     }
 
-    func isSubtype(of other: ValueType) -> Bool {
+    func isSubtype(of other: ValueType, in registry: TypeRegistry) -> Bool {
         if self == other { return true }
         guard case .ref(let reference) = self, case .ref(let otherReference) = other else { return false }
-        return reference.isSubtype(of: otherReference)
+        return reference.isSubtype(of: otherReference, in: registry)
     }
 }
 
 extension Array where Element == ValueType {
     /// Whether each type is a subtype of the type at the same position in `other`.
-    func isSubtype(of other: [ValueType]) -> Bool {
+    func isSubtype(of other: [ValueType], in registry: TypeRegistry) -> Bool {
         guard count == other.count else { return false }
-        return zip(self, other).allSatisfy { $0.isSubtype(of: $1) }
+        return zip(self, other).allSatisfy { $0.isSubtype(of: $1, in: registry) }
     }
 }

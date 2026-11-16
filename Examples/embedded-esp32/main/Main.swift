@@ -141,9 +141,9 @@ func runWASIGuest() throws {
     try bridge.runAndClose { bridge in
         var imports = Imports()
         #if WASMKIT_LINK_ALL_WASI
-            bridge.link(to: &imports, store: store, capabilities: WasmKitWASI.WASICapability.all)
+            try bridge.link(to: &imports, store: store, capabilities: WasmKitWASI.WASICapability.all)
         #else
-            bridge.link(to: &imports, store: store, capabilities: [.stdio, .process])
+            try bridge.link(to: &imports, store: store, capabilities: [.stdio, .process])
         #endif
 
         let module = try parseWasm(bytes: wasiGuestWasm)
@@ -264,12 +264,12 @@ func app_main() {
         var imports = Imports()
         imports.define(
             module: "host", name: "mul",
-            Function(store: store, parameters: [.i32, .i32], results: [.i32]) { _, arguments in
+            try Function(store: store, parameters: [.i32, .i32], results: [.i32]) { _, arguments in
                 [.i32(arguments[0].i32 &* arguments[1].i32)]
             })
         imports.define(
             module: "host", name: "boom",
-            Function(store: store, parameters: []) { _, _ in
+            try Function(store: store, parameters: []) { _, _ in
                 throw DemoHostError(code: 42)
             })
 

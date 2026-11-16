@@ -37,7 +37,7 @@ package enum UnsupportedSpectests {
         [
             "array.wast", "array_copy.wast", "array_fill.wast", "array_init_data.wast", "array_init_elem.wast",
             "array_new_data.wast", "array_new_elem.wast", "extern.wast", "ref_cast.wast", "ref_null.wast",
-            "ref_test.wast", "type-canon.wast", "type-subtyping.wast",
+            "ref_test.wast",
         ]
 
     /// Directives to skip in the other files, by the line they start on. Skipping a module also
@@ -96,55 +96,23 @@ package enum UnsupportedSpectests {
         "table_init64.wast": [
             2457: garbageCollection  // A table of `arrayref`
         ],
-        "tag.wast": [
-            30: garbageCollection,  // A recursion group; exports the tag the directives below import
-            40: garbageCollection,  // A recursion group
-            48: garbageCollection,  // A recursion group, in a module that must fail to link
-            59: garbageCollection,  // Expects an incompatible import of the tag exported by the module on line 30
-        ],
-        "type-equivalence.wast": [
-            30: garbageCollection,  // A recursion group
-            38: garbageCollection,  // A function type that refers to itself, which needs a recursion group
-            49: garbageCollection,  // A recursion group
-            136: garbageCollection,  // A recursion group
-            161: garbageCollection,  // A recursion group
-            233: garbageCollection,  // A recursion group
-            238: garbageCollection,  // A recursion group; imports from the module on line 233
-            246: garbageCollection,  // A recursion group
-            257: garbageCollection,  // A recursion group
-            268: garbageCollection,  // A recursion group
-            279: garbageCollection,  // A recursion group
-            290: garbageCollection,  // A recursion group
-            308: garbageCollection,  // A recursion group
+        "type-subtyping.wast": [
+            283: garbageCollection,  // `ref.cast` on function references
+            344: garbageCollection,  // `ref.cast` on function references
+            402: garbageCollection,  // `ref.test` on function references
+            414: garbageCollection,  // `ref.test` on function references
+            432: garbageCollection,  // `ref.test` on function references
+            444: garbageCollection,  // `ref.test` on function references
+            455: garbageCollection,  // `ref.test` on function references
+            476: garbageCollection,  // `ref.test` on function references
+            492: garbageCollection,  // `ref.test` on function references
+            515: garbageCollection,  // `ref.test` on function references
+            525: garbageCollection,  // `ref.test` on function references
         ],
         "custom/branch_hint.wast": [
             50: branchHinting,  // Two hints on one instruction, which must be malformed
             67: branchHinting,  // A hint outside a function, which must be malformed
             85: branchHinting,  // A hint on an instruction that is not a branch, which must be invalid
-        ],
-        "type-rec.wast": [
-            3: garbageCollection,  // A function type that refers to itself, and recursion groups
-            28: garbageCollection,  // A recursion group, in a module that must be invalid
-            39: garbageCollection,  // A recursion group
-            45: garbageCollection,  // A recursion group
-            51: garbageCollection,  // A recursion group, in a module that must be invalid
-            59: garbageCollection,  // A recursion group, in a module that must be invalid
-            71: garbageCollection,  // A recursion group
-            78: garbageCollection,  // A recursion group
-            93: garbageCollection,  // A recursion group, in a module that must be invalid
-            103: garbageCollection,  // A recursion group, in a module that must be invalid
-            114: garbageCollection,  // A recursion group, in a module that must be invalid
-            124: garbageCollection,  // A recursion group, in a module that must be invalid
-            137: garbageCollection,  // A recursion group
-            143: garbageCollection,  // A recursion group; imports from the module on line 137
-            148: garbageCollection,  // A recursion group; expects an incompatible import from the module on line 137
-            156: garbageCollection,  // A recursion group; expects an incompatible import from the module on line 137
-            167: garbageCollection,  // A recursion group
-            176: garbageCollection,  // A recursion group
-            185: garbageCollection,  // A recursion group
-            197: garbageCollection,  // A recursion group
-            204: garbageCollection,  // A recursion group, in a module that must be invalid
-            216: garbageCollection,  // A recursion group, in a module that must be invalid
         ],
     ]
 

@@ -37,7 +37,7 @@ package struct Explore: ParsableCommand {
                 imports.define(
                     module: importEntry.module,
                     name: importEntry.name,
-                    Function(store: store, type: type) { _, _ in
+                    try Function(store: store, type: type) { _, _ in
                         fatalError("unreachable")
                     }
                 )

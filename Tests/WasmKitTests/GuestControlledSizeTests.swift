@@ -141,7 +141,7 @@ struct GuestControlledSizeTests {
         var imports = Imports()
         imports.define(
             module: "env", name: "cb",
-            Function(store: store, type: FunctionType(parameters: [], results: [])) { _, _ in
+            try Function(store: store, type: FunctionType(parameters: [], results: [])) { _, _ in
                 _ = try box.instance?.exports[function: "growit"]?()
                 return []
             }
