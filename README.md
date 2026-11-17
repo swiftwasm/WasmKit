@@ -28,7 +28,7 @@ To use WasmKit in your package, add it as a [Swift Package Manager](https://www.
 Run the following commands in the same directory as your `Package.swift` manifest to add the dependency:
 
 ```
-swift package add-dependency https://github.com/swiftwasm/WasmKit --up-to-next-minor-from 0.4.2
+swift package add-dependency https://github.com/swiftwasm/WasmKit --up-to-next-minor-from 0.5.0
 swift package add-target-dependency WasmKit <your-package-target-name> --package WasmKit
 ```
 
@@ -37,7 +37,7 @@ You can also add the following snippet manually instead to your `Package.swift` 
 ```swift
 dependencies: [
     // ...other dependencies
-    .package(url: "https://github.com/swiftwasm/WasmKit.git", .upToNextMinor(from: "0.4.2")),
+    .package(url: "https://github.com/swiftwasm/WasmKit.git", .upToNextMinor(from: "0.5.0")),
 ],
 // ...other package configuration
 targets: [
@@ -116,13 +116,14 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 [0.4.0]: https://github.com/swiftwasm/WasmKit/releases/tag/0.4.0
 [0.4.1]: https://github.com/swiftwasm/WasmKit/releases/tag/0.4.1
 [0.4.2]: https://github.com/swiftwasm/WasmKit/releases/tag/0.4.2
+[0.5.0]: https://github.com/swiftwasm/WasmKit/releases/tag/0.5.0
 
 #### Phase 4 - Standardize the Feature (WG)
 
 | Proposal | Status | WasmKit version |
 |----------|--------|-----------------|
 | [Threads and Atomics](https://github.com/webassembly/threads) | ✅ Implemented | [0.3.0] |
-| [Wide Arithmetic](https://github.com/WebAssembly/wide-arithmetic) | ✅ Implemented | `main` branch |
+| [Wide Arithmetic](https://github.com/WebAssembly/wide-arithmetic) | ✅ Implemented | [0.5.0] |
 
 #### Phase 1 - Feature Proposal (CG)
 
