@@ -12,6 +12,7 @@ import WasmKitWASI
 /// |- Fixtures
 /// |  |- ${TEST_CASE}
 /// |     |- ${TEST_CASE}.swift
+/// |     |- ${TEST_CASE}.c (optional)
 /// |     |- wit
 /// |        |- ${WORLD}.wit
 /// ```
@@ -171,7 +172,7 @@ struct RuntimeTestHarness {
             ], outputPath: libcObjFile)
 
         return try compile(
-            inputFiles: inputFiles + [libcObjFile.path],
+            inputFiles: inputFiles + [libcObjFile.path] + compileFixtureC(target: "wasm32-unknown-none-wasm"),
             arguments: [
                 "-target", "wasm32-unknown-none-wasm",
                 "-enable-experimental-feature", "Embedded",
@@ -185,7 +186,7 @@ struct RuntimeTestHarness {
     func compileForWASI(inputFiles: [String]) throws -> URL {
         let wasiSwiftSDK = URL(fileURLWithPath: configuration.wasiSwiftSDKPath)
         return try compile(
-            inputFiles: inputFiles,
+            inputFiles: inputFiles + compileFixtureC(target: "wasm32-unknown-wasip1"),
             arguments: [
                 "-target", "wasm32-unknown-wasip1",
                 "-enable-experimental-feature", "Extern",
@@ -196,6 +197,14 @@ struct RuntimeTestHarness {
                 "-Xclang-linker", "-resource-dir",
                 "-Xclang-linker", wasiSwiftSDK.appendingPathComponent("swift.xctoolchain/usr/lib/swift_static/clang").path,
             ])
+    }
+
+    private func compileFixtureC(target: String) throws -> [String] {
+        let cFile = fixturePath.appendingPathComponent(fixtureName + ".c")
+        guard fileManager.fileExists(atPath: cFile.path) else { return [] }
+        let objFile = compiledDirectory.appendingPathComponent(fixtureName + ".o")
+        try compileToObj(cInputFiles: [cFile.path], arguments: ["-target", target], outputPath: objFile)
+        return [objFile.path]
     }
 
     /// Compile the given input Swift source files into core Wasm module
@@ -214,6 +223,7 @@ struct RuntimeTestHarness {
             process.executableURL = URL(fileURLWithPath: configuration.swiftCompilerExecutablePath.path)
             process.arguments =
                 inputFiles + arguments + [
+                    "-swift-version", "6",
                     "-I\(Self.sourcesDirectory.appendingPathComponent("_CabiShims").appendingPathComponent("include").path)",
                     // TODO: Remove `--export-all` linker option by replacing `@_cdecl` with `@_expose(wasm)`
                     "-Xlinker", "--export-all",

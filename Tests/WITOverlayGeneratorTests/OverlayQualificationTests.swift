@@ -51,7 +51,7 @@ struct OverlayQualificationTests {
 
     @Test func flagsQualifiesOptionSetConformance() throws {
         let code = try guestCode("package test:q4;\nworld w { flags f { a, b } export run: func(); }")
-        #expect(code.contains(": Swift.OptionSet {"))
+        #expect(code.contains(": Swift.OptionSet, Swift.Sendable {"))
     }
 
     @Test func wideFlagsQualifiesRawValueConformances() throws {
@@ -67,6 +67,6 @@ struct OverlayQualificationTests {
               export run: func();
             }
             """)
-        #expect(code.contains("struct RawValue: Swift.Equatable, Swift.Hashable {"))
+        #expect(code.contains("struct RawValue: Swift.Equatable, Swift.Hashable, Swift.Sendable {"))
     }
 }

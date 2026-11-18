@@ -12,4 +12,15 @@ struct RuntimeSmokeTests {
             _ = try component.hello()
         }
     }
+
+    @Test func staticConstructorsRunOncePerInstance() throws {
+        var harness = try RuntimeTestHarness(fixture: "StaticConstructors")
+        try harness.build(link: StaticConstructorsTestWorld.link) { (instance) in
+            let component = StaticConstructorsTestWorld(instance: instance)
+            let runsAfterFirstCall = try component.constructorRuns()
+            let runsAfterSecondCall = try component.constructorRuns()
+            #expect(runsAfterFirstCall == 1)
+            #expect(runsAfterSecondCall == 1)
+        }
+    }
 }
