@@ -46,9 +46,9 @@ To reproduce a crash found by the fuzzer
 
 `FuzzResumable` generates modules whose control flow crosses every place a `ResumableCall` can
 suspend, then runs each export twice: once with a plain call, and once as a resumable call that is
-suspended by tiny fuel slices and epoch deadlines and resumed until it finishes. Both runs must
-agree on results, traps, memory, globals, tables and the fuel each call consumed. It needs no seed
-corpus:
+suspended by tiny fuel slices, epoch deadlines and a host function that waits, and resumed until it
+finishes. Both runs must agree on results, traps, memory, globals, tables and the fuel each call
+consumed. It needs no seed corpus:
 
 ```sh
 ./fuzz.py build FuzzResumable --release

@@ -1,6 +1,6 @@
 // Generates valid modules whose control flow crosses every place a resumable call can suspend:
 // function entries, loop headers, `if` arms, bulk operations, calls, tail calls, exceptions, and
-// host functions that tick the epoch or call back into the guest.
+// host functions that tick the epoch, call back into the guest or wait.
 
 /// Draws decisions from fuzzer input. Once the input runs out it answers zero, which every
 /// choice below treats as its simplest option, so generation always terminates.
@@ -68,6 +68,7 @@ public struct ProgramGenerator {
               (import "env" "reenter" (func $reenter (param i32) (result i32)))
               (import "env" "nested" (func $nested (param i32) (result i32)))
               (import "env" "fail" (func $fail (param i32)))
+              (import "env" "park" (func $park (param i32) (result i32)))
               (memory (export "mem") 1 4)
               (table $tab (export "tab") 8 funcref)
               (global $g (export "g") (mut i32) (i32.const 0))
@@ -139,7 +140,7 @@ public struct ProgramGenerator {
         nodeBudget -= 1
         if depth > 4 || nodeBudget <= 0 { return leaf() }
         let d = depth + 1
-        switch rng.below(24) {
+        switch rng.below(25) {
         case 0, 1, 2: return leaf()
         case 3, 4:
             let ops = [
@@ -162,6 +163,7 @@ public struct ProgramGenerator {
                 "(call_indirect $tab (type $t) \(decremented) (i32.and \(expr(depth: d, loopDepth: loopDepth)) (i32.const \(mask))))"
         case 11: return "(call $reenter (local.get 0))"
         case 12: return "(call $nested (local.get 0))"
+        case 24: return "(call $park \(expr(depth: d, loopDepth: loopDepth)))"
         case 13:
             return
                 "(select \(expr(depth: d, loopDepth: loopDepth)) \(expr(depth: d, loopDepth: loopDepth)) \(expr(depth: d, loopDepth: loopDepth)))"
@@ -264,6 +266,7 @@ public struct ProgramGenerator {
             return "(drop \(expr(depth: d, loopDepth: loopDepth)))"
         case 23:
             if rng.chance(25) { return "(return \(expr(depth: d, loopDepth: loopDepth)))" }
+            if rng.chance(15) { return "(return_call $park \(expr(depth: d, loopDepth: loopDepth)))" }
             if rng.chance(50) { return "(return_call $f\(rng.below(functionCount)) \(decremented))" }
             return "(return_call_indirect $tab (type $t) \(decremented) (i32.and \(expr(depth: d, loopDepth: loopDepth)) (i32.const 7)))"
         case 24:

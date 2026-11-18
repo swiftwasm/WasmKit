@@ -93,6 +93,14 @@ public final class Store {
     /// The engine associated with this store.
     public let engine: Engine
 
+    // Kept below the fields guest code reads, so that adding them does not move those.
+    /// The serial numbers of the ``ResumableCall``s on this store that are running, one inside
+    /// another, outermost first.
+    var runningResumableCalls: [UInt64] = []
+    /// The serial number of the next ``ResumableCall`` made on this store. A number, not the
+    /// call's identity, which a later call can reuse once the call is gone.
+    var nextResumableCallSerial: UInt64 = 0
+
     /// Create a new store associated with the given engine.
     public init(engine: Engine) {
         self.engine = engine
@@ -105,7 +113,7 @@ public final class Store {
     /// (Default: never)
     ///
     /// Guest code checks the epoch at function entries and loop headers. At the deadline, a
-    /// ``ResumableCall`` suspends with ``Suspension/Reason/epochDeadlineReached`` and any other
+    /// ``ResumableCall`` suspends with ``Suspension/epochDeadlineReached`` and any other
     /// call traps. Zero stops at the next check. Set a new deadline before resuming, or the call
     /// suspends again at once.
     ///
@@ -152,6 +160,10 @@ public struct Caller: ~Copyable {
         self.store = store
         self.sp = sp
     }
+
+    /// Whether the host function can suspend the call it was called from: the call runs as a
+    /// ``ResumableCall``, and no other host function lies between it and this one.
+    public var canSuspend: Bool { store.isSuspendable }
 
     /// Captures the current WebAssembly call stack backtrace.
     ///
