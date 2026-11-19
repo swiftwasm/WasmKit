@@ -204,6 +204,23 @@ static inline void *WASMKIT_NULLABLE wasmkit_alloc_zeroed(size_t byteCount) {
 #endif
 }
 
+/// Resizes storage from ``wasmkit_alloc_zeroed`` to `byteCount` bytes, keeping
+/// its contents, or returns NULL and leaves `ptr` as it was. The bytes past the
+/// old size are NOT zeroed. Always NULL without a hosted C library, whose
+/// callers fall back to allocating and copying.
+///
+/// For a large block the allocator can usually extend it in place or move its
+/// pages rather than copy them, which allocating anew and copying cannot.
+static inline void *WASMKIT_NULLABLE wasmkit_realloc(void *WASMKIT_NONNULL ptr, size_t byteCount) {
+#ifdef WASMKIT_HOSTED_LIBC
+    return realloc(ptr, byteCount ? byteCount : 1);
+#else
+    (void)ptr;
+    (void)byteCount;
+    return 0;
+#endif
+}
+
 /// Releases storage from ``wasmkit_alloc_zeroed``. A NULL pointer is ignored.
 static inline void wasmkit_free(void *WASMKIT_NULLABLE ptr) {
     free(ptr);
