@@ -164,6 +164,9 @@ extension ASTVisitor {
     }
     public mutating func walk(_ resource: ResourceSyntax) throws {
         try visit(resource)
+        for function in resource.functions {
+            try walk(function)
+        }
         try visitPost(resource)
     }
     public mutating func walk(_ resourceFunction: ResourceFunctionSyntax) throws {

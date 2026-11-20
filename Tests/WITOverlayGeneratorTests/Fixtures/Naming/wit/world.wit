@@ -1,4 +1,4 @@
-package test:naming-check
+package test:naming-check;
 
 world naming-test-world {
     record keywording-record {
@@ -19,8 +19,8 @@ world naming-test-world {
         if, for,
     }
 
-    export roundtrip-record: func(v: keywording-record) -> keywording-record
-    export roundtrip-enum: func(v: keywording-enum) -> keywording-enum
-    export roundtrip-variant: func(v: keywording-variant) -> keywording-variant
-    export roundtrip-flags: func(v: keywording-flags) -> keywording-flags
+    export roundtrip-record: func(v: keywording-record) -> keywording-record;
+    export roundtrip-enum: func(v: keywording-enum) -> keywording-enum;
+    export roundtrip-variant: func(v: keywording-variant) -> keywording-variant;
+    export roundtrip-flags: func(v: keywording-flags) -> keywording-flags;
 }

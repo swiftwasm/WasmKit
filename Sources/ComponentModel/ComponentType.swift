@@ -208,9 +208,6 @@ public indirect enum ComponentValue {
     case flags(Set<String>)
     case `enum`(String)
     case option(ComponentValue?)
-    case result(ok: ComponentValue?, error: ComponentValue?)
-
-    // Resource handles (future extension)
-    // case own(ResourceHandle)
-    // case borrow(ResourceHandle)
+    case resultOk(ComponentValue?)
+    case resultErr(ComponentValue?)
 }

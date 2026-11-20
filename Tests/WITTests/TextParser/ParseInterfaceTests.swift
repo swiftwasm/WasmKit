@@ -23,8 +23,8 @@ struct ParseInterfaceTests {
         let iface = try parse(
             """
             interface x {
-                type t1 = u8
-                type t2 = u8
+                type t1 = u8;
+                type t2 = u8;
             }
             """
         )
@@ -37,7 +37,7 @@ struct ParseInterfaceTests {
             """
             interface x {
                 // doc comment here
-                f1: func()
+                f1: func();
             }
             """
         )
@@ -76,7 +76,7 @@ struct ParseInterfaceTests {
         let iface = try parse(
             """
             interface x {
-                type t1 = u8
+                type t1 = u8;
             }
             """
         )
@@ -150,7 +150,7 @@ struct ParseInterfaceTests {
         let iface = try parse(
             """
             interface x {
-                resource rs1
+                resource rs1;
             }
             """
         )
@@ -206,7 +206,7 @@ struct ParseInterfaceTests {
         let iface = try parse(
             """
             interface x {
-                f1: func(arg: string)
+                f1: func(arg: string);
             }
             """
         )
@@ -223,7 +223,7 @@ struct ParseInterfaceTests {
         let iface = try parse(
             """
             interface x {
-                use pkg1.{thing}
+                use pkg1.{thing};
             }
             """
         )

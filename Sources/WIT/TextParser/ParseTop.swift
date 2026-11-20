@@ -3,7 +3,7 @@ extension SourceFileSyntax {
         var packageId: PackageNameSyntax?
         if lexer.peek()?.kind == .keyword(.package) {
             packageId = try PackageNameSyntax.parse(lexer: &lexer)
-            try lexer.expectSemicolon()
+            try lexer.expect(.semicolon)
         }
 
         var items: [ASTItemSyntax] = []
@@ -45,8 +45,51 @@ extension Identifier {
             throw ParseError(description: "an identifier expected but got \(token.kind)")
         }
 
-        return Identifier(text: text, textRange: token.textRange)
+        return try Identifier.requireValid(text: text, textRange: token.textRange)
     }
+}
+
+extension Identifier {
+    /// Returns an identifier for `text`, throwing unless `text` follows wasm-tools' identifier grammar.
+    static func requireValid(text: String, textRange: TextRange) throws -> Identifier {
+        try validate(text: text)
+        return Identifier(text: text, textRange: textRange)
+    }
+
+    private static func validate(text: String) throws {
+        func invalid(_ reason: String) -> ParseError {
+            ParseError(description: "invalid WIT identifier '\(text)': \(reason)")
+        }
+        guard let firstChar = text.first else { throw invalid("empty identifier") }
+        guard firstChar.isASCIILetter else { throw invalid("must start with an ASCII letter") }
+        for word in text.split(separator: "-", omittingEmptySubsequences: false) {
+            guard !word.isEmpty else { throw invalid("identifiers must have characters between '-'s") }
+            var wordIsUpper: Bool?
+            for ch in word {
+                if ch.isASCIIDigit { continue }
+                let isUpper: Bool
+                if ch.isASCIIUppercase {
+                    isUpper = true
+                } else if ch.isASCIILowercase {
+                    isUpper = false
+                } else {
+                    throw invalid("word '\(word)' contains an invalid character")
+                }
+                if let prior = wordIsUpper {
+                    guard prior == isUpper else { throw invalid("word '\(word)' mixes letter cases") }
+                } else {
+                    wordIsUpper = isUpper
+                }
+            }
+        }
+    }
+}
+
+extension Character {
+    fileprivate var isASCIILowercase: Bool { self >= "a" && self <= "z" }
+    fileprivate var isASCIIUppercase: Bool { self >= "A" && self <= "Z" }
+    fileprivate var isASCIILetter: Bool { isASCIILowercase || isASCIIUppercase }
+    fileprivate var isASCIIDigit: Bool { self >= "0" && self <= "9" }
 }
 
 extension Version {
@@ -172,7 +215,7 @@ extension TopLevelUseSyntax {
         if lexer.eat(.keyword(.as)) {
             asName = try .parse(lexer: &lexer)
         }
-        try lexer.expectSemicolon()
+        try lexer.expect(.semicolon)
         return TopLevelUseSyntax(attributes: attributes, item: item, asName: asName)
     }
 }
@@ -196,7 +239,7 @@ extension UseSyntax {
                 break
             }
         }
-        try lexer.expectSemicolon()
+        try lexer.expect(.semicolon)
         return .init(syntax: UseSyntax(attributes: attributes, from: from, names: names))
     }
 }

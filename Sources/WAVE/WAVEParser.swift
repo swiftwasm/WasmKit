@@ -627,11 +627,11 @@
                         guard case .rightParen = close else {
                             throw WAVEParserError("expected ')'", span: close.span)
                         }
-                        return .result(ok: payload, error: nil)
+                        return .resultOk(payload)
                     }
                     // No payload - ok type might be unit
                 }
-                return .result(ok: nil, error: nil)
+                return .resultOk(nil)
             case .err:
                 _ = try lexer.next()
                 if let errType = errType {
@@ -643,11 +643,10 @@
                         guard case .rightParen = close else {
                             throw WAVEParserError("expected ')'", span: close.span)
                         }
-                        return .result(ok: nil, error: payload)
+                        return .resultErr(payload)
                     }
                 }
-                // Use empty tuple as marker for err case with no payload
-                return .result(ok: nil, error: .tuple([]))
+                return .resultErr(nil)
             default:
                 // Flat form - must have ok type that's not option or result
                 guard let okType = okType else {
@@ -660,7 +659,7 @@
                     throw WAVEParserError("result<result> requires explicit 'ok(...)' syntax", span: token.span)
                 }
                 let payload = try parse(type: okType, resolver: resolver)
-                return .result(ok: payload, error: nil)
+                return .resultOk(payload)
             }
         }
 

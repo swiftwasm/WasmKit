@@ -1,8 +1,8 @@
-package test:enum-check
+package test:enum-check;
 
 world enum-test-world {
     enum single { a }
-    export roundtrip-single: func(v: single) -> single
+    export roundtrip-single: func(v: single) -> single;
 
     enum large {
         c000, c001, c002, c003, c004, c005, c006, c007,
@@ -40,8 +40,8 @@ world enum-test-world {
         c256,
     }
 
-    export roundtrip-large: func(v: large) -> large
+    export roundtrip-large: func(v: large) -> large;
 
     enum binary { a, b }
-    export return-by-pointer: func() -> tuple<binary, binary>
+    export return-by-pointer: func() -> tuple<binary, binary>;
 }

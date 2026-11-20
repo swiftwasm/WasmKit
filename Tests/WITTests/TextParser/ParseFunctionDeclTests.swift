@@ -36,7 +36,7 @@ struct ParseFunctionDeclTests {
     }
 
     @Test func resourceFunction() throws {
-        let f = try parse("%foo: func() -> bool")
+        let f = try parse("%foo: func() -> bool;")
         guard case .method(let method) = f else {
             Issue.record("expected method but got \(f)")
             return
@@ -45,7 +45,7 @@ struct ParseFunctionDeclTests {
     }
 
     @Test func resourceFunctionStatic() throws {
-        let f = try parse("foo: static func() -> bool")
+        let f = try parse("foo: static func() -> bool;")
         guard case .static(let method) = f else {
             Issue.record("expected method but got \(f)")
             return
@@ -54,7 +54,7 @@ struct ParseFunctionDeclTests {
     }
 
     @Test func resourceFunctionConstructor() throws {
-        let f = try parse("constructor(a: u8, b: u16)")
+        let f = try parse("constructor(a: u8, b: u16);")
         guard case .constructor(let ctor) = f else {
             Issue.record("expected method but got \(f)")
             return

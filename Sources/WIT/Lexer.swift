@@ -44,11 +44,9 @@ struct Lexer {
     }
 
     var cursor: Cursor
-    let requireSemicolon: Bool
 
-    init(cursor: Cursor, requireSemicolon: Bool = false) {
+    init(cursor: Cursor) {
         self.cursor = cursor
-        self.requireSemicolon = requireSemicolon
     }
 
     mutating func advanceToEndOfBlockComment() -> Diagnostic? {
@@ -218,14 +216,6 @@ struct Lexer {
         return lexme
     }
 
-    mutating func expectSemicolon() throws {
-        if self.requireSemicolon {
-            try self.expect(.semicolon)
-        } else {
-            self.eat(.semicolon)
-        }
-    }
-
     @discardableResult
     mutating func eat(_ expected: TokenKind) -> Bool {
         var other = self
@@ -293,7 +283,7 @@ enum WITKeyword: String, CaseIterable {
     case char, resource, own, borrow, record, flags, variant, `enum`, union
     case bool, string, option, result, future, stream, list
     case underscore = "_"
-    case `as`, from, `static`, interface, tuple, world, `import`, export, package, constructor, include, with
+    case `as`, from, `static`, async, interface, tuple, world, `import`, export, package, constructor, include, with
 }
 
 extension TokenKind: CustomStringConvertible {

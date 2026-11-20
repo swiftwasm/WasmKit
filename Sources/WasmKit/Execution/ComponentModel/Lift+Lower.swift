@@ -191,13 +191,13 @@
                         for _ in consumed..<maxPayloadCount {
                             _ = iterator.next()
                         }
-                        return .result(ok: value, error: nil)
+                        return .resultOk(value)
                     } else {
                         // No ok type, consume padding
                         for _ in 0..<maxPayloadCount {
                             _ = iterator.next()
                         }
-                        return .result(ok: nil, error: nil)
+                        return .resultOk(nil)
                     }
                 } else {
                     // error case
@@ -208,13 +208,13 @@
                         for _ in consumed..<maxPayloadCount {
                             _ = iterator.next()
                         }
-                        return .result(ok: nil, error: value)
+                        return .resultErr(value)
                     } else {
                         // No error type, consume padding
                         for _ in 0..<maxPayloadCount {
                             _ = iterator.next()
                         }
-                        return .result(ok: nil, error: nil)
+                        return .resultErr(nil)
                     }
                 }
 
@@ -398,44 +398,14 @@
                 return results
 
             // Result - discriminant (0=ok, 1=err) + payload with variant flattening
-            case (.result(let ok, let error), .result(let okValType, let errorValType)):
-                let okType = try okValType.map { try $0.resolve(resolveType) }
-                let errorType = try errorValType.map { try $0.resolve(resolveType) }
-
-                // Calculate max payload size for variant union
-                let okFlatCount = okType.map { $0.flattenedCount } ?? 0
-                let errorFlatCount = errorType.map { $0.flattenedCount } ?? 0
-                let maxPayloadCount = max(okFlatCount, errorFlatCount)
-
-                if let okValue = ok {
-                    // ok case: discriminant=0
-                    var lowered: [Value] = [.i32(0)]
-                    if let okType = okType {
-                        let okLowered = try okValue.lower(to: okType, resolveType: resolveType, options: options, store: store)
-                        lowered.append(contentsOf: okLowered)
-                        // Pad to max payload size
-                        lowered.append(contentsOf: Array(repeating: .i32(0), count: maxPayloadCount - okLowered.count))
-                    } else {
-                        // No ok type, just zeros
-                        lowered.append(contentsOf: Array(repeating: .i32(0), count: maxPayloadCount))
-                    }
-                    return lowered
-                } else if let errorValue = error {
-                    // error case: discriminant=1
-                    var lowered: [Value] = [.i32(1)]
-                    if let errorType = errorType {
-                        let errorLowered = try errorValue.lower(to: errorType, resolveType: resolveType, options: options, store: store)
-                        lowered.append(contentsOf: errorLowered)
-                        // Pad to max payload size
-                        lowered.append(contentsOf: Array(repeating: .i32(0), count: maxPayloadCount - errorLowered.count))
-                    } else {
-                        // No error type, just zeros
-                        lowered.append(contentsOf: Array(repeating: .i32(0), count: maxPayloadCount))
-                    }
-                    return lowered
-                } else {
-                    throw CanonicalABIError(description: "Result must have either ok or error value")
-                }
+            case (.resultOk(let payload), .result(let okValType, let errorValType)):
+                return try lowerCase(
+                    0, payload: payload, caseValTypes: [okValType, errorValType], of: "result",
+                    resolveType: resolveType, options: options, store: store)
+            case (.resultErr(let payload), .result(let okValType, let errorValType)):
+                return try lowerCase(
+                    1, payload: payload, caseValTypes: [okValType, errorValType], of: "result",
+                    resolveType: resolveType, options: options, store: store)
 
             // Variant - discriminant + payload with max-size union flattening
             case (.variant(let caseName, let payload), .variant(let cases)):
@@ -443,30 +413,9 @@
                     throw CanonicalABIError(description: "Unknown variant case: \(caseName)")
                 }
 
-                // Calculate max payload size across all cases
-                let maxPayloadCount =
-                    try cases.map { variantCase -> Int in
-                        if let valType = variantCase.type {
-                            return try valType.resolve(resolveType).flattenedCount
-                        }
-                        return 0
-                    }.max() ?? 0
-
-                var lowered: [Value] = [.i32(UInt32(caseIndex))]
-
-                if let valType = cases[caseIndex].type, let payloadValue = payload {
-                    // Case with payload
-                    let caseType = try valType.resolve(resolveType)
-                    let caseLowered = try payloadValue.lower(to: caseType, resolveType: resolveType, options: options, store: store)
-                    lowered.append(contentsOf: caseLowered)
-                    // Pad to max payload size
-                    lowered.append(contentsOf: Array(repeating: .i32(0), count: maxPayloadCount - caseLowered.count))
-                } else {
-                    // Case without payload - just zeros
-                    lowered.append(contentsOf: Array(repeating: .i32(0), count: maxPayloadCount))
-                }
-
-                return lowered
+                return try lowerCase(
+                    caseIndex, payload: payload, caseValTypes: cases.map(\.type), of: "variant",
+                    resolveType: resolveType, options: options, store: store)
 
             // List - allocate memory and write elements (requires memory + realloc)
             case (.list(let elements), .list(let elementValType)):
@@ -617,8 +566,9 @@
         let elementCount = UInt32(elements.count)
 
         // Calculate element size in bytes based on type
-        let elementSize = try sizeOf(elementType, resolveType: resolveType)
-        let alignment = try alignmentOf(elementType, resolveType: resolveType)
+        let elementLayout = try layoutOf(elementType, resolveType: resolveType)
+        let elementSize = elementLayout.size
+        let alignment = elementLayout.alignment
         let totalBytes = elementSize * Int(elementCount)
 
         // Allocate memory: realloc(old_ptr=0, old_size=0, align, new_size)
@@ -635,6 +585,7 @@
         // Write each element to memory
         let memoryInstance = Memory(handle: memory, allocator: store.allocator)
         var currentOffset = Int(pointer)
+        var payloadOffsets: [[ComponentCaseField]: Int] = [:]
 
         for element in elements {
             try storeValue(
@@ -644,7 +595,8 @@
                 memory: memoryInstance,
                 resolveType: resolveType,
                 options: options,
-                store: store
+                store: store,
+                payloadOffsets: &payloadOffsets
             )
             currentOffset += elementSize
         }
@@ -652,103 +604,136 @@
         return [.i32(pointer), .i32(elementCount)]
     }
 
-    /// Calculate the byte size of a component value type.
-    private func sizeOf(
-        _ type: ComponentDefValType,
+    private func casePayload(
+        _ payload: ComponentValue?,
+        _ caseValType: ComponentValType?,
+        of typeName: String,
         resolveType: (ComponentTypeIndex) throws -> ComponentDefValType
-    ) throws -> Int {
-        switch type {
-        case .inlined(.primitive(let prim)):
-            switch prim {
-            case .bool, .s8, .u8: return 1
-            case .s16, .u16: return 2
-            case .s32, .u32, .float32, .char: return 4
-            case .s64, .u64, .float64: return 8
-            case .string: return 8  // pointer + length
-            case .errorContext:
-                throw CanonicalABIError(description: "sizeOf for \(type) not yet implemented")
-            }
-        case .list: return 8  // pointer + length
-        case .tuple(let elementValTypes):
-            return try elementValTypes.reduce(0) { sum, valType in
-                try sum + sizeOf(valType.resolve(resolveType), resolveType: resolveType)
-            }
-        case .record(let fields):
-            return try fields.reduce(0) { sum, field in
-                try sum + sizeOf(field.type.resolve(resolveType), resolveType: resolveType)
-            }
-        case .option(let someValType):
-            return try 4 + sizeOf(someValType.resolve(resolveType), resolveType: resolveType)  // discriminant + payload
-        case .result(let okValType, let errorValType):
-            let okSize = try okValType.map { try sizeOf($0.resolve(resolveType), resolveType: resolveType) } ?? 0
-            let errSize = try errorValType.map { try sizeOf($0.resolve(resolveType), resolveType: resolveType) } ?? 0
-            return 4 + max(okSize, errSize)  // discriminant + max payload
-        case .variant(let cases):
-            let maxPayloadSize =
-                try cases.map { variantCase -> Int in
-                    if let valType = variantCase.type {
-                        return try sizeOf(valType.resolve(resolveType), resolveType: resolveType)
-                    }
-                    return 0
-                }.max() ?? 0
-            // Discriminant size varies based on number of cases
-            let discriminantSize: Int
-            let numCases = cases.count
-            if numCases <= 256 {
-                discriminantSize = 1  // u8
-            } else if numCases <= 65536 {
-                discriminantSize = 2  // u16
-            } else {
-                discriminantSize = 4  // u32
-            }
-            return discriminantSize + maxPayloadSize  // discriminant + max payload
-        case .enum: return 4  // u32 discriminant
-        case .flags(let flagNames):
-            return numberOfFlagsInt32(flagsCount: flagNames.count) * 4
-        case .future, .stream, .resource, .inlined(.index):
-            throw CanonicalABIError(description: "sizeOf for \(type) not yet implemented")
+    ) throws -> (value: ComponentValue, type: ComponentDefValType)? {
+        switch (payload, caseValType) {
+        case (let payload?, let caseValType?):
+            return (payload, try caseValType.resolve(resolveType))
+        case (nil, nil):
+            return nil
+        case (_?, nil), (nil, _?):
+            throw CanonicalABIError(description: "The \(typeName) payload does not match its case type")
         }
     }
 
-    /// Calculate the alignment requirement of a component value type.
-    private func alignmentOf(
+    private func lowerCase(
+        _ caseIndex: Int,
+        payload: ComponentValue?,
+        caseValTypes: [ComponentValType?],
+        of typeName: String,
+        resolveType: (ComponentTypeIndex) throws -> ComponentDefValType,
+        options: CanonOptions,
+        store: Store
+    ) throws -> [Value] {
+        let maxPayloadCount = try caseValTypes.map { try $0?.resolve(resolveType).flattenedCount ?? 0 }.max() ?? 0
+        var lowered: [Value] = [.i32(UInt32(caseIndex))]
+        var payloadCount = 0
+        if let matched = try casePayload(payload, caseValTypes[caseIndex], of: typeName, resolveType: resolveType) {
+            let payloadLowered = try matched.value.lower(to: matched.type, resolveType: resolveType, options: options, store: store)
+            // flattenedCount is 0 for non-primitive types, so their lowered values exceed maxPayloadCount.
+            guard payloadLowered.count <= maxPayloadCount else {
+                throw CanonicalABIError(description: "Cannot lower a non-primitive \(typeName) payload")
+            }
+            lowered.append(contentsOf: payloadLowered)
+            payloadCount = payloadLowered.count
+        }
+        lowered.append(contentsOf: Array(repeating: .i32(0), count: maxPayloadCount - payloadCount))
+        return lowered
+    }
+
+    private struct ElementLayout {
+        var size: Int
+        var alignment: Int
+    }
+
+    /// Returns the Canonical ABI's `elem_size` and `alignment` of a component value type.
+    private func layoutOf(
         _ type: ComponentDefValType,
         resolveType: (ComponentTypeIndex) throws -> ComponentDefValType
-    ) throws -> Int {
+    ) throws -> ElementLayout {
         switch type {
         case .inlined(.primitive(let prim)):
             switch prim {
-            case .bool, .s8, .u8: return 1
-            case .s16, .u16: return 2
-            case .s32, .u32, .float32, .char: return 4
-            case .s64, .u64, .float64: return 8
-            case .string: return 4  // pointer/length use i32 alignment
+            case .bool, .s8, .u8: return ElementLayout(size: 1, alignment: 1)
+            case .s16, .u16: return ElementLayout(size: 2, alignment: 2)
+            case .s32, .u32, .float32, .char: return ElementLayout(size: 4, alignment: 4)
+            case .s64, .u64, .float64: return ElementLayout(size: 8, alignment: 8)
+            case .string: return ElementLayout(size: 8, alignment: 4)  // pointer + length
             case .errorContext:
-                throw CanonicalABIError(description: "alignmentOf for \(type) not yet implemented")
+                throw CanonicalABIError(description: "layoutOf for \(type) not yet implemented")
             }
-        case .enum: return 4
-        case .list: return 4  // pointer/length use i32 alignment
+        case .list: return ElementLayout(size: 8, alignment: 4)  // pointer + length
         case .tuple(let elementValTypes):
-            return try elementValTypes.map { try alignmentOf($0.resolve(resolveType), resolveType: resolveType) }.max() ?? 1
+            return try fieldsLayout(elementValTypes, resolveType: resolveType)
         case .record(let fields):
-            return try fields.map { try alignmentOf($0.type.resolve(resolveType), resolveType: resolveType) }.max() ?? 1
+            return try fieldsLayout(fields.map(\.type), resolveType: resolveType)
         case .option(let someValType):
-            return max(4, try alignmentOf(someValType.resolve(resolveType), resolveType: resolveType))
+            return try casesLayout([nil, someValType], resolveType: resolveType).layout
         case .result(let okValType, let errorValType):
-            let okAlign = try okValType.map { try alignmentOf($0.resolve(resolveType), resolveType: resolveType) } ?? 1
-            let errAlign = try errorValType.map { try alignmentOf($0.resolve(resolveType), resolveType: resolveType) } ?? 1
-            return max(4, max(okAlign, errAlign))
+            return try casesLayout([okValType, errorValType], resolveType: resolveType).layout
         case .variant(let cases):
-            let maxPayloadAlign =
-                try cases.compactMap { variantCase -> Int? in
-                    guard let valType = variantCase.type else { return nil }
-                    return try alignmentOf(valType.resolve(resolveType), resolveType: resolveType)
-                }.max() ?? 1
-            return max(4, maxPayloadAlign)
-        case .flags: return 4  // i32 chunks
+            return try casesLayout(cases.map(\.type), resolveType: resolveType).layout
+        case .enum(let caseNames):
+            let size = discriminantSize(caseCount: caseNames.count)
+            return ElementLayout(size: size, alignment: size)
+        case .flags(let flagNames):
+            let size = flagsSize(flagCount: flagNames.count)
+            return ElementLayout(size: size, alignment: min(size, 4))
         case .future, .stream, .resource, .inlined(.index):
-            throw CanonicalABIError(description: "alignmentOf for \(type) not yet implemented")
+            throw CanonicalABIError(description: "layoutOf for \(type) not yet implemented")
         }
+    }
+
+    private func discriminantSize(caseCount: Int) -> Int {
+        if caseCount <= 1 << 8 { return 1 }
+        if caseCount <= 1 << 16 { return 2 }
+        return 4
+    }
+
+    private func flagsSize(flagCount: Int) -> Int {
+        if flagCount <= 8 { return 1 }
+        if flagCount <= 16 { return 2 }
+        return numberOfFlagsInt32(flagsCount: flagCount) * 4
+    }
+
+    private func alignUp(_ offset: Int, to alignment: Int) -> Int {
+        (offset + alignment - 1) / alignment * alignment
+    }
+
+    private func fieldsLayout(
+        _ fieldValTypes: [ComponentValType],
+        resolveType: (ComponentTypeIndex) throws -> ComponentDefValType
+    ) throws -> ElementLayout {
+        var size = 0
+        var alignment = 1
+        for valType in fieldValTypes {
+            let field = try layoutOf(valType.resolve(resolveType), resolveType: resolveType)
+            size = alignUp(size, to: field.alignment) + field.size
+            alignment = max(alignment, field.alignment)
+        }
+        return ElementLayout(size: alignUp(size, to: alignment), alignment: alignment)
+    }
+
+    private func casesLayout(
+        _ caseValTypes: [ComponentValType?],
+        resolveType: (ComponentTypeIndex) throws -> ComponentDefValType
+    ) throws -> (layout: ElementLayout, payloadOffset: Int) {
+        var maxPayloadSize = 0
+        var maxPayloadAlignment = 1
+        for case let valType? in caseValTypes {
+            let payload = try layoutOf(valType.resolve(resolveType), resolveType: resolveType)
+            maxPayloadSize = max(maxPayloadSize, payload.size)
+            maxPayloadAlignment = max(maxPayloadAlignment, payload.alignment)
+        }
+        let discriminantByteCount = discriminantSize(caseCount: caseValTypes.count)
+        let payloadOffset = alignUp(discriminantByteCount, to: maxPayloadAlignment)
+        let alignment = max(discriminantByteCount, maxPayloadAlignment)
+        let size = alignUp(payloadOffset + maxPayloadSize, to: alignment)
+        return (ElementLayout(size: size, alignment: alignment), payloadOffset)
     }
 
     /// Store a component value to memory at a given offset.
@@ -759,7 +744,8 @@
         memory: Memory,
         resolveType: (ComponentTypeIndex) throws -> ComponentDefValType,
         options: CanonOptions,
-        store: Store
+        store: Store,
+        payloadOffsets: inout [[ComponentCaseField]: Int]
     ) throws {
         // First, resolve indexed types to their actual type
         let resolvedType: ComponentDefValType
@@ -835,43 +821,32 @@
                 throw CanonicalABIError(description: "Unknown variant case: \(caseName)")
             }
 
-            // Determine discriminant size based on number of cases
-            let discriminantSize: Int
-            let numCases = cases.count
-            if numCases <= 256 {
-                discriminantSize = 1  // u8
-            } else if numCases <= 65536 {
-                discriminantSize = 2  // u16
-            } else {
-                discriminantSize = 4  // u32
-            }
-
-            // Write discriminant
-            try memory.withUnsafeMutableBufferPointer(offset: UInt(offset), count: discriminantSize) { buffer in
-                switch discriminantSize {
-                case 1:
-                    buffer.storeBytes(of: UInt8(caseIndex), as: UInt8.self)
-                case 2:
-                    buffer.storeBytes(of: UInt16(caseIndex), as: UInt16.self)
-                case 4:
-                    buffer.storeBytes(of: UInt32(caseIndex), as: UInt32.self)
-                default:
-                    break
+            let discriminantByteCount = discriminantSize(caseCount: cases.count)
+            try memory.withUnsafeMutableBufferPointer(offset: UInt(offset), count: discriminantByteCount) { buffer in
+                switch discriminantByteCount {
+                case 1: buffer.storeBytes(of: UInt8(caseIndex), as: UInt8.self)
+                case 2: buffer.storeBytes(of: UInt16(caseIndex), as: UInt16.self)
+                default: buffer.storeBytes(of: UInt32(caseIndex), as: UInt32.self)
                 }
             }
 
-            // Write payload if present
-            if let valType = cases[caseIndex].type, let payloadValue = payload {
-                let caseType = try valType.resolve(resolveType)
-                let payloadOffset = offset + max(4, try alignmentOf(caseType, resolveType: resolveType))
+            if let matched = try casePayload(payload, cases[caseIndex].type, of: "variant", resolveType: resolveType) {
+                let payloadOffset: Int
+                if let cached = payloadOffsets[cases] {
+                    payloadOffset = cached
+                } else {
+                    payloadOffset = try casesLayout(cases.map(\.type), resolveType: resolveType).payloadOffset
+                    payloadOffsets[cases] = payloadOffset
+                }
                 try storeValue(
-                    payloadValue,
-                    type: caseType,
-                    at: payloadOffset,
+                    matched.value,
+                    type: matched.type,
+                    at: offset + payloadOffset,
                     memory: memory,
                     resolveType: resolveType,
                     options: options,
-                    store: store
+                    store: store,
+                    payloadOffsets: &payloadOffsets
                 )
             }
 
@@ -1027,7 +1002,7 @@
         }
 
         let elementType = try elementValType.resolve(resolveType)
-        let elementSize = try sizeOf(elementType, resolveType: resolveType)
+        let elementSize = try layoutOf(elementType, resolveType: resolveType).size
         let memoryInstance = Memory(handle: memory, allocator: store.allocator)
         let memorySize = memoryInstance.byteCount
 

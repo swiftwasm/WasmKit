@@ -284,6 +284,7 @@ public enum ResultListSyntax: Equatable, Hashable, Sendable {
 public struct FunctionSyntax: Equatable, Hashable, Sendable {
     public var parameters: ParameterList
     public var results: ResultListSyntax
+    public var isAsync: Bool
     var textRange: TextRange
 }
 

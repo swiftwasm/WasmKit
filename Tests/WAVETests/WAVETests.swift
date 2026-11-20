@@ -331,9 +331,10 @@
 
         @Test
         func formatResult() {
-            #expect(WAVEFormatter.format(.result(ok: nil, error: nil)) == "ok")
-            #expect(WAVEFormatter.format(.result(ok: .u32(42), error: nil)) == "ok(42)")  // explicit form
-            #expect(WAVEFormatter.format(.result(ok: nil, error: .string("oops"))) == "err(\"oops\")")
+            #expect(WAVEFormatter.format(.resultOk(nil)) == "ok")
+            #expect(WAVEFormatter.format(.resultOk(.u32(42))) == "ok(42)")  // explicit form
+            #expect(WAVEFormatter.format(.resultErr(.string("oops"))) == "err(\"oops\")")
+            #expect(WAVEFormatter.format(.resultErr(nil)) == "err")
         }
 
         @Test

@@ -106,7 +106,7 @@
         @Test func emptyWorldStructure() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world empty {}
                 """, worldName: "empty")
 
@@ -147,7 +147,7 @@
             // Custom encoding version: verify non-default version
             let v5Bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world empty {}
                 """, worldName: "empty", encodingVersion: 5)
             let v5Payloads = try parseOutput(v5Bytes)
@@ -159,7 +159,7 @@
         @Test func worldNotFoundError() throws {
             let ctx = try buildContext(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {}
                 """)
             #expect(throws: ComponentTypeSerializer.Error.worldNotFound("nonexistent")) {
@@ -174,9 +174,9 @@
         @Test func worldWithExportedFunction() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
-                    export do-stuff: func(name: string) -> string
+                    export do-stuff: func(name: string) -> string;
                 }
                 """, worldName: "my-world")
 
@@ -216,9 +216,9 @@
         @Test func worldWithImportedFunction() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
-                    import greet: func(name: string) -> string
+                    import greet: func(name: string) -> string;
                 }
                 """, worldName: "my-world")
 
@@ -242,9 +242,9 @@
         @Test func worldWithVoidFunction() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
-                    export noop: func()
+                    export noop: func();
                 }
                 """, worldName: "my-world")
 
@@ -266,10 +266,10 @@
         @Test func worldWithInlineInterface() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
                     export my-iface: interface {
-                        do-stuff: func(x: u32) -> u32
+                        do-stuff: func(x: u32) -> u32;
                     }
                 }
                 """, worldName: "my-world")
@@ -321,12 +321,12 @@
         @Test func worldWithNamedInterfaceImport() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 interface my-iface {
-                    do-stuff: func(x: u32) -> string
+                    do-stuff: func(x: u32) -> string;
                 }
                 world my-world {
-                    import my-iface
+                    import my-iface;
                 }
                 """, worldName: "my-world")
 
@@ -347,12 +347,12 @@
         @Test func worldWithNamedInterfaceExport() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 interface my-iface {
-                    do-stuff: func(x: u32) -> string
+                    do-stuff: func(x: u32) -> string;
                 }
                 world my-world {
-                    export my-iface
+                    export my-iface;
                 }
                 """, worldName: "my-world")
 
@@ -378,14 +378,14 @@
         @Test func interfaceWithRecordType() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
                     export my-iface: interface {
                         record point {
                             x: s32,
                             y: s32,
                         }
-                        get-origin: func() -> point
+                        get-origin: func() -> point;
                     }
                 }
                 """, worldName: "my-world")
@@ -425,7 +425,7 @@
         @Test func interfaceWithEnumType() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
                     export my-iface: interface {
                         enum color {
@@ -433,7 +433,7 @@
                             green,
                             blue,
                         }
-                        get-color: func() -> color
+                        get-color: func() -> color;
                     }
                 }
                 """, worldName: "my-world")
@@ -463,7 +463,7 @@
         @Test func interfaceWithFlagsType() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
                     export my-iface: interface {
                         flags permissions {
@@ -471,7 +471,7 @@
                             write,
                             execute,
                         }
-                        check-perms: func() -> permissions
+                        check-perms: func() -> permissions;
                     }
                 }
                 """, worldName: "my-world")
@@ -500,7 +500,7 @@
         @Test func interfaceWithVariantType() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
                     export my-iface: interface {
                         variant filter {
@@ -508,7 +508,7 @@
                             none,
                             some(string),
                         }
-                        apply-filter: func(f: filter) -> string
+                        apply-filter: func(f: filter) -> string;
                     }
                 }
                 """, worldName: "my-world")
@@ -549,9 +549,9 @@
         @Test func functionWithListParam() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
-                    export sum: func(values: list<u32>) -> u32
+                    export sum: func(values: list<u32>) -> u32;
                 }
                 """, worldName: "my-world")
 
@@ -565,9 +565,9 @@
         @Test func functionWithOptionParam() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
-                    export maybe-greet: func(name: option<string>) -> string
+                    export maybe-greet: func(name: option<string>) -> string;
                 }
                 """, worldName: "my-world")
 
@@ -581,9 +581,9 @@
         @Test func functionWithResultParam() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
-                    export try-parse: func(input: string) -> result<u32, string>
+                    export try-parse: func(input: string) -> result<u32, string>;
                 }
                 """, worldName: "my-world")
 
@@ -597,9 +597,9 @@
         @Test func functionWithTupleParam() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
-                    export swap: func(pair: tuple<u32, u64>) -> tuple<u64, u32>
+                    export swap: func(pair: tuple<u32, u64>) -> tuple<u64, u32>;
                 }
                 """, worldName: "my-world")
 
@@ -626,11 +626,11 @@
         @Test func worldWithMultipleExterns() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
-                    import log: func(msg: string)
-                    export greet: func(name: string) -> string
-                    export add: func(a: u32, b: u32) -> u32
+                    import log: func(msg: string);
+                    export greet: func(name: string) -> string;
+                    export add: func(a: u32, b: u32) -> u32;
                 }
                 """, worldName: "my-world")
 
@@ -659,9 +659,9 @@
         @Test func outerComponentTypeExportsFullyQualifiedName() throws {
             let bytes = try encode(
                 """
-                package myns:mypkg
+                package myns:mypkg;
                 world my-world {
-                    export greet: func(name: string) -> string
+                    export greet: func(name: string) -> string;
                 }
                 """, worldName: "my-world")
 
@@ -691,21 +691,21 @@
         @Test func allPrimitiveTypes() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
-                    export test-bool: func(v: bool) -> bool
-                    export test-u8: func(v: u8) -> u8
-                    export test-u16: func(v: u16) -> u16
-                    export test-u32: func(v: u32) -> u32
-                    export test-u64: func(v: u64) -> u64
-                    export test-s8: func(v: s8) -> s8
-                    export test-s16: func(v: s16) -> s16
-                    export test-s32: func(v: s32) -> s32
-                    export test-s64: func(v: s64) -> s64
-                    export test-f32: func(v: f32) -> f32
-                    export test-f64: func(v: f64) -> f64
-                    export test-char: func(v: char) -> char
-                    export test-string: func(v: string) -> string
+                    export test-bool: func(v: bool) -> bool;
+                    export test-u8: func(v: u8) -> u8;
+                    export test-u16: func(v: u16) -> u16;
+                    export test-u32: func(v: u32) -> u32;
+                    export test-u64: func(v: u64) -> u64;
+                    export test-s8: func(v: s8) -> s8;
+                    export test-s16: func(v: s16) -> s16;
+                    export test-s32: func(v: s32) -> s32;
+                    export test-s64: func(v: s64) -> s64;
+                    export test-f32: func(v: f32) -> f32;
+                    export test-f64: func(v: f64) -> f64;
+                    export test-char: func(v: char) -> char;
+                    export test-string: func(v: string) -> string;
                 }
                 """, worldName: "my-world")
 
@@ -742,7 +742,7 @@
         @Test func interfaceTypeReferenceInFunction() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
                     export my-iface: interface {
                         record point {
@@ -753,7 +753,7 @@
                             start: point,
                             end: point,
                         }
-                        get-line: func() -> line
+                        get-line: func() -> line;
                     }
                 }
                 """, worldName: "my-world")
@@ -802,16 +802,16 @@
             // with a use item to verify the serializer rejects it.
             let ctx = try buildContext(
                 """
-                package test:pkg
+                package test:pkg;
                 interface types {
-                    type my-id = u32
+                    type my-id = u32;
                 }
                 interface consumer {
-                    use types.{my-id}
-                    get-id: func() -> my-id
+                    use types.{my-id};
+                    get-id: func() -> my-id;
                 }
                 world my-world {
-                    export consumer
+                    export consumer;
                 }
                 """)
             #expect(throws: ComponentTypeSerializer.Error.unsupportedFeature("use in interface")) {
@@ -824,12 +824,12 @@
         @Test func useInWorldThrows() throws {
             let ctx = try buildContext(
                 """
-                package test:pkg
+                package test:pkg;
                 interface types {
-                    type my-id = u32
+                    type my-id = u32;
                 }
                 world my-world {
-                    use types.{my-id}
+                    use types.{my-id};
                 }
                 """)
             #expect(throws: ComponentTypeSerializer.Error.unsupportedFeature("use in world")) {
@@ -842,12 +842,12 @@
         @Test func includeInWorldThrows() throws {
             let ctx = try buildContext(
                 """
-                package test:pkg
+                package test:pkg;
                 world base {
-                    export log: func(msg: string)
+                    export log: func(msg: string);
                 }
                 world my-world {
-                    include base
+                    include base;
                 }
                 """)
             #expect(throws: ComponentTypeSerializer.Error.unsupportedFeature("include in world")) {
@@ -860,11 +860,11 @@
         @Test func resourceTypeThrows() throws {
             let ctx = try buildContext(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
                     export my-iface: interface {
                         resource blob {
-                            constructor(data: list<u8>)
+                            constructor(data: list<u8>);
                         }
                     }
                 }
@@ -888,9 +888,9 @@
             // that references a different package namespace.
             let ctx = try buildContext(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
-                    import other:stuff/something
+                    import other:stuff/something;
                 }
                 """)
             #expect {
@@ -911,7 +911,7 @@
         @Test func typeIndexOrderingInInterface() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
                     export my-iface: interface {
                         record point {
@@ -927,8 +927,8 @@
                             read,
                             write,
                         }
-                        get-point: func() -> point
-                        get-color: func() -> color
+                        get-point: func() -> point;
+                        get-color: func() -> color;
                     }
                 }
                 """, worldName: "my-world")
@@ -1001,10 +1001,10 @@
         @Test func worldLevelTypeDefinition() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
-                    type my-id = u32
-                    export get-id: func() -> my-id
+                    type my-id = u32;
+                    export get-id: func() -> my-id;
                 }
                 """, worldName: "my-world")
 
@@ -1044,7 +1044,7 @@
         @Test func emptyInterface() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
                     export empty: interface {}
                 }
@@ -1065,12 +1065,12 @@
 
         @Test func multipleWorldsSelectsCorrect() throws {
             let wit = """
-                package test:pkg
+                package test:pkg;
                 world alpha {
-                    export greet: func() -> string
+                    export greet: func() -> string;
                 }
                 world beta {
-                    export count: func() -> u32
+                    export count: func() -> u32;
                 }
                 """
 
@@ -1112,9 +1112,9 @@
         @Test func deeplyNestedCompositeType() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
-                    export deep: func(v: list<option<result<u32, string>>>)
+                    export deep: func(v: list<option<result<u32, string>>>);
                 }
                 """, worldName: "my-world")
 
@@ -1129,9 +1129,9 @@
         @Test func namedFunctionResults() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
-                    export get-pair: func() -> (x: u32, y: u32)
+                    export get-pair: func() -> (x: u32, y: u32);
                 }
                 """, worldName: "my-world")
 
@@ -1154,9 +1154,9 @@
         @Test func functionMultipleParams() throws {
             let bytes = try encode(
                 """
-                package test:pkg
+                package test:pkg;
                 world my-world {
-                    export multi: func(a: u32, b: string, c: bool) -> u64
+                    export multi: func(a: u32, b: string, c: bool) -> u64;
                 }
                 """, worldName: "my-world")
 

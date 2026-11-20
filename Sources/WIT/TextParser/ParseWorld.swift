@@ -86,11 +86,11 @@ extension ExternKindSyntax {
         let id = try Identifier.parse(lexer: &clone)
         if clone.eat(.colon) {
             switch clone.peek()?.kind {
-            case .keyword(.func):
-                // import foo: func(...);
+            case .keyword(.func), .keyword(.async):
+                // import foo: [async] func(...);
                 lexer = clone
                 let result: ExternKindSyntax = try .function(id, .parse(lexer: &lexer))
-                try lexer.expectSemicolon()
+                try lexer.expect(.semicolon)
                 return result
             case .keyword(.interface):
                 // import foo: interface { ... }
@@ -102,7 +102,7 @@ extension ExternKindSyntax {
         }
         // import foo:bar/baz;
         let result: ExternKindSyntax = try .path(.parse(lexer: &lexer))
-        try lexer.expectSemicolon()
+        try lexer.expect(.semicolon)
         return result
     }
 }
@@ -121,7 +121,7 @@ extension IncludeSyntax {
                 return IncludeNameSyntax(name: name, asName: asName)
             }
         }
-        try lexer.expectSemicolon()
+        try lexer.expect(.semicolon)
         return IncludeSyntax(attributes: attributes, from: from, names: names)
     }
 }

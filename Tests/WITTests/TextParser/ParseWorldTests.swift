@@ -23,8 +23,8 @@ import Testing
         let world = try parse(
             """
             world x {
-                type t1 = u8
-                type t2 = u8
+                type t1 = u8;
+                type t2 = u8;
             }
             """
         )
@@ -37,7 +37,7 @@ import Testing
             """
             world x {
                 // doc comment here
-                type t1 = u8
+                type t1 = u8;
             }
             """
         )
@@ -76,9 +76,9 @@ import Testing
         let world = try parse(
             """
             world x {
-                import foo: func()
+                import foo: func();
                 import bar: interface {}
-                import baz
+                import baz;
             }
             """
         )
@@ -128,7 +128,7 @@ import Testing
         let world = try parse(
             """
             world x {
-                export foo: func()
+                export foo: func();
             }
             """
         )
@@ -149,9 +149,9 @@ import Testing
         let world = try parse(
             """
             world x {
-                include foo
-                include bar with { baz as qux }
-                include multiple with { n1 as a1, n2 as a2 }
+                include foo;
+                include bar with { baz as qux };
+                include multiple with { n1 as a1, n2 as a2 };
             }
             """
         )
@@ -199,7 +199,7 @@ import Testing
         let world = try parse(
             """
             world x {
-                type t1 = u8
+                type t1 = u8;
             }
             """
         )
@@ -273,7 +273,7 @@ import Testing
         let world = try parse(
             """
             world x {
-                resource rs1
+                resource rs1;
             }
             """
         )
@@ -329,7 +329,7 @@ import Testing
         let world = try parse(
             """
             world x {
-                use pkg1.{thing}
+                use pkg1.{thing};
             }
             """
         )

@@ -8,6 +8,10 @@
 
     @Suite
     struct ComponentLoaderTests {
+        static func flags(_ labelCount: Int) -> String {
+            "(flags " + (0..<labelCount).map { #""f\#($0)""# }.joined(separator: " ") + ")"
+        }
+
         // MARK: - ComponentImports Tests
 
         @Test
@@ -294,6 +298,365 @@
             } else {
                 Issue.record("Expected s32 result")
             }
+        }
+
+        @Test(arguments: [("get-ok", UInt32(0)), ("get-err", UInt32(1))])
+        func payloadlessResultRoundTrips(getter: String, discriminant: UInt32) throws {
+            let instance = try instantiateComponentWAT(
+                """
+                (component
+                    (core module $m
+                        (func (export "get-ok") (result i32) i32.const 0)
+                        (func (export "get-err") (result i32) i32.const 1)
+                        (func (export "discriminant") (param i32) (result i32) local.get 0)
+                    )
+                    (core instance $i (instantiate $m))
+                    (type $r (result))
+                    (func (export "get-ok") (result $r) (canon lift (core func $i "get-ok")))
+                    (func (export "get-err") (result $r) (canon lift (core func $i "get-err")))
+                    (func (export "discriminant") (param "r" $r) (result u32)
+                        (canon lift (core func $i "discriminant")))
+                )
+                """)
+            guard case .function(let get) = instance.export(getter),
+                case .function(let discriminantFunc) = instance.export("discriminant")
+            else {
+                Issue.record("Expected \(getter) and discriminant function exports")
+                return
+            }
+
+            let results = try discriminantFunc.invoke(try get.invoke([]))
+            guard case .u32(let value) = results.first else {
+                Issue.record("Expected u32 result, got \(results)")
+                return
+            }
+            #expect(value == discriminant)
+        }
+
+        @Test
+        func resultPayloadWithoutMatchingTypeThrows() throws {
+            let instance = try instantiateComponentWAT(
+                """
+                (component
+                    (core module $m
+                        (func (export "discriminant") (param i32) (result i32) local.get 0)
+                        (func (export "discriminant-enum") (param i32 i32) (result i32) local.get 0)
+                    )
+                    (core instance $i (instantiate $m))
+                    (type $r (result))
+                    (type $e (enum "a"))
+                    (type $re (result $e (error $e)))
+                    (func (export "discriminant") (param "r" $r) (result u32)
+                        (canon lift (core func $i "discriminant")))
+                    (func (export "discriminant-enum") (param "r" $re) (result u32)
+                        (canon lift (core func $i "discriminant-enum")))
+                )
+                """)
+            guard case .function(let discriminant) = instance.export("discriminant"),
+                case .function(let discriminantEnum) = instance.export("discriminant-enum")
+            else {
+                Issue.record("Expected discriminant function exports")
+                return
+            }
+
+            let mismatches: [(ComponentFunction, ComponentValue)] = [
+                (discriminant, .resultOk(.u32(7))),
+                (discriminant, .resultErr(.u32(7))),
+                (discriminantEnum, .resultOk(nil)),
+                (discriminantEnum, .resultErr(nil)),
+            ]
+            for (function, argument) in mismatches {
+                let error = #expect(throws: CanonicalABIError.self) { try function.invoke([argument]) }
+                #expect(error?.description == "The result payload does not match its case type")
+            }
+        }
+
+        @Test
+        func nonPrimitiveResultPayloadThrows() throws {
+            let instance = try instantiateComponentWAT(
+                """
+                (component
+                    (core module $m
+                        (func (export "discriminant") (param i32 i32) (result i32) local.get 0)
+                    )
+                    (core instance $i (instantiate $m))
+                    (type $e (enum "a"))
+                    (type $r (result $e (error $e)))
+                    (func (export "discriminant") (param "r" $r) (result u32)
+                        (canon lift (core func $i "discriminant")))
+                )
+                """)
+            guard case .function(let discriminant) = instance.export("discriminant") else {
+                Issue.record("Expected discriminant function export")
+                return
+            }
+
+            for argument: ComponentValue in [.resultOk(.enum("a")), .resultErr(.enum("a"))] {
+                let error = #expect(throws: CanonicalABIError.self) { try discriminant.invoke([argument]) }
+                #expect(error?.description == "Cannot lower a non-primitive result payload")
+            }
+        }
+
+        @Test
+        func nonPrimitiveVariantPayloadThrows() throws {
+            let instance = try instantiateComponentWAT(
+                """
+                (component
+                    (core module $m
+                        (func (export "discriminant") (param i32 i32) (result i32) local.get 0)
+                    )
+                    (core instance $i (instantiate $m))
+                    (type $e (enum "a"))
+                    (type $v (variant (case "c" $e)))
+                    (func (export "discriminant") (param "v" $v) (result u32)
+                        (canon lift (core func $i "discriminant")))
+                )
+                """)
+            guard case .function(let discriminant) = instance.export("discriminant") else {
+                Issue.record("Expected discriminant function export")
+                return
+            }
+
+            let error = #expect(throws: CanonicalABIError.self) {
+                try discriminant.invoke([.variant(caseName: "c", payload: .enum("a"))])
+            }
+            #expect(error?.description == "Cannot lower a non-primitive variant payload")
+        }
+
+        @Test
+        func variantPayloadWithoutMatchingTypeThrows() throws {
+            let instance = try instantiateComponentWAT(
+                """
+                (component
+                    (core module $m
+                        (memory (export "memory") 1)
+                        (func (export "realloc") (param i32 i32 i32 i32) (result i32) i32.const 0)
+                        (func (export "discriminant") (param i32 i32) (result i32) local.get 0)
+                        (func (export "length") (param i32 i32) (result i32) local.get 1)
+                    )
+                    (core instance $i (instantiate $m))
+                    (type $e (enum "a"))
+                    (type $v (variant (case "a") (case "b" $e)))
+                    (func (export "discriminant") (param "v" $v) (result u32)
+                        (canon lift (core func $i "discriminant")))
+                    (func (export "length") (param "vs" (list $v)) (result u32)
+                        (canon lift (core func $i "length") (memory $i "memory") (realloc (func $i "realloc"))))
+                )
+                """)
+            guard case .function(let discriminant) = instance.export("discriminant"),
+                case .function(let length) = instance.export("length")
+            else {
+                Issue.record("Expected discriminant and length function exports")
+                return
+            }
+
+            let mismatches: [ComponentValue] = [
+                .variant(caseName: "a", payload: .enum("a")),
+                .variant(caseName: "b", payload: nil),
+            ]
+            for mismatch in mismatches {
+                for (function, argument) in [(discriminant, mismatch), (length, ComponentValue.list([mismatch]))] {
+                    let error = #expect(throws: CanonicalABIError.self) { try function.invoke([argument]) }
+                    #expect(error?.description == "The variant payload does not match its case type")
+                }
+            }
+        }
+
+        /// Lowers `[a(y), a(y)]` as a `list<$v>` and reads the list allocation back.
+        /// Each row's `$payload` type sets the layout of `$v`'s elements, and `$v` has
+        /// `extraCaseCount` payload-less cases after "a" and "b".
+        @Test(arguments: [
+            // element size 2, alignment 1: case-"a" payloads at offsets 1 and 3
+            (#"(variant (case "x") (case "y"))"#, 0, UInt64(0x0000_0000_0100_0100), UInt32(1), UInt32(4)),
+            (#"(enum "x")"#, 0, UInt64(0x0000_0000_0100_0100), UInt32(1), UInt32(4)),
+            (#"(flags "f")"#, 0, UInt64(0x0000_0000_0100_0100), UInt32(1), UInt32(4)),
+            (ComponentLoaderTests.flags(8), 0, UInt64(0x0000_0000_0100_0100), UInt32(1), UInt32(4)),
+            (#"(record (field "f" $e))"#, 0, UInt64(0x0000_0000_0100_0100), UInt32(1), UInt32(4)),
+            (#"(result)"#, 0, UInt64(0x0000_0000_0100_0100), UInt32(1), UInt32(4)),
+            // 256 cases still use a 1-byte discriminant
+            (#"(enum "x")"#, 254, UInt64(0x0000_0000_0100_0100), UInt32(1), UInt32(4)),
+            // element size 3, alignment 1: case-"a" payloads at offsets 1 and 4
+            (#"(tuple $e $e)"#, 0, UInt64(0x0000_0001_0000_0100), UInt32(1), UInt32(6)),
+            (#"(option $e)"#, 0, UInt64(0x0000_0001_0000_0100), UInt32(1), UInt32(6)),
+            (#"(result $e (error $e))"#, 0, UInt64(0x0000_0001_0000_0100), UInt32(1), UInt32(6)),
+            // element size 4, alignment 2: case-"a" payloads at offsets 2 and 6
+            (ComponentLoaderTests.flags(9), 0, UInt64(0x0001_0000_0001_0000), UInt32(2), UInt32(8)),
+            (ComponentLoaderTests.flags(16), 0, UInt64(0x0001_0000_0001_0000), UInt32(2), UInt32(8)),
+            // 257 and 65536 cases use a 2-byte discriminant
+            (#"(enum "x")"#, 255, UInt64(0x0001_0000_0001_0000), UInt32(2), UInt32(8)),
+            (#"(enum "x")"#, 65534, UInt64(0x0001_0000_0001_0000), UInt32(2), UInt32(8)),
+            // element size 8, alignment 4: case-"a" payloads at offsets 4 and 12
+            (ComponentLoaderTests.flags(17), 0, UInt64(0x0000_0001_0000_0000), UInt32(4), UInt32(16)),
+            (ComponentLoaderTests.flags(32), 0, UInt64(0x0000_0001_0000_0000), UInt32(4), UInt32(16)),
+            // 65537 cases use a 4-byte discriminant
+            (#"(enum "x")"#, 65535, UInt64(0x0000_0001_0000_0000), UInt32(4), UInt32(16)),
+        ])
+        func variantListElementLayout(
+            payloadType: String, extraCaseCount: Int, expectedBytes: UInt64, expectedAlignment: UInt32,
+            expectedSize: UInt32
+        ) throws {
+            let extraCases = (0..<extraCaseCount).map { #"(case "c\#($0)")"# }.joined(separator: " ")
+            let instance = try instantiateComponentWAT(
+                """
+                (component
+                    (core module $m
+                        (memory (export "memory") 1)
+                        (global $align (mut i32) (i32.const 0))
+                        (global $size (mut i32) (i32.const 0))
+                        (func (export "realloc") (param i32 i32 i32 i32) (result i32)
+                            local.get 2
+                            global.set $align
+                            local.get 3
+                            global.set $size
+                            i32.const 16)
+                        (func (export "bytes") (param i32 i32) (result i64) local.get 0 i64.load)
+                        (func (export "second") (param i32 i32) (result i64)
+                            local.get 0
+                            global.get $size
+                            i32.const 2
+                            i32.div_u
+                            i32.add
+                            i64.load)
+                        (func (export "align") (result i32) global.get $align)
+                        (func (export "size") (result i32) global.get $size)
+                    )
+                    (core instance $i (instantiate $m))
+                    (type $inner (variant (case "x") (case "y")))
+                    (type $e (enum "x"))
+                    (type $payload \(payloadType))
+                    (type $v (variant (case "a" $inner) (case "b" $payload) \(extraCases)))
+                    (func (export "bytes") (param "vs" (list $v)) (result u64)
+                        (canon lift (core func $i "bytes") (memory $i "memory") (realloc (func $i "realloc"))))
+                    (func (export "second") (param "vs" (list $v)) (result u64)
+                        (canon lift (core func $i "second") (memory $i "memory") (realloc (func $i "realloc"))))
+                    (func (export "align") (result u32) (canon lift (core func $i "align")))
+                    (func (export "size") (result u32) (canon lift (core func $i "size")))
+                )
+                """)
+            guard case .function(let bytes) = instance.export("bytes"),
+                case .function(let second) = instance.export("second"),
+                case .function(let align) = instance.export("align"),
+                case .function(let size) = instance.export("size")
+            else {
+                Issue.record("Expected bytes, second, align and size function exports")
+                return
+            }
+
+            let element = ComponentValue.variant(caseName: "a", payload: .variant(caseName: "y", payload: nil))
+            let bytesResult = try bytes.invoke([.list([element, element])])
+            let secondResult = try second.invoke([.list([element, element])])
+            let alignResult = try align.invoke([])
+            let sizeResult = try size.invoke([])
+            guard case .u64(let actualBytes) = bytesResult.first,
+                case .u64(let actualSecond) = secondResult.first,
+                case .u32(let actualAlignment) = alignResult.first,
+                case .u32(let actualSize) = sizeResult.first
+            else {
+                Issue.record(
+                    "Expected u64, u64, u32 and u32 results, got \(bytesResult), \(secondResult), \(alignResult), \(sizeResult)")
+                return
+            }
+            // Memory past the second element is zero.
+            let elementSize = Int(expectedSize) / 2
+            let expectedSecond = elementSize >= 8 ? expectedBytes : expectedBytes >> UInt64(8 * elementSize)
+            #expect(actualBytes == expectedBytes)
+            #expect(actualSecond == expectedSecond)
+            #expect(actualAlignment == expectedAlignment)
+            #expect(actualSize == expectedSize)
+        }
+
+        /// A second `a(y)` element resolves only `$inner`, the type of its payload.
+        @Test(arguments: [
+            #"(case "b" $e)"#,
+            #"(case "c0" $r) (case "c1" $r) (case "c2" $r) (case "c3" $r) (case "c4" $r) (case "c5" $r) (case "c6" $r) (case "c7" $r) (case "c8" $r)"#,
+        ])
+        func variantListElementsReuseThePayloadOffset(otherCases: String) throws {
+            let instance = try instantiateComponentWAT(
+                """
+                (component
+                    (core module $m
+                        (memory (export "memory") 1)
+                        (func (export "realloc") (param i32 i32 i32 i32) (result i32) i32.const 16)
+                        (func (export "length") (param i32 i32) (result i32) local.get 1)
+                    )
+                    (core instance $i (instantiate $m))
+                    (type $inner (variant (case "x") (case "y")))
+                    (type $e (enum "x"))
+                    (type $r (record (field "x" $e) (field "y" $e) (field "z" $e)))
+                    (type $v (variant (case "a" $inner) \(otherCases)))
+                    (func (export "length") (param "vs" (list $v)) (result u32)
+                        (canon lift (core func $i "length") (memory $i "memory") (realloc (func $i "realloc"))))
+                )
+                """)
+            guard case .function(let length) = instance.export("length") else {
+                Issue.record("Expected a length function export")
+                return
+            }
+
+            let element = ComponentValue.variant(caseName: "a", payload: .variant(caseName: "y", payload: nil))
+            func resolveCount(elementCount: Int) throws -> Int {
+                var count = 0
+                _ = try ComponentValue.list(Array(repeating: element, count: elementCount)).lower(
+                    to: length.type.params[0].type,
+                    resolveType: { index in
+                        count += 1
+                        return try length.resolveType(index)
+                    },
+                    options: length.handle.canonOptions,
+                    store: length.store
+                )
+                return count
+            }
+            let one = try resolveCount(elementCount: 1)
+            let two = try resolveCount(elementCount: 2)
+            #expect(two - one == 1)
+        }
+
+        /// `$v`'s payload offset is 4 and `$mid`'s is 1. Each `a(m(y))` element is the
+        /// bytes 1, 0, 0, 0, 1, 1, 0, 0.
+        @Test
+        func nestedVariantPayloadsInAListUseTheirOwnOffsets() throws {
+            let instance = try instantiateComponentWAT(
+                """
+                (component
+                    (core module $m
+                        (memory (export "memory") 1)
+                        (func (export "realloc") (param i32 i32 i32 i32) (result i32) i32.const 16)
+                        (func (export "first") (param i32 i32) (result i64) local.get 0 i64.load)
+                        (func (export "second") (param i32 i32) (result i64)
+                            local.get 0
+                            i32.const 8
+                            i32.add
+                            i64.load)
+                    )
+                    (core instance $i (instantiate $m))
+                    (type $leaf (variant (case "x") (case "y")))
+                    (type $mid (variant (case "l") (case "m" $leaf)))
+                    (type $wide \(ComponentLoaderTests.flags(17)))
+                    (type $v (variant (case "b" $wide) (case "a" $mid)))
+                    (func (export "first") (param "vs" (list $v)) (result u64)
+                        (canon lift (core func $i "first") (memory $i "memory") (realloc (func $i "realloc"))))
+                    (func (export "second") (param "vs" (list $v)) (result u64)
+                        (canon lift (core func $i "second") (memory $i "memory") (realloc (func $i "realloc"))))
+                )
+                """)
+            guard case .function(let first) = instance.export("first"),
+                case .function(let second) = instance.export("second")
+            else {
+                Issue.record("Expected first and second function exports")
+                return
+            }
+
+            let element = ComponentValue.variant(
+                caseName: "a", payload: .variant(caseName: "m", payload: .variant(caseName: "y", payload: nil)))
+            let firstResult = try first.invoke([.list([element, element])])
+            let secondResult = try second.invoke([.list([element, element])])
+            guard case .u64(let actualFirst) = firstResult.first, case .u64(let actualSecond) = secondResult.first else {
+                Issue.record("Expected u64 results, got \(firstResult) and \(secondResult)")
+                return
+            }
+            #expect(actualFirst == 0x0000_0101_0000_0001)
+            #expect(actualSecond == 0x0000_0101_0000_0001)
         }
 
         @Test
