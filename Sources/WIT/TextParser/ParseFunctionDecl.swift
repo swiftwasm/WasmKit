@@ -22,7 +22,7 @@ extension ResourceFunctionSyntax {
                 let type = try TypeReprSyntax.parse(lexer: &lexer)
                 return ParameterSyntax(name: name, type: type, textRange: start..<lexer.cursor.nextIndex)
             }
-            try lexer.expectSemicolon()
+            try lexer.expect(.semicolon)
             return .constructor(
                 .init(
                     syntax: NamedFunctionSyntax(
@@ -32,6 +32,7 @@ extension ResourceFunctionSyntax {
                         function: FunctionSyntax(
                             parameters: params,
                             results: .named([]),
+                            isAsync: false,
                             textRange: funcStart..<lexer.cursor.nextIndex
                         )
                     )
@@ -47,7 +48,7 @@ extension ResourceFunctionSyntax {
                 ctor = ResourceFunctionSyntax.method
             }
             let function = try FunctionSyntax.parse(lexer: &lexer)
-            try lexer.expectSemicolon()
+            try lexer.expect(.semicolon)
             return ctor(
                 .init(
                     syntax:
@@ -81,6 +82,7 @@ extension FunctionSyntax {
         }
 
         let start = lexer.cursor.nextIndex
+        let isAsync = lexer.eat(.async)
         try lexer.expect(.func)
         let params = try parseParameters(lexer: &lexer, leftParen: true)
         let results: ResultListSyntax
@@ -94,7 +96,7 @@ extension FunctionSyntax {
             results = .named([])
         }
 
-        return FunctionSyntax(parameters: params, results: results, textRange: start..<lexer.cursor.nextIndex)
+        return FunctionSyntax(parameters: params, results: results, isAsync: isAsync, textRange: start..<lexer.cursor.nextIndex)
     }
 }
 
@@ -103,7 +105,7 @@ extension NamedFunctionSyntax {
         let name = try Identifier.parse(lexer: &lexer)
         try lexer.expect(.colon)
         let function = try FunctionSyntax.parse(lexer: &lexer)
-        try lexer.expectSemicolon()
+        try lexer.expect(.semicolon)
         return .init(syntax: NamedFunctionSyntax(documents: documents, attributes: attributes, name: name, function: function))
     }
 }

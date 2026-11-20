@@ -20,7 +20,7 @@ struct ParseTopTests {
     }
 
     @Test func aSTWithPackageId() throws {
-        var lexer = Lexer(cursor: .init(input: "package foo:bar"))
+        var lexer = Lexer(cursor: .init(input: "package foo:bar;"))
         let ast = try SourceFileSyntax.parse(lexer: &lexer)
         #expect(ast.packageId != nil)
     }
@@ -31,7 +31,7 @@ struct ParseTopTests {
                 input: """
                     interface x {}
                     world y {}
-                    use z
+                    use z;
                     """))
         let ast = try SourceFileSyntax.parse(lexer: &lexer)
         #expect(ast.items.count == 3)
@@ -114,14 +114,14 @@ struct ParseTopTests {
     }
 
     @Test func topLevelUseAs() throws {
-        var lexer = Lexer(cursor: .init(input: "use abc as xyz"))
+        var lexer = Lexer(cursor: .init(input: "use abc as xyz;"))
         let use = try TopLevelUseSyntax.parse(lexer: &lexer, documents: .init(comments: []), attributes: [])
         #expect(use.item.name.text == "abc")
         #expect(use.asName?.text == "xyz")
     }
 
     @Test func use() throws {
-        var lexer = Lexer(cursor: .init(input: "use abc.{x, y, z}"))
+        var lexer = Lexer(cursor: .init(input: "use abc.{x, y, z};"))
         let use = try UseSyntax.parse(lexer: &lexer)
         #expect(use.from.name.text == "abc")
         #expect(use.names.map(\.name.text) == ["x", "y", "z"])
@@ -129,7 +129,7 @@ struct ParseTopTests {
     }
 
     @Test func useAs() throws {
-        var lexer = Lexer(cursor: .init(input: "use abc.{x as d, y as e, z}"))
+        var lexer = Lexer(cursor: .init(input: "use abc.{x as d, y as e, z};"))
         let use = try UseSyntax.parse(lexer: &lexer)
         #expect(use.from.name.text == "abc")
         #expect(use.names.map(\.name.text) == ["x", "y", "z"])
@@ -137,7 +137,7 @@ struct ParseTopTests {
     }
 
     @Test func usePath() throws {
-        var lexer = Lexer(cursor: .init(input: "use ns1:pkg1/item1@1.0.0"))
+        var lexer = Lexer(cursor: .init(input: "use ns1:pkg1/item1@1.0.0;"))
         let use = try TopLevelUseSyntax.parse(lexer: &lexer, documents: .init(comments: []), attributes: [])
         #expect(use.item.name.text == "item1")
         guard case .package(let id, _) = use.item else {

@@ -44,11 +44,9 @@ struct Lexer {
     }
 
     var cursor: Cursor
-    let requireSemicolon: Bool
 
-    init(cursor: Cursor, requireSemicolon: Bool = false) {
+    init(cursor: Cursor) {
         self.cursor = cursor
-        self.requireSemicolon = requireSemicolon
     }
 
     mutating func advanceToEndOfBlockComment() -> Diagnostic? {
@@ -167,8 +165,9 @@ struct Lexer {
                 case "s16": return LexKindResult(kind: .s16)
                 case "s32": return LexKindResult(kind: .s32)
                 case "s64": return LexKindResult(kind: .s64)
-                case "float32": return LexKindResult(kind: .float32)
-                case "float64": return LexKindResult(kind: .float64)
+                // `float32` and `float64` are not keywords, matching wasm-tools.
+                case "f32": return LexKindResult(kind: .float32)
+                case "f64": return LexKindResult(kind: .float64)
                 case "char": return LexKindResult(kind: .char)
                 case "resource": return LexKindResult(kind: .resource)
                 case "own": return LexKindResult(kind: .own)
@@ -189,6 +188,7 @@ struct Lexer {
                 case "as": return LexKindResult(kind: .as)
                 case "from": return LexKindResult(kind: .from_)
                 case "static": return LexKindResult(kind: .static)
+                case "async": return LexKindResult(kind: .async)
                 case "interface": return LexKindResult(kind: .interface)
                 case "tuple": return LexKindResult(kind: .tuple)
                 case "world": return LexKindResult(kind: .world)
@@ -259,14 +259,6 @@ struct Lexer {
             throw ParseError(description: "\(expected) expected but got \(actualText)")
         }
         return lexme
-    }
-
-    mutating func expectSemicolon() throws {
-        if self.requireSemicolon {
-            try self.expect(.semicolon)
-        } else {
-            self.eat(.semicolon)
-        }
     }
 
     @discardableResult
@@ -354,6 +346,7 @@ enum TokenKind: Equatable {
     case `as`
     case from_
     case `static`
+    case async
     case interface
     case tuple
     case `import`

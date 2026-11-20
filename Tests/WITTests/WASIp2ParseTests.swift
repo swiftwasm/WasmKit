@@ -248,7 +248,7 @@ private func interfaceBlocks(in text: String) throws -> [String: InterfaceBlock]
     if lexer.peek()?.kind == .package {
         _ = try PackageNameSyntax.parse(lexer: &lexer)
         if lexer.peek()?.kind == .leftBrace { return [:] }
-        try lexer.expectSemicolon()
+        try lexer.expect(.semicolon)
     }
 
     var blocks: [String: InterfaceBlock] = [:]
