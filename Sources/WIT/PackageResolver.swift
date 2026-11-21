@@ -239,5 +239,7 @@ public struct LocalFileLoader: PackageFileLoader {
         let depsDir = dirURL.appendingPathComponent("deps")
         guard isDirectory(filePath: depsDir.path) else { return [] }
         return try fileManager.contentsOfDirectory(atPath: depsDir.path)
+            .map { depsDir.appendingPathComponent($0).path }
+            .filter { isDirectory(filePath: $0) }
     }
 }

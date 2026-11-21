@@ -9,42 +9,42 @@ struct ParseTestsTests {
             cursor: .init(
                 input: """
                     interface types {
-                        type t1 = bool
-                        type t2 = u8
-                        type t3 = u16
-                        type t4 = u32
-                        type t5 = u64
-                        type t6 = s8
-                        type t7 = s16
-                        type t8 = s32
-                        type t9 = s64
-                        type t10 = float32
-                        type t11 = float64
-                        type t12 = char
-                        type t13 = string
+                        type t1 = bool;
+                        type t2 = u8;
+                        type t3 = u16;
+                        type t4 = u32;
+                        type t5 = u64;
+                        type t6 = s8;
+                        type t7 = s16;
+                        type t8 = s32;
+                        type t9 = s64;
+                        type t10 = f32;
+                        type t11 = f64;
+                        type t12 = char;
+                        type t13 = string;
 
-                        type t14 = tuple<bool, u8, u16>
-                        type t15 = list<u32>
-                        type t16 = option<i64>
+                        type t14 = tuple<bool, u8, u16>;
+                        type t15 = list<u32>;
+                        type t16 = option<i64>;
 
-                        type t17 = result<i32, string>
-                        type t18 = result<_, string>
-                        type t19 = result<i32>
-                        type t20 = result
+                        type t17 = result<i32, string>;
+                        type t18 = result<_, string>;
+                        type t19 = result<i32>;
+                        type t20 = result;
 
-                        type t21 = future<i32>
-                        type t22 = future
+                        type t21 = future<i32>;
+                        type t22 = future;
 
-                        type t23 = stream<i32, string>
-                        type t24 = stream<_, string>
-                        type t25 = stream<i32>
-                        type t26 = stream
+                        type t23 = stream<i32, string>;
+                        type t24 = stream<_, string>;
+                        type t25 = stream<i32>;
+                        type t26 = stream;
 
-                        type t27 = own<x>
-                        type t28 = borrow<x>
+                        type t27 = own<x>;
+                        type t28 = borrow<x>;
 
-                        type t29 = x
-                        type t30 = %x
+                        type t29 = x;
+                        type t30 = %x;
                     }
                     """
             )
@@ -72,7 +72,7 @@ struct ParseTestsTests {
                 input: """
                     resource r1 {
                         // doc comment here
-                        f1: func()
+                        f1: func();
                     }
                     """
             )
@@ -105,5 +105,31 @@ struct ParseTestsTests {
             return
         }
         #expect(variant.cases.count == 3)
+    }
+
+    // MARK: - Identifier grammar
+
+    private func parseWIT(_ text: String) throws {
+        var lexer = Lexer(cursor: .init(input: text))
+        _ = try SourceFileSyntax.parse(lexer: &lexer, fileName: "test.wit")
+    }
+
+    @Test(arguments: ["Foo", "aB", "a2B", "foo--bar", "-foo", "foo-", "%Foo"])
+    func nonCanonicalIdentifierIsRejected(name: String) throws {
+        #expect(throws: ParseError.self) {
+            try parseWIT("package test:p;\nworld w { record \(name) { x: s64 } }")
+        }
+    }
+
+    @Test(arguments: ["foo", "foo-bar", "FOO", "FOO-BAR", "FOO-bar", "foo-2", "size-1", "a-2b", "a2b"])
+    func canonicalIdentifierIsAccepted(name: String) throws {
+        try parseWIT("package test:p;\nworld w { record \(name) { x: s64 } }")
+    }
+
+    /// `TypeReprSyntax.parse` reads type references without `Identifier.parse`.
+    @Test func nonCanonicalTypeReferenceIsRejected() throws {
+        #expect(throws: ParseError.self) {
+            try parseWIT("package test:p;\nworld w { record r { f: someTypeRef } }")
+        }
     }
 }

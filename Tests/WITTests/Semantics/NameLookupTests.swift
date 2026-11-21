@@ -75,9 +75,9 @@ struct NameLookupTests {
     @Test func lookupAliasPrimitiveType() throws {
         try assertLookup(
             """
-            package foo:bar
+            package foo:bar;
             interface x {
-              type my-type = u8
+              type my-type = u8;
             }
             """,
             interfaceName: "x",
@@ -89,10 +89,10 @@ struct NameLookupTests {
     @Test func lookupAliasDefinedType() throws {
         let type = try lookupType(
             """
-            package foo:bar
+            package foo:bar;
             interface x {
               record r1 {}
-              type my-type = r1
+              type my-type = r1;
             }
             """,
             interfaceName: "x",
@@ -108,11 +108,11 @@ struct NameLookupTests {
     @Test func lookupThroughUse() throws {
         let type = try lookupType(
             """
-            package foo:bar
+            package foo:bar;
 
             interface x {
-              use y.{r1}
-              type my-type = r1
+              use y.{r1};
+              type my-type = r1;
             }
 
             interface y {
@@ -134,17 +134,17 @@ struct NameLookupTests {
             [
                 [
                     """
-                    package foo:root
+                    package foo:root;
 
                     interface x {
-                      use foo:pkg1/y.{r1}
-                      type my-type = r1
+                      use foo:pkg1/y.{r1};
+                      type my-type = r1;
                     }
                     """
                 ],
                 [
                     """
-                    package foo:pkg1
+                    package foo:pkg1;
 
                     interface y {
                       record r1 {}
@@ -166,18 +166,18 @@ struct NameLookupTests {
             [
                 [
                     """
-                    package foo:root
-                    use foo:pkg1/y
+                    package foo:root;
+                    use foo:pkg1/y;
 
                     interface x {
-                      use y.{r1}
-                      type my-type = r1
+                      use y.{r1};
+                      type my-type = r1;
                     }
                     """
                 ],
                 [
                     """
-                    package foo:pkg1
+                    package foo:pkg1;
 
                     interface y {
                       record r1 {}
@@ -200,24 +200,24 @@ struct NameLookupTests {
                 [
                     [
                         """
-                        package foo:root
-                        use foo:pkg1/y
+                        package foo:root;
+                        use foo:pkg1/y;
 
                         interface x {
-                          use y.{r1}
-                          type my-type = r1
+                          use y.{r1};
+                          type my-type = r1;
                         }
                         """
                     ],
                     [
                         """
-                        package foo:pkg1
-                        use foo:pkg2/y
+                        package foo:pkg1;
+                        use foo:pkg2/y;
                         """
                     ],
                     [
                         """
-                        package foo:pkg2
+                        package foo:pkg2;
 
                         interface y {
                           record r1 {}
@@ -233,13 +233,13 @@ struct NameLookupTests {
     @Test func lookupTopLevelUseWithBareIdentifier() throws {
         try assertLookup(
             """
-            package foo:bar
-            use x as y
+            package foo:bar;
+            use x as y;
             interface x {
-              type my-type = u8
+              type my-type = u8;
             }
             interface z {
-              use y.{my-type}
+              use y.{my-type};
             }
             """,
             interfaceName: "z", typeName: "my-type", expected: .u8
@@ -251,23 +251,23 @@ struct NameLookupTests {
             [
                 [
                     """
-                    package foo:root
-                    use foo:pkg1/y
+                    package foo:root;
+                    use foo:pkg1/y;
 
                     world x {
                       import e1: interface {
-                        use y.{t1}
-                        type t2 = t1
+                        use y.{t1};
+                        type t2 = t1;
                       }
                     }
                     """
                 ],
                 [
                     """
-                    package foo:pkg1
+                    package foo:pkg1;
 
                     interface y {
-                      type t1 = u8
+                      type t1 = u8;
                     }
                     """
                 ],
