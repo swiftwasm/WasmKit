@@ -31,7 +31,8 @@ let benchmarks: @Sendable () -> () = {
             let engine = Engine()
             let store = Store(engine: engine)
             let module = try parseWasm(
-                filePath: wishYouWereFast.appendingPathComponent(file).path
+                filePath: wishYouWereFast.appendingPathComponent(file).path,
+                engine: engine
             )
             let wasi = try WASIBridgeToHost(fileSystem: .host().withStdio(stdout: devNull, stderr: devNull))
             _ = try wasi.runAndClose { wasi in

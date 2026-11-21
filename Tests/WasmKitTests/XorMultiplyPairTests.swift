@@ -7,6 +7,7 @@ import WAT
     @Test(arguments: [EngineConfiguration.ThreadingModel.direct, .token])
     func retainsIntermediateAndWrappingSemantics(threadingModel: EngineConfiguration.ThreadingModel) throws {
         for shift: UInt64 in [0, 17, 63, 64, 129] {
+            let engine = Engine(configuration: .init(threadingModel: threadingModel))
             let module = try parseWasm(
                 bytes: wat2wasm(
                     """
@@ -25,8 +26,8 @@ import WAT
                         local.get 0 local.get 0 i64.const \(shift) i64.shr_u i64.xor local.get 1 i64.mul local.set 3
                         i64.const 7 local.set 3
                         local.get 3 local.get 3 i64.const 31 i64.shr_u i64.xor local.get 2 i64.mul))
-                    """))
-            let store = Store(engine: Engine(configuration: .init(threadingModel: threadingModel)))
+                    """), engine: engine)
+            let store = Store(engine: engine)
             let instance = try module.instantiate(store: store)
             for x: UInt64 in [0, 1, .max, 0x8000_0000_0000_0000, 0x1234_5678_9abc_def0] {
                 for multiplier: UInt64 in [0, 1, .max, 0xbf58_476d_1ce4_e5b9] {
@@ -41,7 +42,7 @@ import WAT
             }
             #if Disassembler
                 if shift == 17 && threadingModel == .direct {
-                    let dumpStore = Store(engine: Engine(configuration: .init(threadingModel: threadingModel)))
+                    let dumpStore = Store(engine: engine)
                     let dumpInstance = try module.instantiate(store: dumpStore)
                     var listing = ""
                     try dumpInstance.dumpFunctions(to: &listing, module: module)

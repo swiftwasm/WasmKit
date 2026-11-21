@@ -113,7 +113,6 @@ public final class WASIThreads: @unchecked Sendable {
     }
 
     private let module: Module
-    private let engine: Engine
     private let configuration: WASIThreadsConfiguration
     private let processControl: WASIThreadsProcessControl
     private let childImports: ChildImportsBuilder
@@ -124,7 +123,6 @@ public final class WASIThreads: @unchecked Sendable {
 
     public init(
         module: Module,
-        engine: Engine,
         configuration: WASIThreadsConfiguration = .init(),
         resourceLimiter: any ResourceLimiter = DefaultResourceLimiter(),
         processControl: WASIThreadsProcessControl,
@@ -132,6 +130,7 @@ public final class WASIThreads: @unchecked Sendable {
     ) throws {
         #if os(macOS) || os(iOS) || os(Linux) || os(Android)
             #if MultiThread && (arch(x86_64) || arch(arm64))
+                let engine = module.engine
                 guard configuration.maximumThreads >= 1 else { throw WASIThreadsError.invalidMaximumThreads }
                 let minimumStackSize = Int(wasmkit_wasi_threads_min_stack_size())
                 if let nativeStackSize = configuration.nativeStackSize, nativeStackSize < minimumStackSize {
@@ -159,7 +158,6 @@ public final class WASIThreads: @unchecked Sendable {
                 }
 
                 self.module = module
-                self.engine = engine
                 self.configuration = configuration
                 self.processControl = processControl
                 self.childImports = childImports
@@ -173,6 +171,18 @@ public final class WASIThreads: @unchecked Sendable {
         #else
             throw WASIThreadsError.unsupportedPlatform
         #endif
+    }
+
+    @available(*, unavailable, renamed: "init(module:configuration:resourceLimiter:processControl:childImports:)")
+    public init(
+        module: Module,
+        engine: Engine,
+        configuration: WASIThreadsConfiguration = .init(),
+        resourceLimiter: any ResourceLimiter = DefaultResourceLimiter(),
+        processControl: WASIThreadsProcessControl,
+        childImports: @escaping ChildImportsBuilder
+    ) throws {
+        fatalError()
     }
 
     /// Creates the imports for one store, including the module's shared memory
@@ -240,7 +250,7 @@ public final class WASIThreads: @unchecked Sendable {
 
     private func runWorker(tid: Int32, argument: Int32, startup: Startup, fuel: Fuel?) {
         do {
-            let store = Store(engine: engine)
+            let store = Store(engine: module.engine)
             store.fuel = fuel
             let imports = try makeImports(store: store)
             let instance = try module.instantiate(store: store, imports: imports)

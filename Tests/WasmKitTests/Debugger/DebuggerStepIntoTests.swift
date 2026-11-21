@@ -97,7 +97,7 @@
         ) throws {
             let features = WasmFeatureSet.default.union(features)
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel, features: features)))
-            let module = try parseWasm(bytes: try wat2wasm(wat, features: features), features: features)
+            let module = try parseWasm(bytes: try wat2wasm(wat, features: features), engine: store.engine, features: features)
             var debugger = try Debugger(module: module, store: store, imports: [:])
             let calleeOrigin = module.functions[0].code.originalAddress
             let startBase = module.functions[1].code.originalAddress

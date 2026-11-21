@@ -22,7 +22,7 @@ struct HostModuleTests {
                 (module
                     (import "env" "memory" (memory 1))
                 )
-                """))
+                """), engine: engine)
         #expect(throws: Never.self) { try module.instantiate(store: store, imports: imports) }
         // Ensure the allocated address is valid
         _ = try memory.withUnsafeBufferPointer(offset: 0, count: 4) {
@@ -50,7 +50,8 @@ struct HostModuleTests {
                         (call $qux)
                     )
                 )
-                """)
+                """),
+            engine: engine
         )
 
         var isExecutingFoo = false

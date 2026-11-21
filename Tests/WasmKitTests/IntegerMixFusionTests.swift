@@ -6,22 +6,23 @@ import WAT
 @Suite struct IntegerMixFusionTests {
     @Test(arguments: [EngineConfiguration.ThreadingModel.direct, .token])
     func shiftMaskAndWrappingMultiply(threadingModel: EngineConfiguration.ThreadingModel) throws {
-        let module = try parseWasm(
-            bytes: wat2wasm(
-                """
-                (module
-                  (func (export "mix") (param i64 i64 i64 i64) (result i64)
-                    local.get 0 local.get 1 i64.shr_u local.get 2 i64.xor local.get 3 i64.mul)
-                  (func (export "reverse") (param i64 i64 i64 i64) (result i64)
-                    local.get 3 local.get 2 local.get 0 local.get 1 i64.shr_u i64.xor i64.mul)
-                  (func (export "constant") (param i64) (result i64)
-                    local.get 0 i64.const 30 i64.shr_u local.get 0 i64.xor
-                    i64.const 0xbf58476d1ce4e5b9 i64.mul)
-                  (func (export "keep") (param i64 i64 i64 i64) (result i64 i64) (local i64)
-                    local.get 0 local.get 1 i64.shr_u local.get 2 i64.xor local.tee 4
-                    local.get 3 i64.mul local.get 4))
-                """))
-        let store = Store(engine: Engine(configuration: .init(threadingModel: threadingModel, compilationMode: .eager)))
+        let bytes = try wat2wasm(
+            """
+            (module
+              (func (export "mix") (param i64 i64 i64 i64) (result i64)
+                local.get 0 local.get 1 i64.shr_u local.get 2 i64.xor local.get 3 i64.mul)
+              (func (export "reverse") (param i64 i64 i64 i64) (result i64)
+                local.get 3 local.get 2 local.get 0 local.get 1 i64.shr_u i64.xor i64.mul)
+              (func (export "constant") (param i64) (result i64)
+                local.get 0 i64.const 30 i64.shr_u local.get 0 i64.xor
+                i64.const 0xbf58476d1ce4e5b9 i64.mul)
+              (func (export "keep") (param i64 i64 i64 i64) (result i64 i64) (local i64)
+                local.get 0 local.get 1 i64.shr_u local.get 2 i64.xor local.tee 4
+                local.get 3 i64.mul local.get 4))
+            """)
+        let engine = Engine(configuration: .init(threadingModel: threadingModel, compilationMode: .eager))
+        let module = try parseWasm(bytes: bytes, engine: engine)
+        let store = Store(engine: engine)
         let instance = try module.instantiate(store: store)
         let mix = try #require(instance.exports[function: "mix"])
         let reverse = try #require(instance.exports[function: "reverse"])
@@ -43,23 +44,27 @@ import WAT
         }
         #if Disassembler
             var listing = ""
-            let dumpStore = Store(engine: Engine(configuration: .init(threadingModel: threadingModel)))
-            let dumpInstance = try module.instantiate(store: dumpStore)
-            try dumpInstance.dumpFunctions(to: &listing, module: module)
+            let dumpEngine = Engine(configuration: .init(threadingModel: threadingModel))
+            let dumpModule = try parseWasm(bytes: bytes, engine: dumpEngine)
+            let dumpStore = Store(engine: dumpEngine)
+            let dumpInstance = try dumpModule.instantiate(store: dumpStore)
+            try dumpInstance.dumpFunctions(to: &listing, module: dumpModule)
             if threadingModel == .direct { #expect(listing.contains("i64XorShiftMulImm")) }
         #endif
     }
     @Test(arguments: [EngineConfiguration.ThreadingModel.direct, .token])
     func constantShiftMasks(threadingModel: EngineConfiguration.ThreadingModel) throws {
         for shift: UInt64 in [0, 31, 63, 64, 65, .max] {
+            let engine = Engine(configuration: .init(threadingModel: threadingModel))
             let module = try parseWasm(
                 bytes: wat2wasm(
                     """
                     (module (func (export "f") (param i64 i64) (result i64)
                         local.get 0 i64.const \(shift) i64.shr_u local.get 0 i64.xor
                         local.get 1 i64.mul))
-                    """))
-            let store = Store(engine: Engine(configuration: .init(threadingModel: threadingModel)))
+                    """),
+                engine: engine)
+            let store = Store(engine: engine)
             let instance = try module.instantiate(store: store)
             let f = try #require(instance.exports[function: "f"])
             for x: UInt64 in [0, 1, .max, 0x8000_0000_0000_0000] {
@@ -72,6 +77,7 @@ import WAT
 
     #if Disassembler
         @Test func localTeeChain() throws {
+            let store = Store(engine: Engine())
             let module = try parseWasm(
                 bytes: wat2wasm(
                     """
@@ -82,8 +88,8 @@ import WAT
                         i64.const 27 i64.shr_u local.get 0 i64.xor
                         i64.const 0x94d049bb133111eb i64.mul local.tee 0
                         i64.const 31 i64.shr_u local.get 0 i64.xor))
-                    """))
-            let store = Store(engine: Engine())
+                    """),
+                engine: store.engine)
             let instance = try module.instantiate(store: store)
             var listing = ""
             try instance.dumpFunctions(to: &listing, module: module)

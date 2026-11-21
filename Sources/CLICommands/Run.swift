@@ -247,13 +247,10 @@ package struct Run: AsyncParsableCommand {
 
         log("Started parsing module", verbose: true)
 
-        let module: Module
         let moduleFeatures = deriveRuntimeConfiguration().features
+        let isWAT = URL(fileURLWithPath: path).pathExtension == "wat"
 
-        if URL(fileURLWithPath: path).pathExtension == "wat" {
-            let wat = try String(contentsOfFile: path, encoding: .utf8)
-            module = try WasmKit.parseWasm(bytes: wat2wasm(wat, features: moduleFeatures), features: moduleFeatures)
-        } else {
+        if !isWAT {
             // Sniff the magic bytes to detect the file type (component vs
             // module), then let the parser re-open the file by path.
             var magic: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0)
@@ -277,8 +274,9 @@ package struct Run: AsyncParsableCommand {
             #if ComponentModel
                 if fileType == .component {
                     log("Detected component binary, parsing component...", verbose: true)
-                    let parsedComponent = try parseComponent(filePath: path)
-                    try runComponent(component: parsedComponent)
+                    let engine = Engine(configuration: deriveRuntimeConfiguration())
+                    let parsedComponent = try parseComponent(filePath: path, engine: engine)
+                    try runComponent(component: parsedComponent, engine: engine)
                     return
                 }
             #endif
@@ -286,26 +284,33 @@ package struct Run: AsyncParsableCommand {
             guard fileType == .coreModule else {
                 fatalError("Unsupported WebAssembly file type: \(fileType)")
             }
+        }
 
+        let (interceptor, finalize) = try deriveInterceptor()
+        defer { finalize() }
+        let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
+
+        let module: Module
+        if isWAT {
+            let wat = try String(contentsOfFile: path, encoding: .utf8)
+            module = try WasmKit.parseWasm(bytes: wat2wasm(wat, features: moduleFeatures), engine: engine, features: moduleFeatures)
+        } else {
             let (parsedModule, parseTime) = try measure {
-                try WasmKit.parseWasm(filePath: path, features: moduleFeatures)
+                try WasmKit.parseWasm(filePath: path, engine: engine, features: moduleFeatures)
             }
             log("Finished parsing module: \(parseTime)", verbose: true)
             module = parsedModule
         }
 
-        let (interceptor, finalize) = try deriveInterceptor()
-        defer { finalize() }
-
         let invoke: () throws -> Void
         let store: Store
         if module.exports.contains(where: { $0.name == "_start" }) {
-            (store, invoke) = try instantiateWASI(module: module, interceptor: interceptor)
+            (store, invoke) = try instantiateWASI(module: module)
         } else {
             if wasiThreads {
                 throw ValidationError("--wasi-threads requires a WASI command module exporting _start.")
             }
-            guard let entry = try instantiateNonWASI(module: module, interceptor: interceptor) else {
+            guard let entry = try instantiateNonWASI(module: module) else {
                 return
             }
             (store, invoke) = entry
@@ -324,8 +329,7 @@ package struct Run: AsyncParsableCommand {
 
     #if ComponentModel
         /// Run a WebAssembly component.
-        func runComponent(component: ParsedComponent) throws {
-            let engine = Engine(configuration: deriveRuntimeConfiguration())
+        func runComponent(component: ParsedComponent, engine: Engine) throws {
             let store = Store(engine: engine)
             let loader = ComponentLoader(store: store)
             let instance = try loader.instantiate(component: component)
@@ -465,9 +469,8 @@ package struct Run: AsyncParsableCommand {
         )
     }
 
-    func instantiateWASI(module: Module, interceptor: EngineInterceptor?) throws -> (Store, () throws -> Void) {
+    func instantiateWASI(module: Module) throws -> (Store, () throws -> Void) {
         let wasi = try WASIBridgeToHost(configuration: deriveWASIConfiguration())
-        let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
         if wasiThreads {
             let processControl = WASIThreadsProcessControl(
                 terminateAfterMainReturn: { code in
@@ -483,7 +486,6 @@ package struct Run: AsyncParsableCommand {
             )
             let threads = try WASIThreads(
                 module: module,
-                engine: engine,
                 configuration: .init(maximumThreads: wasiThreadsMax),
                 processControl: processControl,
                 childImports: { store in
@@ -492,7 +494,7 @@ package struct Run: AsyncParsableCommand {
                     return imports
                 }
             )
-            let store = Store(engine: engine)
+            let store = Store(engine: module.engine)
             applyFuelBudget(to: store)
             return (
                 store,
@@ -506,7 +508,7 @@ package struct Run: AsyncParsableCommand {
                 }
             )
         }
-        let store = Store(engine: engine)
+        let store = Store(engine: module.engine)
         applyFuelBudget(to: store)
         return (
             store,
@@ -522,15 +524,14 @@ package struct Run: AsyncParsableCommand {
         )
     }
 
-    func instantiateNonWASI(module: Module, interceptor: EngineInterceptor?) throws -> (Store, () throws -> Void)? {
+    func instantiateNonWASI(module: Module) throws -> (Store, () throws -> Void)? {
         let (functionName, parameters) = Run.parseInvocation(arguments: self.arguments)
         guard let functionName else {
             log("Error: No function specified to run in a given module.")
             return nil
         }
 
-        let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
-        let store = Store(engine: engine)
+        let store = Store(engine: module.engine)
         applyFuelBudget(to: store)
         let instance = try module.instantiate(store: store)
         return (

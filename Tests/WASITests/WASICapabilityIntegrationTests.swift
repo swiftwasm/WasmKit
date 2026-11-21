@@ -36,7 +36,7 @@ import WasmKitWASI
                 let store = Store(engine: Engine())
                 var imports = Imports()
                 try wasi.link(to: &imports, store: store, capabilities: capabilities, stubUnlinked: stubUnlinked)
-                let module = try parseWasm(filePath: path.path)
+                let module = try parseWasm(filePath: path.path, engine: store.engine)
                 let instance = try module.instantiate(store: store, imports: imports)
                 return try wasi.start(instance)
             }
@@ -80,7 +80,7 @@ import WasmKitWASI
             try wasi.runAndClose { wasi in
                 var imports = Imports()
                 try wasi.link(to: &imports, store: store, capabilities: [.stdio], stubUnlinked: true)
-                let module = try parseWasm(filePath: Self.environGuest.path)
+                let module = try parseWasm(filePath: Self.environGuest.path, engine: store.engine)
                 // environ_get/environ_sizes_get come from stubs, not .stdio.
                 _ = try module.instantiate(store: store, imports: imports)
             }
@@ -92,7 +92,7 @@ import WasmKitWASI
             try wasi.runAndClose { wasi in
                 var imports = Imports()
                 try wasi.link(to: &imports, store: store, capabilities: [.stdio], stubUnlinked: false)
-                let module = try parseWasm(filePath: Self.environGuest.path)
+                let module = try parseWasm(filePath: Self.environGuest.path, engine: store.engine)
                 #expect(throws: (any Error).self) {
                     _ = try module.instantiate(store: store, imports: imports)
                 }

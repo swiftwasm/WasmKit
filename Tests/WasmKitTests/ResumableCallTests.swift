@@ -23,7 +23,7 @@ struct ResumableCallTests {
 
     private static func instantiate(_ wat: String, store: Store, imports: Imports = Imports()) throws -> Instance {
         let features: WasmFeatureSet = [.referenceTypes, .exceptionHandling, .tailCall, .memory64]
-        return try parseWasm(bytes: wat2wasm(wat, features: features), features: features)
+        return try parseWasm(bytes: wat2wasm(wat, features: features), engine: store.engine, features: features)
             .instantiate(store: store, imports: imports)
     }
 

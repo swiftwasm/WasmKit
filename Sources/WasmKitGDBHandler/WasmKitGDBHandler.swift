@@ -156,7 +156,7 @@
             self.wasi = wasi
 
             do {
-                self.debugger = try Debugger(module: parseWasm(bytes: wasmBinary), store: store, imports: imports)
+                self.debugger = try Debugger(module: parseWasm(bytes: wasmBinary, engine: store.engine), store: store, imports: imports)
                 try self.debugger.stopAtEntrypoint()
                 try self.debugger.run()
                 guard case .stoppedAtBreakpoint = self.debugger.state else {

@@ -160,6 +160,7 @@ import WAT
                     """,
                     features: [.threads]
                 ),
+                engine: engine,
                 features: [.threads]
             )
             let instance = try module.instantiate(store: store)
@@ -198,6 +199,7 @@ import WAT
                     """,
                     features: [.threads]
                 ),
+                engine: engine,
                 features: [.threads]
             )
 
@@ -281,6 +283,7 @@ import WAT
                     """,
                     features: [.threads]
                 ),
+                engine: engine,
                 features: [.threads]
             )
             let instance = try module.instantiate(store: store)
@@ -316,6 +319,7 @@ import WAT
                     """,
                     features: [.threads]
                 ),
+                engine: engine,
                 features: [.threads]
             )
             let instance = try module.instantiate(store: store)
@@ -353,6 +357,7 @@ import WAT
                     """,
                     features: [.threads]
                 ),
+                engine: engine,
                 features: [.threads]
             )
             let instance = try module.instantiate(store: store)
@@ -389,6 +394,7 @@ import WAT
                     """,
                     features: [.threads]
                 ),
+                engine: engine,
                 features: [.threads]
             )
             let instance = try module.instantiate(store: store)
@@ -428,6 +434,7 @@ import WAT
                     """,
                     features: [.threads]
                 ),
+                engine: engine,
                 features: [.threads]
             )
             let imports: Imports = ["env": ["mem": memory]]
@@ -458,6 +465,7 @@ import WAT
                     )
                     """,
                     features: [.threads]),
+                engine: engine,
                 features: [.threads])
             let instance = try module.instantiate(store: store, imports: ["env": ["mem": memory]])
             let oob = try #require(instance.exports[function: "oob"])
@@ -513,6 +521,7 @@ import WAT
                     )
                     """,
                     features: [.threads]),
+                engine: engine,
                 features: [.threads])
 
             let growCalled = Atomic<Bool>(false)
@@ -552,6 +561,7 @@ import WAT
                     )
                     """,
                     features: [.threads]),
+                engine: engine,
                 features: [.threads])
             let instance = try module.instantiate(store: store)
             let grow1 = try #require(instance.exports[function: "grow1"])
@@ -589,6 +599,7 @@ import WAT
                     )
                     """,
                     features: [.threads]),
+                engine: engine,
                 features: [.threads])
             let instance = try module.instantiate(store: store)
             let grow1 = try #require(instance.exports[function: "grow1"])
@@ -666,6 +677,7 @@ import WAT
                     """,
                     features: [.threads]
                 ),
+                engine: engine,
                 features: [.threads]
             )
             let instance = try module.instantiate(store: store)
@@ -698,6 +710,7 @@ import WAT
                     """,
                     features: [.threads]
                 ),
+                engine: engine,
                 features: [.threads]
             )
             let instance = try module.instantiate(store: store)
@@ -728,6 +741,7 @@ import WAT
                     """,
                     features: [.threads]
                 ),
+                engine: engine,
                 features: [.threads]
             )
             let instance = try module.instantiate(store: store)
@@ -770,6 +784,7 @@ import WAT
                         """,
                         features: shared ? [.threads] : []
                     ),
+                    engine: dumpEngine,
                     features: shared ? [.threads] : []
                 )
                 let instance = try module.instantiate(store: dumpStore, imports: imports)
@@ -813,6 +828,7 @@ import WAT
                     )
                     """,
                     features: [.threads, .simd]),
+                engine: engine,
                 features: [.threads, .simd])
             let growCalled = Atomic<Bool>(false)
             let limiter = store.resourceLimiter

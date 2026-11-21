@@ -8,6 +8,7 @@ struct ExecutionTests {
 
     @Test
     func dropWithRelinkingOptimization() throws {
+        let engine = Engine()
         let module = try parseWasm(
             bytes: wat2wasm(
                 """
@@ -22,9 +23,9 @@ struct ExecutionTests {
                     )
                 )
                 """
-            )
+            ),
+            engine: engine
         )
-        let engine = Engine()
         let store = Store(engine: engine)
         let instance = try module.instantiate(store: store)
         let _start = try #require(instance.exports[function: "_start"])
@@ -34,6 +35,7 @@ struct ExecutionTests {
 
     @Test
     func updateCurrentMemoryCacheOnGrow() throws {
+        let engine = Engine()
         let module = try parseWasm(
             bytes: wat2wasm(
                 """
@@ -46,9 +48,9 @@ struct ExecutionTests {
                     )
                 )
                 """
-            )
+            ),
+            engine: engine
         )
-        let engine = Engine()
         let store = Store(engine: engine)
         let instance = try module.instantiate(store: store)
         let _start = try #require(instance.exports[function: "_start"])
@@ -61,6 +63,7 @@ struct ExecutionTests {
     /// caller.
     @Test
     func tailCallHostFunction() throws {
+        let engine = Engine()
         let module = try parseWasm(
             bytes: wat2wasm(
                 """
@@ -73,9 +76,9 @@ struct ExecutionTests {
                         (i64.add (call $tail) (local.get 0)))
                 )
                 """
-            )
+            ),
+            engine: engine
         )
-        let engine = Engine()
         let store = Store(engine: engine)
         var imports = Imports()
         imports.define(
@@ -89,11 +92,12 @@ struct ExecutionTests {
     }
 
     func expectTrap(_ wat: String, assertTrap: (Trap) throws -> Void) throws {
+        let engine = Engine()
         let module = try parseWasm(
-            bytes: wat2wasm(wat, options: EncodeOptions(nameSection: true))
+            bytes: wat2wasm(wat, options: EncodeOptions(nameSection: true)),
+            engine: engine
         )
 
-        let engine = Engine()
         let store = Store(engine: engine)
         var imports = Imports()
         for importEntry in module.imports {
@@ -190,8 +194,8 @@ struct ExecutionTests {
             // code: [0] = no locals, `end`, then a trailing `nop` and `end`
             0x0A, 0x06, 0x01, 0x04, 0x00, 0x0B, 0x01, 0x0B,
         ]
-        let module = try parseWasm(bytes: bytes)
         let engine = Engine(configuration: EngineConfiguration(compilationMode: .eager))
+        let module = try parseWasm(bytes: bytes, engine: engine)
         let store = Store(engine: engine)
         let error = #expect(throws: WasmKitError.self) {
             try module.instantiate(store: store)
@@ -213,8 +217,8 @@ struct ExecutionTests {
             // code: [0] = no locals, `i32.const 0`, `if`, `else`, `else`, `end`, `end`
             0x0A, 0x0B, 0x01, 0x09, 0x00, 0x41, 0x00, 0x04, 0x40, 0x05, 0x05, 0x0B, 0x0B,
         ]
-        let module = try parseWasm(bytes: bytes)
         let engine = Engine(configuration: EngineConfiguration(compilationMode: .eager))
+        let module = try parseWasm(bytes: bytes, engine: engine)
         let store = Store(engine: engine)
         let error = #expect(throws: WasmKitError.self) {
             try module.instantiate(store: store)
@@ -227,6 +231,7 @@ struct ExecutionTests {
 
     @Test
     func rejectsFunctionImportOfStructType() throws {
+        let engine = Engine()
         // (module (type (struct)) (import "m" "f" (func (type 0))))
         let module = try parseWasm(
             bytes: [
@@ -234,9 +239,10 @@ struct ExecutionTests {
                 0x01, 0x03, 0x01, 0x5F, 0x00,
                 0x02, 0x07, 0x01, 0x01, 0x6D, 0x01, 0x66, 0x00, 0x00,
             ],
+            engine: engine,
             features: [.referenceTypes, .exceptionHandling, .gc]
         )
-        let store = Store(engine: Engine())
+        let store = Store(engine: engine)
         let function = try Function(store: store, parameters: []) { _, _ in [] }
         let error = try #require(throws: WasmKitError.self) {
             try module.instantiate(store: store, imports: ["m": ["f": function]])

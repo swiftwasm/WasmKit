@@ -255,11 +255,18 @@ public enum ResumableOracle {
         var generator = ProgramGenerator(rng: ByteRng(bytes))
         let wat = generator.generate()
         var rng = generator.remainingRng
-        let module: Module
+        let moduleBytes: [UInt8]
         do {
-            module = try parseWasm(bytes: try wat2wasm(wat, features: features), features: features)
+            moduleBytes = try wat2wasm(wat, features: features)
         } catch {
             throw Finding(description: "generator produced an invalid module: \(error)\n\(wat)")
+        }
+        func parse(engine: Engine) throws -> Module {
+            do {
+                return try parseWasm(bytes: moduleBytes, engine: engine, features: features)
+            } catch {
+                throw Finding(description: "generator produced an invalid module: \(error)\n\(wat)")
+            }
         }
         let exports = generator.exportedFunctions
         let arguments = exports.map { _ in UInt32(1 + rng.below(4)) }
@@ -267,10 +274,11 @@ public enum ResumableOracle {
 
         // Reference: plain calls, one instance after the other.
         let referenceStore = Store(engine: makeEngine(&rng, epochInterruption: rng.chance(50)))
+        let referenceModule = try parse(engine: referenceStore.engine)
         let referenceHost = Host(store: referenceStore, racing: false)
         var reference: [[ReferenceStep]] = []
         for _ in 0..<instanceCount {
-            let (instance, box) = try instantiate(module, host: referenceHost)
+            let (instance, box) = try instantiate(referenceModule, host: referenceHost)
             var steps: [ReferenceStep] = []
             for (name, argument) in zip(exports, arguments) {
                 referenceStore.fuel = Fuel(remaining: budget)
@@ -297,12 +305,13 @@ public enum ResumableOracle {
 
         // Subject: resumable calls, sliced, interleaved across instances.
         let store = Store(engine: makeEngine(&rng, epochInterruption: true))
+        let subjectModule = try parse(engine: store.engine)
         let host = Host(store: store, racing: racing)
         let stopRacer = startRacer?(store.engine.epochTicker)
         defer { stopRacer?() }
         var subjects: [Subject] = []
         for index in 0..<instanceCount {
-            let (instance, box) = try instantiate(module, host: host)
+            let (instance, box) = try instantiate(subjectModule, host: host)
             subjects.append(
                 Subject(index: index, instance: instance, box: box, exports: exports, arguments: arguments, expected: reference[index]))
         }

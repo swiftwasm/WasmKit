@@ -24,8 +24,9 @@ package struct Explore: ParsableCommand {
     package init() {}
 
     package func run() throws {
-        let module = try parseWasm(filePath: path)
-        let store = Store(engine: Engine())
+        let engine = Engine()
+        let module = try parseWasm(filePath: path, engine: engine)
+        let store = Store(engine: engine)
 
         var imports: Imports = [:]
         for importEntry in module.imports {

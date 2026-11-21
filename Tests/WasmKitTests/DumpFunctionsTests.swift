@@ -12,6 +12,7 @@
         /// threading and an opcode under token threading.
         @Test(arguments: testedThreadingModels)
         func dumpsUnderEveryThreadingModel(threadingModel: EngineConfiguration.ThreadingModel) throws {
+            let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let module = try parseWasm(
                 bytes: try wat2wasm(
                     """
@@ -23,9 +24,9 @@
                           (i32.store (local.get 0) (i32.add (local.get 0) (i32.const 1))))
                         (i32.load (local.get 0))))
                     """
-                )
+                ),
+                engine: store.engine
             )
-            let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let instance = try module.instantiate(store: store)
 
             var out = ""
@@ -43,15 +44,16 @@
         @Test
         func immediateConstantsDoNotSpill() throws {
             let additions = (1...40).map { "local.get 0 i64.const \($0) i64.add local.set 0" }.joined(separator: "\n")
+            let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: .direct)))
             let module = try parseWasm(
                 bytes: try wat2wasm(
                     """
                     (module (func (export "add") (param i64) (result i64)
                       \(additions) local.get 0))
                     """
-                )
+                ),
+                engine: store.engine
             )
-            let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: .direct)))
             let instance = try module.instantiate(store: store)
 
             var listing = ""

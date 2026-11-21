@@ -150,7 +150,7 @@ struct RuntimeTestHarness {
                 try wasi.link(to: &imports, store: store)
                 link(&imports, store)
 
-                let module = try parseWasm(filePath: compiled.path)
+                let module = try parseWasm(filePath: compiled.path, engine: engine)
                 let instance = try module.instantiate(store: store, imports: imports)
                 try run(instance)
             }

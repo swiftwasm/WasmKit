@@ -65,7 +65,6 @@ add_wasmkit_library(WasmKit
   Execution/V128Storage.swift
   Platform/AtomicParkingLot.swift
   Platform/Cell.swift
-  Platform/PlatformMutex.swift
   Platform/SystemVirtualMemory.swift
 )
 

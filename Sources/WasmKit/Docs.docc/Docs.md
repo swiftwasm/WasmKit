@@ -15,6 +15,10 @@ This example shows how to instantiate a WebAssembly module, interact with the ho
 import WasmKit
 import WAT
 
+// Create engine and store
+let engine = Engine()
+let store = Store(engine: engine)
+
 // Convert a WAT file to a Wasm binary, then parse it.
 let module = try parseWasm(
     bytes: try wat2wasm(
@@ -26,12 +30,9 @@ let module = try parseWasm(
           )
         )
         """
-    )
+    ),
+    engine: engine
 )
-
-// Create engine and store
-let engine = Engine()
-let store = Store(engine: engine)
 
 // Instantiate a parsed module with importing a host function
 let instance = try module.instantiate(
@@ -64,15 +65,15 @@ import WasmKitWASI
 import WAT
 import Foundation
 
-// Parse a WASI-compliant WebAssembly module from a file.
-let module = try parseWasm(filePath: "wasm/hello.wasm")
+// Create an engine, and parse a WASI-compliant WebAssembly module from a file with it.
+let engine = Engine()
+let module = try parseWasm(filePath: "wasm/hello.wasm", engine: engine)
 
 // Create a WASI instance forwarding to the host environment.
 let wasi = try WASIBridgeToHost()
 // Start the WASI command-line application and close the bridge.
 let exitCode = try wasi.runAndClose { wasi in
-    // Create engine and store
-    let engine = Engine()
+    // Create a store of the module's engine
     let store = Store(engine: engine)
     // Instantiate a parsed module importing WASI
     var imports = Imports()
@@ -105,8 +106,8 @@ See [examples](https://github.com/swiftwasm/WasmKit/tree/main/Examples) for exec
 
 ### Binary Parser
 
-- ``parseWasm(bytes:features:)``
-- ``parseWasm(filePath:features:)``
+- ``parseWasm(bytes:engine:features:)``
+- ``parseWasm(filePath:engine:features:)``
 
 ### Other WebAssembly Entities
 

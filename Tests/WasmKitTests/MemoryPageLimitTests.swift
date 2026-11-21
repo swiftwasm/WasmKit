@@ -28,8 +28,8 @@ import Testing
             // memory: [0] = memory64, min = 15719607437819261 pages, no max
             0x05, 0x0A, 0x01, 0x04, 0xFD, 0xFA, 0xDB, 0x8A, 0xE5, 0x9C, 0xF6, 0x1B,
         ]
-        let module = try parseWasm(bytes: bytes, features: .all)
         let store = Store(engine: Engine())
+        let module = try parseWasm(bytes: bytes, engine: store.engine, features: .all)
         #expect(throws: (any Error).self) {
             try module.instantiate(store: store)
         }

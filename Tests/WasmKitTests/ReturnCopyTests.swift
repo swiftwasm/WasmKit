@@ -6,6 +6,7 @@ import WAT
 @Suite struct ReturnCopyTests {
     @Test(arguments: [EngineConfiguration.ThreadingModel.direct, .token])
     func preservesSwappedResultsAndBranches(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let engine = Engine(configuration: .init(threadingModel: threadingModel))
         let module = try parseWasm(
             bytes: wat2wasm(
                 """
@@ -19,8 +20,8 @@ import WAT
                       i32.const 7 local.get 0 br_if 0 drop
                       i32.const 8
                     end))
-                """))
-        let store = Store(engine: Engine(configuration: .init(threadingModel: threadingModel)))
+                """), engine: engine)
+        let store = Store(engine: engine)
         let instance = try module.instantiate(store: store)
         let f = try #require(instance.exports[function: "f"])
         let branch = try #require(instance.exports[function: "branch"])
@@ -30,7 +31,7 @@ import WAT
         #expect(try branch([.i32(0)]) == [.i32(8)])
         #expect(try branch([.i32(1)]) == [.i32(7)])
         #if Disassembler
-            let dumpStore = Store(engine: Engine(configuration: .init(threadingModel: threadingModel)))
+            let dumpStore = Store(engine: engine)
             let dumpInstance = try module.instantiate(store: dumpStore)
             var listing = ""
             try dumpInstance.dumpFunctions(to: &listing, module: module)

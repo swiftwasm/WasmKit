@@ -1,24 +1,30 @@
 import WasmParser
 
-/// Parse a given byte array as a WebAssembly binary format file
+/// Parse a given byte sequence as a WebAssembly binary format file
+///
+/// Registers the module's types in `engine`. The module can only be instantiated in a ``Store`` of `engine`.
+///
+/// - Throws: `WasmKitError` if the binary is malformed, if a type refers to a type defined in a later recursion
+///   group or declares an invalid supertype, or if `engine` would hold more than
+///   ``EngineConfiguration/maxTypeCount`` types.
+///
 /// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
-public func parseWasm(bytes: [UInt8], features: WasmFeatureSet = .default) throws(WasmKitError) -> Module {
-    let parser = Parser(bytes: bytes, features: features)
-    let module = try parseModule(parser: parser, features: features)
+public func parseWasm(bytes: some Sequence<UInt8>, engine: Engine, features: WasmFeatureSet = .default) throws(WasmKitError) -> Module {
+    let parser = Parser(bytes: ArraySlice(bytes), features: features)
+    let module = try parseModule(parser: parser, engine: engine, features: features)
     return module
 }
 
-/// Parse a given byte slice as a WebAssembly binary format file
-/// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
-public func parseWasm(bytes: ArraySlice<UInt8>, features: WasmFeatureSet = .default) throws -> Module {
-    let parser = Parser(bytes: bytes, features: features)
-    let module = try parseModule(parser: parser, features: features)
-    return module
+@available(*, unavailable, renamed: "parseWasm(bytes:engine:features:)")
+public func parseWasm(bytes: some Sequence<UInt8>, features: WasmFeatureSet = .default) throws(WasmKitError) -> Module {
+    fatalError()
 }
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
-func parseModule<Source: ByteStreamSource>(parser: consuming WasmParser.Parser<Source>, features: WasmFeatureSet = .default) throws(WasmKitError) -> Module {
+func parseModule<Source: ByteStreamSource>(
+    parser: consuming WasmParser.Parser<Source>, engine: Engine, features: WasmFeatureSet = .default
+) throws(WasmKitError) -> Module {
     var types = TypeSection([])
     var typeIndices: [TypeIndex] = []
     var codes: [Code] = []
@@ -101,13 +107,18 @@ func parseModule<Source: ByteStreamSource>(parser: consuming WasmParser.Parser<S
         )
     }
 
+    let typeCanonicalizer = try TypeCanonicalizer(typeSection: types, registry: engine.typeRegistry)
+    let canonicalImports = try imports.map { (entry) throws(WasmKitError) in try typeCanonicalizer.canonicalize(entry) }
+
     return Module(
+        engine: engine,
+        typeCanonicalizer: typeCanonicalizer,
         types: types,
         functions: functions,
         elements: elements,
         data: data,
         start: start,
-        imports: imports,
+        imports: canonicalImports,
         exports: exports,
         globals: globals,
         memories: memories,

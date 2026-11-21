@@ -37,7 +37,7 @@
 
         private func divergentAddresses() throws -> (requested: Int, resolved: Int) {
             let bytes = try wat2wasm(Self.wat)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: Engine())
             let base = module.functions[1].code.originalAddress
 
             let firstEmitted = try resolve(module: module, address: base)
@@ -54,7 +54,7 @@
         }
 
         private func resolve(module: Module, address: Int) throws -> Int {
-            let store = Store(engine: Engine())
+            let store = Store(engine: module.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
             return try debugger.enableBreakpoint(address: address)
         }
@@ -93,7 +93,7 @@
         /// so the lower one is not necessarily the start of a Wasm instruction.
         private func aliasingAddresses() throws -> (lower: Int, higher: Int) {
             let bytes = try wat2wasm(Self.wat)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: Engine())
             let base = module.functions[1].code.originalAddress
 
             var byResolved = [Int: [Int]]()
@@ -156,7 +156,7 @@
 
         @Test
         func stopWithoutABreakpointReportsTheRunStartNotTheEmittingInstruction() throws {
-            let module = try parseWasm(bytes: try wat2wasm(Self.wat))
+            let module = try parseWasm(bytes: try wat2wasm(Self.wat), engine: Engine())
             let base = module.functions[1].code.originalAddress
 
             try withHandler(debugging: Self.wat) { h in

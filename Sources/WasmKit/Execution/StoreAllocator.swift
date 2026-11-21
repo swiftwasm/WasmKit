@@ -239,7 +239,7 @@ extension StoreAllocator {
     ) throws -> InternalInstance {
         // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
 
-        let canonicalizer = try TypeCanonicalizer(typeSection: module.types, registry: typeRegistry)
+        let canonicalizer = module.typeCanonicalizer
         var importedFunctions: [InternalFunction] = []
         var importedTables: [InternalTable] = []
         var importedMemories: [InternalMemory] = []
@@ -272,7 +272,6 @@ extension StoreAllocator {
                 importedFunctions.append(externalFunc)
 
             case (.table(let tableType), .table(let table)):
-                let tableType = try canonicalizer.canonicalize(tableType)
                 if let max = table.limits.max, max < tableType.limits.min {
                     throw WasmKitError(message: .incompatibleTableType(importEntry, actual: tableType, expected: table.tableType))
                 }
@@ -308,7 +307,6 @@ extension StoreAllocator {
                 importedMemories.append(memory)
 
             case (.global(let globalType), .global(let global)):
-                let globalType = try canonicalizer.canonicalize(globalType)
                 let provided = global.globalType
                 // A mutable global can be both read and written, so its type must be
                 // equivalent; an immutable one may provide a subtype.

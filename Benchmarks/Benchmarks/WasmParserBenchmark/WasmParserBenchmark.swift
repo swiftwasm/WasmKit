@@ -5,11 +5,12 @@ import WasmKit
 
 let benchmarks: @Sendable () -> () = {
     Benchmark("parseWasmBenchmark", closure: { (benchmark: Benchmark, setupResult: [(path: String, location: Location, bytes: [UInt8])]) in
+        let engine = Engine()
         for _ in benchmark.scaledIterations {
             for (path, location, bytes) in setupResult {
                 blackHole({ () -> Module? in
                     do {
-                        let module = try parseWasm(bytes: bytes, features: .all)
+                        let module = try parseWasm(bytes: bytes, engine: engine, features: .all)
                         return module
                     } catch {
                         print("Found error while parsing \(path) at \(location): \(error)")

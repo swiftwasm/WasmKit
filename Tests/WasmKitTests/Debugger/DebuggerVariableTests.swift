@@ -34,7 +34,7 @@
         @Test(arguments: testedThreadingModels)
         func localValuesSurviveStepIntoAcrossFrames(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
-            let module = try parseWasm(bytes: try wat2wasm(localsAcrossFramesWAT))
+            let module = try parseWasm(bytes: try wat2wasm(localsAcrossFramesWAT), engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let startBase = module.functions[1].code.originalAddress
@@ -60,7 +60,7 @@
         @Test
         func localValuesReadPastMixedWidthParametersAndLocals() throws {
             let store = Store(engine: Engine())
-            let module = try parseWasm(bytes: try wat2wasm(mixedWidthFrameWAT))
+            let module = try parseWasm(bytes: try wat2wasm(mixedWidthFrameWAT), engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             _ = try debugger.enableBreakpoint(module: module, function: 0)

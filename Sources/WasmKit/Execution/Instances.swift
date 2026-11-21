@@ -563,7 +563,8 @@ public struct Table: Equatable {
     /// let table = try Table(store: store, type: tableType)
     ///
     /// let module = try parseWasm(
-    ///     bytes: try wat2wasm(#"(module (table (import "env" "table") 1 funcref))"#)
+    ///     bytes: try wat2wasm(#"(module (table (import "env" "table") 1 funcref))"#),
+    ///     engine: engine
     /// )
     /// let imports: Imports = ["env": ["table": table]]
     /// let instance = try module.instantiate(store: store, imports: imports)
@@ -1039,7 +1040,8 @@ public struct Memory: Equatable {
     /// let memory = try Memory(store: store, type: memoryType)
     ///
     /// let module = try parseWasm(
-    ///     bytes: try wat2wasm(#"(module (memory (import "env" "memory") 1))"#)
+    ///     bytes: try wat2wasm(#"(module (memory (import "env" "memory") 1))"#),
+    ///     engine: engine
     /// )
     /// let imports: Imports = ["env": ["memory": memory]]
     /// let instance = try module.instantiate(store: store, imports: imports)
@@ -1244,7 +1246,8 @@ public struct Global: Equatable {
     /// let i32Global = try Global(store: store, type: globalType, value: .i32(42))
     ///
     /// let module = try parseWasm(
-    ///     bytes: try wat2wasm(#"(module (global (import "env" "i32-global") i32))"#)
+    ///     bytes: try wat2wasm(#"(module (global (import "env" "i32-global") i32))"#),
+    ///     engine: engine
     /// )
     /// let imports: Imports = ["env": ["i32-global": i32Global]]
     /// let instance = try module.instantiate(store: store, imports: imports)

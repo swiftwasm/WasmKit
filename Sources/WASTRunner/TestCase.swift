@@ -129,7 +129,7 @@ extension TestCase {
     /// - Parameter skip: Why each directive to skip is skipped, keyed by the line it starts on.
     ///   Skipping a module also skips the directives that use it.
     func run(
-        spectestModule: Module, configuration: EngineConfiguration, skip: [Int: String] = [:],
+        spectestModule: (Engine) throws -> Module, configuration: EngineConfiguration, skip: [Int: String] = [:],
         handler: @escaping (TestCase, Location, Result) -> Void
     ) throws {
         guard let data = FileManager.default.contents(atPath: path) else {
@@ -144,7 +144,7 @@ extension TestCase {
 
         let engine = Engine(configuration: configuration)
         let store = Store(engine: engine)
-        let spectestInstance = try spectestModule.instantiate(store: store)
+        let spectestInstance = try spectestModule(engine).instantiate(store: store)
 
         var content = try parseWAST(String(data: data, encoding: .utf8)!, features: features)
         let context = WASTRunContext(store: store, rootPath: rootPath)
@@ -598,7 +598,7 @@ extension WASTRunContext {
             binary = bytes
         }
 
-        let module = try parseWasm(bytes: binary, features: Self.deriveFeatureSet(rootPath: rootPath))
+        let module = try parseWasm(bytes: binary, engine: engine, features: Self.deriveFeatureSet(rootPath: rootPath))
         return module
     }
 }

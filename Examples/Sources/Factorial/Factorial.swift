@@ -7,13 +7,15 @@ import Foundation
 @main
 struct Example {
     static func main() throws {
+        let engine = Engine()
+
         // Convert a WAT file to a Wasm binary, then parse it.
         let module = try parseWasm(
-            bytes: try wat2wasm(String(contentsOfFile: "wasm/factorial.wat", encoding: .utf8))
+            bytes: try wat2wasm(String(contentsOfFile: "wasm/factorial.wat", encoding: .utf8)),
+            engine: engine
         )
 
         // Create a module instance from the parsed module.
-        let engine = Engine()
         let store = Store(engine: engine)
         let instance = try module.instantiate(store: store)
         let input: UInt64 = 5

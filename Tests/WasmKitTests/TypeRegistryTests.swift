@@ -12,65 +12,70 @@ import Testing
 @Suite
 struct TypeRegistryTests {
     @Test
-    func instantiationPastMaxTypeCountThrows() throws {
-        // (module (type (func)))
-        let module = try parseWasm(bytes: [
-            0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
-            0x01, 0x04, 0x01, 0x60, 0x00, 0x00,
-        ])
-        // (module (type (func (param i32))))
-        let moduleWithNewType = try parseWasm(bytes: [
-            0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
-            0x01, 0x05, 0x01, 0x60, 0x01, 0x7F, 0x00,
-        ])
-        let store = Store(engine: Engine(configuration: EngineConfiguration(maxTypeCount: 1)))
-        _ = try Function(store: store, parameters: []) { _, _ in [] }
-        // The module's only type is the host function's, so it takes no more room.
-        _ = try module.instantiate(store: store)
+    func parsingPastMaxTypeCountThrows() throws {
+        let engine = Engine(configuration: EngineConfiguration(maxTypeCount: 1))
+        _ = try Function(store: Store(engine: engine), parameters: []) { _, _ in [] }
+        // (module (type (func))): the host function's type is already registered.
+        _ = try parseWasm(
+            bytes: [
+                0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
+                0x01, 0x04, 0x01, 0x60, 0x00, 0x00,
+            ],
+            engine: engine
+        )
         let error = try #require(throws: WasmKitError.self) {
-            try moduleWithNewType.instantiate(store: store)
+            // (module (type (func (param i32))))
+            try parseWasm(
+                bytes: [
+                    0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
+                    0x01, 0x05, 0x01, 0x60, 0x01, 0x7F, 0x00,
+                ],
+                engine: engine
+            )
         }
         #expect(error.description == "too many types: an engine holds at most 1, set by EngineConfiguration.maxTypeCount")
     }
 
     @Test
     func recursionGroupPastMaxTypeCountThrows() throws {
-        // (module (rec (type (func)) (type (func (param i32)))))
-        let moduleWithGroup = try parseWasm(
-            bytes: [
-                0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
-                0x01, 0x0A, 0x01, 0x4E, 0x02, 0x60, 0x00, 0x00, 0x60, 0x01, 0x7F, 0x00,
-            ],
-            features: [.referenceTypes, .exceptionHandling, .gc]
-        )
-        // (module (type (func (param i32))))
-        let moduleWithNewType = try parseWasm(bytes: [
-            0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
-            0x01, 0x05, 0x01, 0x60, 0x01, 0x7F, 0x00,
-        ])
-        let store = Store(engine: Engine(configuration: EngineConfiguration(maxTypeCount: 2)))
-        _ = try Function(store: store, parameters: []) { _, _ in [] }
+        let engine = Engine(configuration: EngineConfiguration(maxTypeCount: 2))
+        _ = try Function(store: Store(engine: engine), parameters: []) { _, _ in [] }
         // One type is left, and the group needs two.
         let error = try #require(throws: WasmKitError.self) {
-            try moduleWithGroup.instantiate(store: store)
+            // (module (rec (type (func)) (type (func (param i32)))))
+            try parseWasm(
+                bytes: [
+                    0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
+                    0x01, 0x0A, 0x01, 0x4E, 0x02, 0x60, 0x00, 0x00, 0x60, 0x01, 0x7F, 0x00,
+                ],
+                engine: engine,
+                features: [.referenceTypes, .exceptionHandling, .gc]
+            )
         }
         #expect(error.description == "too many types: an engine holds at most 2, set by EngineConfiguration.maxTypeCount")
         // The group took no room, so one new type still fits.
-        _ = try moduleWithNewType.instantiate(store: store)
+        // (module (type (func (param i32))))
+        _ = try parseWasm(
+            bytes: [
+                0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
+                0x01, 0x05, 0x01, 0x60, 0x01, 0x7F, 0x00,
+            ],
+            engine: engine
+        )
     }
 
     @Test
     func supertypeDefinedLaterInGroupIsUnknown() throws {
-        // (module (type (struct)) (rec (type (sub 2 (struct))) (type (sub (struct)))))
-        let module = try parseWasm(
-            bytes: [
-                0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
-                0x01, 0x0E, 0x02, 0x5F, 0x00, 0x4E, 0x02, 0x50, 0x01, 0x02, 0x5F, 0x00, 0x50, 0x00, 0x5F, 0x00,
-            ],
-            features: [.referenceTypes, .exceptionHandling, .gc]
-        )
         let error = try #require(throws: WasmKitError.self) {
-            try module.instantiate(store: Store(engine: Engine()))
+            // (module (type (struct)) (rec (type (sub 2 (struct))) (type (sub (struct)))))
+            try parseWasm(
+                bytes: [
+                    0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
+                    0x01, 0x0E, 0x02, 0x5F, 0x00, 0x4E, 0x02, 0x50, 0x01, 0x02, 0x5F, 0x00, 0x50, 0x00, 0x5F, 0x00,
+                ],
+                engine: Engine(),
+                features: [.referenceTypes, .exceptionHandling, .gc]
+            )
         }
         #expect(error.description == "unknown type 2")
     }
@@ -105,26 +110,60 @@ struct TypeRegistryTests {
         ),
     ])
     func declaredSupertypeErrorNamesModuleTypeIndex(bytes: [UInt8], message: String) throws {
-        let module = try parseWasm(bytes: bytes, features: [.referenceTypes, .exceptionHandling, .gc])
         let error = try #require(throws: WasmKitError.self) {
-            try module.instantiate(store: Store(engine: Engine()))
+            try parseWasm(bytes: bytes, engine: Engine(), features: [.referenceTypes, .exceptionHandling, .gc])
         }
         #expect(error.description == message)
     }
 
     static func functionReference(store: Store) throws -> Value {
         // (module (func $f) (elem declare func $f) (func (export "get") (result funcref) (ref.func $f)))
-        let module = try parseWasm(bytes: [
-            0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
-            0x01, 0x08, 0x02, 0x60, 0x00, 0x00, 0x60, 0x00, 0x01, 0x70,
-            0x03, 0x03, 0x02, 0x00, 0x01,
-            0x07, 0x07, 0x01, 0x03, 0x67, 0x65, 0x74, 0x00, 0x01,
-            0x09, 0x05, 0x01, 0x03, 0x00, 0x01, 0x00,
-            0x0A, 0x09, 0x02, 0x02, 0x00, 0x0B, 0x04, 0x00, 0xD2, 0x00, 0x0B,
-        ])
+        let module = try parseWasm(
+            bytes: [
+                0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
+                0x01, 0x08, 0x02, 0x60, 0x00, 0x00, 0x60, 0x00, 0x01, 0x70,
+                0x03, 0x03, 0x02, 0x00, 0x01,
+                0x07, 0x07, 0x01, 0x03, 0x67, 0x65, 0x74, 0x00, 0x01,
+                0x09, 0x05, 0x01, 0x03, 0x00, 0x01, 0x00,
+                0x0A, 0x09, 0x02, 0x02, 0x00, 0x0B, 0x04, 0x00, 0xD2, 0x00, 0x0B,
+            ], engine: store.engine)
         let get = try #require(try module.instantiate(store: store).exportedFunction(name: "get"))
         let results = try get()
         return results[0]
+    }
+
+    /// `(module (type (func (param i32 ...))))` with `count` parameters.
+    static func moduleWithParameters(_ count: Int, engine: Engine) throws -> Module {
+        try parseWasm(
+            bytes: [0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00, 0x01, UInt8(count + 4), 0x01, 0x60, UInt8(count)]
+                + Array(repeating: 0x7F, count: count) + [0x00],
+            engine: engine
+        )
+    }
+
+    @Test
+    func concurrentParsesRegisterEachTypeOnce() async throws {
+        let engine = Engine()
+        let results = try await withThrowingTaskGroup(of: (count: Int, id: UInt32).self) { group in
+            for task in 0..<64 {
+                group.addTask {
+                    let count = task % 16
+                    let id = try Self.moduleWithParameters(count, engine: engine).typeCanonicalizer.typeIDs[0]
+                    #expect(engine.resolveType(id) == FunctionType(parameters: Array(repeating: .i32, count: count)))
+                    return (count, id.id)
+                }
+            }
+            var results: [(count: Int, id: UInt32)] = []
+            for try await result in group {
+                results.append(result)
+            }
+            return results
+        }
+        #expect(results.count == 64)
+        let idsByCount = Dictionary(grouping: results, by: \.count).mapValues { Set($0.map(\.id)) }
+        #expect(idsByCount.count == 16)
+        #expect(idsByCount.values.allSatisfy { $0.count == 1 })
+        #expect(Set(idsByCount.values.flatMap { $0 }).count == 16)
     }
 
     static func storeWithFunctionReferenceOfOtherEngine() throws -> (store: Store, reference: Value) {
@@ -258,6 +297,7 @@ struct TypeRegistryTests {
                 0x02, 0x1F, 0x04, 0x01, 0x6D, 0x01, 0x66, 0x00, 0x01, 0x01, 0x6D, 0x01, 0x67, 0x03, 0x63, 0x00, 0x00,
                 0x01, 0x6D, 0x01, 0x74, 0x01, 0x63, 0x00, 0x00, 0x01, 0x01, 0x6D, 0x01, 0x65, 0x04, 0x00, 0x01,
             ],
+            engine: store.engine,
             features: [.referenceTypes, .exceptionHandling, .gc]
         )
         _ = try module.instantiate(store: store, imports: ["m": ["f": function, "g": global, "t": table, "e": tag]])
@@ -266,6 +306,7 @@ struct TypeRegistryTests {
     @Test
     func functionReferenceFromOtherEngineFailsParameterCheck() throws {
         let (otherStore, reference) = try Self.storeWithFunctionReferenceOfOtherEngine()
+        let engine = Engine()
         // (module (type $t (func)) (func (export "take") (param (ref null $t))))
         let module = try parseWasm(
             bytes: [
@@ -275,9 +316,10 @@ struct TypeRegistryTests {
                 0x07, 0x08, 0x01, 0x04, 0x74, 0x61, 0x6B, 0x65, 0x00, 0x00,
                 0x0A, 0x04, 0x01, 0x02, 0x00, 0x0B,
             ],
+            engine: engine,
             features: [.referenceTypes, .exceptionHandling, .functionReferences]
         )
-        let take = try #require(try module.instantiate(store: Store(engine: Engine())).exportedFunction(name: "take"))
+        let take = try #require(try module.instantiate(store: Store(engine: engine)).exportedFunction(name: "take"))
         let error = try #require(throws: Trap.self) {
             try withExtendedLifetime(otherStore) { try take([reference]) }
         }
@@ -288,6 +330,7 @@ struct TypeRegistryTests {
     func functionReferenceFromOtherEngineFailsArrayParameterCheck() throws {
         let otherStore = Store(engine: Engine())
         let reference = try Self.functionReference(store: otherStore)
+        let engine = Engine()
         // (module (type $arr (array i32)) (func (export "take") (param (ref null $arr))))
         let module = try parseWasm(
             bytes: [
@@ -297,9 +340,10 @@ struct TypeRegistryTests {
                 0x07, 0x08, 0x01, 0x04, 0x74, 0x61, 0x6B, 0x65, 0x00, 0x00,
                 0x0A, 0x04, 0x01, 0x02, 0x00, 0x0B,
             ],
+            engine: engine,
             features: [.referenceTypes, .exceptionHandling, .gc]
         )
-        let take = try #require(try module.instantiate(store: Store(engine: Engine())).exportedFunction(name: "take"))
+        let take = try #require(try module.instantiate(store: Store(engine: engine)).exportedFunction(name: "take"))
         // The reference's function type and $arr are each the first type of their engine.
         let error = try #require(throws: Trap.self) {
             try withExtendedLifetime(otherStore) { try take([reference]) }
@@ -311,12 +355,13 @@ struct TypeRegistryTests {
         (UInt32(0x0800_0000), UInt32(5000)), (5000, 0x0800_0000), (0x2800_0000, 0x0800_0000),
     ])
     func unregisteredTypeIsUnrelatedToRegisteredType(subtype: UInt32, supertype: UInt32) throws {
-        // (module (type (func)))
-        let module = try parseWasm(bytes: [
-            0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
-            0x01, 0x04, 0x01, 0x60, 0x00, 0x00,
-        ])
         let store = Store(engine: Engine())
+        // (module (type (func)))
+        let module = try parseWasm(
+            bytes: [
+                0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
+                0x01, 0x04, 0x01, 0x60, 0x00, 0x00,
+            ], engine: store.engine)
         _ = try module.instantiate(store: store)
         #expect(!store.engine.typeRegistry.isSubtype(.concrete(typeIndex: subtype), of: .concrete(typeIndex: supertype)))
     }
@@ -343,15 +388,17 @@ struct TypeRegistryTests {
                 // (module (type $t (func)) (table 1 funcref)
                 //   (func (export "run") (param funcref)
                 //     (table.set 0 (i32.const 0) (local.get 0)) (call_indirect (type $t) (i32.const 0))))
-                let module = try parseWasm(bytes: [
-                    0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
-                    0x01, 0x08, 0x02, 0x60, 0x00, 0x00, 0x60, 0x01, 0x70, 0x00,
-                    0x03, 0x02, 0x01, 0x01,
-                    0x04, 0x04, 0x01, 0x70, 0x00, 0x01,
-                    0x07, 0x07, 0x01, 0x03, 0x72, 0x75, 0x6E, 0x00, 0x00,
-                    0x0A, 0x0F, 0x01, 0x0D, 0x00, 0x41, 0x00, 0x20, 0x00, 0x26, 0x00, 0x41, 0x00, 0x11, 0x00, 0x00, 0x0B,
-                ])
-                let run = try #require(try module.instantiate(store: Store(engine: Engine())).exportedFunction(name: "run"))
+                let engine = Engine()
+                let module = try parseWasm(
+                    bytes: [
+                        0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
+                        0x01, 0x08, 0x02, 0x60, 0x00, 0x00, 0x60, 0x01, 0x70, 0x00,
+                        0x03, 0x02, 0x01, 0x01,
+                        0x04, 0x04, 0x01, 0x70, 0x00, 0x01,
+                        0x07, 0x07, 0x01, 0x03, 0x72, 0x75, 0x6E, 0x00, 0x00,
+                        0x0A, 0x0F, 0x01, 0x0D, 0x00, 0x41, 0x00, 0x20, 0x00, 0x26, 0x00, 0x41, 0x00, 0x11, 0x00, 0x00, 0x0B,
+                    ], engine: engine)
+                let run = try #require(try module.instantiate(store: Store(engine: engine)).exportedFunction(name: "run"))
                 // call_indirect finds the types unrelated, then looks the reference's type up for the trap's message.
                 _ = try withExtendedLifetime(otherStore) { try run([reference]) }
             }
@@ -382,14 +429,15 @@ struct TypeRegistryTests {
                 // The child process keeps tests running in parallel out of the measurement.
                 let result = try await #require(processExitsWith: .success, observing: [\.standardOutputContent]) {
                     // (module (func))
-                    let module = try parseWasm(bytes: [
+                    let bytes: [UInt8] = [
                         0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
                         0x01, 0x04, 0x01, 0x60, 0x00, 0x00,
                         0x03, 0x02, 0x01, 0x00,
                         0x0A, 0x04, 0x01, 0x02, 0x00, 0x0B,
-                    ])
+                    ]
                     func instantiateInNewEngine() throws {
-                        _ = try module.instantiate(store: Store(engine: Engine()))
+                        let engine = Engine()
+                        _ = try parseWasm(bytes: bytes, engine: engine).instantiate(store: Store(engine: engine))
                     }
                     // Warm-up, because on Linux the allocator keeps some freed pages resident.
                     for _ in 0..<8 {

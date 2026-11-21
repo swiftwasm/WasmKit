@@ -14,7 +14,7 @@
                 let store = Store(engine: Engine())
                 var imports = Imports()
                 try wasi.link(to: &imports, store: store)
-                let instance = try PreopenFixture.fixtureModule().instantiate(store: store, imports: imports)
+                let instance = try PreopenFixture.fixtureModule(engine: store.engine).instantiate(store: store, imports: imports)
                 return try wasi.start(instance)
             }
         }

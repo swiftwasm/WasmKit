@@ -6,6 +6,7 @@ import WAT
 @Suite struct GlobalUpdateFusionTests {
     @Test(arguments: [EngineConfiguration.ThreadingModel.direct, .token])
     func preservedLocalAndWrapping(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let engine = Engine(configuration: .init(threadingModel: threadingModel))
         let module = try parseWasm(
             bytes: wat2wasm(
                 """
@@ -29,8 +30,8 @@ import WAT
                       local.get 0 i32.const 16 i32.add
                     end
                     global.set $g global.get $g))
-                """))
-        let store = Store(engine: Engine(configuration: .init(threadingModel: threadingModel)))
+                """), engine: engine)
+        let store = Store(engine: engine)
         let instance = try module.instantiate(store: store)
         let f = try #require(instance.exports[function: "f"])
         let sub = try #require(instance.exports[function: "sub"])
@@ -46,7 +47,7 @@ import WAT
             #expect(try join([.i32(x), .i32(1)]) == [.i32(x)])
         }
         #if Disassembler
-            let dumpStore = Store(engine: Engine(configuration: .init(threadingModel: threadingModel)))
+            let dumpStore = Store(engine: engine)
             let dumpInstance = try module.instantiate(store: dumpStore)
             var listing = ""
             try dumpInstance.dumpFunctions(to: &listing, module: module)

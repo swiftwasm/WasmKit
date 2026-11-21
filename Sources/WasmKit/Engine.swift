@@ -204,7 +204,7 @@ public struct EngineConfiguration: Sendable {
     /// Creating an ``Engine`` traps if the value is less than 1 or more than 134,217,728.
     ///
     /// A type counts once however many modules and host functions use it, and stays counted for
-    /// the lifetime of the engine. Past the limit, instantiating a module with a new type throws,
+    /// the lifetime of the engine. Past the limit, parsing a module with a new type throws,
     /// and so does creating a ``Function`` or ``Tag`` with a new signature. Creating the engine
     /// allocates one pointer for every 256 types on 32-bit platforms, and for every 4,096 types on
     /// 64-bit platforms.

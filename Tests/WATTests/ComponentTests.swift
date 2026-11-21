@@ -119,7 +119,7 @@
                         }
                         // Also try to instantiate for execution
                         do {
-                            currentInstance = try instantiateComponent(comp, linker: linker)
+                            currentInstance = try instantiateComponent(comp, engine: engine, linker: linker)
                         } catch {
                             // Instantiation may fail for various reasons (unsupported features)
                             // That's OK for encoding-only tests
@@ -151,6 +151,7 @@
                                 execute: execute,
                                 expectedMessage: expectedMessage,
                                 instance: currentInstance,
+                                engine: engine,
                                 linker: linker,
                                 location: location
                             )
@@ -229,6 +230,7 @@
         /// Instantiate a component from a ComponentDirective.
         private func instantiateComponent(
             _ comp: ComponentDirective,
+            engine: Engine,
             linker: ComponentLoader
         ) throws -> ComponentInstance {
             guard case .text(let componentDef) = comp.source else {
@@ -238,7 +240,7 @@
             var encoder = ComponentEncoder()
             let ourBytes = try encoder.encode(componentDef, options: .init())
 
-            let parsed = try parseComponent(bytes: ourBytes)
+            let parsed = try parseComponent(bytes: ourBytes, engine: engine)
 
             return try linker.instantiate(component: parsed)
         }
@@ -248,6 +250,7 @@
             execute: ComponentWASTExecute,
             expectedMessage: String,
             instance: ComponentInstance?,
+            engine: Engine,
             linker: ComponentLoader,
             location: Location
         ) throws {
@@ -279,7 +282,7 @@
             case .component(let comp):
                 // Component form: instantiate a component and expect it to trap during instantiation
                 do {
-                    _ = try instantiateComponent(comp, linker: linker)
+                    _ = try instantiateComponent(comp, engine: engine, linker: linker)
                     Issue.record("Expected trap during component instantiation at \(location) but instantiation succeeded")
                 } catch let error {
                     // Verify the error message contains the expected substring

@@ -50,7 +50,8 @@ struct ModuleImports: Sendable {
 }
 
 /// A unit of stateless WebAssembly code, which is a direct representation of a module file. You can get one
-/// by calling either ``parseWasm(bytes:features:)`` or ``parseWasm(filePath:features:)``.
+/// by calling either ``parseWasm(bytes:engine:features:)`` or ``parseWasm(filePath:engine:features:)``, and
+/// instantiate it in a ``Store`` of the same ``Engine``.
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#modules>
 public struct Module: Sendable {
@@ -60,14 +61,26 @@ public struct Module: Sendable {
     private(set) var start: FunctionIndex?
     let globals: [WasmParser.Global]
     let tags: [WasmParser.Tag]
+    /// The entities the module imports.
+    ///
+    /// A concrete heap type in a global or table type is the type's ID in the module's engine, so the type can be
+    /// passed to ``Global/init(store:type:value:)`` or ``Table/init(store:type:)``. A function or tag import names its
+    /// type by its index in the module's type section.
     public let imports: [Import]
     public let exports: [Export]
     public let customSections: [CustomSection]
     let types: TypeSection
 
+    /// The engine the module was parsed with.
+    package let engine: Engine
+
+    let typeCanonicalizer: TypeCanonicalizer
+
     let moduleImports: ModuleImports
     let importedFunctionTypes: [TypeIndex]
     let memoryTypes: [MemoryType]
+    /// Imported tables first. An imported table's element type holds canonical IDs, a defined table's holds
+    /// type-section indices.
     let tableTypes: [TableType]
     /// The initializer of each table defined in the module, `nil` for a table
     /// whose elements start out null.
@@ -77,6 +90,8 @@ public struct Module: Sendable {
     let dataCount: UInt32?
 
     init(
+        engine: Engine,
+        typeCanonicalizer: TypeCanonicalizer,
         types: TypeSection,
         functions: [GuestFunction],
         elements: [ElementSegment],
@@ -93,6 +108,8 @@ public struct Module: Sendable {
         dataCount: UInt32?
     ) {
         self.functions = functions
+        self.engine = engine
+        self.typeCanonicalizer = typeCanonicalizer
         self.elements = elements
         self.data = data
         self.start = start
@@ -126,21 +143,29 @@ public struct Module: Sendable {
         self.tagTypes = tagTypes + tags.map { $0.type }
     }
 
-    /// Returns the function type that the given type index defines, or `nil` if the index is out of
-    /// range or defines a non-function type.
+    /// Returns the function type that the given type index defines, with canonical IDs in its concrete heap types, or
+    /// `nil` if the index is out of range or defines a non-function type.
     @_spi(Fuzzing) @_spi(OnlyForCLI)
     public func functionType(at index: UInt32) -> FunctionType? {
-        try? types.functionType(at: index)
+        guard Int(index) < typeCanonicalizer.typeIDs.count else { return nil }
+        guard case .function(let type) = engine.typeRegistry.subType(typeCanonicalizer.typeIDs[Int(index)].id).body else {
+            return nil
+        }
+        return type
     }
 
+    /// Returns the type of function `index`, with canonical IDs in its concrete heap types.
     internal func resolveFunctionType(_ index: FunctionIndex) throws(WasmKitError) -> FunctionType {
         guard Int(index) < functions.count + self.moduleImports.numberOfFunctions else {
             throw WasmKitError("Function index \(index) is out of range")
         }
+        let type: FunctionType
         if Int(index) < self.moduleImports.numberOfFunctions {
-            return try types.functionType(at: importedFunctionTypes[Int(index)])
+            type = try types.functionType(at: importedFunctionTypes[Int(index)])
+        } else {
+            type = functions[Int(index) - self.moduleImports.numberOfFunctions].type
         }
-        return functions[Int(index) - self.moduleImports.numberOfFunctions].type
+        return try typeCanonicalizer.canonicalize(type)
     }
 
     /// Drop the start section information from this module.
@@ -155,7 +180,7 @@ public struct Module: Sendable {
     /// Instantiate this module in the given imports.
     ///
     /// - Parameters:
-    ///   - store: The ``Store`` to allocate the instance in.
+    ///   - store: The ``Store`` to allocate the instance in. It must be a store of the engine the module was parsed with.
     ///   - imports: The imports to use for instantiation. All imported entities
     ///     must be allocated in the given store.
     public func instantiate(store: Store, imports: Imports = [:]) throws -> Instance {
@@ -177,7 +202,7 @@ public struct Module: Sendable {
         /// Instantiate this module with the given imports.
         ///
         /// - Parameters:
-        ///   - store: The ``Store`` to allocate the instance in.
+        ///   - store: The ``Store`` to allocate the instance in. It must be a store of the engine the module was parsed with.
         ///   - imports: The imports to use for instantiation. All imported entities
         ///     must be allocated in the given store.
         ///   - isDebuggable: Whether the module should support debugging actions
@@ -190,6 +215,9 @@ public struct Module: Sendable {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#instantiation>
     private func instantiateHandle(store: Store, imports: Imports, isDebuggable: Bool = false) throws -> InternalInstance {
+        guard store.engine === engine else {
+            throw WasmKitError(message: .moduleFromDifferentEngine)
+        }
         try ModuleValidator(module: self).validate()
 
         // Steps 5-8.

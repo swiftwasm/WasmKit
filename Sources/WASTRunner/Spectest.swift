@@ -135,38 +135,39 @@ package struct NullSpectestProgressReporter: SpectestProgressReporter {
 }
 
 package struct SpectestRunner {
-    let hostModule: Module
+    let hostModuleBytes: [UInt8]
     let configuration: EngineConfiguration
 
     package init(configuration: EngineConfiguration) throws {
         self.configuration = configuration
         // https://github.com/WebAssembly/spec/tree/8a352708cffeb71206ca49a0f743bdc57269fb1a/interpreter#spectest-host-module
-        hostModule = try parseWasm(
-            bytes: wat2wasm(
-                """
-                    (module
-                      (global (export "global_i32") i32 (i32.const 666))
-                      (global (export "global_i64") i64 (i64.const 666))
-                      (global (export "global_f32") f32 (f32.const 666.6))
-                      (global (export "global_f64") f64 (f64.const 666.6))
+        hostModuleBytes = try wat2wasm(
+            """
+                (module
+                  (global (export "global_i32") i32 (i32.const 666))
+                  (global (export "global_i64") i64 (i64.const 666))
+                  (global (export "global_f32") f32 (f32.const 666.6))
+                  (global (export "global_f64") f64 (f64.const 666.6))
 
-                      (table (export "table") 10 20 funcref)
-                      (table (export "table64") 10 20 funcref)
+                  (table (export "table") 10 20 funcref)
+                  (table (export "table64") 10 20 funcref)
 
-                      (memory (export "memory") 1 2)
+                  (memory (export "memory") 1 2)
 
-                      (func (export "print"))
-                      (func (export "print_i32") (param i32))
-                      (func (export "print_i64") (param i64))
-                      (func (export "print_f32") (param f32))
-                      (func (export "print_f64") (param f64))
-                      (func (export "print_i32_f32") (param i32 f32))
-                      (func (export "print_f64_f64") (param f64 f64))
-                    )
-                """
-            ),
-            features: [.referenceTypes]
+                  (func (export "print"))
+                  (func (export "print_i32") (param i32))
+                  (func (export "print_i64") (param i64))
+                  (func (export "print_f32") (param f32))
+                  (func (export "print_f64") (param f64))
+                  (func (export "print_i32_f32") (param i32 f32))
+                  (func (export "print_f64_f64") (param f64 f64))
+                )
+            """
         )
+    }
+
+    func hostModule(engine: Engine) throws(WasmKitError) -> Module {
+        try parseWasm(bytes: hostModuleBytes, engine: engine, features: [.referenceTypes])
     }
 
     struct Failures: Error, CustomStringConvertible {
@@ -192,7 +193,7 @@ package struct SpectestRunner {
     /// - Parameter skip: Why each directive to skip is skipped, keyed by the line it starts on.
     package func evaluate(test: TestCase, reporter: SpectestProgressReporter, skip: [Int: String] = [:]) throws -> Outcome {
         var outcome = Outcome()
-        try test.run(spectestModule: hostModule, configuration: configuration, skip: skip) { test, location, result in
+        try test.run(spectestModule: { try hostModule(engine: $0) }, configuration: configuration, skip: skip) { test, location, result in
             switch result {
             case .failed(let reason):
                 reporter.log("\(result.banner) \(reason)", path: test.path, location: location, verbose: false)

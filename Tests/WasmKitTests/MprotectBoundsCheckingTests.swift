@@ -10,6 +10,7 @@ private let boundsCheckingModesUnderTest: [EngineConfiguration.MemoryBoundsCheck
 struct MprotectBoundsCheckingTests {
     @Test(arguments: boundsCheckingModesUnderTest)
     func outOfBoundsTrapsWithBothModes(mode: EngineConfiguration.MemoryBoundsChecking) throws {
+        let engine = Engine(configuration: .init(memoryBoundsChecking: mode))
         let module = try parseWasm(
             bytes: wat2wasm(
                 """
@@ -19,8 +20,8 @@ struct MprotectBoundsCheckingTests {
                         (i32.load (i32.const 0x10000))
                     )
                 )
-                """))
-        let engine = Engine(configuration: .init(memoryBoundsChecking: mode))
+                """),
+            engine: engine)
         let store = Store(engine: engine)
         let instance = try module.instantiate(store: store)
         let oob = try #require(instance.exports[function: "oob"])
@@ -45,7 +46,7 @@ struct MprotectBoundsCheckingTests {
                 }
             #endif
             let store = Store(engine: engine)
-            let module = try parseWasm(bytes: wat2wasm(wat))
+            let module = try parseWasm(bytes: wat2wasm(wat), engine: engine)
             let instance = try module.instantiate(store: store)
             let memory = try #require(instance.exports[memory: "memory"])
             let reservationSize = memory.handle.withValue { $0.trapGuardReservationSize }
@@ -56,7 +57,7 @@ struct MprotectBoundsCheckingTests {
         do {
             let engine = Engine(configuration: .init(memoryBoundsChecking: .software))
             let store = Store(engine: engine)
-            let module = try parseWasm(bytes: wat2wasm(wat))
+            let module = try parseWasm(bytes: wat2wasm(wat), engine: engine)
             let instance = try module.instantiate(store: store)
             let memory = try #require(instance.exports[memory: "memory"])
             let reservationSize = memory.handle.withValue { $0.trapGuardReservationSize }

@@ -28,7 +28,7 @@
         @Test(arguments: testedThreadingModels)
         func steppingOverAHostCallDoesNotReadTheCalleeAsWasm(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
-            let module = try parseWasm(bytes: try wat2wasm(hostCallWAT))
+            let module = try parseWasm(bytes: try wat2wasm(hostCallWAT), engine: store.engine)
 
             var imports = Imports()
             imports.define(

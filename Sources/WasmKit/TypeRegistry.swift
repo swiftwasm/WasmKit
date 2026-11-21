@@ -1,6 +1,6 @@
+import Synchronization
 import WasmParser
 import WasmTypes
-import _CWasmKit
 
 extension WasmKitError.Message {
     static func tooManyTypes(limit: Int) -> Self {
@@ -59,23 +59,19 @@ final class TypeRegistry: @unchecked Sendable {
         /// The first ID of each registered group, keyed by the group with its
         /// own members referenced by position.
         var groups: [[SubType]: UInt32] = [:]
-        var count: UInt32 = 0
     }
 
-    // `var` because the single-threaded PlatformMutex fallback mutates in
-    // place; the mutex itself guarantees exclusivity.
-    nonisolated(unsafe) private var state = PlatformMutex(State())
+    private let state = PlatformMutex(State())
 
     /// Entries in fixed-size pages that never move, so that a reader holding
-    /// an ID can look it up without taking the lock: an ID is only handed out
-    /// after its entry is written, under the lock.
+    /// an ID can look it up without taking the lock.
     private let pages: UnsafeMutablePointer<UnsafeMutablePointer<Entry>?>
 
     private let capacity: Int
 
-    /// The number of registered types, stored after their entries. A host-built
-    /// type or a function of another engine can carry an ID at or past it.
-    private let registeredCount = Cell<UInt32>(0)
+    /// The number of registered types. A host-built type or a function of another engine can carry an ID at or
+    /// past it.
+    private let registeredCount = Atomic<UInt32>(0)
 
     init(capacity: Int) {
         precondition(
@@ -89,7 +85,7 @@ final class TypeRegistry: @unchecked Sendable {
     }
 
     deinit {
-        let count = Int(state.withLock { $0.count })
+        let count = Int(registeredCount.load(ordering: .relaxed))
         for pageIndex in 0..<(count + Self.pageSize - 1) / Self.pageSize {
             let page = pages[pageIndex].unsafelyUnwrapped
             page.deinitialize(count: min(Self.pageSize, count - pageIndex * Self.pageSize))
@@ -107,7 +103,7 @@ final class TypeRegistry: @unchecked Sendable {
     }
 
     private func loadRegisteredCount() -> Int {
-        Int(wasmkit_atomic_load_32(registeredCount.address))
+        Int(registeredCount.load(ordering: .acquiring))
     }
 
     /// The entry of `id`, if `id` is the ID of one of the first `count` registered types.
@@ -199,7 +195,7 @@ final class TypeRegistry: @unchecked Sendable {
             if let base = state.groups[key] {
                 return ids(base)
             }
-            let base = state.count
+            let base = registeredCount.load(ordering: .relaxed)
             guard Int(base) + key.count <= capacity else {
                 throw WasmKitError(message: .tooManyTypes(limit: capacity))
             }
@@ -212,8 +208,7 @@ final class TypeRegistry: @unchecked Sendable {
                 }
                 (pages[id / Self.pageSize].unsafelyUnwrapped + id % Self.pageSize).initialize(to: entry)
             }
-            state.count += UInt32(key.count)
-            wasmkit_atomic_store_32(registeredCount.address, state.count)
+            registeredCount.store(base + UInt32(key.count), ordering: .releasing)
             state.groups[key] = base
             return ids(base)
         }

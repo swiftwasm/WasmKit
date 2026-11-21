@@ -6,6 +6,7 @@ import WAT
 @Suite struct CopyCallTests {
     @Test(arguments: [EngineConfiguration.ThreadingModel.direct, .token])
     func copiesBeforeFirstAndRepeatedCalls(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let engine = Engine(configuration: .init(threadingModel: threadingModel))
         let module = try parseWasm(
             bytes: wat2wasm(
                 """
@@ -30,8 +31,8 @@ import WAT
                       drop i64.const 7
                     end
                     call $identity))
-                """))
-        let store = Store(engine: Engine(configuration: .init(threadingModel: threadingModel)))
+                """), engine: engine)
+        let store = Store(engine: engine)
         let instance = try module.instantiate(store: store)
         let single = try #require(instance.exports[function: "single"])
         let swap = try #require(instance.exports[function: "swap"])
@@ -45,7 +46,7 @@ import WAT
             #expect(try branch([.i64(x), .i32(1)]) == [.i64(x)])
         }
         #if Disassembler
-            let dumpStore = Store(engine: Engine(configuration: .init(threadingModel: threadingModel)))
+            let dumpStore = Store(engine: engine)
             let dumpInstance = try module.instantiate(store: dumpStore)
             var listing = ""
             try dumpInstance.dumpFunctions(to: &listing, module: module)
