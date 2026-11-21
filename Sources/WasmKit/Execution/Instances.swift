@@ -626,6 +626,22 @@ struct MemoryEntity: ~Copyable {
         var trapGuardReservationSize: Int { 0 }
 
         mutating func grow(to newByteCount: Int) throws {
+            let oldByteCount = buffer.count
+            let delta = newByteCount - oldByteCount
+            // A guest's allocator grows its memory a little at a time, and copying the whole
+            // memory into a new allocation each time made growing quadratic: a page at a time
+            // to 128 MiB took over half a minute. Extending the allocation lets the allocator
+            // grow a large block in place or move its pages instead. Only the new bytes are
+            // zeroed, which touches them; a growth by at least the current size still goes
+            // through a fresh zeroed allocation, whose pages cost nothing until used, and whose
+            // copy is paid for by the doubling.
+            if delta > 0, delta < oldByteCount, let old = buffer.baseAddress,
+                let grown = FailableAllocation.reallocate(UnsafeMutableRawPointer(old), byteCount: newByteCount)
+            {
+                (grown + oldByteCount).initializeMemory(as: UInt8.self, repeating: 0, count: delta)
+                buffer = UnsafeMutableBufferPointer(start: grown.assumingMemoryBound(to: UInt8.self), count: newByteCount)
+                return
+            }
             guard let raw = FailableAllocation.allocateZeroed(byteCount: newByteCount) else {
                 throw Trap(.initialMemorySizeExceedsLimit(byteSize: newByteCount))
             }
