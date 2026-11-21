@@ -30,9 +30,10 @@ let guestPrelude = """
         /// has some ctor works to do.
         static func initializeOnce() {
             enum Static {
-                static var _initialized = false
+                nonisolated(unsafe) static var _initialized = false
             }
             guard !Static._initialized else { return }
+            Static._initialized = true
             __wasm_call_ctors()
         }
 
