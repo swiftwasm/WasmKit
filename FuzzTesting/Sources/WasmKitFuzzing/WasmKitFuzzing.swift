@@ -25,6 +25,7 @@ public func fuzzInstantiation(bytes: [UInt8]) throws {
     let engine = Engine(configuration: EngineConfiguration(compilationMode: .eager))
     let store = Store(engine: engine)
     store.resourceLimiter = FuzzerResourceLimiter()
+    let canonicalizer = try TypeCanonicalizer(module: module, engine: engine)
 
     // Prepare dummy imports
     var imports = Imports()
@@ -36,20 +37,20 @@ public func fuzzInstantiation(bytes: [UInt8]) throws {
                 // Skip if import type index does not name a function type
                 return
             }
-            value = Function(store: store, type: type) { _, _ in
+            value = try Function(store: store, type: canonicalizer.canonicalize(type)) { _, _ in
                 // Provide "start function" with empty results
                 if type.results.isEmpty { return [] }
                 fatalError("Unexpected function call")
             }
         case .global(let globalType):
-            value = try Global(store: store, type: globalType, value: .i32(0))
+            value = try Global(store: store, type: canonicalizer.canonicalize(globalType), value: .i32(0))
         case .memory(let memoryType):
             value = try Memory(store: store, type: memoryType)
         case .table(let tableType):
-            value = try Table(store: store, type: tableType)
+            value = try Table(store: store, type: canonicalizer.canonicalize(tableType))
         case .tag(let typeIndex):
             guard let type = module.functionType(at: typeIndex) else { return }
-            value = Tag(store: store, type: type)
+            value = try Tag(store: store, type: canonicalizer.canonicalize(type))
         }
         imports.define(module: importEntry.module, name: importEntry.name, value.externalValue)
     }

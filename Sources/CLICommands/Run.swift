@@ -488,7 +488,7 @@ package struct Run: AsyncParsableCommand {
                 processControl: processControl,
                 childImports: { store in
                     var imports = Imports()
-                    wasi.link(to: &imports, store: store)
+                    try wasi.link(to: &imports, store: store)
                     return imports
                 }
             )
@@ -513,7 +513,7 @@ package struct Run: AsyncParsableCommand {
             {
                 try wasi.runAndClose { wasi in
                     var imports = Imports()
-                    wasi.link(to: &imports, store: store)
+                    try wasi.link(to: &imports, store: store)
                     let moduleInstance = try module.instantiate(store: store, imports: imports)
                     let exitCode = try wasi.start(moduleInstance)
                     throw ExitCode(Int32(exitCode))

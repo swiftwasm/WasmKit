@@ -124,17 +124,17 @@ final class Host {
         return try body()
     }
 
-    func imports(for instance: InstanceBox) -> Imports {
+    func imports(for instance: InstanceBox) throws(WasmKitError) -> Imports {
         var imports = Imports()
         imports.define(
             module: "env", name: "tick",
-            Function(store: store, parameters: [], results: []) { [unowned self] _, _ in
+            try Function(store: store, parameters: [], results: []) { [unowned self] _, _ in
                 self.tick()
                 return []
             })
         imports.define(
             module: "env", name: "reenter",
-            Function(store: store, parameters: [.i32], results: [.i32]) { [unowned self] _, args in
+            try Function(store: store, parameters: [.i32], results: [.i32]) { [unowned self] _, args in
                 let f0 = instance.instance!.exports[function: "f0"]!
                 guard instance.takeNestedCall() else { return [.i32(UInt32(bitPattern: -3))] }
                 return self.isolated(fuel: reenterBudget) {
@@ -147,7 +147,7 @@ final class Host {
             })
         imports.define(
             module: "env", name: "nested",
-            Function(store: store, parameters: [.i32], results: [.i32]) { [unowned self] _, args in
+            try Function(store: store, parameters: [.i32], results: [.i32]) { [unowned self] _, args in
                 let f0 = instance.instance!.exports[function: "f0"]!
                 guard instance.takeNestedCall() else { return [.i32(UInt32(bitPattern: -3))] }
                 return self.isolated(fuel: 41) {
@@ -171,7 +171,7 @@ final class Host {
             })
         imports.define(
             module: "env", name: "fail",
-            Function(store: store, parameters: [.i32], results: []) { _, args in
+            try Function(store: store, parameters: [.i32], results: []) { _, args in
                 if args[0].i32 & 3 == 0 { throw HostFailure(value: args[0].i32) }
                 return []
             })

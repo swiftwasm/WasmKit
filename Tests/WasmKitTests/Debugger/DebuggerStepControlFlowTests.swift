@@ -322,19 +322,19 @@
             Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
         }
 
-        private func hostImports(_ store: Store) -> Imports {
+        private func hostImports(_ store: Store) throws(WasmKitError) -> Imports {
             var imports = Imports()
-            imports.define(module: "env", name: "host0", Function(store: store, parameters: [], results: []) { _, _ in [] })
+            imports.define(module: "env", name: "host0", try Function(store: store, parameters: [], results: []) { _, _ in [] })
             imports.define(
                 module: "env", name: "host1",
-                Function(store: store, parameters: [.i32], results: [.i32]) { _, args in [.i32(args[0].i32 &+ 1)] })
+                try Function(store: store, parameters: [.i32], results: [.i32]) { _, args in [.i32(args[0].i32 &+ 1)] })
             return imports
         }
 
         /// Stops at `offset` in function `function`, steps once, and returns where the step landed.
         private func stepFrom(
             _ wat: String, function: Int, offset: Int, threadingModel: EngineConfiguration.ThreadingModel,
-            imports: (Store) -> Imports = { _ in [:] },
+            imports: (Store) throws(WasmKitError) -> Imports = { _ in [:] },
             sourceLocation: SourceLocation = #_sourceLocation
         ) throws -> (landing: Int, module: Module) {
             let store = makeStore(threadingModel)

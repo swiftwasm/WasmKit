@@ -30,7 +30,7 @@ struct Example {
                         guard let memory = caller.instance?.exports[memory: "memory"] else {
                             fatalError("Missing \"memory\" export")
                         }
-                        let string = memory.withUnsafeMutableBufferPointer(
+                        let string = try memory.withUnsafeMutableBufferPointer(
                             offset: UInt(stringPtr),
                             count: stringLength
                         ) { buffer in

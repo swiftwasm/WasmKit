@@ -4,24 +4,20 @@ import WasmTypes
 // # Canonical types
 //
 // A concrete heap type in a module, `(ref $t)`, names a type by its index in
-// that module's type section. The typed function references proposal compares
-// such types structurally, also across modules: two indices whose function
-// types are equal (after resolving the concrete types nested in them) are the
-// same type.
+// that module's type section. Types are compared structurally, also across
+// modules, by their recursion groups (see TypeRegistry.swift).
 //
-// Inside the engine, a concrete heap type therefore carries a canonical type ID
-// instead of a module-relative index: the ID the engine's function type
-// interner gives the type's signature once every nested concrete type in it
-// has itself been made canonical. Because a type may only refer to types
-// defined before it, the type section can be canonicalized in order, and two
+// Inside the engine, a concrete heap type therefore carries the canonical type
+// ID the registry gives the type instead of a module-relative index, so two
 // types are equivalent exactly when their canonical IDs are equal.
 //
 // Canonical types reuse `HeapType.concrete(typeIndex:)`, so the same Swift
 // value means a module index in parsed `Module` data and a canonical ID in
 // everything the translator and the runtime see: function entities, globals,
 // tables, element segments and `Function.type`. A type without concrete heap
-// types is its own canonical form. Function types given by the host are taken
-// to be canonical already.
+// types is its own canonical form. Types given by the host must be canonical
+// already: creating a host function, tag, global or table checks that every
+// concrete heap type in its type is a registered type.
 
 extension WasmKitError.Message {
     static func unknownType(_ index: UInt32) -> Self {
@@ -30,30 +26,36 @@ extension WasmKitError.Message {
 }
 
 /// Maps the type indices of one module to canonical type IDs.
-struct TypeCanonicalizer {
-    /// The canonical ID of each type in the module's type section.
+@_spi(Fuzzing)
+public struct TypeCanonicalizer {
+    /// The canonical ID of each type in the module's type section. The ID of a
+    /// struct or array type is stored as an `InternedFuncType` too, but names no function type.
     let typeIDs: [InternedFuncType]
 
     /// Canonicalizes a module's type section.
     ///
-    /// Throws "unknown type" if a type refers to itself or to a later type.
-    init(typeSection: TypeSection, interner: Interner<FunctionType>) throws(WasmKitError) {
+    /// Throws "unknown type" if a type refers to a type defined in a later
+    /// recursion group, and an error if a declared supertype is invalid.
+    init(typeSection: TypeSection, registry: TypeRegistry) throws(WasmKitError) {
         var typeIDs: [InternedFuncType] = []
         typeIDs.reserveCapacity(typeSection.count)
-        // A function type is canonical by its signature alone. GC compares types by the recursive
-        // group they are defined in, with their finality and supertypes, so struct and array types,
-        // and function types that use those, will be canonicalized per group here.
         for group in typeSection.recursiveGroups {
-            for type in group.types {
-                guard case .function(let functionType) = type.body else {
-                    throw WasmKitError("GC type definitions are not supported yet")
-                }
-                // Only the types defined so far are visible to this one.
-                let canonical = try TypeCanonicalizer(typeIDs: typeIDs).canonicalize(functionType)
-                typeIDs.append(interner.intern(canonical))
+            let ids = try registry.register(group, firstIndex: UInt32(typeIDs.count)) { (index) throws(WasmKitError) in
+                typeIDs[Int(index)].id
             }
+            typeIDs.append(contentsOf: ids.map { InternedFuncType(id: $0) })
         }
         self.typeIDs = typeIDs
+    }
+
+    /// Canonicalizes the type section of `module`, registering its types in `engine`.
+    ///
+    /// - Throws: `WasmKitError` if a type refers to a type defined in a later
+    ///   recursion group, if a declared supertype is invalid, or if the engine
+    ///   already holds `EngineConfiguration.maxTypeCount` types.
+    @_spi(Fuzzing)
+    public init(module: Module, engine: Engine) throws(WasmKitError) {
+        try self.init(typeSection: module.types, registry: engine.typeRegistry)
     }
 
     init(typeIDs: [InternedFuncType]) {
@@ -95,18 +97,21 @@ struct TypeCanonicalizer {
         return result
     }
 
-    func canonicalize(_ type: FunctionType) throws(WasmKitError) -> FunctionType {
+    @_spi(Fuzzing)
+    public func canonicalize(_ type: FunctionType) throws(WasmKitError) -> FunctionType {
         guard type.parameters.contains(where: \.hasConcreteHeapType) || type.results.contains(where: \.hasConcreteHeapType) else {
             return type
         }
         return FunctionType(parameters: try canonicalize(type.parameters), results: try canonicalize(type.results))
     }
 
-    func canonicalize(_ type: GlobalType) throws(WasmKitError) -> GlobalType {
+    @_spi(Fuzzing)
+    public func canonicalize(_ type: GlobalType) throws(WasmKitError) -> GlobalType {
         GlobalType(mutability: type.mutability, valueType: try canonicalize(type.valueType))
     }
 
-    func canonicalize(_ type: TableType) throws(WasmKitError) -> TableType {
+    @_spi(Fuzzing)
+    public func canonicalize(_ type: TableType) throws(WasmKitError) -> TableType {
         TableType(elementType: try canonicalize(type.elementType), limits: type.limits)
     }
 }

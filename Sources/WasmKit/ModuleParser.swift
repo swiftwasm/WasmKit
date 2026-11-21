@@ -95,6 +95,7 @@ func parseModule<Source: ByteStreamSource>(parser: consuming WasmParser.Parser<S
         let funcTypeIndex = typeIndices[index]
         let funcType = try types.functionType(at: funcTypeIndex)
         return GuestFunction(
+            typeIndex: funcTypeIndex,
             type: funcType,
             code: code
         )

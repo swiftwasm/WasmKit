@@ -3,27 +3,31 @@ import WasmParser
 protocol ConstEvaluationContextProtocol {
     func functionRef(_ index: FunctionIndex) throws -> Reference
     func globalValue(_ index: GlobalIndex) throws -> Value
+    var typeRegistry: TypeRegistry { get }
 }
 
 struct ConstEvaluationContext: ConstEvaluationContextProtocol {
     let functions: ImmutableArray<InternalFunction>
     /// The globals a constant expression may read, which depends on where it appears.
     var globals: [InternalGlobal]
+    let typeRegistry: TypeRegistry
     let onFunctionReferenced: ((InternalFunction) -> Void)?
 
     init(
         functions: ImmutableArray<InternalFunction>,
         globals: [InternalGlobal],
+        typeRegistry: TypeRegistry,
         onFunctionReferenced: ((InternalFunction) -> Void)? = nil
     ) {
         self.functions = functions
         self.globals = globals
+        self.typeRegistry = typeRegistry
         self.onFunctionReferenced = onFunctionReferenced
     }
 
     /// A context for element and data segment offsets, which may read every global.
-    init(instance: InternalInstance) {
-        self.init(functions: instance.functions, globals: Array(instance.globals))
+    init(instance: InternalInstance, store: Store) {
+        self.init(functions: instance.functions, globals: Array(instance.globals), typeRegistry: store.engine.typeRegistry)
     }
 
     func functionRef(_ index: FunctionIndex) throws -> Reference {
@@ -46,7 +50,7 @@ struct ConstEvaluationContext: ConstEvaluationContextProtocol {
 extension ConstExpression {
     func evaluate<C: ConstEvaluationContextProtocol>(context: C, expectedType: WasmTypes.ValueType) throws -> Value {
         let result = try self._evaluate(context: context)
-        try result.checkType(expectedType)
+        try result.checkType(expectedType, in: context.typeRegistry)
         return result
     }
 
@@ -131,7 +135,7 @@ extension WasmParser.ElementSegment {
     func evaluateInits<C: ConstEvaluationContextProtocol>(context: C, type: ReferenceType) throws -> [Reference] {
         return try self.initializer.map { expression -> Reference in
             let result = try Self._evaluateInits(context: context, expression: expression)
-            try result.checkType(type)
+            try result.checkType(type, in: context.typeRegistry)
             return result
         }
     }
@@ -169,6 +173,7 @@ extension WasmParser.ElementSegment {
 /// canonical.
 struct ConstExpressionTypeContext {
     let canonicalizer: TypeCanonicalizer
+    let typeRegistry: TypeRegistry
     let functions: ImmutableArray<InternalFunction>
     /// The types of the globals a constant expression may read.
     var globalTypes: [GlobalType]
@@ -182,7 +187,7 @@ extension ConstExpression {
     /// `(ref null $t)`. Malformed expressions are left for evaluation to report.
     func checkType(_ expectedType: ValueType, context: ConstExpressionTypeContext) throws(WasmKitError) {
         guard let type = try staticType(context: context) else { return }
-        guard type.isSubtype(of: expectedType) else {
+        guard type.isSubtype(of: expectedType, in: context.typeRegistry) else {
             throw WasmKitError(message: .expectTypeButGot(expected: "\(expectedType)", got: "\(type)"))
         }
     }

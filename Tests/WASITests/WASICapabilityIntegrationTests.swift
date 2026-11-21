@@ -35,7 +35,7 @@ import WasmKitWASI
             return try wasi.runAndClose { wasi in
                 let store = Store(engine: Engine())
                 var imports = Imports()
-                wasi.link(to: &imports, store: store, capabilities: capabilities, stubUnlinked: stubUnlinked)
+                try wasi.link(to: &imports, store: store, capabilities: capabilities, stubUnlinked: stubUnlinked)
                 let module = try parseWasm(filePath: path.path)
                 let instance = try module.instantiate(store: store, imports: imports)
                 return try wasi.start(instance)
@@ -79,7 +79,7 @@ import WasmKitWASI
             let wasi = try WASIBridgeToHost(fileSystem: .host().withStdio())
             try wasi.runAndClose { wasi in
                 var imports = Imports()
-                wasi.link(to: &imports, store: store, capabilities: [.stdio], stubUnlinked: true)
+                try wasi.link(to: &imports, store: store, capabilities: [.stdio], stubUnlinked: true)
                 let module = try parseWasm(filePath: Self.environGuest.path)
                 // environ_get/environ_sizes_get come from stubs, not .stdio.
                 _ = try module.instantiate(store: store, imports: imports)
@@ -91,7 +91,7 @@ import WasmKitWASI
             let wasi = try WASIBridgeToHost(fileSystem: .host().withStdio())
             try wasi.runAndClose { wasi in
                 var imports = Imports()
-                wasi.link(to: &imports, store: store, capabilities: [.stdio], stubUnlinked: false)
+                try wasi.link(to: &imports, store: store, capabilities: [.stdio], stubUnlinked: false)
                 let module = try parseWasm(filePath: Self.environGuest.path)
                 #expect(throws: (any Error).self) {
                     _ = try module.instantiate(store: store, imports: imports)

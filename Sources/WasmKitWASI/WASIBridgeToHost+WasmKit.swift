@@ -17,8 +17,11 @@ extension WASIBridgeToHost {
     /// - Parameters:
     ///   - imports: The imports scope to register the WASI implementation.
     ///   - store: The store to create the host functions.
-    public func link(to imports: inout Imports, store: Store) {
-        link(to: &imports, store: store, capabilities: WASICapability.all)
+    /// - Throws: `WasmKitError` if a WASI signature is new and the store's engine
+    ///   already holds `EngineConfiguration.maxTypeCount` types. `imports` is
+    ///   then unchanged.
+    public func link(to imports: inout Imports, store: Store) throws(WasmKitError) {
+        try link(to: &imports, store: store, capabilities: WASICapability.all)
     }
 
     /// Register only the selected parts of the WASI implementation.
@@ -35,20 +38,25 @@ extension WASIBridgeToHost {
     ///     linked capability provides are registered as stubs returning
     ///     `ENOSYS`. Guests import a fixed list regardless of what they call,
     ///     so turning this off risks instantiation failures on unused imports.
+    /// - Throws: `WasmKitError` if a WASI signature is new and the store's engine
+    ///   already holds `EngineConfiguration.maxTypeCount` types. `imports` is
+    ///   then unchanged.
     public func link(
         to imports: inout Imports,
         store: Store,
         capabilities: [WASICapability],
         stubUnlinked: Bool = true
-    ) {
+    ) throws(WasmKitError) {
         let functions = hostFunctions(capabilities: capabilities, stubUnlinked: stubUnlinked)
+        var linked = imports
         for (name, function) in functions {
-            imports.define(
+            linked.define(
                 module: "wasi_snapshot_preview1",
                 name: name,
-                Function(store: store, type: function.type, body: makeHostFunction(function))
+                try Function(store: store, type: function.type, body: makeHostFunction(function))
             )
         }
+        imports = linked
     }
 
     @available(*, deprecated, renamed: "link(to:store:)", message: "Use `Engine`-based API instead")

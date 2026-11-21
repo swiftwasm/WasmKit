@@ -186,7 +186,7 @@ public final class WASIThreads: @unchecked Sendable {
             )
             imports.define(
                 module: "wasi", name: "thread-spawn",
-                Function(store: store, parameters: [.i32], results: [.i32]) { [self] caller, arguments in
+                try Function(store: store, parameters: [.i32], results: [.i32]) { [self] caller, arguments in
                     // Each worker gets its own `Store`, and therefore its own budget. Copying the
                     // spawning store's budget bounds every thread instead of leaving spawned ones
                     // unmetered; it does not bound their total, which would need a shared counter.

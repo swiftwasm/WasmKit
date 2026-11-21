@@ -170,7 +170,7 @@ let benchmarks: @Sendable () -> () = {
                 )
                 do {
                     var imports = Imports()
-                    bridge.link(to: &imports, store: store)
+                    try bridge.link(to: &imports, store: store)
                     let instance = try module.instantiate(store: store, imports: imports)
                     try instance.exports[function: "_start"]!()
                     let pump = instance.exports[function: "swift_wasm_macro_v1_pump"]!

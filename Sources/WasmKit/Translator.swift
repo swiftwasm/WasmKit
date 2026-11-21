@@ -70,19 +70,27 @@ extension InternalInstance {
         _ = try elementType(index)
     }
 
-    func resolveType(_ index: TypeIndex) throws(WasmKitError) -> FunctionType {
+    /// The canonical definition of the type at `index` in the module's type section.
+    func definedType(_ index: TypeIndex) throws(WasmKitError) -> SubType {
         guard Int(index) < self.types.count else {
             throw WasmKitError(message: .indexOutOfBounds("type", index, max: UInt32(self.types.count)))
         }
         return self.types[Int(index)]
     }
+    /// The function type at `index` in the module's type section.
+    func resolveType(_ index: TypeIndex) throws(WasmKitError) -> FunctionType {
+        guard case .function(let type) = try definedType(index).body else {
+            throw WasmKitError("type mismatch: type \(index) is not a function type")
+        }
+        return type
+    }
     func resolveBlockType(_ blockType: BlockType) throws(WasmKitError) -> FunctionType {
         if case .type(.ref(let referenceType)) = blockType, case .concrete = referenceType.heapType {
             return FunctionType(parameters: [], results: [.ref(try typeCanonicalizer.canonicalize(referenceType))])
         }
-        return try FunctionType(blockType: blockType, typeSection: self.types)
+        return try FunctionType(blockType: blockType, resolveType: resolveType)
     }
-    func functionType(_ index: FunctionIndex, interner: Interner<FunctionType>) throws(WasmKitError) -> FunctionType {
+    func functionType(_ index: FunctionIndex, interner: TypeRegistry) throws(WasmKitError) -> FunctionType {
         return try interner.resolve(self.functions[validating: Int(index)].type)
     }
     func globalType(_ index: GlobalIndex) throws(WasmKitError) -> ValueType {
@@ -645,6 +653,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     struct ValueStack {
+        let typeRegistry: TypeRegistry
         private var values: [MetaValueOnStack] = []
         private var startSlotOffsets: [Int] = []
         /// The current physical slot height of the stack (excluding locals/const pool base).
@@ -656,9 +665,10 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let stackRegBase: VReg
         let stackLayout: StackLayout
 
-        init(stackLayout: StackLayout) {
+        init(stackLayout: StackLayout, typeRegistry: TypeRegistry) {
             self.stackRegBase = stackLayout.stackRegBase
             self.stackLayout = stackLayout
+            self.typeRegistry = typeRegistry
         }
 
         mutating func push(_ value: ValueType) -> VReg {
@@ -792,15 +802,15 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             if case .some(let actual) = value, actual == expected {
                 return register
             }
-            try Self.check(value, matches: expected)
+            try Self.check(value, matches: expected, in: typeRegistry)
             return register
         }
         /// Checks that a value of type `actual` can be used where `expected` is.
         @inline(never)
-        static func check(_ actual: MetaValue, matches expected: ValueType) throws(WasmKitError) {
+        static func check(_ actual: MetaValue, matches expected: ValueType, in registry: TypeRegistry) throws(WasmKitError) {
             switch actual {
             case .some(let actual):
-                guard actual == expected || actual.isSubtype(of: expected) else {
+                guard actual == expected || actual.isSubtype(of: expected, in: registry) else {
                     throw WasmKitError("Expected \(expected) on the stack top but got \(actual)")
                 }
             case .unknown: break  // OK
@@ -2743,7 +2753,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     let allocator: ISeqAllocator
-    let funcTypeInterner: Interner<FunctionType>
+    let typeRegistry: TypeRegistry
     let engineConfiguration: EngineConfiguration
     var module: InternalInstance
     /// The fuel region being translated, when the engine meters fuel; `nil` otherwise.
@@ -2822,7 +2832,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     init(
         allocator: ISeqAllocator,
         engineConfiguration: EngineConfiguration,
-        funcTypeInterner: Interner<FunctionType>,
+        typeRegistry: TypeRegistry,
         module: InternalInstance,
         type: FunctionType,
         locals: [WasmTypes.ValueType],
@@ -2831,7 +2841,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         isIntercepting: Bool
     ) throws(WasmKitError) {
         self.allocator = allocator
-        self.funcTypeInterner = funcTypeInterner
+        self.typeRegistry = typeRegistry
         self.engineConfiguration = engineConfiguration
         self.type = type
         self.module = module
@@ -2843,7 +2853,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             locals: locals,
             codeSize: codeSize
         )
-        self.valueStack = ValueStack(stackLayout: stackLayout)
+        self.valueStack = ValueStack(stackLayout: stackLayout, typeRegistry: typeRegistry)
         self.locals = Locals(types: type.parameters + locals)
         self.tracksLocalInitialization = self.locals.hasNonDefaultable
         self.isLocalInitialized =
@@ -2854,7 +2864,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         self.functionIndex = functionIndex
         self.isIntercepting = isIntercepting
         self.constantSlots = ConstSlots(stackLayout: stackLayout)
-        self.validator = InstructionValidator(context: module)
+        self.validator = InstructionValidator(context: module, typeRegistry: typeRegistry)
         self.maxFrameSlotIndex = stackLayout.stackRegBaseSlotIndex
 
         do {
@@ -3197,7 +3207,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             guard try checkBeforePop(typeHint: type, depth: stackDepth) else { return }
             let actual = valueStack.peekType(depth: stackDepth)
             if case .some(let actualType) = actual, actualType == type { continue }
-            try ValueStack.check(actual, matches: type)
+            try ValueStack.check(actual, matches: type, in: typeRegistry)
         }
     }
 
@@ -3647,7 +3657,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
         if case .if(_, _, isElse: false) = toBePopped.kind {
             let blockType = toBePopped.blockType
-            guard blockType.parameters.isSubtype(of: blockType.results) else {
+            guard blockType.parameters.isSubtype(of: blockType.results, in: typeRegistry) else {
                 throw WasmKitError(message: .parameterResultTypeMismatch(blockType: blockType))
             }
         }
@@ -4237,7 +4247,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         return VReg(slotIndex: argumentsSlotIndex)
     }
     mutating func visitCall(functionIndex: UInt32) throws(WasmKitError) -> Output {
-        let calleeType = try self.module.functionType(functionIndex, interner: funcTypeInterner)
+        let calleeType = try self.module.functionType(functionIndex, interner: typeRegistry)
         guard let arguments = try visitCallLike(calleeType: calleeType) else { return }
         guard let callee = self.module.resolveCallee(functionIndex) else {
             // Skip actual code emission if validation-only mode
@@ -4294,7 +4304,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let calleeType = try self.module.resolveType(typeIndex)
         guard let arguments = try visitCallLike(calleeType: calleeType) else { return }
         guard let address = address else { return }
-        let internType = funcTypeInterner.intern(calleeType)
+        let internType = try module.typeCanonicalizer.canonicalID(of: typeIndex)
         let operand = Instruction.CallIndirectOperand(
             tableIndex: tableIndex,
             type: internType,
@@ -4317,7 +4327,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
     }
 
     mutating func visitReturnCall(functionIndex: UInt32) throws(WasmKitError) {
-        let calleeType = try self.module.functionType(functionIndex, interner: funcTypeInterner)
+        let calleeType = try self.module.functionType(functionIndex, interner: typeRegistry)
         try validator.validateReturnCallLike(calleeType: calleeType, callerType: type)
 
         guard let callee = self.module.resolveCallee(functionIndex) else {
@@ -4346,7 +4356,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         let address = try popOnStackOperand(addressType)  // function address
         guard let address = address else { return }
 
-        let internType = funcTypeInterner.intern(calleeType)
+        let internType = try module.typeCanonicalizer.canonicalID(of: typeIndex)
 
         // Clean up all exception handlers before the tail call
         let handlersToUnwind = controlStack.catchHandlersToUnwind(
@@ -4373,7 +4383,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
 
     mutating func visitThrow(tagIndex: UInt32) throws(WasmKitError) -> Output {
         let tag = try module.tags[validating: Int(tagIndex)]
-        let tagType = funcTypeInterner.resolve(tag.type)
+        let tagType = typeRegistry.resolve(tag.type)
         // Pop tag parameter values and ensure they're on the physical stack
         for param in tagType.parameters.reversed() {
             guard (try popOnStackOperand(param)) != nil else { return }
@@ -4452,7 +4462,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             var catchTypes: [ValueType]
             if let tagIndex {
                 tag = try module.tags[validating: Int(tagIndex)]
-                let tagType = funcTypeInterner.resolve(tag!.type)
+                let tagType = typeRegistry.resolve(tag!.type)
                 catchTypes = tagType.parameters
             } else {
                 tag = nil
@@ -4464,7 +4474,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             }
 
             // Validate that the caught value types match the target label's copy types
-            guard catchTypes.isSubtype(of: targetFrame.copyTypes) else {
+            guard catchTypes.isSubtype(of: targetFrame.copyTypes, in: typeRegistry) else {
                 throw WasmKitError(message: .catchTypeMismatch)
             }
 
@@ -4557,7 +4567,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
                     throw WasmKitError(message: .cannotSelectOnReferenceTypes)
                 }
             case .some(let operandType):
-                guard operandType.isSubtype(of: type) else {
+                guard operandType.isSubtype(of: type, in: typeRegistry) else {
                     throw WasmKitError(message: .typeMismatchOnSelect(expected: type, actual: operandType))
                 }
             }
@@ -7115,22 +7125,16 @@ extension FunctionType {
         }
     }
 
-    fileprivate init(blockType: WasmParser.BlockType, typeSection: [FunctionType]) throws(WasmKitError) {
+    fileprivate init(
+        blockType: WasmParser.BlockType, resolveType: (TypeIndex) throws(WasmKitError) -> FunctionType
+    ) throws(WasmKitError) {
         switch blockType {
         case .type(let valueType):
             self.init(parameters: [], results: [valueType])
         case .empty:
             self.init(parameters: [], results: [])
         case .funcType(let typeIndex):
-            let typeIndex = Int(typeIndex)
-            guard typeIndex < typeSection.count else {
-                throw WasmKitError(message: .indexOutOfBounds("type", typeIndex, max: typeSection.count))
-            }
-            let funcType = typeSection[typeIndex]
-            self.init(
-                parameters: funcType.parameters,
-                results: funcType.results
-            )
+            self = try resolveType(typeIndex)
         }
         try checkFitsInterpreter()
     }

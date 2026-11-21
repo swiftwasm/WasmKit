@@ -14,7 +14,7 @@ import struct WasmTypes.FunctionType
 /// ### Print Int32 given by WebAssembly process
 ///
 /// ```swift
-/// Function(store: store, parameters: [.i32]) { _, args in
+/// try Function(store: store, parameters: [.i32]) { _, args in
 ///     print(args[0])
 ///     return []
 /// }
@@ -23,7 +23,7 @@ import struct WasmTypes.FunctionType
 /// ### Print a UTF-8 string passed by a WebAssembly module instance
 ///
 /// ```swift
-/// Function(store: store, parameters: [.i32, .i32]) { caller, args in
+/// try Function(store: store, parameters: [.i32, .i32]) { caller, args in
 ///     let (stringPtr, stringLength) = (Int(args[0].i32), Int(args[1].i32))
 ///     guard let memory = caller.instance?.exports[memory: "memory"] else {
 ///         fatalError("Missing \"memory\" export")
@@ -62,12 +62,15 @@ public struct Function: Equatable {
     ///   - parameters: The types of the function parameters.
     ///   - results: The types of the function results.
     ///   - body: The implementation of the function.
+    /// - Throws: `WasmKitError` if a parameter or result type refers to a type
+    ///   the store's engine has not registered, or if the signature is new and
+    ///   the engine already holds `EngineConfiguration.maxTypeCount` types.
     public init(
         store: Store,
         parameters: [ValueType], results: [ValueType] = [],
         body: @escaping Implementation
-    ) {
-        self.init(store: store, type: FunctionType(parameters: parameters, results: results), body: body)
+    ) throws(WasmKitError) {
+        try self.init(store: store, type: FunctionType(parameters: parameters, results: results), body: body)
     }
 
     /// Creates a new function instance backed by a native host function.
@@ -76,13 +79,16 @@ public struct Function: Equatable {
     ///   - store: The store to allocate the function in.
     ///   - type: The signature type of the function.
     ///   - body: The implementation of the function.
+    /// - Throws: `WasmKitError` if a parameter or result type refers to a type
+    ///   the store's engine has not registered, or if the signature is new and
+    ///   the engine already holds `EngineConfiguration.maxTypeCount` types.
     public init(
         store: Store,
         type: FunctionType,
         body: @escaping Implementation
-    ) {
+    ) throws(WasmKitError) {
         self.init(
-            handle: store.allocator.allocate(
+            handle: try store.allocator.allocate(
                 type: type, implementation: Function.adapting(body, results: type.results),
                 engine: store.engine),
             store: store)
@@ -100,7 +106,7 @@ public struct Function: Equatable {
             }
             for index in 0..<produced.count {
                 do {
-                    try produced[index].checkType(results[index])
+                    try produced[index].checkType(results[index], in: caller.store.allocator.typeRegistry)
                 } catch {
                     throw Trap(.resultTypesMismatch(expected: results, got: produced))
                 }
@@ -111,20 +117,24 @@ public struct Function: Equatable {
 
     /// Creates a function backed by a host implementation that does not
     /// allocate to receive its parameters.
+    ///
+    /// - Throws: `WasmKitError` if a parameter or result type refers to a type
+    ///   the store's engine has not registered, or if the signature is new and
+    ///   the engine already holds `EngineConfiguration.maxTypeCount` types.
     public init(
         store: Store,
         parameters: [ValueType], results: [ValueType] = [],
         raw body: @escaping RawImplementation
-    ) {
+    ) throws(WasmKitError) {
         let type = FunctionType(parameters: parameters, results: results)
         self.init(
-            handle: store.allocator.allocate(type: type, implementation: body, engine: store.engine),
+            handle: try store.allocator.allocate(type: type, implementation: body, engine: store.engine),
             store: store)
     }
 
     /// The signature type of the function.
     public var type: FunctionType {
-        store.allocator.funcTypeInterner.resolve(handle.type)
+        store.allocator.typeRegistry.resolve(handle.type)
     }
 
     /// Invokes a function of the given address with the given parameters.
@@ -235,7 +245,7 @@ extension InternalFunction {
         if isWasm {
             let entity = wasm
             let resolvedType = store.engine.resolveType(entity.type)
-            try check(functionType: resolvedType, parameters: arguments)
+            try check(functionType: resolvedType, parameters: arguments, in: store.allocator.typeRegistry)
             return try executeWasm(
                 store: store,
                 function: self,
@@ -252,7 +262,7 @@ extension InternalFunction {
     func invokeHost(_ arguments: [Value], store: Store) throws -> [Value] {
         let entity = host
         let resolvedType = store.engine.resolveType(entity.type)
-        try check(functionType: resolvedType, parameters: arguments)
+        try check(functionType: resolvedType, parameters: arguments, in: store.allocator.typeRegistry)
         let caller = Caller(instanceHandle: nil, store: store)
         var results = [Value](repeating: .i32(0), count: resolvedType.results.count)
         let implementation = entity.implementation
@@ -261,23 +271,23 @@ extension InternalFunction {
                 try implementation(caller, parameters, out)
             }
         }
-        try check(functionType: resolvedType, results: results)
+        try check(functionType: resolvedType, results: results, in: store.allocator.typeRegistry)
         return results
     }
 
-    private func check(expectedTypes: [ValueType], values: [Value]) -> Bool {
+    private func check(expectedTypes: [ValueType], values: [Value], in registry: TypeRegistry) -> Bool {
         guard expectedTypes.count == values.count else { return false }
-        return zip(values, expectedTypes).allSatisfy { $0.matches($1) }
+        return zip(values, expectedTypes).allSatisfy { $0.matches($1, in: registry) }
     }
 
-    private func check(functionType: FunctionType, parameters: [Value]) throws {
-        guard check(expectedTypes: functionType.parameters, values: parameters) else {
+    private func check(functionType: FunctionType, parameters: [Value], in registry: TypeRegistry) throws {
+        guard check(expectedTypes: functionType.parameters, values: parameters, in: registry) else {
             throw Trap(.parameterTypesMismatch(expected: functionType.parameters, got: parameters))
         }
     }
 
-    private func check(functionType: FunctionType, results: [Value]) throws {
-        guard check(expectedTypes: functionType.results, values: results) else {
+    private func check(functionType: FunctionType, results: [Value], in registry: TypeRegistry) throws {
+        guard check(expectedTypes: functionType.results, values: results, in: registry) else {
             throw Trap(.resultTypesMismatch(expected: functionType.results, got: results))
         }
     }
@@ -348,7 +358,7 @@ struct WasmFunctionEntity {
             try InstructionTranslator(
                 allocator: store.allocator.iseqAllocator,
                 engineConfiguration: engine.configuration,
-                funcTypeInterner: engine.funcTypeInterner,
+                typeRegistry: engine.typeRegistry,
                 module: instance,
                 type: engine.resolveType(type),
                 locals: code.locals,

@@ -178,7 +178,7 @@ struct FuelTests {
         var imports = Imports()
         imports.define(
             module: "env", name: "burn",
-            Function(store: store, parameters: [], results: []) { caller, _ in
+            try Function(store: store, parameters: [], results: []) { caller, _ in
                 caller.store.fuel = Fuel(remaining: 0)
                 return []
             })

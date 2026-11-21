@@ -517,7 +517,7 @@ import WAT
 
             let growCalled = Atomic<Bool>(false)
             let limiter = store.resourceLimiter
-            let growFunc = Function(store: store, type: FunctionType(parameters: [], results: [])) { _, _ in
+            let growFunc = try Function(store: store, type: FunctionType(parameters: [], results: [])) { _, _ in
                 _ = try! sharedStorage.grow(by: 1, resourceLimiter: limiter)
                 growCalled.store(true, ordering: .releasing)
                 return []
@@ -816,7 +816,7 @@ import WAT
                 features: [.threads, .simd])
             let growCalled = Atomic<Bool>(false)
             let limiter = store.resourceLimiter
-            let growFunc = Function(store: store, type: FunctionType(parameters: [], results: [])) { _, _ in
+            let growFunc = try Function(store: store, type: FunctionType(parameters: [], results: [])) { _, _ in
                 _ = try! sharedStorage.grow(by: 1, resourceLimiter: limiter)
                 growCalled.store(true, ordering: .releasing)
                 return []

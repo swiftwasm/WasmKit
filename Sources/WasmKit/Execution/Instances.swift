@@ -68,8 +68,8 @@ extension EntityHandle: ValidatableEntity where T: ValidatableEntity, T: ~Copyab
 }
 
 package struct InstanceEntity /* : ~Copyable */ {
-    /// The canonical signature of each type in the module's type section.
-    var types: [FunctionType]
+    /// The canonical definition of each type in the module's type section.
+    var types: [SubType]
     /// The canonical type ID of each type in the module's type section.
     var typeIDs: [InternedFuncType]
     var functions: ImmutableArray<InternalFunction>
@@ -241,7 +241,7 @@ public struct Instance {
                 // Print slot space information
                 let localTypes = code.withValue { $0.locals }
                 let stackLayout = try StackLayout(
-                    type: store.engine.funcTypeInterner.resolve(function.type),
+                    type: store.engine.typeRegistry.resolve(function.type),
                     locals: localTypes,
                     codeSize: code.expression.count
                 )
@@ -552,7 +552,9 @@ public struct Table: Equatable {
     /// - Parameters:
     ///   - store: The store that to allocate the global instance in.
     ///   - type: The type of the table instance.
-    /// - Throws: `Trap` if the initial and maximum table size exceeds the resource limit.
+    /// - Throws: `WasmKitError` if the element type refers to a type the store's
+    ///   engine has not registered, and `Trap` if the initial and maximum table
+    ///   size exceeds the resource limit.
     ///
     /// ```swift
     /// let engine = Engine()
@@ -567,6 +569,7 @@ public struct Table: Equatable {
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
     public init(store: Store, type: TableType) throws {
+        try store.allocator.typeRegistry.checkRegistered(.ref(type.elementType))
         self.init(
             handle: try store.allocator.allocate(tableType: type, resourceLimiter: store.resourceLimiter),
             allocator: store.allocator
@@ -1166,8 +1169,8 @@ struct GlobalEntity /* : ~Copyable */ {
         }
     }
 
-    init(globalType: GlobalType, initialValue: Value) throws {
-        try initialValue.checkType(globalType.valueType)
+    init(globalType: GlobalType, initialValue: Value, typeRegistry: TypeRegistry) throws {
+        try initialValue.checkType(globalType.valueType, in: typeRegistry)
         self.rawStorage = GlobalEntity.rawStorage(of: initialValue)
         self.globalType = globalType
     }
@@ -1202,7 +1205,7 @@ public struct Global: Equatable {
             guard global.globalType.mutability == .variable else {
                 throw Trap(.cannotAssignToImmutableGlobal)
             }
-            try value.checkType(global.globalType.valueType)
+            try value.checkType(global.globalType.valueType, in: allocator.typeRegistry)
             global.value = value
         }
     }
@@ -1215,9 +1218,11 @@ public struct Global: Equatable {
     /// Initializes a new global instance with the given type and initial value.
     /// The returned global instance may be used to instantiate a new
     /// WebAssembly module.
+    /// - Throws: `WasmKitError` if `globalType` refers to a type the store's
+    ///   engine has not registered, or if `initialValue` does not match `globalType`.
     @available(*, deprecated, renamed: "init(store:type:value:)")
-    public init(globalType: GlobalType, initialValue: Value, store: Store) {
-        try! self.init(store: store, type: globalType, value: initialValue)
+    public init(globalType: GlobalType, initialValue: Value, store: Store) throws {
+        try self.init(store: store, type: globalType, value: initialValue)
     }
 
     /// Create a new WebAssembly `global` instance.
@@ -1226,7 +1231,8 @@ public struct Global: Equatable {
     ///   - store: The store that to allocate the global instance in.
     ///   - type: The type of the global instance.
     ///   - value: Initial value of the global instance.
-    /// - Throws: `Trap` if the initial value does not match the global type.
+    /// - Throws: `WasmKitError` if `type` refers to a type the store's engine
+    ///   has not registered, or if `value` does not match `type`.
     ///
     /// ```swift
     /// import WasmKit
@@ -1244,6 +1250,7 @@ public struct Global: Equatable {
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
     public init(store: Store, type: GlobalType, value: Value) throws {
+        try store.allocator.typeRegistry.checkRegistered(type.valueType)
         let handle = try store.allocator.allocate(globalType: type, initialValue: value)
         self.init(handle: handle, allocator: store.allocator)
     }
@@ -1266,8 +1273,11 @@ public struct Tag: Equatable {
     /// - Parameters:
     ///   - store: The store to allocate the tag instance in.
     ///   - type: The function type describing the tag's parameters.
-    public init(store: Store, type: FunctionType) {
-        let handle = store.allocator.allocate(tagType: store.engine.internType(type))
+    /// - Throws: `WasmKitError` if a parameter type refers to a type the store's
+    ///   engine has not registered, or if the signature is new and the engine
+    ///   already holds `EngineConfiguration.maxTypeCount` types.
+    public init(store: Store, type: FunctionType) throws(WasmKitError) {
+        let handle = store.allocator.allocate(tagType: try store.engine.internType(type))
         self.init(handle: handle, allocator: store.allocator)
     }
 }
@@ -1368,7 +1378,7 @@ enum InternalExternalValue {
 
 extension InternalInstance {
     var instructionMapping: DebuggerInstructionMapping { withValue { $0.instructionMapping } }
-    var types: [FunctionType] { withValue { $0.types } }
+    var types: [SubType] { withValue { $0.types } }
     var typeCanonicalizer: TypeCanonicalizer { TypeCanonicalizer(typeIDs: withValue { $0.typeIDs }) }
     var functions: ImmutableArray<InternalFunction> { withValue { $0.functions } }
     var tables: ImmutableArray<InternalTable> { withValue { $0.tables } }

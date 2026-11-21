@@ -8,8 +8,8 @@ public final class Runtime {
     var interceptor: EngineInterceptor? {
         engine.interceptor
     }
-    var funcTypeInterner: Interner<FunctionType> {
-        engine.funcTypeInterner
+    var typeRegistry: TypeRegistry {
+        engine.typeRegistry
     }
     var configuration: EngineConfiguration {
         engine.configuration
@@ -25,24 +25,24 @@ public final class Runtime {
     /// - Parameter hostModules: Host module names mapped to their corresponding ``HostModule`` definitions.
     /// - Parameter interceptor: An optional runtime interceptor to intercept execution of instructions.
     /// - Parameter configuration: An optional runtime configuration to customize the runtime behavior.
+    /// - Throws: `WasmKitError` if a host function's type refers to a type the
+    ///   engine has not registered, or if the host functions' signatures need
+    ///   more than `EngineConfiguration.maxTypeCount` types.
     public init(
         hostModules: [String: HostModule] = [:],
         interceptor: EngineInterceptor? = nil,
         configuration: EngineConfiguration = EngineConfiguration()
-    ) {
+    ) throws(WasmKitError) {
         self.engine = Engine(configuration: configuration, interceptor: interceptor)
         store = Store(engine: engine)
 
         for (moduleName, hostModule) in hostModules {
-            registerUniqueHostModule(hostModule, as: moduleName, engine: engine)
+            try registerUniqueHostModule(hostModule, as: moduleName, engine: engine)
         }
     }
 
     func resolveType(_ type: InternedFuncType) -> FunctionType {
-        return funcTypeInterner.resolve(type)
-    }
-    func internType(_ type: FunctionType) -> InternedFuncType {
-        return funcTypeInterner.intern(type)
+        return typeRegistry.resolve(type)
     }
 
     public func instantiate(module: Module) throws -> Instance {
@@ -67,11 +67,11 @@ public final class Runtime {
             throw WasmKitError(message: .moduleInstanceAlreadyRegistered(name))
         }
 
-        registerUniqueHostModule(hostModule, as: name, engine: engine)
+        try registerUniqueHostModule(hostModule, as: name, engine: engine)
     }
 
     /// Register the given host module assuming that the given name is not registered yet.
-    func registerUniqueHostModule(_ hostModule: HostModule, as name: String, engine: Engine) {
+    func registerUniqueHostModule(_ hostModule: HostModule, as name: String, engine: Engine) throws(WasmKitError) {
         var moduleExports = [String: ExternalValue]()
 
         for (globalName, global) in hostModule.globals {
@@ -82,7 +82,7 @@ public final class Runtime {
         for (functionName, function) in hostModule.functions {
             moduleExports[functionName] = .function(
                 Function(
-                    handle: store.allocator.allocate(type: function.type, implementation: Function.adapting(function.implementation, results: function.type.results), engine: engine),
+                    handle: try store.allocator.allocate(type: function.type, implementation: Function.adapting(function.implementation, results: function.type.results), engine: engine),
                     store: store
                 )
             )

@@ -1068,7 +1068,7 @@
             // 1. Lifts core arguments to component values
             // 2. Calls the component function
             // 3. Lowers component results to core values
-            let wrappedFunction = Function(store: store, type: coreFuncType) { [componentFunction] _, coreArgs in
+            let wrappedFunction = try Function(store: store, type: coreFuncType) { [componentFunction] _, coreArgs in
                 // Lift core arguments to component values
                 var componentArgs: [ComponentValue] = []
                 var argIndex = 0

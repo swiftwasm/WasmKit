@@ -12,7 +12,7 @@ import struct WasmParser.Import
 /// ```swift
 /// let imports: Imports = [
 ///     "printer": [
-///         "print_i32": Function(store: store, parameters: [.i32]) { _, args in
+///         "print_i32": try Function(store: store, parameters: [.i32]) { _, args in
 ///             // This function is called from "print_add" in the WebAssembly module.
 ///             print(args[0])
 ///             return []

@@ -446,7 +446,7 @@ import WasmTypes
         try bridge.runAndClose { bridge in
             let store = Store(engine: Engine())
             var imports = Imports()
-            bridge.link(to: &imports, store: store)
+            try bridge.link(to: &imports, store: store)
             let instance = try parseWasm(bytes: Self.writerModule).instantiate(store: store, imports: imports)
             let write = try #require(instance.exports[function: "write"])
 
