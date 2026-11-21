@@ -14,7 +14,7 @@ struct Example {
         let watURL = examplesDirectory.appendingPathComponent("wasm/string_passing.wat")
 
         let module = try parseWasm(
-            bytes: try wat2wasm(String(contentsOf: watURL))
+            bytes: try wat2wasm(String(contentsOf: watURL, encoding: .utf8))
         )
 
         let engine = Engine()
