@@ -29,8 +29,7 @@ package final class MemoryDirectoryNode: MemFSNode {
         var ctim: WASIAbi.Timestamp
     }
 
-    // See `WASIImplementation.fdTable` for why this is a `nonisolated(unsafe) var`.
-    nonisolated(unsafe) private var state: PlatformMutex<State>
+    private let state: PlatformMutex<State>
 
     init() {
         let now = WASIAbi.Timestamp.currentWallClock()
@@ -137,8 +136,7 @@ final class MemoryFileNode: MemFSNode {
         var ctim: WASIAbi.Timestamp
     }
 
-    // See `WASIImplementation.fdTable` for why this is a `nonisolated(unsafe) var`.
-    nonisolated(unsafe) private var state: PlatformMutex<State>
+    private let state: PlatformMutex<State>
 
     init(content: FileContent) {
         let now = WASIAbi.Timestamp.currentWallClock()

@@ -174,13 +174,14 @@ struct TailCallHostTrapTests {
             store.setEpochDeadline(ticksBeyondCurrent: 1000)
         }
         let module = try parseWasm(
-            bytes: wat2wasm(wat, features: features, options: EncodeOptions(nameSection: true)), features: features)
+            bytes: wat2wasm(wat, features: features, options: EncodeOptions(nameSection: true)),
+            engine: store.engine, features: features)
         let calls = Calls()
         var imports = Imports()
         for (name, count) in [("wide", 8), ("three", 3), ("one", 1)] {
             imports.define(
                 module: "env", name: name,
-                Function(store: store, parameters: Array(repeating: .i32, count: count), results: [.i32]) {
+                try Function(store: store, parameters: Array(repeating: .i32, count: count), results: [.i32]) {
                     _, arguments in
                     calls.arguments[name, default: []].append(arguments)
                     return try host(arguments, calls.arguments[name, default: []].count)
@@ -320,10 +321,10 @@ struct TailCallHostTrapTests {
         var imports = Imports()
         imports.define(
             module: "env", name: "seven",
-            Function(store: store, parameters: [.i32], results: [.i32]) { _, args in [.i32(args[0].i32 &+ 7)] })
+            try Function(store: store, parameters: [.i32], results: [.i32]) { _, args in [.i32(args[0].i32 &+ 7)] })
         imports.define(
             module: "env", name: "mark",
-            Function(store: store, parameters: [], results: []) { _, _ in
+            try Function(store: store, parameters: [], results: []) { _, _ in
                 marks += 1
                 return []
             })
@@ -344,6 +345,7 @@ struct TailCallHostTrapTests {
                   (func (export "nested") (param i32) (result i32)
                     (i32.mul (call $tail (local.get 0)) (i32.const 3))))
                 """, features: Self.features),
+            engine: store.engine,
             features: Self.features
         ).instantiate(store: store, imports: imports)
         for (name, expected) in [("root", UInt32(8)), ("nested", 24)] {

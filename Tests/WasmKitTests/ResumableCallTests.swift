@@ -23,7 +23,7 @@ struct ResumableCallTests {
 
     private static func instantiate(_ wat: String, store: Store, imports: Imports = Imports()) throws -> Instance {
         let features: WasmFeatureSet = [.referenceTypes, .exceptionHandling, .tailCall, .memory64]
-        return try parseWasm(bytes: wat2wasm(wat, features: features), features: features)
+        return try parseWasm(bytes: wat2wasm(wat, features: features), engine: store.engine, features: features)
             .instantiate(store: store, imports: imports)
     }
 
@@ -367,7 +367,7 @@ struct ResumableCallTests {
         var imports = Imports()
         imports.define(
             module: "env", name: "h",
-            Function(store: store, parameters: [], results: []) { _, _ in
+            try Function(store: store, parameters: [], results: []) { _, _ in
                 do {
                     _ = try spin([.i32(100_000)])
                     nested = "returned"
@@ -402,7 +402,7 @@ struct ResumableCallTests {
         var imports = Imports()
         imports.define(
             module: "env", name: "h",
-            Function(store: store, parameters: [], results: [.i32]) { _, _ in
+            try Function(store: store, parameters: [], results: [.i32]) { _, _ in
                 let inner = try ResumableCall(function: spin, arguments: [.i32(500)])
                 let saved = store.fuel
                 store.fuel = Fuel(remaining: 50)
@@ -489,7 +489,7 @@ struct ResumableCallTests {
         var imports = Imports()
         imports.define(
             module: "env", name: "tick",
-            Function(store: store, parameters: [], results: []) { _, _ in
+            try Function(store: store, parameters: [], results: []) { _, _ in
                 store.engine.epochTicker.increment()
                 return []
             })
@@ -546,7 +546,7 @@ struct ResumableCallTests {
         var imports = Imports()
         imports.define(
             module: "env", name: "h",
-            Function(store: store, parameters: [], results: []) { _, _ in
+            try Function(store: store, parameters: [], results: []) { _, _ in
                 store.setEpochDeadline(ticksBeyondCurrent: 0)
                 defer { store.setEpochDeadline(ticksBeyondCurrent: .max) }
                 do {
@@ -616,7 +616,7 @@ struct ResumableCallTests {
         var imports = Imports()
         imports.define(
             module: "env", name: "h",
-            Function(store: store, parameters: [], results: []) { _, _ in
+            try Function(store: store, parameters: [], results: []) { _, _ in
                 do {
                     _ = try call!.resume()
                 } catch let error as ResumableCallError {
@@ -645,7 +645,7 @@ struct ResumableCallTests {
         var call: ResumableCall?
         var reentered: ResumableCallError?
         var finishedWhileRunning: Bool?
-        let host = Function(store: store, parameters: [], results: []) { _, _ in
+        let host = try Function(store: store, parameters: [], results: []) { _, _ in
             finishedWhileRunning = call!.isFinished
             do {
                 _ = try call!.resume()
@@ -724,7 +724,7 @@ struct ResumableCallTests {
     @Test(arguments: testedThreadingModels)
     func hostFunctionAndUnmeteredEngineRunToCompletion(threadingModel: EngineConfiguration.ThreadingModel) throws {
         let store = Self.makeStore(threadingModel: threadingModel, fuelMetering: false)
-        let host = Function(store: store, parameters: [.i32], results: [.i32]) { _, args in [args[0]] }
+        let host = try Function(store: store, parameters: [.i32], results: [.i32]) { _, args in [args[0]] }
         guard case .returned(let hostResults) = try ResumableCall(function: host, arguments: [.i32(3)]).resume() else {
             Issue.record("expected the call to return")
             return

@@ -13,11 +13,12 @@ struct Example {
             .deletingLastPathComponent() // Examples
         let watURL = examplesDirectory.appendingPathComponent("wasm/string_passing.wat")
 
+        let engine = Engine()
         let module = try parseWasm(
-            bytes: try wat2wasm(String(contentsOf: watURL))
+            bytes: try wat2wasm(String(contentsOf: watURL)),
+            engine: engine
         )
 
-        let engine = Engine()
         let store = Store(engine: engine)
 
         let instance = try module.instantiate(
@@ -30,7 +31,7 @@ struct Example {
                         guard let memory = caller.instance?.exports[memory: "memory"] else {
                             fatalError("Missing \"memory\" export")
                         }
-                        let string = memory.withUnsafeMutableBufferPointer(
+                        let string = try memory.withUnsafeMutableBufferPointer(
                             offset: UInt(stringPtr),
                             count: stringLength
                         ) { buffer in

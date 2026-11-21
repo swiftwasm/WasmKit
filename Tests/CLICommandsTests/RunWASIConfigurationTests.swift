@@ -13,8 +13,8 @@
             return try bridge.runAndClose { wasi in
                 let store = Store(engine: Engine())
                 var imports = Imports()
-                wasi.link(to: &imports, store: store)
-                let instance = try PreopenFixture.fixtureModule().instantiate(store: store, imports: imports)
+                try wasi.link(to: &imports, store: store)
+                let instance = try PreopenFixture.fixtureModule(engine: store.engine).instantiate(store: store, imports: imports)
                 return try wasi.start(instance)
             }
         }

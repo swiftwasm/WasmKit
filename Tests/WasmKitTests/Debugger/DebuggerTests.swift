@@ -424,7 +424,7 @@
         func breakpoints(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(trivialModuleWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             try debugger.stopAtEntrypoint()
@@ -451,7 +451,7 @@
         @Test(arguments: testedThreadingModels)
         func steppingPreservesAValueHeldInARegister(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
-            let module = try parseWasm(bytes: try wat2wasm(registerHandoffWAT))
+            let module = try parseWasm(bytes: try wat2wasm(registerHandoffWAT), engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             _ = try debugger.enableBreakpoint(module: module, function: 0)
@@ -467,7 +467,7 @@
         func lazyFunctionsCompilation(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(multiFunctionWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
 
             #expect(module.functions.count == 2)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -500,7 +500,7 @@
         func getLocal(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(manyLocalsWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             _ = try debugger.enableBreakpoint(
@@ -526,7 +526,7 @@
         func stepFollowsBrIf(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(loopWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let base = module.functions[0].code.originalAddress
@@ -567,7 +567,7 @@
         func stepFollowsBr(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(brLoopWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let base = module.functions[0].code.originalAddress
@@ -609,7 +609,7 @@
         func stepFollowsBrTable(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(brTableLoopWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let base = module.functions[0].code.originalAddress
@@ -647,7 +647,7 @@
         func stepEntersCall(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(callWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let startBase = module.functions[0].code.originalAddress
@@ -669,7 +669,7 @@
         func stepEntersCallIndirect(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(callIndirectWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let startBase = module.functions[0].code.originalAddress
@@ -694,7 +694,7 @@
             let features: WasmFeatureSet = [.tailCall]
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(returnCallWAT, features: features)
-            let module = try parseWasm(bytes: bytes, features: features)
+            let module = try parseWasm(bytes: bytes, engine: store.engine, features: features)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let startBase = module.functions[0].code.originalAddress
@@ -722,7 +722,7 @@
         func stepThroughRecursiveCall(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(recursiveCallWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let startBase = module.functions[0].code.originalAddress
@@ -747,7 +747,7 @@
         func stepThroughIndirectRecursiveCall(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(indirectRecursiveCallWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             // _start body: i32.const 2 (2) + i32.const 0 (2) + call_indirect (3) + end (1)
@@ -772,7 +772,7 @@
         func runPreservingFactorialBreakpoint(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(factorialWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let breakpointAddress = try debugger.enableBreakpoint(
@@ -808,7 +808,7 @@
         func runPreservingBrIfBreakpoint(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(loopWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let base = module.functions[0].code.originalAddress
@@ -838,7 +838,7 @@
         func runPreservingBrBreakpoint(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(brLoopWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let base = module.functions[0].code.originalAddress
@@ -861,7 +861,7 @@
         func runPreservingBrTableBreakpoint(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(brTableLoopWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let base = module.functions[0].code.originalAddress
@@ -887,7 +887,7 @@
         func runPreservingCallBreakpoint(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(callInLoopWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let base = module.functions[0].code.originalAddress
@@ -930,7 +930,7 @@
         func runPreservingCallIndirectInLoopBreakpoint(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(callIndirectInLoopWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let base = module.functions[0].code.originalAddress
@@ -976,7 +976,7 @@
         func runPreservingRecursiveCallBreakpoint(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(recursiveCallWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let recurseBase = module.functions[1].code.originalAddress
@@ -1017,7 +1017,7 @@
         func runPreservingRecursiveCallIndirectBreakpoint(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(recursiveCallIndirectSelfWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let recurseBase = module.functions[1].code.originalAddress
@@ -1062,7 +1062,7 @@
             let features: WasmFeatureSet = [.tailCall]
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(returnCallRecursiveWAT, features: features)
-            let module = try parseWasm(bytes: bytes, features: features)
+            let module = try parseWasm(bytes: bytes, engine: store.engine, features: features)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let countdownBase = module.functions[1].code.originalAddress
@@ -1096,7 +1096,7 @@
         func counterDemoTwoBreakpointsAllIterations(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(counterDemoWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             // Set breakpoints at entry of both helper functions
@@ -1151,7 +1151,7 @@
         func counterDemoBreakpointInsideIfBody(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(counterDemoWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let advanceBp = try debugger.enableBreakpoint(
@@ -1206,7 +1206,7 @@
         func stepAfterBreakpointRemovedAtCurrentPc(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(trivialModuleWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             try debugger.stopAtEntrypoint()
@@ -1225,7 +1225,7 @@
         func stepFromFactorialEntrypoint(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(factorialWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             try debugger.stopAtEntrypoint()
@@ -1250,7 +1250,7 @@
         func stepAfterRunPreservingBreakpoint(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(factorialWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let breakpointAddress = try debugger.enableBreakpoint(
@@ -1284,7 +1284,7 @@
         func breakpointRemovedAndReaddedWhileStopped(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(factorialWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let requestedAddress = module.functions[1].code.originalAddress
@@ -1322,7 +1322,7 @@
         func stepLeavesNoBreakpointBehind(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(loopWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let base = module.functions[0].code.originalAddress
@@ -1350,7 +1350,7 @@
         func stepKeepsTheBreakpointItSteppedOff(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(loopWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let base = module.functions[0].code.originalAddress
@@ -1373,7 +1373,7 @@
         func resumeStopsAtABreakpointOneInstructionAway(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(callInLoopWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             let callAddress = try debugger.enableBreakpoint(
@@ -1395,7 +1395,7 @@
         func removingAllBreakpointsRunsToCompletion(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(counterDemoWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             _ = try debugger.enableBreakpoint(module: module, function: 1)
@@ -1420,7 +1420,7 @@
         func aBreakpointResolvesInsideTheFunctionThatContainsIt(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(twoCalleesWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             // Compile the later function first, so that the earlier one has something above it to
@@ -1442,7 +1442,7 @@
         func aBreakpointAtAFunctionsStartResolvesIntoIt(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(twoCalleesWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             // Compile `$second` first, so the address has something above it to slide into.
@@ -1459,7 +1459,7 @@
         func anAddressPastItsFunctionDoesNotResolveIntoTheNext(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
             let bytes = try wat2wasm(twoCalleesWAT)
-            let module = try parseWasm(bytes: bytes)
+            let module = try parseWasm(bytes: bytes, engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             // The size prefix of `$second`'s code entry: still within `$first`'s range, and past
@@ -1483,8 +1483,8 @@
         @Test(arguments: testedThreadingModels)
         func anImportedFunctionDoesNotDisplaceThisModulesAddresses(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let store = Store(engine: Engine(configuration: EngineConfiguration(threadingModel: threadingModel)))
-            let libModule = try parseWasm(bytes: try wat2wasm(paddedLibraryWAT))
-            let module = try parseWasm(bytes: try wat2wasm(importingModuleWAT))
+            let libModule = try parseWasm(bytes: try wat2wasm(paddedLibraryWAT), engine: store.engine)
+            let module = try parseWasm(bytes: try wat2wasm(importingModuleWAT), engine: store.engine)
 
             // What makes the import's address misleading: it lies above everything in the module
             // that imports it.

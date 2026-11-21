@@ -844,11 +844,8 @@ final class WASIImplementation: Sendable {
     private let environment: [String: String]
     private let wallClock: WallClock
     private let monotonicClock: MonotonicClock
-    // `var` because the single-threaded PlatformMutex fallback mutates in
-    // place; `nonisolated(unsafe)` because the lock, not the compiler, is what
-    // makes the access safe.
-    nonisolated(unsafe) private var randomGenerator: PlatformMutex<any RandomBufferGenerator>
-    nonisolated(unsafe) internal var fdTable: PlatformMutex<FdTable>
+    private let randomGenerator: PlatformMutex<any RandomBufferGenerator>
+    internal let fdTable: PlatformMutex<FdTable>
     internal let fileSystem: FileSystemImplementation
 
     init(

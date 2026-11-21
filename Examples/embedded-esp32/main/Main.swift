@@ -141,12 +141,12 @@ func runWASIGuest() throws {
     try bridge.runAndClose { bridge in
         var imports = Imports()
         #if WASMKIT_LINK_ALL_WASI
-            bridge.link(to: &imports, store: store, capabilities: WasmKitWASI.WASICapability.all)
+            try bridge.link(to: &imports, store: store, capabilities: WasmKitWASI.WASICapability.all)
         #else
-            bridge.link(to: &imports, store: store, capabilities: [.stdio, .process])
+            try bridge.link(to: &imports, store: store, capabilities: [.stdio, .process])
         #endif
 
-        let module = try parseWasm(bytes: wasiGuestWasm)
+        let module = try parseWasm(bytes: wasiGuestWasm, engine: store.engine)
         let instance = try module.instantiate(store: store, imports: imports)
         _ = try bridge.start(instance)
     }
@@ -254,22 +254,22 @@ func serveGDBOverUART() throws {
 func app_main() {
     print("WasmKit on ESP32-C6")
     do {
-        let module = try parseWasm(bytes: demoWasm)
         // The default 512 KiB VM stack does not fit in on-chip SRAM.
         var configuration = EngineConfiguration()
         configuration.stackSize = 64 * 1024
         let engine = Engine(configuration: configuration)
+        let module = try parseWasm(bytes: demoWasm, engine: engine)
         let store = Store(engine: engine)
 
         var imports = Imports()
         imports.define(
             module: "host", name: "mul",
-            Function(store: store, parameters: [.i32, .i32], results: [.i32]) { _, arguments in
+            try Function(store: store, parameters: [.i32, .i32], results: [.i32]) { _, arguments in
                 [.i32(arguments[0].i32 &* arguments[1].i32)]
             })
         imports.define(
             module: "host", name: "boom",
-            Function(store: store, parameters: []) { _, _ in
+            try Function(store: store, parameters: []) { _, _ in
                 throw DemoHostError(code: 42)
             })
 

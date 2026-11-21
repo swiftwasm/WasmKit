@@ -11,15 +11,23 @@
     ///
     /// - Parameters:
     ///   - bytes: The WebAssembly component binary bytes
+    ///   - engine: The engine that registers the types of the component's core modules. The component can only be
+    ///     instantiated in a ``Store`` of this engine.
     ///   - features: Enabled WebAssembly features for parsing
     /// - Returns: A `ParsedComponent` ready for instantiation
     /// - Throws: `WasmKitError` if parsing fails, `ComponentParseError` for semantic errors
     public func parseComponent(
         bytes: [UInt8],
+        engine: Engine,
         features: WasmFeatureSet = .default
     ) throws -> ParsedComponent {
         let stream = StaticByteStreamSource(bytes: bytes)
-        return try parseComponent(stream: stream, features: features)
+        return try parseComponent(stream: stream, engine: engine, features: features)
+    }
+
+    @available(*, unavailable, renamed: "parseComponent(bytes:engine:features:)")
+    public func parseComponent(bytes: [UInt8], features: WasmFeatureSet = .default) throws -> ParsedComponent {
+        fatalError()
     }
 
     /// Parse a component binary from an ArraySlice into a `ParsedComponent`.
@@ -33,19 +41,21 @@
     /// - Throws: `WasmKitError` if parsing fails, `ComponentParseError` for semantic errors
     func parseComponent(
         bytes: ArraySlice<UInt8>,
+        engine: Engine,
         features: WasmFeatureSet = .default
     ) throws -> ParsedComponent {
         let stream = StaticByteStreamSource(bytes: bytes)
-        return try parseComponent(stream: stream, features: features)
+        return try parseComponent(stream: stream, engine: engine, features: features)
     }
 
     /// Internal implementation that parses from any ByteStream.
     private func parseComponent<Source: ByteStreamSource>(
         stream: Source,
+        engine: Engine,
         features: WasmFeatureSet
     ) throws -> ParsedComponent {
         var parser = WasmParser.ComponentParser(stream: stream, features: features)
-        var builder = ParsedComponentBuilder()
+        var builder = ParsedComponentBuilder(engine: engine)
 
         while let payload = try parser.parseNext() {
             try builder.process(payload)
@@ -86,6 +96,7 @@
         private var imports: [ComponentImportDef] = []
         private var exports: [ComponentExportDef] = []
         private var canonicalDefs: [CanonicalDefinition] = []
+        private let engine: Engine
 
         /// Tracks the order of definitions for interleaved processing
         private enum OrderedDefKind {
@@ -96,7 +107,9 @@
         }
         private var orderedDefs: [OrderedDefKind] = []
 
-        init() {}
+        init(engine: Engine) {
+            self.engine = engine
+        }
 
         /// Process a parsing payload from the streaming parser.
         mutating func process(_ payload: ComponentParsingPayload) throws {
@@ -110,7 +123,7 @@
                 break
 
             case .coreModule(let moduleBytes):
-                let module = try parseWasm(bytes: moduleBytes)
+                let module = try parseModule(parser: WasmParser.Parser(bytes: moduleBytes), engine: engine)
                 coreModules.append(module)
 
             case .coreInstanceSection(let instances):
@@ -175,7 +188,7 @@
 
             // Build nested components (recursively parse component bytes)
             for componentBytes in components {
-                let nestedParsed = try parseComponent(bytes: componentBytes)
+                let nestedParsed = try parseComponent(bytes: componentBytes, engine: engine)
                 result.nestedComponents.append(nestedParsed)
             }
 
@@ -606,10 +619,16 @@
     /// current offset.
     public func parseComponent(
         fileHandle: CInt,
+        engine: Engine,
         features: WasmFeatureSet = .default
     ) throws -> ParsedComponent {
         let stream = try FileHandleStreamSource(fileHandle: fileHandle)
-        return try parseComponent(stream: stream, features: features)
+        return try parseComponent(stream: stream, engine: engine, features: features)
+    }
+
+    @available(*, unavailable, renamed: "parseComponent(fileHandle:engine:features:)")
+    public func parseComponent(fileHandle: CInt, features: WasmFeatureSet = .default) throws -> ParsedComponent {
+        fatalError()
     }
 
     /// Parse a component binary from a file path.
@@ -618,9 +637,15 @@
     /// source is deallocated.
     public func parseComponent(
         filePath: String,
+        engine: Engine,
         features: WasmFeatureSet = .default
     ) throws -> ParsedComponent {
         let stream = try FileHandleStreamSource(filePath: filePath)
-        return try parseComponent(stream: stream, features: features)
+        return try parseComponent(stream: stream, engine: engine, features: features)
+    }
+
+    @available(*, unavailable, renamed: "parseComponent(filePath:engine:features:)")
+    public func parseComponent(filePath: String, features: WasmFeatureSet = .default) throws -> ParsedComponent {
+        fatalError()
     }
 #endif

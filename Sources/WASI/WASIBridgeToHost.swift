@@ -20,8 +20,7 @@ import WasmTypes
 /// ```
 public final class WASIBridgeToHost: Sendable {
     internal let underlying: WASIImplementation
-    // See `WASIImplementation.fdTable` for why this is a `nonisolated(unsafe) var`.
-    nonisolated(unsafe) private var isClosed = PlatformMutex(false)
+    private let isClosed = PlatformMutex(false)
 
     /// A preopened directory mapping from a guest path to a host path.
     ///

@@ -268,27 +268,27 @@ final class Runner {
         Array(try Data(contentsOf: url(relativePath)))
     }
 
-    private func loadWat(_ name: String) throws -> Module {
+    private func loadWat(_ name: String, engine: Engine) throws -> Module {
         let source = try String(contentsOf: url("res/wat/\(name).wat"), encoding: .utf8)
-        return try parseWasm(bytes: try wat2wasm(source))
+        return try parseWasm(bytes: try wat2wasm(source), engine: engine)
     }
 
-    private func loadWasm(_ relativePath: String) throws -> Module {
-        try parseWasm(filePath: url(relativePath).path)
+    private func loadWasm(_ relativePath: String, engine: Engine) throws -> Module {
+        try parseWasm(filePath: url(relativePath).path, engine: engine)
     }
 
     // MARK: Cases
 
     private func run(_ watCase: WatCase) throws {
         let store = makeStore()
-        let instance = try loadWat(watCase.name).instantiate(store: store)
+        let instance = try loadWat(watCase.name, engine: store.engine).instantiate(store: store)
         let run = instance.exports[function: "run"]!
         try measure(watCase.name) { _ = try run([watCase.input]) }
     }
 
     private func run(_ rustCase: RustCase) throws {
         let store = makeStore()
-        let instance = try loadWasm("res/rust/cases/\(rustCase.name)/out.wasm").instantiate(store: store)
+        let instance = try loadWasm("res/rust/cases/\(rustCase.name)/out.wasm", engine: store.engine).instantiate(store: store)
         let setup = instance.exports[function: "setup"]!
 
         let data: Value
@@ -312,7 +312,7 @@ final class Runner {
 
     private func run(_ extraCase: ExtraCase) throws {
         let store = makeStore()
-        let instance = try parseWasm(bytes: try wat2wasm(extraCase.wat)).instantiate(store: store)
+        let instance = try parseWasm(bytes: try wat2wasm(extraCase.wat), engine: store.engine).instantiate(store: store)
         let run = instance.exports[function: "run"]!
         try measure(extraCase.name, group: "extra") { _ = try run([extraCase.input]) }
         expect(try run([extraCase.input]), [extraCase.expected], "\(extraCase.name).run")
@@ -321,9 +321,9 @@ final class Runner {
     /// CoreMark reports its own score, so it is run exactly once instead of being timed.
     private func runCoreMark() throws {
         let store = makeStore()
-        let module = try loadWasm("res/wasm/coremark.wasm")
+        let module = try loadWasm("res/wasm/coremark.wasm", engine: store.engine)
         let start = Self.now()
-        let clockMs = Function(store: store, parameters: [], results: [.i32]) { _, _ in
+        let clockMs = try Function(store: store, parameters: [], results: [.i32]) { _, _ in
             [Value(signed: Int32(truncatingIfNeeded: (Self.now() - start) / 1_000_000))]
         }
         let instance = try module.instantiate(store: store, imports: ["env": ["clock_ms": clockMs]])

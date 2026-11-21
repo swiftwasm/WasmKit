@@ -55,7 +55,7 @@
                         (memory.atomic.notify (i32.const 0) (i32.const 1)))
                     )
                     """, features: [.threads]
-                ), features: [.threads])
+                ), engine: engine, features: [.threads])
             let waitStore = Store(engine: engine)
             let notifyStore = Store(engine: engine)
             let waitInstance = try module.instantiate(
@@ -107,10 +107,9 @@
                     )
                     """,
                     features: [.threads]
-                ), features: [.threads])
+                ), engine: engine, features: [.threads])
             let threads = try WASIThreads(
                 module: module,
-                engine: engine,
                 processControl: .init(
                     terminateAfterMainReturn: { _ in fatalError("not reached") },
                     terminateAfterWorkerFailure: { error in fatalError("unexpected worker failure: \(error)") }
@@ -152,9 +151,9 @@
                     )
                     """,
                     features: [.threads]
-                ), features: [.threads])
+                ), engine: engine, features: [.threads])
             let threads = try WASIThreads(
-                module: module, engine: engine,
+                module: module,
                 configuration: .init(maximumThreads: 2),
                 processControl: .init(
                     terminateAfterMainReturn: { _ in fatalError("not reached") },
@@ -202,9 +201,9 @@
                       (func (export "run") (result i32) (call $spawn (i32.const 0)))
                     )
                     """, features: [.threads]
-                ), features: [.threads])
+                ), engine: engine, features: [.threads])
             let threads = try WASIThreads(
-                module: module, engine: engine,
+                module: module,
                 processControl: .init(
                     terminateAfterMainReturn: { _ in fatalError("not reached") },
                     terminateAfterWorkerFailure: { error in fatalError("unexpected worker failure: \(error)") }
@@ -228,9 +227,9 @@
                       (func (export "run") (result i32) (call $spawn (i32.const 0)))
                     )
                     """, features: [.threads]
-                ), features: [.threads])
+                ), engine: engine, features: [.threads])
             let threads = try WASIThreads(
-                module: module, engine: engine, configuration: .init(maximumThreads: 1),
+                module: module, configuration: .init(maximumThreads: 1),
                 processControl: .init(
                     terminateAfterMainReturn: { _ in fatalError("not reached") },
                     terminateAfterWorkerFailure: { error in fatalError("unexpected worker failure: \(error)") }

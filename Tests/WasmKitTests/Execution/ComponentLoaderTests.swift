@@ -31,7 +31,8 @@
                         )
                     )
                     """
-                )
+                ),
+                engine: engine
             )
             let instance = try module.instantiate(store: store)
 
@@ -89,7 +90,8 @@
                         )
                     )
                     """
-                )
+                ),
+                engine: engine
             )
 
             var component = ParsedComponent()
@@ -166,7 +168,8 @@
                         )
                     )
                     """
-                )
+                ),
+                engine: engine
             )
             let instance = try module.instantiate(store: store)
 
@@ -214,7 +217,8 @@
                         )
                     )
                     """
-                )
+                ),
+                engine: engine
             )
 
             // Create a component that requires a module import
@@ -236,12 +240,26 @@
 
         // MARK: - Full CM WAT Tests
 
-        /// Helper to parse, encode, and instantiate a component from WAT
-        private func instantiateComponentWAT(_ wat: String) throws -> ComponentInstance {
-            let engine = Engine()
-            let store = Store(engine: engine)
-            let linker = ComponentLoader(store: store)
+        private static let doubleComponentWAT = """
+            (component
+                (core module $m
+                    (func (export "double") (param i32) (result i32)
+                        local.get 0
+                        local.get 0
+                        i32.add
+                    )
+                    (memory (export "memory") 1)
+                )
+                (core instance $i (instantiate $m))
+                (func (export "double") (param "value" s32) (result s32)
+                    (canon lift (core func $i "double")
+                        (memory $i "memory")
+                    )
+                )
+            )
+            """
 
+        private func parseComponentWAT(_ wat: String, engine: Engine) throws -> ParsedComponent {
             var wast = try parseComponentWAST(wat)
             guard let (directive, _) = try wast.nextDirective(),
                 case .component(let comp) = directive,
@@ -252,31 +270,29 @@
 
             var encoder = ComponentEncoder()
             let bytes = try encoder.encode(componentDef, options: .init())
-            let parsed = try parseComponent(bytes: bytes)
-            return try linker.instantiate(component: parsed)
+            return try parseComponent(bytes: bytes, engine: engine)
+        }
+
+        /// Helper to parse, encode, and instantiate a component from WAT
+        private func instantiateComponentWAT(_ wat: String) throws -> ComponentInstance {
+            let engine = Engine()
+            let linker = ComponentLoader(store: Store(engine: engine))
+            return try linker.instantiate(component: parseComponentWAT(wat, engine: engine))
+        }
+
+        @Test
+        func componentParsedWithOtherEngineThrows() throws {
+            let component = try parseComponentWAT(Self.doubleComponentWAT, engine: Engine())
+            let linker = ComponentLoader(store: Store(engine: Engine()))
+            let error = try #require(throws: WasmKitError.self) {
+                try linker.instantiate(component: component)
+            }
+            #expect(error.description == "module was parsed with a different engine than the store's")
         }
 
         @Test
         func liftCoreFunctionFromWAT() throws {
-            let instance = try instantiateComponentWAT(
-                """
-                (component
-                    (core module $m
-                        (func (export "double") (param i32) (result i32)
-                            local.get 0
-                            local.get 0
-                            i32.add
-                        )
-                        (memory (export "memory") 1)
-                    )
-                    (core instance $i (instantiate $m))
-                    (func (export "double") (param "value" s32) (result s32)
-                        (canon lift (core func $i "double")
-                            (memory $i "memory")
-                        )
-                    )
-                )
-                """)
+            let instance = try instantiateComponentWAT(Self.doubleComponentWAT)
 
             guard case .function(let doubleFunc) = instance.export("double") else {
                 Issue.record("Expected double function export")

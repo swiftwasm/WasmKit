@@ -6,6 +6,7 @@ import WAT
 @Suite struct AddressLoadFusionTests {
     @Test(arguments: [EngineConfiguration.ThreadingModel.direct, .token])
     func wrapsAddressBeforeAddingMemoryOffset(threadingModel: EngineConfiguration.ThreadingModel) throws {
+        let engine = Engine(configuration: .init(threadingModel: threadingModel))
         let module = try parseWasm(
             bytes: wat2wasm(
                 """
@@ -20,8 +21,8 @@ import WAT
                       local.get 0 i32.const 16 i32.add
                     end
                     i32.load offset=4))
-                """))
-        let store = Store(engine: Engine(configuration: .init(threadingModel: threadingModel)))
+                """), engine: engine)
+        let store = Store(engine: engine)
         let instance = try module.instantiate(store: store)
         let f = try #require(instance.exports[function: "f"])
         let join = try #require(instance.exports[function: "join"])
@@ -33,7 +34,7 @@ import WAT
             #expect(throws: (any Error).self) { try f([.i32(x)]) }
         }
         #if Disassembler
-            let dumpStore = Store(engine: Engine(configuration: .init(threadingModel: threadingModel)))
+            let dumpStore = Store(engine: engine)
             let dumpInstance = try module.instantiate(store: dumpStore)
             var listing = ""
             try dumpInstance.dumpFunctions(to: &listing, module: module)
@@ -46,6 +47,7 @@ import WAT
     @Test(arguments: [false, true])
     func compactLoadBounds(shared: Bool) throws {
         guard !shared || SpectestTests.sharedMemorySupported else { return }
+        let store = Store(engine: Engine())
         let module = try parseWasm(
             bytes: wat2wasm(
                 """
@@ -53,8 +55,7 @@ import WAT
                   (data (i32.const 65532) "abcd")
                   (func (export "load") (param i32) (result i32) local.get 0 i32.load)
                   (func (export "offset") (param i32) (result i32) local.get 0 i32.load offset=4294967295))
-                """, features: shared ? [.threads] : []), features: shared ? [.threads] : [])
-        let store = Store(engine: Engine())
+                """, features: shared ? [.threads] : []), engine: store.engine, features: shared ? [.threads] : [])
         let instance = try module.instantiate(store: store)
         let load = try #require(instance.exports[function: "load"])
         let offset = try #require(instance.exports[function: "offset"])

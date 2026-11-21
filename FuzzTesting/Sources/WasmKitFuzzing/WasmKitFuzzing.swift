@@ -18,11 +18,11 @@ public final class FuzzerResourceLimiter: ResourceLimiter {
 ///
 /// - Parameter bytes: The bytes of the Wasm module.
 public func fuzzInstantiation(bytes: [UInt8]) throws {
-    var module = try WasmKit.parseWasm(bytes: bytes, features: .all)
+    let engine = Engine(configuration: EngineConfiguration(compilationMode: .eager))
+    var module = try WasmKit.parseWasm(bytes: bytes, engine: engine, features: .all)
     // To ensure that the module instantiation will stop eventually.
     module.dropStartFunction()
 
-    let engine = Engine(configuration: EngineConfiguration(compilationMode: .eager))
     let store = Store(engine: engine)
     store.resourceLimiter = FuzzerResourceLimiter()
 
@@ -36,7 +36,7 @@ public func fuzzInstantiation(bytes: [UInt8]) throws {
                 // Skip if import type index does not name a function type
                 return
             }
-            value = Function(store: store, type: type) { _, _ in
+            value = try Function(store: store, type: type) { _, _ in
                 // Provide "start function" with empty results
                 if type.results.isEmpty { return [] }
                 fatalError("Unexpected function call")
@@ -49,7 +49,7 @@ public func fuzzInstantiation(bytes: [UInt8]) throws {
             value = try Table(store: store, type: tableType)
         case .tag(let typeIndex):
             guard let type = module.functionType(at: typeIndex) else { return }
-            value = Tag(store: store, type: type)
+            value = try Tag(store: store, type: type)
         }
         imports.define(module: importEntry.module, name: importEntry.name, value.externalValue)
     }

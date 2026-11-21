@@ -22,7 +22,7 @@ struct HostModuleTests {
                 (module
                     (import "env" "memory" (memory 1))
                 )
-                """))
+                """), engine: engine)
         #expect(throws: Never.self) { try module.instantiate(store: store, imports: imports) }
         // Ensure the allocated address is valid
         _ = try memory.withUnsafeBufferPointer(offset: 0, count: 4) {
@@ -50,14 +50,15 @@ struct HostModuleTests {
                         (call $qux)
                     )
                 )
-                """)
+                """),
+            engine: engine
         )
 
         var isExecutingFoo = false
         var isQuxCalled = false
         let imports: Imports = [
             "env": [
-                "bar": Function(store: store, type: voidSignature) { caller, _ in
+                "bar": try Function(store: store, type: voidSignature) { caller, _ in
                     // Ensure "invoke" executes instructions under the current call
                     #expect(isExecutingFoo == false, "bar should not be called recursively")
                     isExecutingFoo = true
@@ -66,7 +67,7 @@ struct HostModuleTests {
                     _ = try foo()
                     return []
                 },
-                "qux": Function(store: store, type: voidSignature) { caller, _ in
+                "qux": try Function(store: store, type: voidSignature) { caller, _ in
                     #expect(isExecutingFoo == true)
                     isQuxCalled = true
                     return []

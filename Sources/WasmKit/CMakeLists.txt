@@ -9,6 +9,7 @@ add_wasmkit_library(WasmKit
   Validator.swift
   TypeCanonicalization.swift
   TypeMatching.swift
+  TypeRegistry.swift
   WasmKitError.swift
   ResourceLimiter.swift
   Execution/SharedMemory.swift
@@ -64,7 +65,6 @@ add_wasmkit_library(WasmKit
   Execution/V128Storage.swift
   Platform/AtomicParkingLot.swift
   Platform/Cell.swift
-  Platform/PlatformMutex.swift
   Platform/SystemVirtualMemory.swift
 )
 

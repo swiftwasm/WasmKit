@@ -17,8 +17,8 @@ enum PreopenFixture {
         try String(contentsOfFile: fixturePath, encoding: .utf8)
     }
 
-    static func fixtureModule() throws -> Module {
-        try WasmKit.parseWasm(bytes: wat2wasm(fixtureSource()))
+    static func fixtureModule(engine: Engine) throws -> Module {
+        try WasmKit.parseWasm(bytes: wat2wasm(fixtureSource()), engine: engine)
     }
 
     static func withProbeDirectory<R>(_ body: (URL) throws -> R) throws -> R {

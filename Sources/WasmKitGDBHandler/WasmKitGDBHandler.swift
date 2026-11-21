@@ -152,11 +152,11 @@
 
             let store = Store(engine: Engine(configuration: engineConfiguration))
             var imports = Imports()
-            wasi.link(to: &imports, store: store)
+            try wasi.link(to: &imports, store: store)
             self.wasi = wasi
 
             do {
-                self.debugger = try Debugger(module: parseWasm(bytes: wasmBinary), store: store, imports: imports)
+                self.debugger = try Debugger(module: parseWasm(bytes: wasmBinary, engine: store.engine), store: store, imports: imports)
                 try self.debugger.stopAtEntrypoint()
                 try self.debugger.run()
                 guard case .stoppedAtBreakpoint = self.debugger.state else {

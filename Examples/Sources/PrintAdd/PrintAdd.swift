@@ -6,6 +6,10 @@ import WAT
 @main
 struct Example {
     static func main() throws {
+        // Create engine and store
+        let engine = Engine()
+        let store = Store(engine: engine)
+
         // Convert a WAT file to a Wasm binary, then parse it.
         let module = try parseWasm(
             bytes: try wat2wasm(
@@ -17,12 +21,9 @@ struct Example {
                   )
                 )
                 """
-            )
+            ),
+            engine: engine
         )
-
-        // Create engine and store
-        let engine = Engine()
-        let store = Store(engine: engine)
 
         // Instantiate a parsed module with importing a host function
         let instance = try module.instantiate(

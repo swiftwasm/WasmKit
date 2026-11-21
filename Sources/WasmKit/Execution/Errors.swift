@@ -252,6 +252,9 @@ extension WasmKitError.Message {
     static func importedEntityFromDifferentStore(_ importEntry: Import) -> Self {
         Self("imported entity from different store: \(importEntry.module).\(importEntry.name)")
     }
+    static var moduleFromDifferentEngine: Self {
+        Self("module was parsed with a different engine than the store's")
+    }
     static func moduleInstanceAlreadyRegistered(_ name: String) -> Self {
         Self("a module instance is already registered under a name `\(name)")
     }

@@ -13,12 +13,12 @@ struct GuestControlledSizeTests {
         compilationMode: EngineConfiguration.CompilationMode = .eager,
         boundsChecking: EngineConfiguration.MemoryBoundsChecking? = nil
     ) throws -> (Instance, Store) {
-        let module = try parseWasm(bytes: try wat2wasm(wat, features: .all), features: .all)
         let engine = Engine(
             configuration: EngineConfiguration(
                 compilationMode: compilationMode, memoryBoundsChecking: boundsChecking
             )
         )
+        let module = try parseWasm(bytes: try wat2wasm(wat, features: .all), engine: engine, features: .all)
         let store = Store(engine: engine)
         return (try module.instantiate(store: store), store)
     }
@@ -126,13 +126,13 @@ struct GuestControlledSizeTests {
                 (i32.store (i32.const 100000) (i32.const 0x5A5A5A5A))
                 (i32.load (i32.const 100000))))
             """
-        let module = try parseWasm(bytes: try wat2wasm(wat, features: .all), features: .all)
         // Software bounds checking uses the malloc backing, where growing moves
         // the buffer. Under mprotect the base is stable and the bug only shows
         // up as a spurious trap.
         let engine = Engine(
             configuration: EngineConfiguration(compilationMode: .eager, memoryBoundsChecking: .software)
         )
+        let module = try parseWasm(bytes: try wat2wasm(wat, features: .all), engine: engine, features: .all)
         let store = Store(engine: engine)
 
         // The callback re-enters the guest, which is what moves the memory.
@@ -141,7 +141,7 @@ struct GuestControlledSizeTests {
         var imports = Imports()
         imports.define(
             module: "env", name: "cb",
-            Function(store: store, type: FunctionType(parameters: [], results: [])) { _, _ in
+            try Function(store: store, type: FunctionType(parameters: [], results: [])) { _, _ in
                 _ = try box.instance?.exports[function: "growit"]?()
                 return []
             }

@@ -121,8 +121,8 @@ extension wasm_name_t {
 struct WasmKitEngine: Engine {
     var name: String { return "wasmkit" }
     func run(moduleBytes: [UInt8]) throws -> ExecResult {
-        let module = try WasmKit.parseWasm(bytes: moduleBytes)
         let engine = WasmKit.Engine()
+        let module = try WasmKit.parseWasm(bytes: moduleBytes, engine: engine)
         let store = WasmKit.Store(engine: engine)
         let instance = try module.instantiate(store: store)
         let exports = instance.exports.sorted(by: { $0.name < $1.name })
@@ -147,18 +147,22 @@ struct WasmKitEngine: Engine {
         }
         let type = fn.type
         let arguments = type.parameters.map { $0.defaultValue }
-        func snapshot(_ memory: Memory?) -> [UInt8]? {
+        func snapshot(_ memory: Memory?) throws -> [UInt8]? {
             guard let memory else { return nil }
-            return memory.withUnsafeBufferPointer(offset: 0, count: memory.byteCount) {
+            return try memory.withUnsafeBufferPointer(offset: 0, count: memory.byteCount) {
                 Array($0)
             }
         }
+        let results: [Value]?
+        let trap: String?
         do {
-            let results = try fn(arguments)
-            return ExecResult(values: results, trap: nil, memory: snapshot(memory))
+            results = try fn(arguments)
+            trap = nil
         } catch {
-            return ExecResult(values: nil, trap: String(describing: error), memory: snapshot(memory))
+            results = nil
+            trap = String(describing: error)
         }
+        return ExecResult(values: results, trap: trap, memory: try snapshot(memory))
     }
 }
 

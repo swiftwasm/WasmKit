@@ -16,7 +16,8 @@
                     """
                     (module (global $g (mut i32) (i32.const 1))
                       (func (export "_start") (result i32) (global.get $g)))
-                    """))
+                    """),
+                engine: store.engine)
             var debugger = try Debugger(module: module, store: store, imports: [:])
             try debugger.stopAtEntrypoint()
             try debugger.run()

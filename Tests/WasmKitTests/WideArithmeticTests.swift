@@ -80,9 +80,10 @@ struct WideArithmeticTests {
 
     static func instance(threadingModel: EngineConfiguration.ThreadingModel) throws -> Instance {
         let features: WasmFeatureSet = [.wideArithmetic]
-        let module = try parseWasm(bytes: wat2wasm(wat, features: features), features: features)
         let configuration = EngineConfiguration(threadingModel: threadingModel, features: features)
-        return try module.instantiate(store: Store(engine: Engine(configuration: configuration)))
+        let engine = Engine(configuration: configuration)
+        let module = try parseWasm(bytes: wat2wasm(wat, features: features), engine: engine, features: features)
+        return try module.instantiate(store: Store(engine: engine))
     }
 
     @Test(arguments: testedThreadingModels, ["", "_locals"])
@@ -118,6 +119,8 @@ struct WideArithmeticTests {
         @Test(arguments: testedThreadingModels)
         func storesResultsIntoLocalsWithoutCopies(threadingModel: EngineConfiguration.ThreadingModel) throws {
             let features: WasmFeatureSet = [.wideArithmetic]
+            let configuration = EngineConfiguration(threadingModel: threadingModel, features: features)
+            let engine = Engine(configuration: configuration)
             let module = try parseWasm(
                 bytes: wat2wasm(
                     """
@@ -127,9 +130,8 @@ struct WideArithmeticTests {
                         (local.set $high)
                         (local.set $low)
                         (i64.add (local.get $low) (local.get $high))))
-                    """, features: features), features: features)
-            let configuration = EngineConfiguration(threadingModel: threadingModel, features: features)
-            let instance = try module.instantiate(store: Store(engine: Engine(configuration: configuration)))
+                    """, features: features), engine: engine, features: features)
+            let instance = try module.instantiate(store: Store(engine: engine))
             var listing = ""
             try instance.dumpFunctions(to: &listing, module: module)
             let lines = listing.replacing(/\u{1B}\[[^m]*m/, with: "").split(separator: "\n")

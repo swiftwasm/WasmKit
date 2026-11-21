@@ -24,8 +24,9 @@ package struct Explore: ParsableCommand {
     package init() {}
 
     package func run() throws {
-        let module = try parseWasm(filePath: path)
-        let store = Store(engine: Engine())
+        let engine = Engine()
+        let module = try parseWasm(filePath: path, engine: engine)
+        let store = Store(engine: engine)
 
         var imports: Imports = [:]
         for importEntry in module.imports {
@@ -37,7 +38,7 @@ package struct Explore: ParsableCommand {
                 imports.define(
                     module: importEntry.module,
                     name: importEntry.name,
-                    Function(store: store, type: type) { _, _ in
+                    try Function(store: store, type: type) { _, _ in
                         fatalError("unreachable")
                     }
                 )

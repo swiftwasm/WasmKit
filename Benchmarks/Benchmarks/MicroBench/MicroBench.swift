@@ -11,7 +11,7 @@ let benchmarks: @Sendable () -> () = {
             (module
                 (func (export "_start"))
             )
-            """))
+            """), engine: engine)
             _ = try module.instantiate(store: store)
         }
     }

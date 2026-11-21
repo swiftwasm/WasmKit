@@ -33,14 +33,15 @@ struct StoreAllocatorTests {
     func storeAllocatorLeak() throws {
         weak var weakAllocator: StoreAllocator?
         do {
+            let engine = Engine()
             let module = try parseWasm(
                 bytes: wat2wasm(
                     """
                       (module
                         (memory (;0;) 0)
                         (export "a" (memory 0)))
-                    """))
-            let engine = Engine()
+                    """),
+                engine: engine)
             let store = Store(engine: engine)
             _ = try module.instantiate(store: store)
             weakAllocator = store.allocator

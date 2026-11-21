@@ -19,7 +19,6 @@ struct FuelTests {
         fuelMetering: Bool = true,
         features: WasmFeatureSet = .default
     ) throws -> (Store, Function) {
-        let module = try parseWasm(bytes: wat2wasm(wat, features: features), features: features)
         let engine = Engine(
             configuration: EngineConfiguration(
                 threadingModel: threadingModel,
@@ -28,6 +27,7 @@ struct FuelTests {
                 fuelMetering: fuelMetering
             )
         )
+        let module = try parseWasm(bytes: wat2wasm(wat, features: features), engine: engine, features: features)
         let store = Store(engine: engine)
         if let fuel {
             store.fuel = Fuel(remaining: fuel)
@@ -165,20 +165,21 @@ struct FuelTests {
 
     @Test
     func hostFunctionCanDrainTheBudget() throws {
+        let engine = Engine(configuration: EngineConfiguration(fuelMetering: true))
         let module = try parseWasm(
             bytes: wat2wasm(
                 """
                 (module
                     (import "env" "burn" (func $burn))
                     (func (export "f") (call $burn) (loop $l (br $l))))
-                """))
-        let engine = Engine(configuration: EngineConfiguration(fuelMetering: true))
+                """),
+            engine: engine)
         let store = Store(engine: engine)
         store.fuel = Fuel(remaining: 1_000_000)
         var imports = Imports()
         imports.define(
             module: "env", name: "burn",
-            Function(store: store, parameters: [], results: []) { caller, _ in
+            try Function(store: store, parameters: [], results: []) { caller, _ in
                 caller.store.fuel = Fuel(remaining: 0)
                 return []
             })
