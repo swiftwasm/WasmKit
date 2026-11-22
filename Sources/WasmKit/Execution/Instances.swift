@@ -585,6 +585,11 @@ public struct Table: Equatable {
             handle.withValue { $0.elements[index] = TableEntity.rawValue(newValue) }
         }
     }
+
+    /// Stores a reference to `function` at the given index.
+    public func setElement(_ function: Function, at index: Int) {
+        self[index] = .function(from: function.handle)
+    }
 }
 
 struct MemoryEntity: ~Copyable {
