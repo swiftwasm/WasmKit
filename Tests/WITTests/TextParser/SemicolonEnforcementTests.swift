@@ -10,80 +10,39 @@ struct SemicolonEnforcementTests {
         return try SourceFileSyntax.parse(lexer: &lexer, fileName: "test.wit")
     }
 
-    private func expectMissingSemicolon(
-        _ input: String, sourceLocation: SourceLocation = #_sourceLocation
-    ) {
-        #expect(sourceLocation: sourceLocation) {
+    @Test(arguments: [
+        ("package foo:bar\n\ninterface i {}", "semicolon expected but got interface"),
+        ("package foo:bar;\n\nuse a:b/c", "semicolon expected but got nothing"),
+        ("package foo:bar;\n\ninterface i {\n  f: func()\n}", "semicolon expected but got rightBrace"),
+        ("package foo:bar;\n\ninterface i {\n  type t = u8\n}", "semicolon expected but got rightBrace"),
+        ("package foo:bar;\n\nworld w {\n  export f: func()\n}", "semicolon expected but got rightBrace"),
+        ("package foo:bar;\n\nworld w {\n  import a:b/c\n}", "semicolon expected but got rightBrace"),
+        ("package foo:bar;\n\nworld w {\n  include a:b/c\n}", "semicolon expected but got rightBrace"),
+        ("package foo:bar;\n\ninterface i {\n  resource r {\n    f: func()\n  }\n}", "semicolon expected but got rightBrace"),
+    ])
+    func missingSemicolonIsRejected(input: String, message: String) throws {
+        let error = try #require(throws: ParseError.self) {
             try parseDoc(input)
-        } throws: { error in
-            String(describing: error).contains("semicolon expected")
         }
+        #expect(error.description == message)
     }
 
-    // MARK: - Missing semicolons
-
-    @Test func missingPackageSemicolon() {
-        expectMissingSemicolon("package foo:bar\n\ninterface i {}")
+    @Test(arguments: [
+        "package foo:bar;\n\ninterface i {\n  f: func();\n\n  type t = u8;\n}\n",
+        "package foo:bar;\n\nworld w {\n  export f: func();\n  import a:b/c;\n  include a:b/d;\n}\n",
+        "package foo:bar;\n\ninterface i {\n  resource r {\n    f: func();\n  }\n}\n",
+        // wasm-tools rejects `import bar: interface {};`.
+        "package foo:bar;\n\nworld w {\n  import bar: interface {\n  }\n}\n",
+    ])
+    func terminatedItemsRoundTrip(input: String) throws {
+        let ast = try parseDoc(input)
+        #expect(WITFormatter.format(sourceFile: ast.syntax, includeDocs: true) == input)
     }
 
-    @Test func missingTopLevelUseSemicolon() {
-        expectMissingSemicolon("package foo:bar;\n\nuse a:b/c")
-    }
-
-    @Test func missingFuncItemSemicolon() {
-        expectMissingSemicolon("package foo:bar;\n\ninterface i {\n  f: func()\n}")
-    }
-
-    @Test func missingTypeAliasSemicolon() {
-        expectMissingSemicolon("package foo:bar;\n\ninterface i {\n  type t = u8\n}")
-    }
-
-    @Test func missingWorldFuncExportSemicolon() {
-        expectMissingSemicolon("package foo:bar;\n\nworld w {\n  export f: func()\n}")
-    }
-
-    @Test func missingWorldPathImportSemicolon() {
-        expectMissingSemicolon("package foo:bar;\n\nworld w {\n  import a:b/c\n}")
-    }
-
-    @Test func missingIncludeSemicolon() {
-        expectMissingSemicolon("package foo:bar;\n\nworld w {\n  include a:b/c\n}")
-    }
-
-    @Test func missingResourceMethodSemicolon() {
-        expectMissingSemicolon("package foo:bar;\n\ninterface i {\n  resource r {\n    f: func()\n  }\n}")
-    }
-
-    // MARK: - Terminated items
-
-    @Test func interfaceWithSemicolonsParses() throws {
-        let ast = try parseDoc("package foo:bar;\n\ninterface i {\n  f: func();\n  type t = u8;\n}")
-        #expect(ast.items.count == 1)
-    }
-
-    @Test func worldWithSemicolonsParses() throws {
-        let ast = try parseDoc(
-            "package foo:bar;\n\nworld w {\n  export f: func();\n  import a:b/c;\n  include a:b/d;\n}")
-        #expect(ast.items.count == 1)
-    }
-
-    @Test func resourceMethodWithSemicolonParses() throws {
-        let ast = try parseDoc(
-            "package foo:bar;\n\ninterface i {\n  resource r {\n    f: func();\n  }\n}")
-        #expect(ast.items.count == 1)
-    }
-
-    /// wasm-tools rejects `import bar: interface {};`.
-    @Test func inlineInterfaceExternWithoutSemicolonParses() throws {
-        let ast = try parseDoc("package foo:bar;\n\nworld w {\n  import bar: interface {}\n}")
-        #expect(ast.items.count == 1)
-    }
-
-    // MARK: - Stray semicolons
-
-    @Test func strayInterfaceBlockSemicolonRejected() {
-        #expect(throws: (any Error).self) {
+    @Test func strayInterfaceBlockSemicolonRejected() throws {
+        let error = try #require(throws: ParseError.self) {
             try parseDoc("package foo:bar;\n\ninterface i {};")
         }
+        #expect(error.description == "`world`, `interface` or `use` expected")
     }
 }
