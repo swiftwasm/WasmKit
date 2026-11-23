@@ -1,5 +1,5 @@
-package test:static-constructors
+package test:static-constructors;
 
 world static-constructors-test-world {
-    export constructor-runs: func() -> u32
+    export constructor-runs: func() -> u32;
 }
