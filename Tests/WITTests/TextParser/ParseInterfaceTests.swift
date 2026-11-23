@@ -52,9 +52,24 @@ struct ParseInterfaceTests {
     }
 
     @Test func invalidItem() throws {
-        #expect(throws: (any Error).self) {
+        let error = try #require(throws: ParseError.self) {
             try parse("interface x { . }")
         }
+        #expect(error.description == "`type`, `resource` or `func` expected but got period")
+    }
+
+    @Test func missingItemAtEndOfInput() throws {
+        let error = try #require(throws: ParseError.self) {
+            try parse("interface a {\n  f: func();\n")
+        }
+        #expect(error.description == "`type`, `resource` or `func` expected but got nothing")
+    }
+
+    @Test func missingColonAfterItemName() throws {
+        let error = try #require(throws: ParseError.self) {
+            try parse("interface a {\n  bogus\n}\n")
+        }
+        #expect(error.description == "colon expected but got rightBrace")
     }
 
     @Test func itemType() throws {
@@ -219,5 +234,39 @@ struct ParseInterfaceTests {
             return
         }
         #expect(use.from.name.text == "pkg1")
+    }
+
+    @Test func itemFunctionAttributes() throws {
+        let iface = try parse(
+            """
+            interface x {
+                @since(version = 0.2.2)
+                f1: func()
+            }
+            """
+        )
+        guard case .function(let function)? = iface.items.first, case .since(let since)? = function.attributes.first else {
+            Issue.record("unexpected items: \(iface.items)")
+            return
+        }
+        #expect(function.attributes.count == 1)
+        #expect(since.version.description == "0.2.2")
+    }
+
+    @Test func itemUseAttributes() throws {
+        let iface = try parse(
+            """
+            interface x {
+                @since(version = 0.2.3)
+                use pkg1.{thing}
+            }
+            """
+        )
+        guard case .use(let use)? = iface.items.first, case .since(let since)? = use.attributes.first else {
+            Issue.record("unexpected items: \(iface.items)")
+            return
+        }
+        #expect(use.attributes.count == 1)
+        #expect(since.version.description == "0.2.3")
     }
 }

@@ -6,7 +6,7 @@
   },
   "wasi-testsuite": {
     "repository": "https://github.com/WebAssembly/wasi-testsuite.git",
-    "revision": "f442fae1a214263aeeddb5395c0c50dc9403b7f8",
+    "revision": "de056c60895ff589996da758c91200cda41feebe",
     "categories": ["default"]
   },
   "wasi-threads": {
@@ -22,6 +22,11 @@
   "component-model": {
     "repository": "https://github.com/WebAssembly/component-model.git",
     "revision": "0b951b72b3f4019edf386a93585782587d221a0c",
+    "categories": ["component-model"]
+  },
+  "wasi": {
+    "repository": "https://github.com/WebAssembly/wasi.git",
+    "revision": "184b0c0e9fd437e5e5601d6e327a28feddbbd7f7",
     "categories": ["component-model"]
   },
   "wasm-tools-prebuilt": {

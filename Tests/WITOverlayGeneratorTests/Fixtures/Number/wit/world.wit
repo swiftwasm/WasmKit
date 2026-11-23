@@ -13,8 +13,8 @@ world number-test-world {
     export roundtrip-s32: func(v: s32) -> s32
     export roundtrip-s64: func(v: s64) -> s64
 
-    export roundtrip-float32: func(v: float32) -> float32
-    export roundtrip-float64: func(v: float64) -> float64
+    export roundtrip-float32: func(v: f32) -> f32
+    export roundtrip-float64: func(v: f64) -> f64
 
     export retptr-u8: func() -> tuple<u8, u8>
     export retptr-u16: func() -> tuple<u16, u16>

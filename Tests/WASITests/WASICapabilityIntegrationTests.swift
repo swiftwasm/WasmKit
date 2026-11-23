@@ -18,7 +18,7 @@ import WasmKitWASI
         static let environGuest = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent(
-                "Vendor/wasi-testsuite/tests/assemblyscript/testsuite/environ_get-multiple-variables.wasm")
+                "Vendor/wasi-testsuite/tests/assemblyscript/testsuite/wasm32-wasip1/environ_get-multiple-variables.wasm")
 
         private static let environment = ["a": "text", "b": "escap \" ing", "c": "new\nline"]
 

@@ -363,6 +363,50 @@ package func wasm2wat(
     return result.stdoutString
 }
 
+/// Prints a WIT package as WIT text using `wasm-tools component wit`.
+///
+/// Keeps no host file descriptor open while `wasm-tools` runs. It is safe to run concurrently with
+/// the suite's `.host()`-based WASI tests.
+///
+/// - Parameters:
+///   - packagePath: The guest directory of the package. `wasm-tools` finds the package's
+///     dependencies in `<packagePath>/deps/<name>/`.
+///   - directories: Host directories keyed by the guest directory to load them at. Only the `.wit`
+///     files directly inside each host directory are loaded.
+package func componentWit(
+    wasmToolsPath: String = defaultWasmToolsPath,
+    packagePath: String,
+    directories: [String: String] = [:],
+    files: [WasmToolsInputFile] = [],
+    allFeatures: Bool = true,
+    noDocs: Bool = true
+) throws -> String {
+    let context = try WasmToolsContext()
+    for (guestDirectory, hostDirectory) in directories {
+        for name in try FileManager.default.contentsOfDirectory(atPath: hostDirectory) where name.hasSuffix(".wit") {
+            let content = try [UInt8](Data(contentsOf: URL(fileURLWithPath: hostDirectory).appendingPathComponent(name)))
+            try context.addInputFile(WasmToolsInputFile(guestPath: "\(guestDirectory)/\(name)", content: content))
+        }
+    }
+    for file in files {
+        try context.addInputFile(file)
+    }
+
+    // A large output on stdout deadlocks runWasmTools.
+    let outputDirectory = "/output"
+    let outputPath = "\(outputDirectory)/package.wit"
+    try context.memoryFS.ensureDirectory(at: outputDirectory)
+    var args = ["component", "wit", packagePath, "--output", outputPath]
+    if allFeatures { args.append("--all-features") }
+    if noDocs { args.append("--no-docs") }
+
+    let result = try runWasmTools(wasmToolsPath: wasmToolsPath, args: args, context: context)
+    guard result.exitCode == 0 else {
+        throw WasmToolsError.executionFailed(exitCode: result.exitCode, stderr: result.stderrString)
+    }
+    return String(decoding: try context.getFile(at: outputPath), as: UTF8.self)
+}
+
 package func wat2wasm(
     wasmToolsPath: String = defaultWasmToolsPath,
     watContent: [UInt8]

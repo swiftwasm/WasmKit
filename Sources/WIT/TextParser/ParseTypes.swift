@@ -4,36 +4,36 @@ extension TypeReprSyntax {
             throw ParseError(description: "a type expected")
         }
         switch token.kind {
-        case .bool: return .bool
-        case .u8: return .u8
-        case .u16: return .u16
-        case .u32: return .u32
-        case .u64: return .u64
-        case .s8: return .s8
-        case .s16: return .s16
-        case .s32: return .s32
-        case .s64: return .s64
-        case .float32: return .float32
-        case .float64: return .float64
-        case .char: return .char
-        case .string_: return .string
+        case .keyword(.bool): return .bool
+        case .keyword(.u8): return .u8
+        case .keyword(.u16): return .u16
+        case .keyword(.u32): return .u32
+        case .keyword(.u64): return .u64
+        case .keyword(.s8): return .s8
+        case .keyword(.s16): return .s16
+        case .keyword(.s32): return .s32
+        case .keyword(.s64): return .s64
+        case .keyword(.f32): return .float32
+        case .keyword(.f64): return .float64
+        case .keyword(.char): return .char
+        case .keyword(.string): return .string
 
         // tuple<T, U, ...>
-        case .tuple:
+        case .keyword(.tuple):
             let types = try Parser.parseList(
                 lexer: &lexer, start: .lessThan, end: .greaterThan
             ) { try TypeReprSyntax.parse(lexer: &$1) }
             return .tuple(types)
 
         // list<T>
-        case .list:
+        case .keyword(.list):
             try lexer.expect(.lessThan)
             let type = try TypeReprSyntax.parse(lexer: &lexer)
             try lexer.expect(.greaterThan)
             return .list(type)
 
         // option<T>
-        case .option_:
+        case .keyword(.option):
             try lexer.expect(.lessThan)
             let type = try TypeReprSyntax.parse(lexer: &lexer)
             try lexer.expect(.greaterThan)
@@ -43,11 +43,11 @@ extension TypeReprSyntax {
         // result<_, E>
         // result<T>
         // result
-        case .result_:
+        case .keyword(.result):
             var ok: TypeReprSyntax?
             var error: TypeReprSyntax?
             if lexer.eat(.lessThan) {
-                if lexer.eat(.underscore) {
+                if lexer.eat(.keyword(.underscore)) {
                     try lexer.expect(.comma)
                     error = try TypeReprSyntax.parse(lexer: &lexer)
                 } else {
@@ -62,7 +62,7 @@ extension TypeReprSyntax {
 
         // future<T>
         // future
-        case .future:
+        case .keyword(.future):
             var type: TypeReprSyntax?
             if lexer.eat(.lessThan) {
                 type = try TypeReprSyntax.parse(lexer: &lexer)
@@ -74,11 +74,11 @@ extension TypeReprSyntax {
         // stream<_, Z>
         // stream<T>
         // stream
-        case .stream:
+        case .keyword(.stream):
             var element: TypeReprSyntax?
             var end: TypeReprSyntax?
             if lexer.eat(.lessThan) {
-                if lexer.eat(.underscore) {
+                if lexer.eat(.keyword(.underscore)) {
                     try lexer.expect(.comma)
                     end = try TypeReprSyntax.parse(lexer: &lexer)
                 } else {
@@ -92,14 +92,14 @@ extension TypeReprSyntax {
             return .stream(StreamSyntax(element: element, end: end))
 
         // own<T>
-        case .own:
+        case .keyword(.own):
             try lexer.expect(.lessThan)
             let resource = try Identifier.parse(lexer: &lexer)
             try lexer.expect(.greaterThan)
             return .handle(.own(resource: resource))
 
         // borrow<T>
-        case .borrow:
+        case .keyword(.borrow):
             try lexer.expect(.lessThan)
             let resource = try Identifier.parse(lexer: &lexer)
             try lexer.expect(.greaterThan)
@@ -127,7 +127,7 @@ extension TypeReprSyntax {
 
 extension TypeDefSyntax {
     static func parse(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> TypeDefSyntax {
-        try lexer.expect(.type)
+        try lexer.expect(.keyword(.type))
         let name = try Identifier.parse(lexer: &lexer)
         try lexer.expect(.equals)
         let repr = try TypeReprSyntax.parse(lexer: &lexer)
@@ -136,7 +136,7 @@ extension TypeDefSyntax {
     }
 
     static func parseFlags(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> TypeDefSyntax {
-        try lexer.expect(.flags)
+        try lexer.expect(.keyword(.flags))
         let name = try Identifier.parse(lexer: &lexer)
         let body = try TypeDefBodySyntax.flags(
             FlagsSyntax(
@@ -152,13 +152,14 @@ extension TypeDefSyntax {
     }
 
     static func parseResource(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> SyntaxNode<TypeDefSyntax> {
-        try lexer.expect(.resource)
+        try lexer.expect(.keyword(.resource))
         let name = try Identifier.parse(lexer: &lexer)
         var functions: [ResourceFunctionSyntax] = []
         if lexer.eat(.leftBrace) {
             while !lexer.eat(.rightBrace) {
                 let docs = try DocumentsSyntax.parse(lexer: &lexer)
-                functions.append(try ResourceFunctionSyntax.parse(lexer: &lexer, documents: docs, attributes: []))
+                let attributes = try AttributeSyntax.parseItems(lexer: &lexer)
+                functions.append(try ResourceFunctionSyntax.parse(lexer: &lexer, documents: docs, attributes: attributes))
             }
         } else {
             try lexer.expectSemicolon()
@@ -168,7 +169,7 @@ extension TypeDefSyntax {
     }
 
     static func parseRecord(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> TypeDefSyntax {
-        try lexer.expect(.record)
+        try lexer.expect(.keyword(.record))
         let name = try Identifier.parse(lexer: &lexer)
         let body = try TypeDefBodySyntax.record(
             RecordSyntax(
@@ -187,7 +188,7 @@ extension TypeDefSyntax {
     }
 
     static func parseVariant(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> TypeDefSyntax {
-        try lexer.expect(.variant)
+        try lexer.expect(.keyword(.variant))
         let name = try Identifier.parse(lexer: &lexer)
         let body = try TypeDefBodySyntax.variant(
             VariantSyntax(
@@ -210,7 +211,7 @@ extension TypeDefSyntax {
     }
 
     static func parseUnion(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> TypeDefSyntax {
-        try lexer.expect(.union)
+        try lexer.expect(.keyword(.union))
         let name = try Identifier.parse(lexer: &lexer)
         let body = try TypeDefBodySyntax.union(
             UnionSyntax(
@@ -228,7 +229,7 @@ extension TypeDefSyntax {
     }
 
     static func parseEnum(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> TypeDefSyntax {
-        try lexer.expect(.enum)
+        try lexer.expect(.keyword(.enum))
         let name = try Identifier.parse(lexer: &lexer)
         let body = try TypeDefBodySyntax.enum(
             EnumSyntax(

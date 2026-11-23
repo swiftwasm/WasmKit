@@ -2,7 +2,7 @@ extension InterfaceSyntax {
     static func parse(
         lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]
     ) throws -> SyntaxNode<InterfaceSyntax> {
-        try lexer.expect(.interface)
+        try lexer.expect(.keyword(.interface))
         let name = try Identifier.parse(lexer: &lexer)
         let items = try parseItems(lexer: &lexer)
         return .init(
@@ -28,27 +28,30 @@ extension InterfaceSyntax {
 
 extension InterfaceItemSyntax {
     static func parse(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> InterfaceItemSyntax {
-        switch lexer.peek()?.kind {
-        case .type:
+        guard let token = lexer.peek() else {
+            throw ParseError(description: "`type`, `resource` or `func` expected but got nothing")
+        }
+        switch token.kind {
+        case .keyword(.type):
             return try .typeDef(.init(syntax: .parse(lexer: &lexer, documents: documents, attributes: attributes)))
-        case .flags:
+        case .keyword(.flags):
             return try .typeDef(.init(syntax: .parseFlags(lexer: &lexer, documents: documents, attributes: attributes)))
-        case .enum:
+        case .keyword(.enum):
             return try .typeDef(.init(syntax: .parseEnum(lexer: &lexer, documents: documents, attributes: attributes)))
-        case .variant:
+        case .keyword(.variant):
             return try .typeDef(.init(syntax: .parseVariant(lexer: &lexer, documents: documents, attributes: attributes)))
-        case .resource:
+        case .keyword(.resource):
             return try .typeDef(TypeDefSyntax.parseResource(lexer: &lexer, documents: documents, attributes: attributes))
-        case .record:
+        case .keyword(.record):
             return try .typeDef(.init(syntax: .parseRecord(lexer: &lexer, documents: documents, attributes: attributes)))
-        case .union:
+        case .keyword(.union):
             return try .typeDef(.init(syntax: .parseUnion(lexer: &lexer, documents: documents, attributes: attributes)))
         case .id, .explicitId:
-            return try .function(NamedFunctionSyntax.parse(lexer: &lexer, documents: documents))
-        case .use:
-            return try .use(UseSyntax.parse(lexer: &lexer))
+            return try .function(NamedFunctionSyntax.parse(lexer: &lexer, documents: documents, attributes: attributes))
+        case .keyword(.use):
+            return try .use(UseSyntax.parse(lexer: &lexer, attributes: attributes))
         default:
-            throw ParseError(description: "`import`, `export`, `include`, `use`, or type definition")
+            throw ParseError(description: "`type`, `resource` or `func` expected but got \(token.kind)")
         }
     }
 }

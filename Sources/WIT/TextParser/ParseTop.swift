@@ -1,7 +1,7 @@
 extension SourceFileSyntax {
     static func parse(lexer: inout Lexer, fileName: String) throws -> SyntaxNode<SourceFileSyntax> {
         var packageId: PackageNameSyntax?
-        if lexer.peek()?.kind == .package {
+        if lexer.peek()?.kind == .keyword(.package) {
             packageId = try PackageNameSyntax.parse(lexer: &lexer)
             try lexer.expectSemicolon()
         }
@@ -19,7 +19,7 @@ extension SourceFileSyntax {
 
 extension PackageNameSyntax {
     static func parse(lexer: inout Lexer) throws -> PackageNameSyntax {
-        try lexer.expect(.package)
+        try lexer.expect(.keyword(.package))
         let namespace = try Identifier.parse(lexer: &lexer)
         try lexer.expect(.colon)
         let name = try Identifier.parse(lexer: &lexer)
@@ -139,17 +139,17 @@ extension ASTItemSyntax {
     ) throws -> ASTItemSyntax {
         let attributes = try AttributeSyntax.parseItems(lexer: &lexer)
         switch lexer.peek()?.kind {
-        case .interface:
+        case .keyword(.interface):
             return try .interface(
                 InterfaceSyntax.parse(
                     lexer: &lexer, documents: documents, attributes: attributes
                 ))
-        case .world:
+        case .keyword(.world):
             return try .world(
                 WorldSyntax.parse(
                     lexer: &lexer, documents: documents, attributes: attributes
                 ))
-        case .use:
+        case .keyword(.use):
             return try .use(
                 .init(
                     syntax: .parse(
@@ -166,10 +166,10 @@ extension TopLevelUseSyntax {
         lexer: inout Lexer,
         documents: DocumentsSyntax, attributes: [AttributeSyntax]
     ) throws -> TopLevelUseSyntax {
-        try lexer.expect(.use)
+        try lexer.expect(.keyword(.use))
         let item = try UsePathSyntax.parse(lexer: &lexer)
         var asName: Identifier?
-        if lexer.eat(.as) {
+        if lexer.eat(.keyword(.as)) {
             asName = try .parse(lexer: &lexer)
         }
         try lexer.expectSemicolon()
@@ -178,8 +178,8 @@ extension TopLevelUseSyntax {
 }
 
 extension UseSyntax {
-    static func parse(lexer: inout Lexer) throws -> SyntaxNode<UseSyntax> {
-        try lexer.expect(.use)
+    static func parse(lexer: inout Lexer, attributes: [AttributeSyntax] = []) throws -> SyntaxNode<UseSyntax> {
+        try lexer.expect(.keyword(.use))
         let from = try UsePathSyntax.parse(lexer: &lexer)
         try lexer.expect(.period)
         try lexer.expect(.leftBrace)
@@ -187,7 +187,7 @@ extension UseSyntax {
         var names: [UseNameSyntax] = []
         while !lexer.eat(.rightBrace) {
             var name = try UseNameSyntax(name: .parse(lexer: &lexer))
-            if lexer.eat(.as) {
+            if lexer.eat(.keyword(.as)) {
                 name.asName = try .parse(lexer: &lexer)
             }
             names.append(name)
@@ -197,7 +197,7 @@ extension UseSyntax {
             }
         }
         try lexer.expectSemicolon()
-        return .init(syntax: UseSyntax(attributes: [], from: from, names: names))
+        return .init(syntax: UseSyntax(attributes: attributes, from: from, names: names))
     }
 }
 
