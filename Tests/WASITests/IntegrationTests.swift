@@ -28,8 +28,8 @@ struct IntegrationTests {
     static var skipTests: [String: Set<String>] {
         #if os(Windows)
             return [
-                "WASI Assemblyscript tests": [],
-                "WASI C tests": [
+                "WASI AssemblyScript tests [wasm32-wasip1]": [],
+                "WASI C tests [wasm32-wasip1]": [
                     "fdopendir-with-access",
                     "fopen-with-access",
                     "lseek",
@@ -40,7 +40,7 @@ struct IntegrationTests {
                     "sock_shutdown-not_sock",
                     "stat-dev-ino",
                 ],
-                "WASI Rust tests": [
+                "WASI Rust tests [wasm32-wasip1]": [
                     "close_preopen",
                     "dangling_fd",
                     "dangling_symlink",
@@ -88,25 +88,16 @@ struct IntegrationTests {
                 ],
             ]
         #else
-            var tests: [String: Set<String>] = [
-                "WASI Rust tests": [
-                    "overwrite_preopen",
-                    "path_link",
+            return [
+                "WASI Rust tests [wasm32-wasip1]": [
                     "dir_fd_op_failures",
                     "path_filestat",
-                    "symlink_filestat",
-                    "path_open_read_write",
-                    "path_open_preopen",
-                    "fd_fdstat_set_rights",
-                    "file_allocate",
+                    "path_link",
+                    // Creates a host symlink to "/" under fs-tests.dir.
                     "symlink_create",
-                ],
-                "WASI C tests": [],
+                    "symlink_filestat",
+                ]
             ]
-            #if os(Linux)
-                tests["WASI C tests"]?.insert("pwrite-with-append")
-            #endif
-            return tests
         #endif
     }
 
@@ -115,7 +106,7 @@ struct IntegrationTests {
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Vendor/wasi-testsuite")
         var tests = [URL]()
-        for testSuitePath in ["tests/assemblyscript/testsuite", "tests/c/testsuite", "tests/rust/testsuite"] {
+        for testSuitePath in ["tests/assemblyscript/testsuite/wasm32-wasip1", "tests/c/testsuite/wasm32-wasip1", "tests/rust/testsuite/wasm32-wasip1"] {
             let suitePath = testDir.appendingPathComponent(testSuitePath)
             tests.append(contentsOf: try discoverTestsFromSuite(path: suitePath))
         }
@@ -153,13 +144,13 @@ struct IntegrationTests {
     }
 
     struct CaseManifest: Codable {
-        var dirs: [String]?
+        var root: String?
         var args: [String]?
         var env: [String: String]?
         var exitCode: UInt32?
 
         static var empty: CaseManifest {
-            CaseManifest(dirs: nil, args: nil, env: nil, exitCode: nil)
+            CaseManifest(root: nil, args: nil, env: nil, exitCode: nil)
         }
     }
 
@@ -181,12 +172,10 @@ struct IntegrationTests {
 
         let suitePath = path.deletingLastPathComponent()
 
-        let preopens = (manifest.dirs ?? []).map {
-            WASIBridgeToHost.Preopen(
-                guestPath: $0,
-                hostPath: suitePath.appendingPathComponent($0).path
-            )
-        }
+        let preopens =
+            manifest.root.map {
+                [WASIBridgeToHost.Preopen(guestPath: "/", hostPath: suitePath.appendingPathComponent($0).path)]
+            } ?? []
 
         let wasi = try WASIBridgeToHost(
             args: [path.path] + (manifest.args ?? []),

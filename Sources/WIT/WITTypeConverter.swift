@@ -52,17 +52,10 @@
             case .char: return .primitive(.char)
             case .string: return .primitive(.string)
             case .name(let id):
-                // Handle f32/f64 as aliases for float32/float64 (WIT spec uses f32/f64)
-                switch id.text {
-                case "f32": return .primitive(.float32)
-                case "f64": return .primitive(.float64)
-                default:
-                    // Look up named type
-                    if let type = namedTypes[id.text] {
-                        return type
-                    }
-                    fatalError("Unknown type: \(id.text)")
+                if let type = namedTypes[id.text] {
+                    return type
                 }
+                fatalError("Unknown type: \(id.text)")
             case .list(let element):
                 let elementType = convert(element)
                 let idx = addType(elementType)

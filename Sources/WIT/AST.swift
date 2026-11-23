@@ -173,7 +173,7 @@ public enum HandleSyntax: Equatable, Hashable, Sendable {
     case own(resource: Identifier)
     case borrow(resource: Identifier)
 
-    public var id: Identifier {
+    var id: Identifier {
         switch self {
         case .own(let resource): return resource
         case .borrow(let resource): return resource
@@ -182,7 +182,7 @@ public enum HandleSyntax: Equatable, Hashable, Sendable {
 }
 
 public struct ResourceSyntax: Equatable, Hashable, Sendable {
-    public var functions: [ResourceFunctionSyntax]
+    var functions: [ResourceFunctionSyntax]
 }
 
 public enum ResourceFunctionSyntax: Equatable, Hashable, Sendable {
@@ -312,7 +312,7 @@ public struct UseNameSyntax: Equatable, Hashable, Sendable {
 
 public struct IncludeSyntax: Equatable, Hashable, Sendable {
     var attributes: [AttributeSyntax]
-    public var from: UsePathSyntax
+    var from: UsePathSyntax
     var names: [IncludeNameSyntax]
 }
 

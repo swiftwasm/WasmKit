@@ -52,9 +52,24 @@ import Testing
     }
 
     @Test func invalidItem() throws {
-        #expect(throws: (any Error).self) {
+        let error = try #require(throws: ParseError.self) {
             try parse("world x { . }")
         }
+        #expect(error.description == "`import`, `export`, `include`, `use`, or type definition expected but got period")
+    }
+
+    @Test func missingItemAtEndOfInput() throws {
+        let error = try #require(throws: ParseError.self) {
+            try parse("world w {\n")
+        }
+        #expect(error.description == "`import`, `export`, `include`, `use`, or type definition expected but got nothing")
+    }
+
+    @Test func inlineInterfaceInvalidItem() throws {
+        let error = try #require(throws: ParseError.self) {
+            try parse("world w { import x: interface { . } }")
+        }
+        #expect(error.description == "`type`, `resource` or `func` expected but got period")
     }
 
     @Test func itemImport() throws {
@@ -325,5 +340,22 @@ import Testing
             return
         }
         #expect(use.from.name.text == "pkg1")
+    }
+
+    @Test func itemUseAttributes() throws {
+        let world = try parse(
+            """
+            world x {
+                @since(version = 0.2.4)
+                use pkg1.{thing}
+            }
+            """
+        )
+        guard case .use(let use)? = world.items.first, case .since(let since)? = use.attributes.first else {
+            Issue.record("unexpected items: \(world.items)")
+            return
+        }
+        #expect(use.attributes.count == 1)
+        #expect(since.version.description == "0.2.4")
     }
 }

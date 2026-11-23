@@ -1,67 +1,61 @@
-/// Formats WIT AST nodes to canonical WIT text.
+/// Writes WIT syntax as WIT text.
 ///
-/// The output format matches `wasm-tools component wit --all-features --no-docs`:
-/// - 2-space indentation
-/// - Trailing commas in variant/enum/flags cases
-/// - Blank lines between interface-level items
-/// - No doc comments
-/// - Attributes on their own line before the item
+/// Items keep their source order. Each item and each attribute takes its own line, indented by two
+/// spaces per level. A blank line separates the items of a source file and of an interface, except
+/// two `use` items in a row. The items of a world follow one another without blank lines. Every field
+/// and case in a braced list ends with a comma.
 public struct WITFormatter<Output: TextOutputStream>: ~Copyable {
     public private(set) var output: Output
 
-    public init(output: Output) {
+    /// Whether to write the comments in front of each item, which WIT tools read as its documentation.
+    public let includeDocs: Bool
+
+    public init(output: Output, includeDocs: Bool = true) {
         self.output = output
+        self.includeDocs = includeDocs
     }
 
-    // MARK: - Package
+    // MARK: - Source files
 
-    /// Write an entire package (all source files merged) as canonical WIT text.
-    public mutating func write(package: PackageUnit) {
-        output.write("package \(package.packageName);\n")
-
-        // Collect all interfaces and worlds across source files
-        var interfaces: [SyntaxNode<InterfaceSyntax>] = []
-        var worlds: [SyntaxNode<WorldSyntax>] = []
-        for sourceFile in package.sourceFiles {
-            for item in sourceFile.items {
-                switch item {
-                case .interface(let iface): interfaces.append(iface)
-                case .world(let world): worlds.append(world)
-                case .use: break
-                }
+    public mutating func write(sourceFile: SourceFileSyntax) {
+        var previousIsUse: Bool?
+        if let packageId = sourceFile.packageId {
+            line("package \(formatPackageName(packageId));", indent: 0)
+            previousIsUse = false
+        }
+        for item in sourceFile.items {
+            let isUse: Bool
+            if case .use = item { isUse = true } else { isUse = false }
+            writeSeparator(isUse: isUse, previousIsUse: previousIsUse)
+            switch item {
+            case .interface(let interface): write(interface: interface.syntax, indent: 0)
+            case .world(let world): write(world: world.syntax, indent: 0)
+            case .use(let use): writeTopLevelUse(use.syntax)
             }
-        }
-
-        for iface in interfaces {
-            output.write("\n")
-            write(interface: iface.syntax, indent: 0)
-        }
-        for world in worlds {
-            output.write("\n")
-            write(world: world.syntax, indent: 0)
+            previousIsUse = isUse
         }
     }
 
     // MARK: - Top-level items
 
     mutating func write(interface: InterfaceSyntax, indent: Int) {
-        writeAttributes(interface.attributes, indent: indent)
+        writeDocsAndAttributes(interface.documents, interface.attributes, indent: indent)
         line("interface \(ident(interface.name)) {", indent: indent)
         writeInterfaceItems(interface.items, indent: indent + 1)
         line("}", indent: indent)
     }
 
     mutating func write(world: WorldSyntax, indent: Int) {
-        writeAttributes(world.attributes, indent: indent)
+        writeDocsAndAttributes(world.documents, world.attributes, indent: indent)
         line("world \(ident(world.name)) {", indent: indent)
         for item in world.items {
             switch item {
             case .import(let imp):
-                writeAttributes(imp.attributes, indent: indent + 1)
-                line("import \(formatExternKind(imp.kind));", indent: indent + 1)
+                writeDocsAndAttributes(imp.documents, imp.attributes, indent: indent + 1)
+                writeExtern("import", imp.kind, indent: indent + 1)
             case .export(let exp):
-                writeAttributes(exp.attributes, indent: indent + 1)
-                line("export \(formatExternKind(exp.kind));", indent: indent + 1)
+                writeDocsAndAttributes(exp.documents, exp.attributes, indent: indent + 1)
+                writeExtern("export", exp.kind, indent: indent + 1)
             case .use(let use):
                 writeUse(use.syntax, indent: indent + 1)
             case .type(let typeDef):
@@ -73,63 +67,54 @@ public struct WITFormatter<Output: TextOutputStream>: ~Copyable {
         line("}", indent: indent)
     }
 
+    mutating func writeTopLevelUse(_ use: TopLevelUseSyntax) {
+        writeAttributes(use.attributes, indent: 0)
+        var text = "use \(formatUsePath(use.item))"
+        if let asName = use.asName {
+            text += " as \(ident(asName))"
+        }
+        line(text + ";", indent: 0)
+    }
+
     // MARK: - Interface items
 
     mutating func writeInterfaceItems(_ items: [InterfaceItemSyntax], indent: Int) {
-        // Canonical order: use statements, type definitions, functions
-        let sorted = items.sorted { a, b in
-            func rank(_ item: InterfaceItemSyntax) -> Int {
-                switch item {
-                case .use: return 0
-                case .typeDef: return 1
-                case .function: return 2
-                }
-            }
-            return rank(a) < rank(b)
-        }
-        for (i, item) in sorted.enumerated() {
-            // Blank line between items, except between consecutive use statements
-            if i > 0 {
-                let prevIsUse = {
-                    if case .use = sorted[i - 1] { return true }
-                    return false
-                }()
-                let currIsUse = {
-                    if case .use = item { return true }
-                    return false
-                }()
-                if !(prevIsUse && currIsUse) {
-                    output.write("\n")
-                }
-            }
+        var previousIsUse: Bool?
+        for item in items {
+            let isUse: Bool
+            if case .use = item { isUse = true } else { isUse = false }
+            writeSeparator(isUse: isUse, previousIsUse: previousIsUse)
             switch item {
             case .typeDef(let typeDef):
                 writeTypeDef(typeDef.syntax, indent: indent)
             case .function(let namedFunc):
-                writeAttributes(namedFunc.attributes, indent: indent)
+                writeDocsAndAttributes(namedFunc.documents, namedFunc.attributes, indent: indent)
                 line("\(ident(namedFunc.name)): \(formatFunc(namedFunc.function));", indent: indent)
             case .use(let use):
                 writeUse(use.syntax, indent: indent)
             }
+            previousIsUse = isUse
         }
     }
 
     // MARK: - Type definitions
 
     mutating func writeTypeDef(_ typeDef: TypeDefSyntax, indent: Int) {
-        writeAttributes(typeDef.attributes, indent: indent)
+        writeDocsAndAttributes(typeDef.documents, typeDef.attributes, indent: indent)
         switch typeDef.body {
         case .alias(let alias):
             line("type \(ident(typeDef.name)) = \(formatTypeRepr(alias.typeRepr));", indent: indent)
         case .record(let record):
             line("record \(ident(typeDef.name)) {", indent: indent)
             for field in record.fields {
+                writeDocs(field.documents, indent: indent + 1)
                 line("\(ident(field.name)): \(formatTypeRepr(field.type)),", indent: indent + 1)
             }
             line("}", indent: indent)
         case .variant(let variant):
             line("variant \(ident(typeDef.name)) {", indent: indent)
             for c in variant.cases {
+                writeDocs(c.documents, indent: indent + 1)
                 if let type = c.type {
                     line("\(ident(c.name))(\(formatTypeRepr(type))),", indent: indent + 1)
                 } else {
@@ -140,12 +125,14 @@ public struct WITFormatter<Output: TextOutputStream>: ~Copyable {
         case .enum(let enumType):
             line("enum \(ident(typeDef.name)) {", indent: indent)
             for c in enumType.cases {
+                writeDocs(c.documents, indent: indent + 1)
                 line("\(ident(c.name)),", indent: indent + 1)
             }
             line("}", indent: indent)
         case .flags(let flags):
             line("flags \(ident(typeDef.name)) {", indent: indent)
             for f in flags.flags {
+                writeDocs(f.documents, indent: indent + 1)
                 line("\(ident(f.name)),", indent: indent + 1)
             }
             line("}", indent: indent)
@@ -162,6 +149,7 @@ public struct WITFormatter<Output: TextOutputStream>: ~Copyable {
         case .union(let union):
             line("union \(ident(typeDef.name)) {", indent: indent)
             for c in union.cases {
+                writeDocs(c.documents, indent: indent + 1)
                 line("\(formatTypeRepr(c.type)),", indent: indent + 1)
             }
             line("}", indent: indent)
@@ -173,14 +161,14 @@ public struct WITFormatter<Output: TextOutputStream>: ~Copyable {
     mutating func writeResourceFunc(_ resourceFunc: ResourceFunctionSyntax, indent: Int) {
         switch resourceFunc {
         case .constructor(let namedFunc):
-            writeAttributes(namedFunc.attributes, indent: indent)
+            writeDocsAndAttributes(namedFunc.documents, namedFunc.attributes, indent: indent)
             let params = formatParams(namedFunc.function.parameters)
             line("constructor(\(params));", indent: indent)
         case .method(let namedFunc):
-            writeAttributes(namedFunc.attributes, indent: indent)
+            writeDocsAndAttributes(namedFunc.documents, namedFunc.attributes, indent: indent)
             line("\(ident(namedFunc.name)): \(formatFunc(namedFunc.function));", indent: indent)
         case .static(let namedFunc):
-            writeAttributes(namedFunc.attributes, indent: indent)
+            writeDocsAndAttributes(namedFunc.documents, namedFunc.attributes, indent: indent)
             line("\(ident(namedFunc.name)): static \(formatFunc(namedFunc.function));", indent: indent)
         }
     }
@@ -210,7 +198,24 @@ public struct WITFormatter<Output: TextOutputStream>: ~Copyable {
         line(text + ";", indent: indent)
     }
 
-    // MARK: - Attributes
+    // MARK: - Docs and attributes
+
+    mutating func writeDocs(_ documents: DocumentsSyntax, indent: Int) {
+        guard includeDocs else { return }
+        for comment in documents.comments {
+            // A line comment's text ends with its newline.
+            var text = Substring(comment)
+            while text.last?.isNewline == true {
+                text.removeLast()
+            }
+            line(String(text), indent: indent)
+        }
+    }
+
+    mutating func writeDocsAndAttributes(_ documents: DocumentsSyntax, _ attributes: [AttributeSyntax], indent: Int) {
+        writeDocs(documents, indent: indent)
+        writeAttributes(attributes, indent: indent)
+    }
 
     mutating func writeAttributes(_ attrs: [AttributeSyntax], indent: Int) {
         for attr in attrs {
@@ -249,11 +254,7 @@ public struct WITFormatter<Output: TextOutputStream>: ~Copyable {
         switch results {
         case .named(let params):
             if params.isEmpty { return "" }
-            if params.count == 1 {
-                return "\(ident(params[0].name)): \(formatTypeRepr(params[0].type))"
-            }
-            let inner = params.map { "\(ident($0.name)): \(formatTypeRepr($0.type))" }.joined(separator: ", ")
-            return "(\(inner))"
+            return "(\(formatParams(params)))"
         case .anon(let typeRepr):
             return formatTypeRepr(typeRepr)
         }
@@ -263,67 +264,80 @@ public struct WITFormatter<Output: TextOutputStream>: ~Copyable {
 
     func formatTypeRepr(_ type: TypeReprSyntax) -> String {
         switch type {
-        case .bool: return "bool"
-        case .u8: return "u8"
-        case .u16: return "u16"
-        case .u32: return "u32"
-        case .u64: return "u64"
-        case .s8: return "s8"
-        case .s16: return "s16"
-        case .s32: return "s32"
-        case .s64: return "s64"
-        case .float32: return "f32"
-        case .float64: return "f64"
-        case .char: return "char"
-        case .string: return "string"
+        case .bool: return WITKeyword.bool.rawValue
+        case .u8: return WITKeyword.u8.rawValue
+        case .u16: return WITKeyword.u16.rawValue
+        case .u32: return WITKeyword.u32.rawValue
+        case .u64: return WITKeyword.u64.rawValue
+        case .s8: return WITKeyword.s8.rawValue
+        case .s16: return WITKeyword.s16.rawValue
+        case .s32: return WITKeyword.s32.rawValue
+        case .s64: return WITKeyword.s64.rawValue
+        case .float32: return WITKeyword.f32.rawValue
+        case .float64: return WITKeyword.f64.rawValue
+        case .char: return WITKeyword.char.rawValue
+        case .string: return WITKeyword.string.rawValue
         case .name(let id): return ident(id)
-        case .list(let element): return "list<\(formatTypeRepr(element))>"
-        case .option(let wrapped): return "option<\(formatTypeRepr(wrapped))>"
+        case .list(let element): return "\(WITKeyword.list.rawValue)<\(formatTypeRepr(element))>"
+        case .option(let wrapped): return "\(WITKeyword.option.rawValue)<\(formatTypeRepr(wrapped))>"
         case .tuple(let types):
-            return "tuple<\(types.map { formatTypeRepr($0) }.joined(separator: ", "))>"
-        case .handle(.own(let resource)): return "own<\(ident(resource))>"
-        case .handle(.borrow(let resource)): return "borrow<\(ident(resource))>"
+            return "\(WITKeyword.tuple.rawValue)<\(types.map { formatTypeRepr($0) }.joined(separator: ", "))>"
+        case .handle(.own(let resource)): return "\(WITKeyword.own.rawValue)<\(ident(resource))>"
+        case .handle(.borrow(let resource)): return "\(WITKeyword.borrow.rawValue)<\(ident(resource))>"
         case .result(let result):
+            let name = WITKeyword.result.rawValue
             switch (result.ok, result.error) {
-            case (nil, nil): return "result"
-            case (.some(let ok), nil): return "result<\(formatTypeRepr(ok))>"
-            case (nil, .some(let err)): return "result<_, \(formatTypeRepr(err))>"
-            case (.some(let ok), .some(let err)): return "result<\(formatTypeRepr(ok)), \(formatTypeRepr(err))>"
+            case (nil, nil): return name
+            case (.some(let ok), nil): return "\(name)<\(formatTypeRepr(ok))>"
+            case (nil, .some(let err)): return "\(name)<\(WITKeyword.underscore.rawValue), \(formatTypeRepr(err))>"
+            case (.some(let ok), .some(let err)): return "\(name)<\(formatTypeRepr(ok)), \(formatTypeRepr(err))>"
             }
         case .future(let element):
-            if let element { return "future<\(formatTypeRepr(element))>" }
-            return "future"
+            let name = WITKeyword.future.rawValue
+            if let element { return "\(name)<\(formatTypeRepr(element))>" }
+            return name
         case .stream(let stream):
+            let name = WITKeyword.stream.rawValue
             switch (stream.element, stream.end) {
-            case (nil, nil): return "stream"
-            case (.some(let element), nil): return "stream<\(formatTypeRepr(element))>"
-            case (nil, .some(let end)): return "stream<_, \(formatTypeRepr(end))>"
-            case (.some(let element), .some(let end)): return "stream<\(formatTypeRepr(element)), \(formatTypeRepr(end))>"
+            case (nil, nil): return name
+            case (.some(let element), nil): return "\(name)<\(formatTypeRepr(element))>"
+            case (nil, .some(let end)): return "\(name)<\(WITKeyword.underscore.rawValue), \(formatTypeRepr(end))>"
+            case (.some(let element), .some(let end)): return "\(name)<\(formatTypeRepr(element)), \(formatTypeRepr(end))>"
             }
         }
     }
 
     // MARK: - Extern kinds
 
-    func formatExternKind(_ kind: ExternKindSyntax) -> String {
+    mutating func writeExtern(_ keyword: String, _ kind: ExternKindSyntax, indent: Int) {
         switch kind {
-        case .path(let path): return formatUsePath(path)
+        case .path(let path):
+            line("\(keyword) \(formatUsePath(path));", indent: indent)
         case .function(let name, let function):
-            return "\(ident(name)): \(formatFunc(function))"
-        case .interface(let name, _):
-            // Inline interface (rare in WASIp2). The body payload is not rendered.
-            return "\(ident(name)): interface { ... }"
+            line("\(keyword) \(ident(name)): \(formatFunc(function));", indent: indent)
+        case .interface(let name, let items):
+            line("\(keyword) \(ident(name)): interface {", indent: indent)
+            writeInterfaceItems(items, indent: indent + 1)
+            line("}", indent: indent)
         }
     }
 
     // MARK: - Use paths
+
+    func formatPackageName(_ packageName: PackageNameSyntax) -> String {
+        var text = "\(ident(packageName.namespace)):\(ident(packageName.name))"
+        if let version = packageName.version {
+            text += "@\(version)"
+        }
+        return text
+    }
 
     func formatUsePath(_ path: UsePathSyntax) -> String {
         switch path {
         case .id(let id): return ident(id)
         case .package(let packageName, let name):
             // WIT format: ns:pkg/iface@version (version after interface name)
-            var text = "\(packageName.namespace.text):\(packageName.name.text)/\(ident(name))"
+            var text = "\(ident(packageName.namespace)):\(ident(packageName.name))/\(ident(name))"
             if let version = packageName.version {
                 text += "@\(version)"
             }
@@ -334,11 +348,13 @@ public struct WITFormatter<Output: TextOutputStream>: ~Copyable {
     // MARK: - Helpers
 
     func ident(_ id: Identifier) -> String {
-        let text = id.text
-        if witKeywords.contains(text) {
-            return "%\(text)"
+        WITKeyword(rawValue: id.text) == nil ? id.text : "%\(id.text)"
+    }
+
+    private mutating func writeSeparator(isUse: Bool, previousIsUse: Bool?) {
+        if let previousIsUse, !(previousIsUse && isUse) {
+            output.write("\n")
         }
-        return text
     }
 
     private mutating func line(_ text: String, indent: Int) {
@@ -346,30 +362,12 @@ public struct WITFormatter<Output: TextOutputStream>: ~Copyable {
     }
 }
 
-/// WIT keywords and built-in type names that need `%` escaping when used as identifiers.
-/// File-scope because Swift forbids stored `static let` in a generic type.
-private let witKeywords: Set<String> = [
-    // Structural keywords
-    "use", "type", "resource", "func", "record", "enum", "flags",
-    "variant", "static", "interface", "world", "import", "export",
-    "package", "include", "constructor", "with", "union",
-    // Built-in type names
-    "bool", "char", "string",
-    "u8", "u16", "u32", "u64",
-    "s8", "s16", "s32", "s64",
-    "f32", "f64", "float32", "float64",
-    "list", "option", "result", "tuple",
-    "future", "stream",
-    "own", "borrow",
-]
-
 // MARK: - String convenience
 
 extension WITFormatter where Output == String {
-    /// Format an entire package (all source files merged) to canonical WIT text.
-    public static func format(package: PackageUnit) -> String {
-        var formatter = WITFormatter(output: "")
-        formatter.write(package: package)
+    public static func format(sourceFile: SourceFileSyntax, includeDocs: Bool = true) -> String {
+        var formatter = WITFormatter(output: "", includeDocs: includeDocs)
+        formatter.write(sourceFile: sourceFile)
         return formatter.output
     }
 }

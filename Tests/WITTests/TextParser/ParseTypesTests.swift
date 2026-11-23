@@ -18,8 +18,8 @@ struct ParseTestsTests {
                         type t7 = s16
                         type t8 = s32
                         type t9 = s64
-                        type t10 = float32
-                        type t11 = float64
+                        type t10 = f32
+                        type t11 = f64
                         type t12 = char
                         type t13 = string
 
@@ -66,6 +66,23 @@ struct ParseTestsTests {
         }
     }
 
+    @Test(arguments: [("f32", TypeReprSyntax.float32), ("f64", .float64)])
+    func floatTypes(text: String, type: TypeReprSyntax) throws {
+        var lexer = Lexer(cursor: .init(input: text))
+        let parsed = try TypeReprSyntax.parse(lexer: &lexer)
+        #expect(parsed == type)
+    }
+
+    @Test(arguments: ["float32", "float64"])
+    func legacyFloatSpellingsAreTypeNames(text: String) throws {
+        var lexer = Lexer(cursor: .init(input: text))
+        guard case .name(let name) = try TypeReprSyntax.parse(lexer: &lexer) else {
+            Issue.record("\(text) should parse as a type name")
+            return
+        }
+        #expect(name.text == text)
+    }
+
     @Test func typeDefResource() throws {
         var lexer = Lexer(
             cursor: .init(
@@ -84,6 +101,28 @@ struct ParseTestsTests {
             return
         }
         #expect(resource.functions.count == 1)
+    }
+
+    @Test func typeDefResourceFunctionAttributes() throws {
+        var lexer = Lexer(
+            cursor: .init(
+                input: """
+                    resource r1 {
+                        @since(version = 0.2.1)
+                        f1: func()
+                    }
+                    """
+            )
+        )
+        let typeDef = try TypeDefSyntax.parseResource(lexer: &lexer, documents: .init(comments: []), attributes: [])
+        guard case .resource(let resource) = typeDef.body, case .method(let method)? = resource.functions.first,
+            case .since(let since)? = method.attributes.first
+        else {
+            Issue.record("unexpected type: \(typeDef.body)")
+            return
+        }
+        #expect(method.attributes.count == 1)
+        #expect(since.version.description == "0.2.1")
     }
 
     @Test func typeDefVariant() throws {

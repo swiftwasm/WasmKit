@@ -8,8 +8,8 @@ extension ResourceFunctionSyntax {
             throw ParseError(description: "`constructor` or identifier expected but got nothing")
         }
         switch token.kind {
-        case .constructor:
-            try lexer.expect(.constructor)
+        case .keyword(.constructor):
+            try lexer.expect(.keyword(.constructor))
             try lexer.expect(.leftParen)
 
             let funcStart = lexer.cursor.nextIndex
@@ -41,7 +41,7 @@ extension ResourceFunctionSyntax {
             let name = try Identifier.parse(lexer: &lexer)
             try lexer.expect(.colon)
             let ctor: (SyntaxNode<NamedFunctionSyntax>) -> ResourceFunctionSyntax
-            if lexer.eat(.static) {
+            if lexer.eat(.keyword(.static)) {
                 ctor = ResourceFunctionSyntax.static
             } else {
                 ctor = ResourceFunctionSyntax.method
@@ -81,7 +81,7 @@ extension FunctionSyntax {
         }
 
         let start = lexer.cursor.nextIndex
-        try lexer.expect(.func)
+        try lexer.expect(.keyword(.func))
         let params = try parseParameters(lexer: &lexer, leftParen: true)
         let results: ResultListSyntax
         if lexer.eat(.rArrow) {

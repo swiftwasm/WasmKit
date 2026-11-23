@@ -254,7 +254,8 @@ let package = Package(
             dependencies: [
                 "WIT",
                 .target(name: "WasmTools", condition: .when(traits: ["ComponentModel"])),
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
 
         .target(

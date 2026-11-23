@@ -155,51 +155,8 @@ struct Lexer {
                     self.cursor = tmp
                 }
 
-                switch String(self.cursor.input[startIndex..<self.cursor.nextIndex]) {
-                case "use": return LexKindResult(kind: .use)
-                case "type": return LexKindResult(kind: .type)
-                case "func": return LexKindResult(kind: .func)
-                case "u8": return LexKindResult(kind: .u8)
-                case "u16": return LexKindResult(kind: .u16)
-                case "u32": return LexKindResult(kind: .u32)
-                case "u64": return LexKindResult(kind: .u64)
-                case "s8": return LexKindResult(kind: .s8)
-                case "s16": return LexKindResult(kind: .s16)
-                case "s32": return LexKindResult(kind: .s32)
-                case "s64": return LexKindResult(kind: .s64)
-                case "float32": return LexKindResult(kind: .float32)
-                case "float64": return LexKindResult(kind: .float64)
-                case "char": return LexKindResult(kind: .char)
-                case "resource": return LexKindResult(kind: .resource)
-                case "own": return LexKindResult(kind: .own)
-                case "borrow": return LexKindResult(kind: .borrow)
-                case "record": return LexKindResult(kind: .record)
-                case "flags": return LexKindResult(kind: .flags)
-                case "variant": return LexKindResult(kind: .variant)
-                case "enum": return LexKindResult(kind: .enum)
-                case "union": return LexKindResult(kind: .union)
-                case "bool": return LexKindResult(kind: .bool)
-                case "string": return LexKindResult(kind: .string_)
-                case "option": return LexKindResult(kind: .option_)
-                case "result": return LexKindResult(kind: .result_)
-                case "future": return LexKindResult(kind: .future)
-                case "stream": return LexKindResult(kind: .stream)
-                case "list": return LexKindResult(kind: .list)
-                case "_": return LexKindResult(kind: .underscore)
-                case "as": return LexKindResult(kind: .as)
-                case "from": return LexKindResult(kind: .from_)
-                case "static": return LexKindResult(kind: .static)
-                case "interface": return LexKindResult(kind: .interface)
-                case "tuple": return LexKindResult(kind: .tuple)
-                case "world": return LexKindResult(kind: .world)
-                case "import": return LexKindResult(kind: .import)
-                case "export": return LexKindResult(kind: .export)
-                case "package": return LexKindResult(kind: .package)
-                case "constructor": return LexKindResult(kind: .constructor)
-                case "include": return LexKindResult(kind: .include)
-                case "with": return LexKindResult(kind: .with)
-                case _: return LexKindResult(kind: .id)
-                }
+                let text = String(self.cursor.input[startIndex..<self.cursor.nextIndex])
+                return LexKindResult(kind: WITKeyword(rawValue: text).map(TokenKind.keyword) ?? .id)
             case let ch where isASCIIDigit(ch):
                 var tmp = self.cursor
                 while let ch = tmp.next() {
@@ -321,52 +278,50 @@ enum TokenKind: Equatable {
     case plus
     case minus
 
-    case use
-    case type
-    case `func`
-    case u8
-    case u16
-    case u32
-    case u64
-    case s8
-    case s16
-    case s32
-    case s64
-    case float32
-    case float64
-    case char
-    case record
-    case resource
-    case own
-    case borrow
-    case flags
-    case variant
-    case `enum`
-    case union
-    case bool
-    case string_
-    case option_
-    case result_
-    case future
-    case stream
-    case list
-    case underscore
-    case `as`
-    case from_
-    case `static`
-    case interface
-    case tuple
-    case `import`
-    case export
-    case world
-    case package
-    case constructor
+    case keyword(WITKeyword)
 
     case id
     case explicitId
 
     case integer
+}
 
-    case include
-    case with
+enum WITKeyword: String, CaseIterable {
+    case use, type, `func`
+    case u8, u16, u32, u64, s8, s16, s32, s64
+    case f32, f64
+    case char, resource, own, borrow, record, flags, variant, `enum`, union
+    case bool, string, option, result, future, stream, list
+    case underscore = "_"
+    case `as`, from, `static`, interface, tuple, world, `import`, export, package, constructor, include, with
+}
+
+extension TokenKind: CustomStringConvertible {
+    var description: String {
+        switch self {
+        case .keyword(let keyword): return keyword.rawValue
+        case .whitespace: return "whitespace"
+        case .comment: return "comment"
+        case .equals: return "equals"
+        case .comma: return "comma"
+        case .colon: return "colon"
+        case .period: return "period"
+        case .semicolon: return "semicolon"
+        case .leftParen: return "leftParen"
+        case .rightParen: return "rightParen"
+        case .leftBrace: return "leftBrace"
+        case .rightBrace: return "rightBrace"
+        case .lessThan: return "lessThan"
+        case .greaterThan: return "greaterThan"
+        case .rArrow: return "rArrow"
+        case .star: return "star"
+        case .at: return "at"
+        case .slash: return "slash"
+        case .plus: return "plus"
+        case .minus: return "minus"
+        case .id: return "id"
+        case .explicitId: return "explicitId"
+        case .integer: return "integer"
+        }
+    }
 }

@@ -702,8 +702,8 @@
                     export test-s16: func(v: s16) -> s16
                     export test-s32: func(v: s32) -> s32
                     export test-s64: func(v: s64) -> s64
-                    export test-f32: func(v: float32) -> float32
-                    export test-f64: func(v: float64) -> float64
+                    export test-f32: func(v: f32) -> f32
+                    export test-f64: func(v: f64) -> f64
                     export test-char: func(v: char) -> char
                     export test-string: func(v: string) -> string
                 }

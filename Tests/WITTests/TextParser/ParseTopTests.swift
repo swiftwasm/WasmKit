@@ -200,6 +200,15 @@ struct ParseTopTests {
         }
         #expect(attribute.version.description == "1.0.3")
     }
+
+    @Test(arguments: WITKeyword.allCases.map(\.rawValue))
+    func keywordWhereIdentifierExpected(keyword: String) throws {
+        let error = try #require(throws: ParseError.self) {
+            var lexer = Lexer(cursor: .init(input: keyword))
+            _ = try Identifier.parse(lexer: &lexer)
+        }
+        #expect(error.description == "an identifier expected but got \(keyword)")
+    }
 }
 
 extension SourceFileSyntax {

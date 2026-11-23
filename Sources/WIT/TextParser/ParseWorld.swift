@@ -2,7 +2,7 @@ extension WorldSyntax {
     static func parse(
         lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]
     ) throws -> SyntaxNode<WorldSyntax> {
-        try lexer.expect(.world)
+        try lexer.expect(.keyword(.world))
         let name = try Identifier.parse(lexer: &lexer)
         let items = try parseItems(lexer: &lexer)
         return .init(
@@ -28,31 +28,34 @@ extension WorldSyntax {
 
 extension WorldItemSyntax {
     static func parse(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> WorldItemSyntax {
-        switch lexer.peek()?.kind {
-        case .import:
+        guard let token = lexer.peek() else {
+            throw ParseError(description: "`import`, `export`, `include`, `use`, or type definition expected but got nothing")
+        }
+        switch token.kind {
+        case .keyword(.import):
             return try .import(.parse(lexer: &lexer, documents: documents, attributes: attributes))
-        case .export:
+        case .keyword(.export):
             return try .export(.parse(lexer: &lexer, documents: documents, attributes: attributes))
-        case .use:
+        case .keyword(.use):
             return try .use(UseSyntax.parse(lexer: &lexer, attributes: attributes))
-        case .type:
+        case .keyword(.type):
             return try .type(.init(syntax: .parse(lexer: &lexer, documents: documents, attributes: attributes)))
-        case .flags:
+        case .keyword(.flags):
             return try .type(.init(syntax: .parseFlags(lexer: &lexer, documents: documents, attributes: attributes)))
-        case .enum:
+        case .keyword(.enum):
             return try .type(.init(syntax: .parseEnum(lexer: &lexer, documents: documents, attributes: attributes)))
-        case .variant:
+        case .keyword(.variant):
             return try .type(.init(syntax: .parseVariant(lexer: &lexer, documents: documents, attributes: attributes)))
-        case .resource:
+        case .keyword(.resource):
             return try .type(TypeDefSyntax.parseResource(lexer: &lexer, documents: documents, attributes: attributes))
-        case .record:
+        case .keyword(.record):
             return try .type(.init(syntax: .parseRecord(lexer: &lexer, documents: documents, attributes: attributes)))
-        case .union:
+        case .keyword(.union):
             return try .type(.init(syntax: .parseUnion(lexer: &lexer, documents: documents, attributes: attributes)))
-        case .include:
+        case .keyword(.include):
             return try .include(.parse(lexer: &lexer, attributes: attributes))
         default:
-            throw ParseError(description: "`type`, `resource` or `func` expected")
+            throw ParseError(description: "`import`, `export`, `include`, `use`, or type definition expected but got \(token.kind)")
         }
     }
 }
@@ -63,7 +66,7 @@ extension ImportSyntax {
         documents: DocumentsSyntax,
         attributes: [AttributeSyntax]
     ) throws -> ImportSyntax {
-        try lexer.expect(.import)
+        try lexer.expect(.keyword(.import))
         let kind = try ExternKindSyntax.parse(lexer: &lexer)
         return ImportSyntax(documents: documents, attributes: attributes, kind: kind)
     }
@@ -71,7 +74,7 @@ extension ImportSyntax {
 
 extension ExportSyntax {
     static func parse(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> ExportSyntax {
-        try lexer.expect(.export)
+        try lexer.expect(.keyword(.export))
         let kind = try ExternKindSyntax.parse(lexer: &lexer)
         return ExportSyntax(documents: documents, attributes: attributes, kind: kind)
     }
@@ -83,15 +86,15 @@ extension ExternKindSyntax {
         let id = try Identifier.parse(lexer: &clone)
         if clone.eat(.colon) {
             switch clone.peek()?.kind {
-            case .func:
+            case .keyword(.func):
                 // import foo: func(...);
                 lexer = clone
                 let result: ExternKindSyntax = try .function(id, .parse(lexer: &lexer))
                 try lexer.expectSemicolon()
                 return result
-            case .interface:
+            case .keyword(.interface):
                 // import foo: interface { ... }
-                try clone.expect(.interface)
+                try clone.expect(.keyword(.interface))
                 lexer = clone
                 return try .interface(id, InterfaceSyntax.parseItems(lexer: &lexer))
             default: break
@@ -106,14 +109,14 @@ extension ExternKindSyntax {
 
 extension IncludeSyntax {
     static func parse(lexer: inout Lexer, attributes: [AttributeSyntax]) throws -> IncludeSyntax {
-        try lexer.expect(.include)
+        try lexer.expect(.keyword(.include))
         let from = try UsePathSyntax.parse(lexer: &lexer)
 
         var names: [IncludeNameSyntax] = []
-        if lexer.eat(.with) {
+        if lexer.eat(.keyword(.with)) {
             names = try Parser.parseList(lexer: &lexer, start: .leftBrace, end: .rightBrace) { _, lexer in
                 let name = try Identifier.parse(lexer: &lexer)
-                try lexer.expect(.as)
+                try lexer.expect(.keyword(.as))
                 let asName = try Identifier.parse(lexer: &lexer)
                 return IncludeNameSyntax(name: name, asName: asName)
             }

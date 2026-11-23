@@ -363,37 +363,40 @@ package func wasm2wat(
     return result.stdoutString
 }
 
-/// Formats a WIT package directory to canonical WIT text using `wasm-tools component wit`.
+/// Prints a WIT package as WIT text using `wasm-tools component wit`.
 ///
-/// Loads the `.wit` files (including any under `deps/`) into an in-memory filesystem rather than
-/// preopening the host directory, so it opens no host file descriptors and is safe to run
-/// concurrently with the suite's `.host()`-based WASI tests.
+/// Keeps no host file descriptor open while `wasm-tools` runs. It is safe to run concurrently with
+/// the suite's `.host()`-based WASI tests.
+///
+/// - Parameters:
+///   - packagePath: The guest directory of the package. `wasm-tools` finds the package's
+///     dependencies in `<packagePath>/deps/<name>/`.
+///   - directories: Host directories keyed by the guest directory to load them at. Only the `.wit`
+///     files directly inside each host directory are loaded.
 package func componentWit(
     wasmToolsPath: String = defaultWasmToolsPath,
-    packageDirectory: String,
+    packagePath: String,
+    directories: [String: String] = [:],
+    files: [WasmToolsInputFile] = [],
     allFeatures: Bool = true,
     noDocs: Bool = true
 ) throws -> String {
-    let guestRoot = "/package"
-    // Resolve symlinks so the enumerator's URLs share this prefix (macOS temp dirs symlink /var to
-    // /private/var, which would otherwise break the relative-path slicing below).
-    let hostBase = URL(fileURLWithPath: packageDirectory).resolvingSymlinksInPath()
-    guard
-        let enumerator = FileManager.default.enumerator(
-            at: hostBase, includingPropertiesForKeys: [.isRegularFileKey])
-    else {
-        throw WasmToolsError.fileNotFound(path: packageDirectory)
-    }
-
     let context = try WasmToolsContext()
-    for case let fileURL as URL in enumerator where fileURL.pathExtension == "wit" {
-        // Mirror the host layout (e.g. "/random.wit", "/deps/io/streams.wit") under the guest root.
-        let relative = fileURL.resolvingSymlinksInPath().path.dropFirst(hostBase.path.count)
-        let content = try [UInt8](Data(contentsOf: fileURL))
-        try context.memoryFS.addFile(at: guestRoot + relative, content: content)
+    for (guestDirectory, hostDirectory) in directories {
+        for name in try FileManager.default.contentsOfDirectory(atPath: hostDirectory) where name.hasSuffix(".wit") {
+            let content = try [UInt8](Data(contentsOf: URL(fileURLWithPath: hostDirectory).appendingPathComponent(name)))
+            try context.addInputFile(WasmToolsInputFile(guestPath: "\(guestDirectory)/\(name)", content: content))
+        }
+    }
+    for file in files {
+        try context.addInputFile(file)
     }
 
-    var args = ["component", "wit", guestRoot]
+    // A large output on stdout deadlocks runWasmTools.
+    let outputDirectory = "/output"
+    let outputPath = "\(outputDirectory)/package.wit"
+    try context.memoryFS.ensureDirectory(at: outputDirectory)
+    var args = ["component", "wit", packagePath, "--output", outputPath]
     if allFeatures { args.append("--all-features") }
     if noDocs { args.append("--no-docs") }
 
@@ -401,7 +404,7 @@ package func componentWit(
     guard result.exitCode == 0 else {
         throw WasmToolsError.executionFailed(exitCode: result.exitCode, stderr: result.stderrString)
     }
-    return result.stdoutString
+    return String(decoding: try context.getFile(at: outputPath), as: UTF8.self)
 }
 
 package func wat2wasm(

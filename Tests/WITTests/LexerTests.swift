@@ -16,7 +16,7 @@ struct LexerTests {
 
     @Test func lexIdentifier() throws {
         #expect(try collectToken("") == [])
-        #expect(try collectToken("_") == [.underscore])
+        #expect(try collectToken("_") == [.keyword(.underscore)])
         #expect(try collectToken("a") == [.id])
         #expect(try collectToken("a1") == [.id])
         #expect(try collectToken("a1b") == [.id])
@@ -34,17 +34,22 @@ struct LexerTests {
     }
 
     @Test func lexKeyword() throws {
-        #expect(try collectToken("func") == [.func])
-        #expect(try collectToken("func()") == [.func, .leftParen, .rightParen])
+        #expect(try collectToken("func") == [.keyword(.func)])
+        #expect(try collectToken("func()") == [.keyword(.func), .leftParen, .rightParen])
 
-        #expect(try collectToken("resource") == [.resource])
+        #expect(try collectToken("resource") == [.keyword(.resource)])
 
-        #expect(try collectToken("own") == [.own])
-        #expect(try collectToken("borrow") == [.borrow])
+        #expect(try collectToken("own") == [.keyword(.own)])
+        #expect(try collectToken("borrow") == [.keyword(.borrow)])
 
         #expect(
-            try collectToken("own<file>") == [.own, .lessThan, .id, .greaterThan]
+            try collectToken("own<file>") == [.keyword(.own), .lessThan, .id, .greaterThan]
         )
+
+        #expect(try collectToken("f32").map(\.description) == ["f32"])
+        #expect(try collectToken("f64").map(\.description) == ["f64"])
+        #expect(try collectToken("float32") == [.id])
+        #expect(try collectToken("float64") == [.id])
     }
 
     @Test func lexInteger() throws {
@@ -56,18 +61,18 @@ struct LexerTests {
     @Test func lexFunction() throws {
         #expect(
             try collectToken("stat-file: func()") == [
-                .id, .colon, .func, .leftParen, .rightParen,
+                .id, .colon, .keyword(.func), .leftParen, .rightParen,
             ])
         #expect(
             try collectToken("stat-file: func(path: string)") == [
-                .id, .colon, .func,
-                .leftParen, .id, .colon, .string_, .rightParen,
+                .id, .colon, .keyword(.func),
+                .leftParen, .id, .colon, .keyword(.string), .rightParen,
             ])
 
         #expect(
             try collectToken("stat-file: func() -> result<stat>") == [
-                .id, .colon, .func, .leftParen, .rightParen,
-                .rArrow, .result_, .lessThan, .id, .greaterThan,
+                .id, .colon, .keyword(.func), .leftParen, .rightParen,
+                .rArrow, .keyword(.result), .lessThan, .id, .greaterThan,
             ])
     }
 
