@@ -347,7 +347,7 @@ import Testing
             """
             world x {
                 @since(version = 0.2.4)
-                use pkg1.{thing}
+                use pkg1.{thing};
             }
             """
         )

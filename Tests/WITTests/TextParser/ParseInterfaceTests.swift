@@ -241,7 +241,7 @@ struct ParseInterfaceTests {
             """
             interface x {
                 @since(version = 0.2.2)
-                f1: func()
+                f1: func();
             }
             """
         )
@@ -258,7 +258,7 @@ struct ParseInterfaceTests {
             """
             interface x {
                 @since(version = 0.2.3)
-                use pkg1.{thing}
+                use pkg1.{thing};
             }
             """
         )

@@ -209,6 +209,21 @@ struct ParseTopTests {
         }
         #expect(error.description == "an identifier expected but got \(keyword)")
     }
+
+    @Test(arguments: [
+        ("%", "invalid WIT identifier '': empty identifier"),
+        ("%_", "invalid WIT identifier '_': must start with an ASCII letter"),
+        ("a--b", "invalid WIT identifier 'a--b': identifiers must have characters between '-'s"),
+        ("a_b", "invalid WIT identifier 'a_b': word 'a_b' contains an invalid character"),
+        ("aB", "invalid WIT identifier 'aB': word 'aB' mixes letter cases"),
+    ])
+    func invalidIdentifier(input: String, message: String) throws {
+        let error = try #require(throws: ParseError.self) {
+            var lexer = Lexer(cursor: .init(input: input))
+            _ = try Identifier.parse(lexer: &lexer)
+        }
+        #expect(error.description == message)
+    }
 }
 
 extension SourceFileSyntax {
