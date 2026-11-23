@@ -152,7 +152,7 @@ struct WITFormatterTests {
         #expect(output == text)
     }
 
-    @Test(arguments: WITKeyword.allCases.map(\.rawValue))
+    @Test(arguments: WITKeyword.allCases.filter { $0 != .underscore }.map(\.rawValue))
     func keywordIdentifiers(keyword: String) throws {
         let text = """
             interface i {

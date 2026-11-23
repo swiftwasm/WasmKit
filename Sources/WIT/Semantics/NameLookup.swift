@@ -265,7 +265,14 @@ extension TypeDefSyntax {
                     parent: context.definitionContext
                 )
             )
-        case .resource(let resource): return .resource(resource)
+        case .resource(let resource):
+            return .resource(
+                WITResource(
+                    name: self.name.text,
+                    syntax: resource,
+                    parent: context.definitionContext
+                )
+            )
         case .record(let record):
             return try .record(
                 WITRecord(

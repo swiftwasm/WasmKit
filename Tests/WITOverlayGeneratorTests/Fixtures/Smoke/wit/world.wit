@@ -1,5 +1,5 @@
-package test:smoke
+package test:smoke;
 
 world smoke-test-world {
-    export hello: func()
+    export hello: func();
 }

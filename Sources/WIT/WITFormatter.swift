@@ -240,10 +240,11 @@ public struct WITFormatter<Output: TextOutputStream>: ~Copyable {
     func formatFunc(_ func_: FunctionSyntax) -> String {
         let params = formatParams(func_.parameters)
         let results = formatResults(func_.results)
+        let keyword = func_.isAsync ? "async func" : "func"
         if results.isEmpty {
-            return "func(\(params))"
+            return "\(keyword)(\(params))"
         }
-        return "func(\(params)) -> \(results)"
+        return "\(keyword)(\(params)) -> \(results)"
     }
 
     func formatParams(_ params: ParameterList) -> String {

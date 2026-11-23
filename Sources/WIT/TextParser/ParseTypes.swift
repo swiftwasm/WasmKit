@@ -107,15 +107,15 @@ extension TypeReprSyntax {
 
         // `foo`
         case .id:
-            return .name(
-                Identifier(
+            return try .name(
+                Identifier.requireValid(
                     text: lexer.parseText(in: token.textRange),
                     textRange: token.textRange
                 ))
         // `%foo`
         case .explicitId:
-            return .name(
-                Identifier(
+            return try .name(
+                Identifier.requireValid(
                     text: lexer.parseExplicitIdentifier(in: token.textRange),
                     textRange: token.textRange
                 ))
@@ -131,7 +131,7 @@ extension TypeDefSyntax {
         let name = try Identifier.parse(lexer: &lexer)
         try lexer.expect(.equals)
         let repr = try TypeReprSyntax.parse(lexer: &lexer)
-        try lexer.expectSemicolon()
+        try lexer.expect(.semicolon)
         return TypeDefSyntax(documents: documents, attributes: attributes, name: name, body: .alias(TypeAliasSyntax(typeRepr: repr)))
     }
 
@@ -162,7 +162,7 @@ extension TypeDefSyntax {
                 functions.append(try ResourceFunctionSyntax.parse(lexer: &lexer, documents: docs, attributes: attributes))
             }
         } else {
-            try lexer.expectSemicolon()
+            try lexer.expect(.semicolon)
         }
         let body = TypeDefBodySyntax.resource(ResourceSyntax(functions: functions))
         return .init(syntax: TypeDefSyntax(documents: documents, attributes: attributes, name: name, body: body))

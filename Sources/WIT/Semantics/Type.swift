@@ -13,8 +13,8 @@ public indirect enum WITType: Equatable, Hashable {
     case char
     case string
     case list(WITType)
-    case handleOwn(ResourceSyntax)
-    case handleBorrow(ResourceSyntax)
+    case handleOwn(WITResource)
+    case handleBorrow(WITResource)
     case tuple([WITType])
     case option(WITType)
     case result(ok: WITType?, error: WITType?)
@@ -25,7 +25,7 @@ public indirect enum WITType: Equatable, Hashable {
     case flags(WITFlags)
     case `enum`(WITEnum)
     case variant(WITVariant)
-    case resource(ResourceSyntax)
+    case resource(WITResource)
     case union(WITUnion)
 }
 
@@ -90,6 +90,12 @@ public struct WITFlags: Equatable, Hashable {
     public var parent: TypeDefinitionContext
 }
 
+public struct WITResource: Equatable, Hashable {
+    public var name: String
+    public var syntax: ResourceSyntax
+    public var parent: TypeDefinitionContext
+}
+
 struct TypeResolutionRequest: EvaluationRequest {
     let context: DeclContext
     let typeRepr: TypeReprSyntax
@@ -111,7 +117,12 @@ struct TypeResolutionRequest: EvaluationRequest {
         case .string: return .string
         case .name(let id):
             let name = id.text
-            return try evaluator.evaluate(request: TypeNameLookupRequest(context: context, name: name))
+            let type = try evaluator.evaluate(request: TypeNameLookupRequest(context: context, name: name))
+            // A bare resource name denotes an owning handle.
+            if case .resource(let resource) = type {
+                return .handleOwn(resource)
+            }
+            return type
         case .list(let elementRepr):
             let elementTy = try evaluator.evaluate(request: self.copy(with: elementRepr))
             return .list(elementTy)
@@ -158,7 +169,7 @@ struct ResourceTypeNameLookupRequest: EvaluationRequest {
     let context: DeclContext
     let name: String
 
-    func evaluate(evaluator: Evaluator) throws -> ResourceSyntax {
+    func evaluate(evaluator: Evaluator) throws -> WITResource {
         let type = try evaluator.evaluate(request: TypeNameLookupRequest(context: context, name: name))
         guard case .resource(let resource) = type else {
             throw DiagnosticError(diagnostic: .expectedResourceType(type, textRange: nil))

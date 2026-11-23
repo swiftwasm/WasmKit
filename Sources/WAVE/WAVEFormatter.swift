@@ -63,8 +63,11 @@
             case .option(let inner):
                 return formatOption(inner)
 
-            case .result(let ok, let error):
-                return formatResult(ok: ok, error: error)
+            case .resultOk(let ok):
+                // Always use explicit ok() form to match reference implementation
+                return ok.map { "ok(\(format($0)))" } ?? "ok"
+            case .resultErr(let error):
+                return error.map { "err(\(format($0)))" } ?? "err"
             }
         }
     }
@@ -269,25 +272,6 @@
 
         // Always use explicit some() form to match reference implementation
         return "some(\(WAVEFormatter.format(inner)))"
-    }
-
-    // MARK: - Result Formatting
-
-    private func formatResult(ok: ComponentValue?, error: ComponentValue?) -> String {
-        if let error = error {
-            // Check for empty tuple marker (err case with no payload)
-            if case .tuple(let elements) = error, elements.isEmpty {
-                return "err"
-            }
-            return "err(\(WAVEFormatter.format(error)))"
-        }
-
-        if let ok = ok {
-            // Always use explicit ok() form to match reference implementation
-            return "ok(\(WAVEFormatter.format(ok)))"
-        }
-
-        return "ok"
     }
 
     // MARK: - Label Formatting

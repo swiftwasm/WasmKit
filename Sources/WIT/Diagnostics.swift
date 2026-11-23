@@ -2,8 +2,9 @@ struct ParseError: Error, CustomStringConvertible {
     let description: String
 }
 
-struct DiagnosticError: Error {
+struct DiagnosticError: Error, CustomStringConvertible {
     let diagnostic: Diagnostic
+    var description: String { diagnostic.message }
 }
 
 public struct Diagnostic: Sendable {

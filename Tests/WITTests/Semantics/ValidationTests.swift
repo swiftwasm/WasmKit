@@ -24,12 +24,12 @@ struct ValidationTests {
     @Test func invalidTypeReferences() throws {
         try assertDiagnostics(
             """
-            package foo:bar
+            package foo:bar;
             interface x {
-              type x = invalid1
+              type x = invalid1;
             }
             world y {
-              type y = invalid2
+              type y = invalid2;
             }
             """,
             expected: [
@@ -42,7 +42,7 @@ struct ValidationTests {
     @Test func invalidTypeReferencesInTypeDefinitions() throws {
         try assertDiagnostics(
             """
-            package foo:bar
+            package foo:bar;
             interface x {
               record r1 {
                 f1: invalid1
@@ -54,7 +54,7 @@ struct ValidationTests {
               union u1 {
                 invalid3,
               }
-              type h1 = own<invalid4>
+              type h1 = own<invalid4>;
             }
             """,
             expected: [
@@ -69,11 +69,11 @@ struct ValidationTests {
     @Test func invalidTypeReferencesInFunctions() throws {
         try assertDiagnostics(
             """
-            package foo:bar
+            package foo:bar;
             interface x {
-              f1: func() -> invalid1
-              f2: func(x: invalid2) -> invalid3
-              f3: func(a: invalid4, b: invalid5) -> (c: invalid6, d: invalid7)
+              f1: func() -> invalid1;
+              f2: func(x: invalid2) -> invalid3;
+              f3: func(a: invalid4, b: invalid5) -> (c: invalid6, d: invalid7);
             }
             """,
             expected: [
@@ -91,13 +91,13 @@ struct ValidationTests {
     @Test func invalidTypeReferencesInUse() throws {
         try assertDiagnostics(
             """
-            package foo:bar
+            package foo:bar;
             interface types {
-              type t1 = u8
+              type t1 = u8;
             }
             interface x {
-              use types.{t1, invalid1}
-              use invalid2.{t2}
+              use types.{t1, invalid1};
+              use invalid2.{t2};
             }
             """,
             expected: [
@@ -110,15 +110,15 @@ struct ValidationTests {
     @Test func validateInlineInterface() throws {
         try assertDiagnostics(
             """
-            package foo:bar
+            package foo:bar;
             world x {
               import y: interface {
-                type z = invalid1
-                type a = u8
-                type b = a
+                type z = invalid1;
+                type a = u8;
+                type b = a;
               }
               // a should not be visible here
-              type c = a
+              type c = a;
             }
             """,
             expected: [
@@ -128,15 +128,15 @@ struct ValidationTests {
         )
         try assertDiagnostics(
             """
-            package foo:bar
+            package foo:bar;
             world x {
               export y: interface {
-                type z = invalid1
-                type a = u8
-                type b = a
+                type z = invalid1;
+                type a = u8;
+                type b = a;
               }
               // a should not be visible here
-              type c = a
+              type c = a;
             }
             """,
             expected: [
@@ -149,14 +149,14 @@ struct ValidationTests {
     @Test func validateImportExport() throws {
         try assertDiagnostics(
             """
-            package foo:bar
+            package foo:bar;
             interface ok1 {}
             interface ok2 {}
             world x {
-              import ok1
-              import invalid1
-              export ok2
-              export invalid2
+              import ok1;
+              import invalid1;
+              export ok2;
+              export invalid2;
             }
             """,
             expected: [
@@ -169,16 +169,16 @@ struct ValidationTests {
     @Test func invalidTopLevelUse() throws {
         try assertDiagnostics(
             """
-            package foo:bar
-            use foo:my-pkg/my-iface
+            package foo:bar;
+            use foo:my-pkg/my-iface;
             """,
             expected: ["No such package 'foo:my-pkg'"]
         )
 
         try assertDiagnostics(
             """
-            package foo:bar
-            use foo
+            package foo:bar;
+            use foo;
             """,
             expected: ["Cannot find interface 'foo' in scope"]
         )
@@ -187,7 +187,7 @@ struct ValidationTests {
     @Test func recordRedeclaration() throws {
         try assertDiagnostics(
             """
-            package foo:bar
+            package foo:bar;
             interface x {
               record r1 {
                 f1: u8,
@@ -207,7 +207,7 @@ struct ValidationTests {
     @Test func variantRedeclaration() throws {
         try assertDiagnostics(
             """
-            package foo:bar
+            package foo:bar;
             interface x {
               variant v1 {
                 var-case1,
