@@ -19,24 +19,24 @@
     /// // Then convert types
     /// let componentType = converter.convert(typeRepr)
     /// ```
-    public struct WITTypeConverter {
+    package struct WITTypeConverter {
         /// Type table for resolving indexed types
-        public private(set) var typeTable: [ComponentDefValType] = []
+        private(set) var typeTable: [ComponentDefValType] = []
 
         /// Named type definitions
-        public private(set) var namedTypes: [String: ComponentDefValType] = [:]
+        private(set) var namedTypes: [String: ComponentDefValType] = [:]
 
-        public init() {}
+        init() {}
 
         /// Add a type to the table and return its index
-        public mutating func addType(_ type: ComponentDefValType) -> ComponentTypeIndex {
+        mutating func addType(_ type: ComponentDefValType) -> ComponentTypeIndex {
             let idx = typeTable.count
             typeTable.append(type)
             return ComponentTypeIndex(rawValue: idx)
         }
 
         /// Convert a WIT type representation to a ComponentDefValType
-        public mutating func convert(_ typeRepr: TypeReprSyntax) -> ComponentDefValType {
+        mutating func convert(_ typeRepr: TypeReprSyntax) -> ComponentDefValType {
             switch typeRepr {
             case .bool: return .primitive(.bool)
             case .u8: return .primitive(.u8)
@@ -86,7 +86,7 @@
         }
 
         /// Register a type definition, making it available for lookup by name
-        public mutating func registerTypeDef(_ typeDef: TypeDefSyntax) {
+        mutating func registerTypeDef(_ typeDef: TypeDefSyntax) {
             let typeName = typeDef.name.text
             let componentType: ComponentDefValType
 
@@ -123,25 +123,25 @@
         }
 
         /// Resolve a type index to its ComponentDefValType
-        public func resolve(_ idx: ComponentTypeIndex) -> ComponentDefValType {
+        package func resolve(_ idx: ComponentTypeIndex) -> ComponentDefValType {
             return typeTable[Int(idx.rawValue)]
         }
     }
 
     /// Helper for extracting interface information from parsed WIT
-    public struct WITInterfaceExtractor {
+    package struct WITInterfaceExtractor {
         /// Extracted function signatures
-        public private(set) var functions: [String: [(name: String, type: ComponentDefValType)]] = [:]
+        package private(set) var functions: [String: [(name: String, type: ComponentDefValType)]] = [:]
 
         /// The type converter used during extraction
-        public private(set) var converter: WITTypeConverter
+        package private(set) var converter: WITTypeConverter
 
-        public init() {
+        package init() {
             self.converter = WITTypeConverter()
         }
 
         /// Extract function signatures from a WIT interface
-        public mutating func extractInterface(_ interfaceSyntax: InterfaceSyntax) {
+        mutating func extractInterface(_ interfaceSyntax: InterfaceSyntax) {
             // First pass: register all type definitions
             for item in interfaceSyntax.items {
                 if case .typeDef(let typeDefNode) = item {
@@ -164,7 +164,7 @@
         }
 
         /// Extract an interface by name from a parsed source file
-        public mutating func extractInterface(named name: String, from sourceFile: SourceFileSyntax) -> Bool {
+        package mutating func extractInterface(named name: String, from sourceFile: SourceFileSyntax) -> Bool {
             for item in sourceFile.items {
                 guard case .interface(let interfaceNode) = item else { continue }
                 let interfaceSyntax = interfaceNode.syntax

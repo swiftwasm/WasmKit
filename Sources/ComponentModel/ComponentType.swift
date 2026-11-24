@@ -1,4 +1,4 @@
-public struct ComponentTypeIndex: Hashable {
+public struct ComponentTypeIndex: Hashable, Sendable {
     public init(rawValue: Int) {
         self.rawValue = UInt32(rawValue)
     }
@@ -6,7 +6,16 @@ public struct ComponentTypeIndex: Hashable {
     public let rawValue: UInt32
 }
 
-public struct ComponentIndex: Hashable {
+/// Index into the resource types array within a component.
+package struct ResourceTypeIndex: Hashable, Sendable {
+    package init(rawValue: Int) {
+        self.rawValue = UInt32(rawValue)
+    }
+
+    package let rawValue: UInt32
+}
+
+package struct ComponentIndex: Hashable {
     package init(_ int: Int) {
         self.rawValue = UInt32(int)
     }
@@ -14,7 +23,7 @@ public struct ComponentIndex: Hashable {
     package let rawValue: UInt32
 }
 
-public struct ComponentInstanceIndex: Hashable {
+package struct ComponentInstanceIndex: Hashable {
     package init(_ int: Int) {
         self.rawValue = UInt32(int)
     }
@@ -22,7 +31,7 @@ public struct ComponentInstanceIndex: Hashable {
     package let rawValue: UInt32
 }
 
-public struct ComponentFuncIndex: Hashable {
+package struct ComponentFuncIndex: Hashable {
     package init(_ int: Int) {
         self.rawValue = UInt32(int)
     }
@@ -30,7 +39,7 @@ public struct ComponentFuncIndex: Hashable {
     package let rawValue: UInt32
 }
 
-public struct CoreInstanceIndex: Hashable {
+package struct CoreInstanceIndex: Hashable {
     package init(_ int: Int) {
         self.rawValue = UInt32(int)
     }
@@ -38,7 +47,7 @@ public struct CoreInstanceIndex: Hashable {
     package let rawValue: UInt32
 }
 
-public struct CoreModuleIndex: Hashable {
+package struct CoreModuleIndex: Hashable {
     package init(_ int: Int) {
         self.rawValue = UInt32(int)
     }
@@ -46,17 +55,18 @@ public struct CoreModuleIndex: Hashable {
     package let rawValue: UInt32
 }
 
-public enum CoreDefSort: String {
+package enum CoreDefSort: String {
     case `func`
     case table
     case memory
     case global
+    case tag
     case type
     case module
     case instance
 }
 
-public enum ComponentDefSort {
+package enum ComponentDefSort {
     case core(CoreDefSort)
     case `func`
     case value
@@ -67,7 +77,7 @@ public enum ComponentDefSort {
 
 /// Primitive value types that can be encoded inline in valtypes.
 /// Corresponds to `primvaltype` in the Component Model binary spec.
-public enum ComponentPrimValType: Hashable {
+package enum ComponentPrimValType: Hashable {
     case bool
     case s8
     case s16
@@ -87,7 +97,7 @@ public enum ComponentPrimValType: Hashable {
 /// A value type reference: either a type index or an inline primitive.
 /// Corresponds to `valtype` in the Component Model binary spec:
 /// `valtype ::= i:<typeidx> | pvt:<primvaltype>`
-public enum ComponentValType: Hashable {
+package enum ComponentValType: Hashable {
     case index(ComponentTypeIndex)
     case primitive(ComponentPrimValType)
 
@@ -103,10 +113,11 @@ public enum ComponentValType: Hashable {
     }
 }
 
-public enum ComponentDefValType: Hashable {
+package enum ComponentDefValType: Hashable {
     /// A value type: a type index or an inline primitive.
     case inlined(ComponentValType)
 
+    /// A list type with its element type as a valtype (primitive or indexed)
     case list(ComponentValType)
     case tuple([ComponentValType])
     case option(ComponentValType)
@@ -120,62 +131,80 @@ public enum ComponentDefValType: Hashable {
     case flags([String])
     case `enum`([String])
     case variant([ComponentCaseField])
-    case resource(destructor: ComponentFuncIndex)
+    case resource(destructor: ComponentFuncIndex?)
+
+    /// An owned handle to a resource type
+    case own(ResourceTypeIndex)
+    /// A borrowed handle to a resource type
+    case borrow(ResourceTypeIndex)
 
     /// Construct an inline-primitive value type.
-    public static func primitive(_ type: ComponentPrimValType) -> Self { .inlined(.primitive(type)) }
+    package static func primitive(_ type: ComponentPrimValType) -> Self { .inlined(.primitive(type)) }
 
     /// Construct a type-index value type.
-    public static func indexed(_ index: ComponentTypeIndex) -> Self { .inlined(.index(index)) }
+    package static func indexed(_ index: ComponentTypeIndex) -> Self { .inlined(.index(index)) }
 
     /// `true` if this is an inline-primitive value type.
     package var isPrimitive: Bool {
-        guard case .inlined(.primitive) = self else { return false }
+        guard case .inlined(.primitive(_)) = self else {
+            return false
+        }
+
         return true
     }
 }
 
-public struct ComponentFuncType: Hashable {
-    public init(params: [ComponentFuncType.Param], result: ComponentDefValType?) {
-        self.params = params
-        self.result = result
+package struct ComponentFuncType: Hashable {
+    package init(params: [ComponentFuncType.Param], result: ComponentDefValType?) {
+        self.init(params: params, result: result, isAsync: false)
     }
 
-    public struct Param: Hashable {
-        public init(name: String, type: ComponentDefValType) {
+    package init(params: [ComponentFuncType.Param], result: ComponentDefValType?, isAsync: Bool) {
+        self.params = params
+        self.result = result
+        self.isAsync = isAsync
+    }
+
+    package struct Param: Hashable {
+        package init(name: String, type: ComponentDefValType) {
             self.name = name
             self.type = type
         }
 
-        public let name: String
-        public let type: ComponentDefValType
+        package let name: String
+        package let type: ComponentDefValType
     }
-    public let params: [Param]
-    public let result: ComponentDefValType?
+    package let params: [Param]
+    package let result: ComponentDefValType?
+
+    /// Whether this is an `async` function type (binary opcode `0x43`), as opposed to a
+    /// synchronous function type (`0x40`). Async and sync function types with identical
+    /// params/results are distinct binary types and must not be deduplicated together.
+    package let isAsync: Bool
 }
 
-public struct ComponentRecordField: Hashable {
-    public let name: String
-    public let type: ComponentValType
+package struct ComponentRecordField: Hashable {
+    package let name: String
+    package let type: ComponentValType
 
-    public init(name: String, type: ComponentValType) {
+    package init(name: String, type: ComponentValType) {
         self.name = name
         self.type = type
     }
 }
 
-public struct ComponentCaseField: Hashable {
-    public let name: String
-    public let type: ComponentValType?
+package struct ComponentCaseField: Hashable {
+    package let name: String
+    package let type: ComponentValType?
 
-    public init(name: String, type: ComponentValType?) {
+    package init(name: String, type: ComponentValType?) {
         self.name = name
         self.type = type
     }
 }
 
 /// String encoding options for the canonical ABI.
-public enum ComponentStringEncoding {
+package enum ComponentStringEncoding {
     case utf8
     case utf16
     case latin1UTF16

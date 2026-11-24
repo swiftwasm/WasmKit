@@ -416,10 +416,8 @@
             #expect(fields.count == 2)
             #expect(fields[0].name == "x")
             #expect(fields[1].name == "y")
-            // Field types are read as type indices by the parser since they're
-            // encoded as primitive opcodes (s32 = 0x7A = 122 as unsigned LEB128)
-            #expect(fields[0].type == .index(ComponentTypeIndex(rawValue: Int(0x7A))))
-            #expect(fields[1].type == .index(ComponentTypeIndex(rawValue: Int(0x7A))))
+            #expect(fields[0].type == .primitive(.s32))
+            #expect(fields[1].type == .primitive(.s32))
         }
 
         @Test func interfaceWithEnumType() throws {

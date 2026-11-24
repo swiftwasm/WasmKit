@@ -214,42 +214,42 @@
     /// This represents the output of parsing a component WAT/binary file.
     public struct ParsedComponent {
         /// Core modules embedded in this component
-        public var coreModules: [ParsedCoreModule] = []
+        package var coreModules: [ParsedCoreModule] = []
 
         /// Core instance definitions (from core instances index space)
         /// This includes both inline exports and module instantiations in binary order.
-        public var coreInstanceDefs: [ParsedCoreInstanceDef] = []
+        package var coreInstanceDefs: [ParsedCoreInstanceDef] = []
 
         /// Nested components embedded in this component (recursively parsed)
-        public var nestedComponents: [ParsedComponent] = []
+        package var nestedComponents: [ParsedComponent] = []
 
         /// Component instance definitions (instantiate or inline exports)
-        public var componentInstances: [ParsedComponentInstanceDef] = []
+        package var componentInstances: [ParsedComponentInstanceDef] = []
 
         /// Canonical definitions (lift/lower)
-        public var canonicalDefinitions: [ParsedCanonicalDefinition] = []
+        package var canonicalDefinitions: [ParsedCanonicalDefinition] = []
 
         /// Aliases that populate index spaces
-        public var aliases: [ParsedAlias] = []
+        package var aliases: [ParsedAlias] = []
 
         /// Interleaved definitions that must be processed in binary order.
         /// This preserves the semantic ordering of definitions that have dependencies.
-        public var orderedDefinitions: [ParsedOrderedDefinition] = []
+        package var orderedDefinitions: [ParsedOrderedDefinition] = []
 
         /// Component exports
-        public var exports: [ParsedComponentExport] = []
+        package var exports: [ParsedComponentExport] = []
 
         /// Component imports
-        public var imports: [ParsedComponentImport] = []
+        package var imports: [ParsedComponentImport] = []
 
         /// Component type definitions for type resolution during lowering/lifting
-        public var componentTypes: [ComponentTypeDef] = []
+        package var componentTypes: [ComponentTypeDef] = []
 
-        public init() {}
+        package init() {}
 
         /// Resolve a ComponentTypeIndex to its ComponentDefValType definition.
         /// This is used during canonical ABI lowering/lifting to resolve nested types.
-        public func resolveType(_ index: ComponentTypeIndex) throws -> ComponentDefValType {
+        package func resolveType(_ index: ComponentTypeIndex) throws -> ComponentDefValType {
             let idx = Int(index.rawValue)
             guard idx < componentTypes.count else {
                 throw CanonicalABIError(description: "Type index \(idx) out of bounds (have \(componentTypes.count) types)")
@@ -264,7 +264,7 @@
 
     /// A definition that must be processed in binary order.
     /// Used to preserve semantic ordering for definitions with dependencies.
-    public enum ParsedOrderedDefinition {
+    package enum ParsedOrderedDefinition {
         /// A core instance definition
         case coreInstance(index: Int)
         /// An alias definition
@@ -274,7 +274,7 @@
     }
 
     /// A core instance definition.
-    public enum ParsedCoreInstanceDef {
+    package enum ParsedCoreInstanceDef {
         /// Instantiate a core module with arguments
         case instantiate(moduleIndex: Int, args: [ParsedCoreInstantiateArg])
         /// Inline exports forming an instance
@@ -282,28 +282,28 @@
     }
 
     /// An argument for core module instantiation.
-    public struct ParsedCoreInstantiateArg {
+    package struct ParsedCoreInstantiateArg {
         /// The import name to satisfy
-        public let name: String
+        package let name: String
         /// The core instance index providing the exports
-        public let instanceIndex: Int
+        package let instanceIndex: Int
 
-        public init(name: String, instanceIndex: Int) {
+        package init(name: String, instanceIndex: Int) {
             self.name = name
             self.instanceIndex = instanceIndex
         }
     }
 
     /// An inline export in a core instance.
-    public struct ParsedCoreInlineExport {
+    package struct ParsedCoreInlineExport {
         /// The export name
-        public let name: String
+        package let name: String
         /// The sort of the export
-        public let sort: CoreDefSort
+        package let sort: CoreDefSort
         /// The index in the corresponding core index space
-        public let index: Int
+        package let index: Int
 
-        public init(name: String, sort: CoreDefSort, index: Int) {
+        package init(name: String, sort: CoreDefSort, index: Int) {
             self.name = name
             self.sort = sort
             self.index = index
@@ -311,7 +311,7 @@
     }
 
     /// A component instance definition.
-    public enum ParsedComponentInstanceDef {
+    package enum ParsedComponentInstanceDef {
         /// Instantiate a nested component with arguments
         case instantiate(componentIndex: Int, args: [ParsedComponentInstantiateArg])
         /// Inline exports forming an instance
@@ -319,15 +319,15 @@
     }
 
     /// An argument for component instantiation.
-    public struct ParsedComponentInstantiateArg {
+    package struct ParsedComponentInstantiateArg {
         /// The import name to satisfy
-        public let name: String
+        package let name: String
         /// The sort of the argument
-        public let sort: ComponentDefSort
+        package let sort: ComponentDefSort
         /// The index in the corresponding index space
-        public let index: Int
+        package let index: Int
 
-        public init(name: String, sort: ComponentDefSort, index: Int) {
+        package init(name: String, sort: ComponentDefSort, index: Int) {
             self.name = name
             self.sort = sort
             self.index = index
@@ -335,15 +335,15 @@
     }
 
     /// An inline export in a component instance.
-    public struct ParsedComponentInlineExport {
+    package struct ParsedComponentInlineExport {
         /// The export name
-        public let name: String
+        package let name: String
         /// The sort of the export
-        public let sort: ComponentDefSort
+        package let sort: ComponentDefSort
         /// The index in the corresponding index space
-        public let index: Int
+        package let index: Int
 
-        public init(name: String, sort: ComponentDefSort, index: Int) {
+        package init(name: String, sort: ComponentDefSort, index: Int) {
             self.name = name
             self.sort = sort
             self.index = index
@@ -351,38 +351,38 @@
     }
 
     /// A core module embedded within a component.
-    public struct ParsedCoreModule {
+    package struct ParsedCoreModule {
         /// The parsed core module
-        public let module: Module
+        package let module: Module
 
         /// Optional name for this module
-        public let name: String?
+        package let name: String?
 
         /// Import arguments for instantiation
-        public var instantiateArgs: [ParsedInstantiateArg] = []
+        package var instantiateArgs: [ParsedInstantiateArg] = []
 
-        public init(module: Module, name: String? = nil) {
+        package init(module: Module, name: String? = nil) {
             self.module = module
             self.name = name
         }
     }
 
     /// An argument for core module instantiation.
-    public struct ParsedInstantiateArg {
+    package struct ParsedInstantiateArg {
         /// The import name to satisfy
-        public let importName: String
+        package let importName: String
 
         /// The source of the import value
-        public let source: ParsedInstantiateArgSource
+        package let source: ParsedInstantiateArgSource
 
-        public init(importName: String, source: ParsedInstantiateArgSource) {
+        package init(importName: String, source: ParsedInstantiateArgSource) {
             self.importName = importName
             self.source = source
         }
     }
 
     /// The source of an instantiate argument.
-    public enum ParsedInstantiateArgSource {
+    package enum ParsedInstantiateArgSource {
         /// From another core instance's exports
         case coreInstance(index: Int)
 
@@ -391,21 +391,21 @@
     }
 
     /// A canonical definition (lift or lower).
-    public struct ParsedCanonicalDefinition {
+    package struct ParsedCanonicalDefinition {
         /// The kind of canonical definition
-        public let kind: ParsedCanonicalKind
+        package let kind: ParsedCanonicalKind
 
         /// Canon options
-        public var options: ParsedCanonOptions
+        package var options: ParsedCanonOptions
 
-        public init(kind: ParsedCanonicalKind, options: ParsedCanonOptions = ParsedCanonOptions()) {
+        package init(kind: ParsedCanonicalKind, options: ParsedCanonOptions = ParsedCanonOptions()) {
             self.kind = kind
             self.options = options
         }
     }
 
     /// The kind of canonical definition.
-    public enum ParsedCanonicalKind {
+    package enum ParsedCanonicalKind {
         /// Lift a core function to a component function
         case lift(coreInstanceIndex: Int, functionName: String, type: ComponentFuncType)
 
@@ -414,60 +414,60 @@
     }
 
     /// Parsed canonical options.
-    public struct ParsedCanonOptions {
+    package struct ParsedCanonOptions {
         /// Memory to use for string/list operations
-        public var memory: ParsedCanonMemory?
+        package var memory: ParsedCanonMemory?
 
         /// Realloc function for allocation
-        public var realloc: ParsedCanonFunc?
+        package var realloc: ParsedCanonFunc?
 
         /// Post-return cleanup function
-        public var postReturn: ParsedCanonFunc?
+        package var postReturn: ParsedCanonFunc?
 
         /// String encoding
-        public var stringEncoding: ComponentStringEncoding = .utf8
+        package var stringEncoding: ComponentStringEncoding = .utf8
 
-        public init() {}
+        package init() {}
     }
 
     /// Reference to a memory for canonical options.
-    public struct ParsedCanonMemory {
-        public let coreInstanceIndex: Int
-        public let memoryName: String
+    package struct ParsedCanonMemory {
+        package let coreInstanceIndex: Int
+        package let memoryName: String
 
-        public init(coreInstanceIndex: Int, memoryName: String) {
+        package init(coreInstanceIndex: Int, memoryName: String) {
             self.coreInstanceIndex = coreInstanceIndex
             self.memoryName = memoryName
         }
     }
 
     /// Reference to a function for canonical options.
-    public struct ParsedCanonFunc {
-        public let coreInstanceIndex: Int
-        public let functionName: String
+    package struct ParsedCanonFunc {
+        package let coreInstanceIndex: Int
+        package let functionName: String
 
-        public init(coreInstanceIndex: Int, functionName: String) {
+        package init(coreInstanceIndex: Int, functionName: String) {
             self.coreInstanceIndex = coreInstanceIndex
             self.functionName = functionName
         }
     }
 
     /// A component export definition.
-    public struct ParsedComponentExport {
+    package struct ParsedComponentExport {
         /// The export name
-        public let name: String
+        package let name: String
 
         /// The kind of export
-        public let kind: ParsedComponentExportKind
+        package let kind: ParsedComponentExportKind
 
-        public init(name: String, kind: ParsedComponentExportKind) {
+        package init(name: String, kind: ParsedComponentExportKind) {
             self.name = name
             self.kind = kind
         }
     }
 
     /// The kind of component export.
-    public enum ParsedComponentExportKind {
+    package enum ParsedComponentExportKind {
         /// Export a component function
         case function(index: Int)
 
@@ -488,21 +488,21 @@
     }
 
     /// A component import definition.
-    public struct ParsedComponentImport {
+    package struct ParsedComponentImport {
         /// The import name
-        public let name: String
+        package let name: String
 
         /// The expected type of the import
-        public let kind: ParsedComponentImportKind
+        package let kind: ParsedComponentImportKind
 
-        public init(name: String, kind: ParsedComponentImportKind) {
+        package init(name: String, kind: ParsedComponentImportKind) {
             self.name = name
             self.kind = kind
         }
     }
 
     /// The kind of component import.
-    public enum ParsedComponentImportKind {
+    package enum ParsedComponentImportKind {
         /// Import a function
         case function(ComponentFuncType)
 
@@ -517,21 +517,21 @@
     }
 
     /// An alias definition that populates an index space.
-    public struct ParsedAlias {
+    package struct ParsedAlias {
         /// The sort of the alias (what kind of thing it creates)
-        public let sort: ComponentDefSort
+        package let sort: ComponentDefSort
 
         /// The source of the alias
-        public let source: ParsedAliasSource
+        package let source: ParsedAliasSource
 
-        public init(sort: ComponentDefSort, source: ParsedAliasSource) {
+        package init(sort: ComponentDefSort, source: ParsedAliasSource) {
             self.sort = sort
             self.source = source
         }
     }
 
     /// The source of an alias.
-    public enum ParsedAliasSource {
+    package enum ParsedAliasSource {
         /// Alias from a component instance export
         case componentInstanceExport(instanceIndex: Int, name: String)
         /// Alias from a core instance export
@@ -775,6 +775,9 @@
 
             case .global:
                 throw ComponentLoaderError.instantiationFailed("Inline global exports not yet supported")
+
+            case .tag:
+                throw ComponentLoaderError.instantiationFailed("Inline tag exports not yet supported")
 
             case .type:
                 throw ComponentLoaderError.instantiationFailed("Inline type exports not yet supported")

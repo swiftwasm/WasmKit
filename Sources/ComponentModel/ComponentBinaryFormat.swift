@@ -143,6 +143,29 @@ package enum CanonOpcode: UInt8 {
     case threadAvailableParallelism = 0x42
 }
 
+extension CanonOpcode {
+    /// The async canon built-ins this implementation currently decodes. Excludes
+    /// `lift`/`lower`/`resource.*` (decoded by explicit earlier cases) and the
+    /// not-yet-handled `errorContext*`/`threadSwitchTo`/`threadYieldTo`/
+    /// `threadResumeLater`/`threadSpawn*` opcodes.
+    package var isSupportedAsyncBuiltin: Bool {
+        switch self {
+        case .taskReturn, .taskCancel, .subtaskCancel, .subtaskDrop,
+            .contextGetI32, .contextSetI32,
+            .threadYield, .threadSuspend, .threadIndex, .threadNewIndirect,
+            .streamNew, .streamRead, .streamWrite, .streamCancelRead, .streamCancelWrite,
+            .streamDropReadable, .streamDropWritable,
+            .futureNew, .futureRead, .futureWrite, .futureCancelRead, .futureCancelWrite,
+            .futureDropReadable, .futureDropWritable,
+            .waitableSetNew, .waitableSetWait, .waitableSetPoll, .waitableSetDrop, .waitableJoin,
+            .backpressureInc, .backpressureDec:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 /// Canonical option tags
 package enum CanonOptionTag: UInt8 {
     case stringEncodingUtf8 = 0x00
@@ -163,6 +186,7 @@ package enum CoreSortOpcode: UInt8 {
     case table = 0x01
     case memory = 0x02
     case global = 0x03
+    case tag = 0x04
     case type = 0x10
     case module = 0x11
     case instance = 0x12

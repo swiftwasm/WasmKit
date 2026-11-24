@@ -321,7 +321,7 @@
             case .memory:
                 let memDef = CoreMemoryAliasDef(id: bindingId)
                 _ = try currentComponent.coreMemoriesMap.add(memDef)
-            case .table, .global, .type, .module, .instance:
+            case .table, .global, .tag, .type, .module, .instance:
                 // TODO: Add support for table and global aliases
                 // TODO: Not all core alias sorts supported yet
                 break
@@ -864,7 +864,7 @@
                     case .type:
                         let resolvedIndex = try component.coreTypesMap.resolveIndex(use: typeIndex)
                         return (resolvedIndex, outerCount)
-                    case .func, .table, .memory, .global, .module, .instance:
+                    case .func, .table, .memory, .global, .tag, .module, .instance:
                         throw WatParserError("Outer alias sort '\(sort.rawValue)' not yet supported", location: componentId.location)
                     }
                 }

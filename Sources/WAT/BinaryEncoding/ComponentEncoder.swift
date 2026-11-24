@@ -379,7 +379,7 @@
                 return cases.compactMap { $0.type.flatMap(indexOf) }
             case .inlined(.primitive), .flags, .enum:
                 return []
-            case .future, .stream, .resource:
+            case .future, .stream, .resource, .own, .borrow:
                 return []
             }
         }
@@ -807,7 +807,7 @@
                             coreMemoryCount += 1
                         case .func:
                             coreFunctionCount += 1
-                        case .table, .global, .type, .module, .instance:
+                        case .table, .global, .tag, .type, .module, .instance:
                             // TODO: Track table and global counts
                             // TODO: Table and global counts not tracked in `encodeBatchedAlises`
                             break
@@ -1517,7 +1517,7 @@
                     encoder.encode(caseName)
                 }
 
-            case .future, .stream, .resource:
+            case .future, .stream, .resource, .own, .borrow:
                 throw WatParserError("Component value type not yet supported: \(valueType)", location: nil)
 
             case .inlined(.index(let typeIndex)):
@@ -1677,6 +1677,7 @@
             case .table: return 0x01
             case .memory: return 0x02
             case .global: return 0x03
+            case .tag: return 0x04
             case .type: return 0x10
             case .module: return 0x11
             case .instance: return 0x12

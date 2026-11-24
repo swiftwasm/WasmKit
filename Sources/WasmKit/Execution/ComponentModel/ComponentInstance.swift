@@ -201,13 +201,13 @@
         }
 
         /// The component-level function type.
-        public var type: ComponentFuncType {
+        package var type: ComponentFuncType {
             handle.type
         }
 
         /// Resolves a type index to its component value type.
         /// Used for parsing nested types in WAVE arguments.
-        public func resolveType(_ index: ComponentTypeIndex) throws -> ComponentDefValType {
+        package func resolveType(_ index: ComponentTypeIndex) throws -> ComponentDefValType {
             try handle.resolveType(index)
         }
 

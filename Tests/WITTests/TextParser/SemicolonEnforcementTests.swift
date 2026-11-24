@@ -19,6 +19,9 @@ struct SemicolonEnforcementTests {
         ("package foo:bar;\n\nworld w {\n  import a:b/c\n}", "semicolon expected but got rightBrace"),
         ("package foo:bar;\n\nworld w {\n  include a:b/c\n}", "semicolon expected but got rightBrace"),
         ("package foo:bar;\n\ninterface i {\n  resource r {\n    f: func()\n  }\n}", "semicolon expected but got rightBrace"),
+        ("package foo:bar;\n\ninterface i {\n  resource r {\n    constructor()\n  }\n}", "semicolon expected but got rightBrace"),
+        ("package foo:bar;\n\ninterface i {\n  resource r\n}", "semicolon expected but got rightBrace"),
+        ("package foo:bar;\n\ninterface i {\n  use a.{b}\n}", "semicolon expected but got rightBrace"),
     ])
     func missingSemicolonIsRejected(input: String, message: String) throws {
         let error = try #require(throws: ParseError.self) {
@@ -39,10 +42,16 @@ struct SemicolonEnforcementTests {
         #expect(WITFormatter.format(sourceFile: ast.syntax, includeDocs: true) == input)
     }
 
-    @Test func strayInterfaceBlockSemicolonRejected() throws {
+    @Test(arguments: [
+        ("package foo:bar;\n\ninterface i {};", "`world`, `interface` or `use` expected"),
+        ("package foo:bar;\n\ninterface i {\n  f: func();;\n}", "`type`, `resource` or `func` expected but got semicolon"),
+        ("package foo:bar;\n\nworld w {\n  import a:b/c;;\n}", "`import`, `export`, `include`, `use`, or type definition expected but got semicolon"),
+        ("package foo:bar;\n\ninterface i {\n  resource r {\n    f: func();;\n  }\n}", "`constructor` or identifier expected but got semicolon"),
+    ])
+    func straySemicolonIsRejected(input: String, message: String) throws {
         let error = try #require(throws: ParseError.self) {
-            try parseDoc("package foo:bar;\n\ninterface i {};")
+            try parseDoc(input)
         }
-        #expect(error.description == "`world`, `interface` or `use` expected")
+        #expect(error.description == message)
     }
 }

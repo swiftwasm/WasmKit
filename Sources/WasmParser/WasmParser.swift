@@ -224,6 +224,10 @@ public struct WasmFeatureSet: OptionSet, Sendable {
     /// The WebAssembly wide arithmetic proposal
     @_alwaysEmitIntoClient
     public static var wideArithmetic: WasmFeatureSet { WasmFeatureSet(.wideArithmetic) }
+    /// The Component Model async proposal: `stream` and `future` types, `func async`, and the
+    /// async canon built-ins. ``all`` does not include it.
+    @_alwaysEmitIntoClient
+    package static var componentModelAsync: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 10) }
 
     /// The default feature set
     public static let `default`: WasmFeatureSet = [.referenceTypes, .exceptionHandling]
