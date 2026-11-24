@@ -4,7 +4,7 @@ import WasmTypes
 
 /// A core instance definition.
 /// `core:instance` production rule at https://github.com/WebAssembly/component-model/blob/3a00c74f6f4035240ed6cd96f25ef0b40b0577ab/design/mvp/Explainer.md#instance-definitions
-public enum CoreInstanceDefinition {
+package enum CoreInstanceDefinition {
     /// Instantiate a core module with arguments
     case instantiate(moduleIndex: UInt32, args: [CoreInstantiateArg])
     /// Inline exports forming an instance
@@ -13,11 +13,11 @@ public enum CoreInstanceDefinition {
 
 /// An argument for core module instantiation.
 /// `core:instantiatearg` production rule at https://github.com/WebAssembly/component-model/blob/3a00c74f6f4035240ed6cd96f25ef0b40b0577ab/design/mvp/Explainer.md#instance-definitions
-public struct CoreInstantiateArg {
-    public let name: String
-    public let instanceIndex: UInt32
+package struct CoreInstantiateArg {
+    package let name: String
+    package let instanceIndex: UInt32
 
-    public init(name: String, instanceIndex: UInt32) {
+    package init(name: String, instanceIndex: UInt32) {
         self.name = name
         self.instanceIndex = instanceIndex
     }
@@ -25,22 +25,40 @@ public struct CoreInstantiateArg {
 
 /// An inline export in a core instance.
 /// `core:inlineexport` production rule at https://github.com/WebAssembly/component-model/blob/3a00c74f6f4035240ed6cd96f25ef0b40b0577ab/design/mvp/Explainer.md#instance-definitions
-public struct CoreInlineExport {
-    public let name: String
-    public let sort: CoreDefSort
-    public let index: UInt32
+package struct CoreInlineExport {
+    package let name: String
+    package let sort: CoreDefSort
+    package let index: UInt32
 
-    public init(name: String, sort: CoreDefSort, index: UInt32) {
+    package init(name: String, sort: CoreDefSort, index: UInt32) {
         self.name = name
         self.sort = sort
         self.index = index
     }
 }
 
+// MARK: - Core Alias Definitions
+
+/// A core alias definition.
+package struct CoreAlias {
+    package let sort: CoreDefSort
+    package let target: CoreAliasTarget
+
+    package init(sort: CoreDefSort, target: CoreAliasTarget) {
+        self.sort = sort
+        self.target = target
+    }
+}
+
+/// Target of a core alias.
+package enum CoreAliasTarget {
+    case outer(count: UInt32, index: UInt32)
+}
+
 // MARK: - Component Instance Definitions
 
 /// A component instance definition (from binary section 5).
-public enum ComponentInstanceDefinition {
+package enum ComponentInstanceDefinition {
     /// Instantiate a component with arguments
     case instantiate(componentIndex: UInt32, args: [ComponentInstantiateArg])
     /// Inline exports forming an instance
@@ -48,12 +66,12 @@ public enum ComponentInstanceDefinition {
 }
 
 /// An argument for component instantiation.
-public struct ComponentInstantiateArg {
-    public let name: String
-    public let sort: ComponentDefSort
-    public let index: UInt32
+package struct ComponentInstantiateArg {
+    package let name: String
+    package let sort: ComponentDefSort
+    package let index: UInt32
 
-    public init(name: String, sort: ComponentDefSort, index: UInt32) {
+    package init(name: String, sort: ComponentDefSort, index: UInt32) {
         self.name = name
         self.sort = sort
         self.index = index
@@ -61,12 +79,12 @@ public struct ComponentInstantiateArg {
 }
 
 /// An inline export in a component instance.
-public struct ComponentInlineExport {
-    public let name: String
-    public let sort: ComponentDefSort
-    public let index: UInt32
+package struct ComponentInlineExport {
+    package let name: String
+    package let sort: ComponentDefSort
+    package let index: UInt32
 
-    public init(name: String, sort: ComponentDefSort, index: UInt32) {
+    package init(name: String, sort: ComponentDefSort, index: UInt32) {
         self.name = name
         self.sort = sort
         self.index = index
@@ -76,18 +94,18 @@ public struct ComponentInlineExport {
 // MARK: - Alias Definitions
 
 /// An alias definition (from binary section 6).
-public struct ComponentAlias {
-    public let sort: ComponentDefSort
-    public let target: ComponentAliasTarget
+package struct ComponentAlias {
+    package let sort: ComponentDefSort
+    package let target: ComponentAliasTarget
 
-    public init(sort: ComponentDefSort, target: ComponentAliasTarget) {
+    package init(sort: ComponentDefSort, target: ComponentAliasTarget) {
         self.sort = sort
         self.target = target
     }
 }
 
 /// Target of a component alias.
-public enum ComponentAliasTarget {
+package enum ComponentAliasTarget {
     /// Export from a component instance
     case export(instanceIndex: UInt32, name: String)
     /// Export from a core instance
@@ -99,29 +117,29 @@ public enum ComponentAliasTarget {
 // MARK: - Extern Descriptor Types
 
 /// An import declaration in a type.
-public struct ComponentImportDecl {
-    public let name: String
-    public let externDesc: ComponentExternDesc
+package struct ComponentImportDecl {
+    package let name: String
+    package let externDesc: ComponentExternDesc
 
-    public init(name: String, externDesc: ComponentExternDesc) {
+    package init(name: String, externDesc: ComponentExternDesc) {
         self.name = name
         self.externDesc = externDesc
     }
 }
 
 /// An export declaration in a type.
-public struct ComponentExportDecl {
-    public let name: String
-    public let externDesc: ComponentExternDesc
+package struct ComponentExportDecl {
+    package let name: String
+    package let externDesc: ComponentExternDesc
 
-    public init(name: String, externDesc: ComponentExternDesc) {
+    package init(name: String, externDesc: ComponentExternDesc) {
         self.name = name
         self.externDesc = externDesc
     }
 }
 
 /// An extern descriptor for imports/exports.
-public enum ComponentExternDesc {
+package enum ComponentExternDesc {
     case coreModule(typeIndex: UInt32)
     case function(typeIndex: UInt32)
     case value(ComponentValueBound)
@@ -131,13 +149,13 @@ public enum ComponentExternDesc {
 }
 
 /// A bound on a value type.
-public enum ComponentValueBound {
+package enum ComponentValueBound {
     case eq(valueIndex: UInt32)
     case type(ComponentDefValType)
 }
 
 /// A bound on a type.
-public enum ComponentTypeBound {
+package enum ComponentTypeBound {
     case eq(typeIndex: UInt32)
     case subResource
 }
@@ -145,7 +163,7 @@ public enum ComponentTypeBound {
 // MARK: - Canonical Definitions
 
 /// A canonical definition (from binary section 8).
-public enum CanonicalDefinition {
+package enum CanonicalDefinition {
     /// Lift a core function to a component function
     case lift(
         coreFuncIndex: UInt32,
@@ -163,10 +181,52 @@ public enum CanonicalDefinition {
     case resourceDrop(typeIndex: UInt32)
     /// Get resource representation
     case resourceRep(typeIndex: UInt32)
+    /// A recognized async canon built-in. See ``AsyncCanonicalBuiltin``.
+    case asyncBuiltin(AsyncCanonicalBuiltin)
+}
+
+/// A decoded async Component Model canon built-in.
+package struct AsyncCanonicalBuiltin {
+    package let opcode: CanonOpcode
+    package let immediates: AsyncCanonicalImmediates
+    package init(opcode: CanonOpcode, immediates: AsyncCanonicalImmediates) {
+        self.opcode = opcode
+        self.immediates = immediates
+    }
+}
+
+/// The immediate-byte payload shapes shared across the async canon built-ins.
+package enum AsyncCanonicalImmediates {
+    /// `task.cancel`, `subtask.drop`, `thread.index`, `waitable-set.{new,drop}`, `waitable.join`
+    case none
+    /// `stream`/`future` `.new`, `.drop-readable`, `.drop-writable`
+    case type(UInt32)
+    /// `stream`/`future` `.read`, `.write`
+    case typeWithOptions(UInt32, options: [CanonicalOption])
+    /// `stream`/`future` `.cancel-read`, `.cancel-write`
+    case typeWithAsyncFlag(UInt32, async: Bool)
+    /// `subtask.cancel`
+    case asyncFlag(Bool)
+    /// `thread.yield`, `thread.suspend`
+    case cancellableFlag(Bool)
+    /// `waitable-set.wait`, `waitable-set.poll`
+    case cancellableWithMemory(Bool, memoryIndex: UInt32)
+    /// `task.return`
+    case resultListWithOptions(ComponentDefValType?, options: [CanonicalOption])
+    /// `context.get`, `context.set`
+    case context(CanonicalContextValueType, slot: UInt32)
+    /// `thread.new-indirect`
+    case typeWithTable(UInt32, tableIndex: UInt32)
+}
+
+/// The core value type a `context.get`/`context.set` slot holds (ABI-restricted to i32/i64).
+package enum CanonicalContextValueType {
+    case i32
+    case i64
 }
 
 /// A canonical option.
-public enum CanonicalOption {
+package enum CanonicalOption {
     case utf8
     case utf16
     case latin1UTF16
@@ -180,12 +240,12 @@ public enum CanonicalOption {
 // MARK: - Start Definition
 
 /// A start definition (from binary section 9).
-public struct ComponentStart {
-    public let funcIndex: UInt32
-    public let args: [UInt32]
-    public let resultCount: UInt32
+package struct ComponentStart {
+    package let funcIndex: UInt32
+    package let args: [UInt32]
+    package let resultCount: UInt32
 
-    public init(funcIndex: UInt32, args: [UInt32], resultCount: UInt32) {
+    package init(funcIndex: UInt32, args: [UInt32], resultCount: UInt32) {
         self.funcIndex = funcIndex
         self.args = args
         self.resultCount = resultCount
@@ -195,24 +255,24 @@ public struct ComponentStart {
 // MARK: - Import/Export Definitions
 
 /// An import definition (from binary section 10).
-public struct ComponentImportDef {
-    public let name: String
-    public let externDesc: ComponentExternDesc
+package struct ComponentImportDef {
+    package let name: String
+    package let externDesc: ComponentExternDesc
 
-    public init(name: String, externDesc: ComponentExternDesc) {
+    package init(name: String, externDesc: ComponentExternDesc) {
         self.name = name
         self.externDesc = externDesc
     }
 }
 
 /// An export definition (from binary section 11).
-public struct ComponentExportDef {
-    public let name: String
-    public let sort: ComponentDefSort
-    public let index: UInt32
-    public let externDesc: ComponentExternDesc?
+package struct ComponentExportDef {
+    package let name: String
+    package let sort: ComponentDefSort
+    package let index: UInt32
+    package let externDesc: ComponentExternDesc?
 
-    public init(name: String, sort: ComponentDefSort, index: UInt32, externDesc: ComponentExternDesc?) {
+    package init(name: String, sort: ComponentDefSort, index: UInt32, externDesc: ComponentExternDesc?) {
         self.name = name
         self.sort = sort
         self.index = index
@@ -221,11 +281,11 @@ public struct ComponentExportDef {
 }
 
 /// A value definition (from binary section 12).
-public struct ComponentValueDef {
-    public let type: ComponentDefValType
-    public let value: [UInt8]  // Raw bytes, interpretation depends on type
+package struct ComponentValueDef {
+    package let type: ComponentDefValType
+    package let value: [UInt8]  // Raw bytes, interpretation depends on type
 
-    public init(type: ComponentDefValType, value: [UInt8]) {
+    package init(type: ComponentDefValType, value: [UInt8]) {
         self.type = type
         self.value = value
     }

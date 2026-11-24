@@ -353,6 +353,9 @@
             case .resourceNew, .resourceDrop, .resourceRep:
                 // Resource operations are deferred
                 break
+
+            case .asyncBuiltin(let builtin):
+                throw ComponentParseError.unsupported("Async canon built-in \(builtin.opcode) is not supported")
             }
         }
 

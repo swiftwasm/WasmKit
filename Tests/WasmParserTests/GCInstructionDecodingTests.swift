@@ -15,7 +15,7 @@ import WasmTypes
     private static func module(_ sections: [(id: UInt8, content: [UInt8])]) -> [UInt8] {
         var bytes: [UInt8] = [0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00]
         for section in sections {
-            bytes += [section.id] + unsignedLEB128(section.content.count) + section.content
+            bytes += [section.id] + TestSupport.unsignedLEB128(section.content.count) + section.content
         }
         return bytes
     }
@@ -25,7 +25,7 @@ import WasmTypes
         let bytes = module([
             (id: 1, content: [0x01, 0x60, 0x00, 0x00]),
             (id: 3, content: [0x01, 0x00]),
-            (id: 10, content: [0x01] + unsignedLEB128(body.count) + body),
+            (id: 10, content: [0x01] + TestSupport.unsignedLEB128(body.count) + body),
         ])
         var parser = Parser(bytes: bytes, features: features)
         while let payload = try parser.parseNext() {
@@ -50,20 +50,6 @@ import WasmTypes
         } catch {
             return "\(error)"
         }
-    }
-
-    private static func unsignedLEB128(_ value: Int) -> [UInt8] {
-        var value = UInt(value)
-        var bytes: [UInt8] = []
-        repeat {
-            var byte = UInt8(value & 0b0111_1111)
-            value >>= 7
-            if value != 0 {
-                byte |= 0b1000_0000
-            }
-            bytes.append(byte)
-        } while value != 0
-        return bytes
     }
 
     @Test func decodesEveryInstruction() throws {

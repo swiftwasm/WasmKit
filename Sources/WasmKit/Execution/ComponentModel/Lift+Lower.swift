@@ -683,7 +683,7 @@
         case .flags(let flagNames):
             let size = flagsSize(flagCount: flagNames.count)
             return ElementLayout(size: size, alignment: min(size, 4))
-        case .future, .stream, .resource, .inlined(.index):
+        case .future, .stream, .resource, .own, .borrow, .inlined(.index):
             throw CanonicalABIError(description: "layoutOf for \(type) not yet implemented")
         }
     }

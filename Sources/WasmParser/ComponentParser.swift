@@ -4,7 +4,7 @@
 
     /// A streaming parser for WebAssembly Component Model binary format.
     /// For proposed production rules refer to https://github.com/WebAssembly/component-model/blob/7479890cb506d0f8f687595a4d41361ff8a2a194/design/mvp/Binary.md
-    public struct ComponentParser<Source: ByteStreamSource> {
+    package struct ComponentParser<Source: ByteStreamSource> {
         @usableFromInline
         var stream: ByteStream<Source>
         @usableFromInline
@@ -18,11 +18,11 @@
         @usableFromInline
         var nextParseTarget: NextParseTarget
 
-        public var offset: Int {
+        package var offset: Int {
             return stream.currentIndex
         }
 
-        public init(stream: Source, features: WasmFeatureSet = .default) {
+        package init(stream: Source, features: WasmFeatureSet = .default) {
             self.stream = ByteStream(stream)
             self.features = features
             self.nextParseTarget = .header
@@ -32,6 +32,11 @@
         internal func makeError(_ message: WasmParserError.Message) -> WasmParserError {
             return WasmParserError(message: message, offset: offset)
         }
+
+        @usableFromInline
+        internal func makeUnexpectedByteError(_ byte: UInt8, for context: String) -> WasmParserError {
+            makeError(.init("invalid leading byte (0x\(String(byte, radix: 16))) for \(context)"))
+        }
     }
 
     extension ComponentParser where Source == StaticByteStreamSource {
@@ -40,7 +45,7 @@
         /// - Parameters:
         ///   - bytes: The bytes of the WebAssembly component binary file to parse
         ///   - features: Enabled WebAssembly features for parsing
-        public init(bytes: [UInt8], features: WasmFeatureSet = .default) {
+        package init(bytes: [UInt8], features: WasmFeatureSet = .default) {
             self.init(stream: StaticByteStreamSource(bytes: bytes), features: features)
         }
     }
@@ -48,7 +53,7 @@
     // MARK: - Component Parsing Payload
 
     /// The parsed output of a component section.
-    public enum ComponentParsingPayload {
+    package enum ComponentParsingPayload {
         /// The component header with version bytes
         case header(version: [UInt8])
 
@@ -95,7 +100,7 @@
     // MARK: - Core Type Definitions (Parser-specific - depends on WasmParser types)
 
     /// A core type definition (from binary section 3).
-    public enum CoreTypeDef {
+    package enum CoreTypeDef {
         /// A core function type
         case function(FunctionType)
         /// A core module type
@@ -103,26 +108,26 @@
     }
 
     /// A core module type definition.
-    public struct CoreModuleType {
-        public var declarations: [CoreModuleDecl]
+    package struct CoreModuleType {
+        package var declarations: [CoreModuleDecl]
 
-        public init(declarations: [CoreModuleDecl]) {
+        package init(declarations: [CoreModuleDecl]) {
             self.declarations = declarations
         }
     }
 
     /// A declaration within a core module type.
-    public enum CoreModuleDecl {
+    package enum CoreModuleDecl {
         case `import`(Import)
         case type(CoreTypeDef)
-        case alias(ComponentAlias)
+        case alias(CoreAlias)
         case exportDecl(name: String, descriptor: ImportDescriptor)
     }
 
     // MARK: - Component Type Definitions (Parser-specific - depends on CoreTypeDef)
 
     /// A component type definition (from binary section 7).
-    public enum ComponentTypeDef {
+    package enum ComponentTypeDef {
         /// A defined value type
         case definedValue(ComponentDefValType)
         /// A function type
@@ -136,31 +141,31 @@
     }
 
     /// Declarations within a component type.
-    public struct ComponentTypeDecl {
-        public var declarations: [ComponentOrInstanceDecl]
+    package struct ComponentTypeDecl {
+        package var declarations: [ComponentOrInstanceDecl]
 
-        public init(declarations: [ComponentOrInstanceDecl]) {
+        package init(declarations: [ComponentOrInstanceDecl]) {
             self.declarations = declarations
         }
     }
 
     /// Declarations within an instance type.
-    public struct InstanceTypeDecl {
-        public var declarations: [InstanceDecl]
+    package struct InstanceTypeDecl {
+        package var declarations: [InstanceDecl]
 
-        public init(declarations: [InstanceDecl]) {
+        package init(declarations: [InstanceDecl]) {
             self.declarations = declarations
         }
     }
 
     /// A declaration that can appear in a component type.
-    public enum ComponentOrInstanceDecl {
+    package enum ComponentOrInstanceDecl {
         case importDecl(ComponentImportDecl)
         case instanceDecl(InstanceDecl)
     }
 
     /// A declaration that can appear in an instance type.
-    public enum InstanceDecl {
+    package enum InstanceDecl {
         case coreType(CoreTypeDef)
         case type(ComponentTypeDef)
         case alias(ComponentAlias)
@@ -180,13 +185,18 @@
             }
 
             // Version: 0x0d 0x00 (component model version 13)
-            // Layer: 0x01 0x00 (indicates component, not module)
-            let version = try stream.consume(count: 4)
-            guard version.elementsEqual([0x0d, 0x00, 0x01, 0x00]) else {
+            let version = try stream.consume(count: 2)
+            guard version.elementsEqual([0x0d, 0x00]) else {
                 throw makeError(.unknownVersion(Array(version)))
             }
 
-            return Array(version)
+            // Layer: 0x01 0x00 (indicates component, not module)
+            let layer = try stream.consume(count: 2)
+            guard layer.elementsEqual([0x01, 0x00]) else {
+                throw makeError(.unknownVersion(Array(version) + Array(layer)))
+            }
+
+            return Array(version) + Array(layer)
         }
 
         @inlinable
@@ -206,6 +216,7 @@
             return contents
         }
 
+        /// Parse a core sort discriminator.
         mutating func parseCoreSort() throws(WasmParserError) -> CoreDefSort {
             let byte = try stream.consumeAny()
             switch byte {
@@ -213,14 +224,16 @@
             case 0x01: return .table
             case 0x02: return .memory
             case 0x03: return .global
+            case 0x04: return .tag
             case 0x10: return .type
             case 0x11: return .module
             case 0x12: return .instance
             default:
-                throw makeError(.malformedSectionID(byte))
+                throw makeUnexpectedByteError(byte, for: "core sort")
             }
         }
 
+        /// Parse a component sort discriminator.
         mutating func parseSort() throws(WasmParserError) -> ComponentDefSort {
             let byte = try stream.consumeAny()
             switch byte {
@@ -233,10 +246,11 @@
             case 0x04: return .component
             case 0x05: return .instance
             default:
-                throw makeError(.malformedSectionID(byte))
+                throw makeUnexpectedByteError(byte, for: "component sort")
             }
         }
 
+        /// Parse a sort and index pair.
         mutating func parseSortIdx() throws(WasmParserError) -> (sort: ComponentDefSort, index: UInt32) {
             let sort = try parseSort()
             let index: UInt32 = try parseUnsigned()
@@ -271,15 +285,17 @@
         }
 
         /// Parse a value type (primitive or type index).
-        mutating func parseValType() throws(WasmParserError) -> ComponentDefValType {
+        mutating func parseValType() throws(WasmParserError) -> ComponentValType {
             let byte = try stream.peek() ?? 0
-            // Check if it's a type index (non-negative SLEB128)
-            if byte < 0x64 {
-                let idx: UInt32 = try parseUnsigned()
-                return .indexed(ComponentTypeIndex(rawValue: Int(idx)))
-            } else {
+            // Type opcodes are negative SLEB128: single bytes in [0x64, 0x7F].
+            // Type indices are non-negative SLEB128: single byte [0x00, 0x63]
+            // or multi-byte with high bit set [0x80, 0xFF].
+            if byte >= 0x64 && byte <= 0x7F {
                 let opcode = try stream.consumeAny()
-                return try parsePrimValTypeFromOpcode(opcode)
+                return try .primitive(parsePrimValTypeFromOpcode(opcode))
+            } else {
+                let idx: UInt32 = try parseUnsigned()
+                return .index(ComponentTypeIndex(rawValue: Int(idx)))
             }
         }
 
@@ -289,8 +305,7 @@
             if present == 0x00 {
                 return nil
             } else {
-                let idx: UInt32 = try parseUnsigned()
-                return .index(ComponentTypeIndex(rawValue: Int(idx)))
+                return try parseValType()
             }
         }
 
@@ -298,8 +313,10 @@
         mutating func parseDefValType() throws(WasmParserError) -> ComponentDefValType {
             let byte = try stream.peek() ?? 0
 
-            // Check for type index first
-            if byte < 0x64 {
+            // Type indices are non-negative SLEB128: single byte [0x00, 0x63]
+            // or multi-byte with high bit set [0x80, 0xFF].
+            // Type/composite opcodes are in [0x64, 0x7F].
+            if byte < 0x64 || byte >= 0x80 {
                 let idx: UInt32 = try parseUnsigned()
                 return .indexed(ComponentTypeIndex(rawValue: Int(idx)))
             }
@@ -308,7 +325,7 @@
 
             // Primitive types (0x73...0x7f and 0x64 are not in CompositeValTypeOpcode)
             if PrimitiveValTypeOpcode(rawValue: opcode) != nil {
-                return try parsePrimValTypeFromOpcode(opcode)
+                return try .primitive(parsePrimValTypeFromOpcode(opcode))
             }
 
             guard let compositeType = CompositeValTypeOpcode(rawValue: opcode) else {
@@ -318,27 +335,30 @@
             case .record:
                 let fields = try parseVector { p throws(WasmParserError) -> ComponentRecordField in
                     let name = try p.stream.parseName()
-                    let typeIdx: UInt32 = try p.parseUnsigned()
-                    return ComponentRecordField(name: name, type: .index(ComponentTypeIndex(rawValue: Int(typeIdx))))
+                    let valType = try p.parseValType()
+                    return ComponentRecordField(name: name, type: valType)
                 }
                 return .record(fields)
 
             case .variant:
                 let cases = try parseVector { p throws(WasmParserError) -> ComponentCaseField in
                     let name = try p.stream.parseName()
-                    let typeIdx = try p.parseOptionalValType()
-                    _ = try p.stream.consumeAny()  // consume 0x00 terminator
-                    return ComponentCaseField(name: name, type: typeIdx)
+                    let valType = try p.parseOptionalValType()
+                    let terminator = try p.stream.consumeAny()
+                    guard terminator == 0x00 else {
+                        throw p.makeUnexpectedByteError(terminator, for: "variant case terminator")
+                    }
+                    return ComponentCaseField(name: name, type: valType)
                 }
                 return .variant(cases)
 
             case .list:
-                let elemIdx: UInt32 = try parseUnsigned()
-                return .list(.index(ComponentTypeIndex(rawValue: Int(elemIdx))))
+
+                let valType = try parseValType()
+                return .list(valType)
 
             case .tuple:
-                let typeIndices: [UInt32] = try parseVector { p throws(WasmParserError) -> UInt32 in try p.parseUnsigned() }
-                return .tuple(typeIndices.map { .index(ComponentTypeIndex(rawValue: Int($0))) })
+                return .tuple(try parseVector { p throws(WasmParserError) -> ComponentValType in try p.parseValType() })
 
             case .flags:
                 let labels = try parseVector { p throws(WasmParserError) -> String in try p.stream.parseName() }
@@ -349,48 +369,56 @@
                 return .enum(labels)
 
             case .option:
-                let someIdx: UInt32 = try parseUnsigned()
-                return .option(.index(ComponentTypeIndex(rawValue: Int(someIdx))))
+                let someType = try parseValType()
+                return .option(someType)
 
             case .result:
                 let okIdx = try parseOptionalValType()
                 let errIdx = try parseOptionalValType()
                 return .result(ok: okIdx, error: errIdx)
 
-            case .stream:
+            case .own:  // own
+                let resourceIdx: UInt32 = try parseUnsigned()
+                return .own(ResourceTypeIndex(rawValue: Int(resourceIdx)))
+
+            case .borrow:  // borrow
+                let resourceIdx: UInt32 = try parseUnsigned()
+                return .borrow(ResourceTypeIndex(rawValue: Int(resourceIdx)))
+
+            case .stream where features.contains(.componentModelAsync):  // stream
                 let elemIdx = try parseOptionalValType()
                 return .stream(element: elemIdx, end: nil)
 
-            case .future:
+            case .future where features.contains(.componentModelAsync):
                 let elemIdx = try parseOptionalValType()
                 return .future(elemIdx)
 
-            case .own, .borrow, .listFixed:
+            default:
                 throw makeError(.malformedValueType(opcode))
             }
         }
 
         /// Parse a primitive value type from an already-consumed opcode.
-        func parsePrimValTypeFromOpcode(_ opcode: UInt8) throws(WasmParserError) -> ComponentDefValType {
+        func parsePrimValTypeFromOpcode(_ opcode: UInt8) throws(WasmParserError) -> ComponentPrimValType {
             guard let type = PrimitiveValTypeOpcode(rawValue: opcode) else {
                 throw makeError(.malformedValueType(opcode))
             }
 
             switch type {
-            case .bool: return .primitive(.bool)
-            case .s8: return .primitive(.s8)
-            case .u8: return .primitive(.u8)
-            case .s16: return .primitive(.s16)
-            case .u16: return .primitive(.u16)
-            case .s32: return .primitive(.s32)
-            case .u32: return .primitive(.u32)
-            case .s64: return .primitive(.s64)
-            case .u64: return .primitive(.u64)
-            case .float32: return .primitive(.float32)
-            case .float64: return .primitive(.float64)
-            case .char: return .primitive(.char)
-            case .string: return .primitive(.string)
-            case .errorContext: return .primitive(.errorContext)
+            case .bool: return .bool
+            case .s8: return .s8
+            case .u8: return .u8
+            case .s16: return .s16
+            case .u16: return .u16
+            case .s32: return .s32
+            case .u32: return .u32
+            case .s64: return .s64
+            case .u64: return .u64
+            case .float32: return .float32
+            case .float64: return .float64
+            case .char: return .char
+            case .string: return .string
+            case .errorContext: return .errorContext
             }
         }
 
@@ -401,7 +429,7 @@
             case 0x00:
                 let moduleMarker = try stream.consumeAny()
                 guard moduleMarker == 0x11 else {
-                    throw makeError(.malformedSectionID(moduleMarker))
+                    throw makeUnexpectedByteError(moduleMarker, for: "core module extern descriptor")
                 }
                 let idx: UInt32 = try parseUnsigned()
                 return .coreModule(typeIndex: idx)
@@ -421,7 +449,7 @@
                 let idx: UInt32 = try parseUnsigned()
                 return .instance(typeIndex: idx)
             default:
-                throw makeError(.malformedSectionID(byte))
+                throw makeUnexpectedByteError(byte, for: "extern descriptor")
             }
         }
 
@@ -434,9 +462,9 @@
                 return .eq(valueIndex: idx)
             case 0x01:
                 let valType = try parseValType()
-                return .type(valType)
+                return .type(.inlined(valType))
             default:
-                throw makeError(.malformedSectionID(byte))
+                throw makeUnexpectedByteError(byte, for: "value bound")
             }
         }
 
@@ -450,13 +478,16 @@
             case 0x01:
                 return .subResource
             default:
-                throw makeError(.malformedSectionID(byte))
+                throw makeUnexpectedByteError(byte, for: "type bound")
             }
         }
 
-        /// Parse an import/export name with optional version suffix.
+        /// Parse an import/export name.
         mutating func parseImportExportName() throws(WasmParserError) -> String {
             let prefix = try stream.consumeAny()
+            guard prefix == 0x00 || prefix == 0x01 else {
+                throw makeError(.init("invalid import/export name prefix: 0x\(String(prefix, radix: 16))"))
+            }
             let len: UInt32 = try parseUnsigned()
             let nameBytes = try stream.consume(count: Int(len))
 
@@ -471,13 +502,7 @@
                 }
             }
 
-            // Handle version suffix if present
-            if prefix == 0x01 {
-                let suffixLen: UInt32 = try parseUnsigned()
-                // TODO: Version suffix skipped in `parseImportExportName` as not implemented yet
-                _ = try stream.consume(count: Int(suffixLen))  // Skip version suffix for now
-            }
-
+            // A 0x01 prefix is the legacy form of 0x00 and has no version suffix.
             return name
         }
     }
@@ -511,7 +536,7 @@
                         let name = try q.stream.parseName()
                         let marker = try q.stream.consumeAny()
                         guard marker == 0x12 else {
-                            throw q.makeError(.malformedSectionID(marker))
+                            throw q.makeUnexpectedByteError(marker, for: "core instantiate argument")
                         }
                         let instanceIdx: UInt32 = try q.parseUnsigned()
                         return CoreInstantiateArg(name: name, instanceIndex: instanceIdx)
@@ -526,7 +551,7 @@
                     }
                     return .exports(exports)
                 default:
-                    throw p.makeError(.malformedSectionID(kind))
+                    throw p.makeUnexpectedByteError(kind, for: "core instance")
                 }
             }
         }
@@ -552,7 +577,7 @@
                     }
                     return .exports(exports)
                 default:
-                    throw p.makeError(.malformedSectionID(kind))
+                    throw p.makeUnexpectedByteError(kind, for: "component instance")
                 }
             }
         }
@@ -577,7 +602,7 @@
                     let idx: UInt32 = try p.parseUnsigned()
                     target = .outer(count: count, index: idx)
                 default:
-                    throw p.makeError(.malformedSectionID(targetKind))
+                    throw p.makeUnexpectedByteError(targetKind, for: "alias target")
                 }
                 return ComponentAlias(sort: sort, target: target)
             }
@@ -595,7 +620,7 @@
             let byte = try stream.peek() ?? 0
 
             // Check if it's a defined value type (primitive or composite)
-            if byte >= 0x64 || byte < 0x40 {
+            if byte >= 0x64 {
                 let valType = try parseDefValType()
                 return .definedValue(valType)
             }
@@ -603,21 +628,10 @@
             let opcode = try stream.consumeAny()
             switch opcode {
             case 0x40:  // functype
-                let params = try parseVector { p throws(WasmParserError) -> ComponentFuncType.Param in
-                    let name = try p.stream.parseName()
-                    let valType = try p.parseValType()
-                    return ComponentFuncType.Param(name: name, type: valType)
-                }
-                let resultKind = try stream.consumeAny()
-                let result: ComponentDefValType?
-                if resultKind == 0x00 {
-                    result = try parseValType()
-                } else {
-                    // 0x01 0x00 means no result
-                    _ = try stream.consumeAny()
-                    result = nil
-                }
-                return .function(ComponentFuncType(params: params, result: result))
+                return try parseFuncTypeBody(isAsync: false)
+
+            case 0x43 where features.contains(.componentModelAsync):  // func async
+                return try parseFuncTypeBody(isAsync: true)
 
             case 0x41:  // componenttype
                 let decls = try parseVector { p throws(WasmParserError) -> ComponentOrInstanceDecl in
@@ -636,7 +650,37 @@
                 return .resource(destructor: dtor)
 
             default:
-                throw makeError(.malformedSectionID(opcode))
+                throw makeUnexpectedByteError(opcode, for: "component type")
+            }
+        }
+
+        /// Parse the body of a component function type (shared by sync `0x40` and async `0x43`).
+        /// The two opcodes have byte-identical paramlist/resultlist encodings; only `isAsync` differs.
+        mutating func parseFuncTypeBody(isAsync: Bool) throws(WasmParserError) -> ComponentTypeDef {
+            let params = try parseVector { p throws(WasmParserError) -> ComponentFuncType.Param in
+                let name = try p.stream.parseName()
+                let valType = try p.parseValType()
+                return ComponentFuncType.Param(name: name, type: .inlined(valType))
+            }
+            let result = try parseResultList()
+            return .function(ComponentFuncType(params: params, result: result, isAsync: isAsync))
+        }
+
+        /// Parse a component function `resultlist`: `0x00 t:<valtype>` (one result) or
+        /// `0x01 0x00` (empty named-results = no result). Shared by `parseFuncTypeBody`
+        /// and the `task.return` async canon op. Non-zero named-result counts are rejected.
+        mutating func parseResultList() throws(WasmParserError) -> ComponentDefValType? {
+            let resultKind = try stream.consumeAny()
+            if resultKind == 0x00 {
+                return try .inlined(parseValType())
+            } else if resultKind == 0x01 {
+                let count: UInt32 = try parseUnsigned()
+                if count != 0 {
+                    throw makeError(.init("named results must be empty, got count \(count)"))
+                }
+                return nil
+            } else {
+                throw makeUnexpectedByteError(resultKind, for: "component function results")
             }
         }
 
@@ -681,7 +725,7 @@
                 let externDesc = try parseExternDesc()
                 return .exportDecl(ComponentExportDecl(name: name, externDesc: externDesc))
             default:
-                throw makeError(.malformedSectionID(kind))
+                throw makeUnexpectedByteError(kind, for: "instance declaration")
             }
         }
 
@@ -704,7 +748,7 @@
                 let idx: UInt32 = try parseUnsigned()
                 target = .outer(count: count, index: idx)
             default:
-                throw makeError(.malformedSectionID(targetKind))
+                throw makeUnexpectedByteError(targetKind, for: "alias target")
             }
             return ComponentAlias(sort: sort, target: target)
         }
@@ -724,7 +768,7 @@
                 let results = try parseVector { p throws(WasmParserError) -> ValueType in try p.parseCoreValueType() }
                 return .function(FunctionType(parameters: params, results: results))
             } else {
-                throw makeError(.malformedSectionID(byte))
+                throw makeUnexpectedByteError(byte, for: "core type")
             }
         }
 
@@ -762,14 +806,14 @@
                 _ = try stream.consumeAny()  // 0x01 for outer
                 let count: UInt32 = try parseUnsigned()
                 let idx: UInt32 = try parseUnsigned()
-                return .alias(ComponentAlias(sort: .core(sort), target: .outer(count: count, index: idx)))
+                return .alias(CoreAlias(sort: sort, target: .outer(count: count, index: idx)))
             case 0x03:
                 // export decl
                 let name = try stream.parseName()
                 let desc = try parseCoreImportDesc()
                 return .exportDecl(name: name, descriptor: desc)
             default:
-                throw makeError(.malformedSectionID(kind))
+                throw makeUnexpectedByteError(kind, for: "core module declaration")
             }
         }
 
@@ -791,8 +835,13 @@
                 let valType = try parseCoreValueType()
                 let mutability = try parseMutability()
                 return .global(GlobalType(mutability: mutability, valueType: valType))
+            case 0x04 where features.contains(.exceptionHandling):
+                let attribute: UInt8 = try parseUnsigned()
+                guard attribute == 0 else { throw makeError(.invalidTagAttribute(attribute)) }
+                let typeIndex: UInt32 = try parseUnsigned()
+                return .tag(typeIndex)
             default:
-                throw makeError(.malformedSectionID(byte))
+                throw makeUnexpectedByteError(byte, for: "core import descriptor")
             }
         }
 
@@ -836,7 +885,7 @@
                 case 0x00:
                     let sortMarker = try p.stream.consumeAny()
                     guard sortMarker == 0x00 else {
-                        throw p.makeError(.malformedSectionID(sortMarker))
+                        throw p.makeUnexpectedByteError(sortMarker, for: "canon core function sort")
                     }
                     let funcIdx: UInt32 = try p.parseUnsigned()
                     let opts = try p.parseCanonicalOptions()
@@ -846,7 +895,7 @@
                 case 0x01:
                     let sortMarker = try p.stream.consumeAny()
                     guard sortMarker == 0x00 else {
-                        throw p.makeError(.malformedSectionID(sortMarker))
+                        throw p.makeUnexpectedByteError(sortMarker, for: "canon core function sort")
                     }
                     let funcIdx: UInt32 = try p.parseUnsigned()
                     let opts = try p.parseCanonicalOptions()
@@ -864,10 +913,75 @@
                     let typeIdx: UInt32 = try p.parseUnsigned()
                     return .resourceRep(typeIndex: typeIdx)
 
+                case let opcodeByte
+                where p.features.contains(.componentModelAsync)
+                    && CanonOpcode(rawValue: opcodeByte)?.isSupportedAsyncBuiltin == true:
+                    let opcode = CanonOpcode(rawValue: opcodeByte)!
+                    let immediates = try p.parseAsyncCanonicalImmediates(for: opcode)
+                    return .asyncBuiltin(AsyncCanonicalBuiltin(opcode: opcode, immediates: immediates))
+
                 default:
                     // Skip other canon builtins for now
-                    throw p.makeError(.malformedSectionID(kind))
+                    throw p.makeUnexpectedByteError(kind, for: "canon definition")
                 }
+            }
+        }
+
+        /// Decode the immediate bytes following a supported async canon opcode.
+        /// The opcode determines the shape (one arm per ``AsyncCanonicalImmediates`` case).
+        mutating func parseAsyncCanonicalImmediates(for opcode: CanonOpcode) throws(WasmParserError) -> AsyncCanonicalImmediates {
+            switch opcode {
+            case .taskCancel, .subtaskDrop, .threadIndex, .waitableSetNew, .waitableSetDrop, .waitableJoin,
+                .backpressureInc, .backpressureDec:
+                return .none
+            case .streamNew, .streamDropReadable, .streamDropWritable,
+                .futureNew, .futureDropReadable, .futureDropWritable:
+                return .type(try parseUnsigned())
+            case .streamRead, .streamWrite, .futureRead, .futureWrite:
+                let typeIndex: UInt32 = try parseUnsigned()
+                return .typeWithOptions(typeIndex, options: try parseCanonicalOptions())
+            case .streamCancelRead, .streamCancelWrite, .futureCancelRead, .futureCancelWrite:
+                let typeIndex: UInt32 = try parseUnsigned()
+                return .typeWithAsyncFlag(typeIndex, async: try parseFlagByte())
+            case .subtaskCancel:
+                return .asyncFlag(try parseFlagByte())
+            case .threadYield, .threadSuspend:
+                return .cancellableFlag(try parseFlagByte())
+            case .waitableSetWait, .waitableSetPoll:
+                let cancellable = try parseFlagByte()
+                return .cancellableWithMemory(cancellable, memoryIndex: try parseUnsigned())
+            case .taskReturn:
+                return .resultListWithOptions(try parseResultList(), options: try parseCanonicalOptions())
+            case .contextGetI32, .contextSetI32:
+                let valueType = try parseContextValueType()
+                return .context(valueType, slot: try parseUnsigned())
+            case .threadNewIndirect:
+                let typeIndex: UInt32 = try parseUnsigned()
+                return .typeWithTable(typeIndex, tableIndex: try parseUnsigned())
+            default:
+                // Unreachable: the caller gates on `isSupportedAsyncBuiltin`.
+                throw makeUnexpectedByteError(opcode.rawValue, for: "async canon built-in")
+            }
+        }
+
+        /// Decode a single-byte `async?`/`cancel?` flag (`0x00` = false, `0x01` = true).
+        mutating func parseFlagByte() throws(WasmParserError) -> Bool {
+            let byte = try stream.consumeAny()
+            switch byte {
+            case 0x00: return false
+            case 0x01: return true
+            default: throw makeUnexpectedByteError(byte, for: "flag")
+            }
+        }
+
+        /// Decode the core value type byte of a `context.get`/`context.set` slot
+        /// (`i32` = `0x7f`, `i64` = `0x7e`; ABI-restricted to these two).
+        mutating func parseContextValueType() throws(WasmParserError) -> CanonicalContextValueType {
+            let byte = try stream.consumeAny()
+            switch byte {
+            case 0x7f: return .i32
+            case 0x7e: return .i64
+            default: throw makeUnexpectedByteError(byte, for: "context value type")
             }
         }
 
@@ -894,17 +1008,17 @@
                 let name = try p.parseImportExportName()
                 let (sort, idx) = try p.parseSortIdx()
                 // Parse optional extern desc
+                // The presence flag is always consumed:
                 // 0x00 = no extern desc present
-                // 0x01-0x05 = extern desc type prefix
-                let marker = try p.stream.peek() ?? 0
+                // 0x01 = extern desc present (followed by the extern desc)
+                let marker = try p.stream.consumeAny()
                 let externDesc: ComponentExternDesc?
                 if marker == 0x00 {
-                    _ = try p.stream.consumeAny()  // consume the absence marker
                     externDesc = nil
-                } else if marker >= 0x01 && marker <= 0x05 {
+                } else if marker == 0x01 {
                     externDesc = try p.parseExternDesc()
                 } else {
-                    externDesc = nil
+                    throw p.makeUnexpectedByteError(marker, for: "export type ascription")
                 }
                 return ComponentExportDef(name: name, sort: sort, index: idx, externDesc: externDesc)
             }
@@ -916,7 +1030,7 @@
                 let valType = try p.parseValType()
                 let len: UInt32 = try p.parseUnsigned()
                 let valueBytes = try p.stream.consume(count: Int(len))
-                return ComponentValueDef(type: valType, value: Array(valueBytes))
+                return ComponentValueDef(type: .inlined(valType), value: Array(valueBytes))
             }
         }
     }
@@ -927,7 +1041,7 @@
         /// Attempts to parse a chunk of the component binary stream.
         ///
         /// - Returns: A `ComponentParsingPayload` if parsing was successful, otherwise `nil`.
-        public mutating func parseNext() throws(WasmParserError) -> ComponentParsingPayload? {
+        package mutating func parseNext() throws(WasmParserError) -> ComponentParsingPayload? {
             switch nextParseTarget {
             case .header:
                 let version = try parsePreamble()

@@ -26,7 +26,7 @@
         }
 
         /// Parse a value given its expected type
-        public mutating func parse(type: ComponentDefValType) throws(WAVEParserError) -> ComponentValue {
+        package mutating func parse(type: ComponentDefValType) throws(WAVEParserError) -> ComponentValue {
             switch type {
             case .inlined(.primitive(let prim)):
                 return try parsePrimitive(prim)
@@ -54,7 +54,7 @@
         }
 
         /// Parse a value with a type resolver for composite types
-        public mutating func parse(
+        package mutating func parse(
             type: ComponentDefValType,
             resolver: (ComponentTypeIndex) throws -> ComponentDefValType
         ) throws -> ComponentValue {
@@ -765,7 +765,7 @@
         ///   - params: The parameter types to parse, in order
         ///   - resolver: A function to resolve type indices to concrete types
         /// - Returns: The parsed argument values
-        public mutating func parseArguments(
+        package mutating func parseArguments(
             params: [ComponentDefValType],
             resolver: @escaping (ComponentTypeIndex) throws -> ComponentDefValType
         ) throws -> [ComponentValue] {

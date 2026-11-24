@@ -659,6 +659,97 @@
             #expect(actualSecond == 0x0000_0101_0000_0001)
         }
 
+        @Test(arguments: [
+            ("encode-both", true, UInt32?(1), UInt32(1)),
+            ("encode-both", false, UInt32?(1), UInt32(11)),
+            ("encode-err-only", true, UInt32?.none, UInt32(0)),
+            ("encode-err-only", false, UInt32?(1), UInt32(11)),
+        ])
+        func resultPayloadLowersAfterDiscriminant(export: String, isOk: Bool, payload: UInt32?, expected: UInt32) throws {
+            let instance = try instantiateComponentWAT(
+                """
+                (component
+                    (core module $m
+                        (func (export "encode") (param i32 i32) (result i32)
+                            local.get 0
+                            i32.const 10
+                            i32.mul
+                            local.get 1
+                            i32.add)
+                    )
+                    (core instance $i (instantiate $m))
+                    (type $both (result u32 (error u32)))
+                    (type $err-only (result (error u32)))
+                    (func (export "encode-both") (param "r" $both) (result u32)
+                        (canon lift (core func $i "encode")))
+                    (func (export "encode-err-only") (param "r" $err-only) (result u32)
+                        (canon lift (core func $i "encode")))
+                )
+                """)
+            guard case .function(let encode) = instance.export(export) else {
+                Issue.record("Expected \(export) function export")
+                return
+            }
+
+            let value = payload.map { ComponentValue.u32($0) }
+            let results = try encode.invoke([isOk ? .resultOk(value) : .resultErr(value)])
+            guard case .u32(let actual) = results.first else {
+                Issue.record("Expected u32 result, got \(results)")
+                return
+            }
+            #expect(actual == expected)
+        }
+
+        @Test(arguments: [
+            ("a", UInt32?.none, UInt32(0)),
+            ("b", UInt32?(1), UInt32(11)),
+            ("c", UInt32?(2), UInt32(22)),
+        ])
+        func variantPayloadLowersAfterDiscriminant(caseName: String, payload: UInt32?, expected: UInt32) throws {
+            let instance = try instantiateComponentWAT(
+                """
+                (component
+                    (core module $m
+                        (func (export "encode") (param i32 i32) (result i32)
+                            local.get 0
+                            i32.const 10
+                            i32.mul
+                            local.get 1
+                            i32.add)
+                    )
+                    (core instance $i (instantiate $m))
+                    (type $v (variant (case "a") (case "b" u32) (case "c" u32)))
+                    (func (export "encode") (param "v" $v) (result u32)
+                        (canon lift (core func $i "encode")))
+                )
+                """)
+            guard case .function(let encode) = instance.export("encode") else {
+                Issue.record("Expected encode function export")
+                return
+            }
+
+            let results = try encode.invoke([.variant(caseName: caseName, payload: payload.map { .u32($0) })])
+            guard case .u32(let actual) = results.first else {
+                Issue.record("Expected u32 result, got \(results)")
+                return
+            }
+            #expect(actual == expected)
+        }
+
+        @Test
+        func coreTagAliasInstantiates() {
+            #expect(throws: Never.self) {
+                _ = try instantiateComponentWAT(
+                    """
+                    (component
+                        (core module $m (tag (export "t")))
+                        (core instance $i (instantiate $m))
+                        (alias core export $i "t" (core tag $t))
+                    )
+                    """)
+            }
+        }
+
         @Test
         func primitiveLiftingFromWAT() throws {
             let instance = try instantiateComponentWAT(
