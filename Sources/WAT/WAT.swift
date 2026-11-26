@@ -321,7 +321,7 @@ public func parseWAST(_ input: String, features: WasmFeatureSet = .default) thro
 #if ComponentModel
 
     /// A Component WAST script representation.
-    public struct ComponentWAST {
+    package struct ComponentWAST {
         var parser: ComponentWASTParser
 
         init(_ input: String, features: WasmFeatureSet) {
@@ -332,7 +332,7 @@ public func parseWAST(_ input: String, features: WasmFeatureSet = .default) thro
         ///
         /// - Returns: A tuple containing the parsed directive and its location in the script,
         ///   or `nil` if there are no more directives to parse.
-        public mutating func nextDirective() throws -> (directive: ComponentWASTDirective, location: Location)? {
+        package mutating func nextDirective() throws -> (directive: ComponentWASTDirective, location: Location)? {
             let location = try parser.parser.peek()?.location(in: parser.parser.lexer) ?? parser.parser.lexer.location()
             if let directive = try parser.nextDirective() {
                 return (directive, location)
@@ -343,7 +343,7 @@ public func parseWAST(_ input: String, features: WasmFeatureSet = .default) thro
 
         /// Skip the current directive after an error.
         /// Call this after catching an error from `nextDirective()` to recover and continue parsing.
-        public mutating func skipCurrentDirective() {
+        package mutating func skipCurrentDirective() {
             parser.skipCurrentDirective()
         }
     }
@@ -370,7 +370,7 @@ public func parseWAST(_ input: String, features: WasmFeatureSet = .default) thro
     ///     print("\(location): \(directive)")
     /// }
     /// ```
-    public func parseComponentWAST(
+    package func parseComponentWAST(
         _ input: String,
         features: WasmFeatureSet = .default
     ) throws(WatParserError) -> ComponentWAST {

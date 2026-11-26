@@ -52,6 +52,10 @@ struct NameMapping<Decl: NamedFieldDecl>: NameToIndexResolver {
         return index
     }
 
+    func index(of name: String) -> Int? {
+        nameToIndex[name]
+    }
+
     func resolveIndex(use: Parser.IndexOrId) throws(WatParserError) -> Int {
         switch use {
         case .id(let id, _):
@@ -320,6 +324,10 @@ extension TypesMap: Collection {
                 nameToIndex[name.value] = index
             }
             return index
+        }
+
+        func index(of name: String) -> Int? {
+            nameToIndex[name]
         }
 
         func resolveIndex(use: Parser.IndexOrId) throws(WatParserError) -> Int {

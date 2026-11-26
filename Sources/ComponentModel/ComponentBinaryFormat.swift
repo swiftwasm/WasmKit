@@ -25,24 +25,6 @@ package enum ComponentSectionID: UInt8, Comparable {
 
 // MARK: - Value Type Opcodes
 
-/// Primitive value type opcodes (negative SLEB128 from 0x7f)
-package enum PrimitiveValTypeOpcode: UInt8 {
-    case bool = 0x7f
-    case s8 = 0x7e
-    case u8 = 0x7d
-    case s16 = 0x7c
-    case u16 = 0x7b
-    case s32 = 0x7a
-    case u32 = 0x79
-    case s64 = 0x78
-    case u64 = 0x77
-    case float32 = 0x76
-    case float64 = 0x75
-    case char = 0x74
-    case string = 0x73
-    case errorContext = 0x64
-}
-
 /// Composite value type opcodes
 package enum CompositeValTypeOpcode: UInt8 {
     case record = 0x72
@@ -179,18 +161,6 @@ package enum CanonOptionTag: UInt8 {
 }
 
 // MARK: - Sort Values
-
-/// Core sort values (used in aliases and extern descs)
-package enum CoreSortOpcode: UInt8 {
-    case function = 0x00
-    case table = 0x01
-    case memory = 0x02
-    case global = 0x03
-    case tag = 0x04
-    case type = 0x10
-    case module = 0x11
-    case instance = 0x12
-}
 
 /// Component sort values (used in aliases and extern descs)
 package enum ComponentSortOpcode: UInt8 {

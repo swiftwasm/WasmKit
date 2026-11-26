@@ -8,7 +8,7 @@
 
     /// A directive in a Component WAST script.
     /// Mirrors WASTDirective but for Component Model.
-    public enum ComponentWASTDirective {
+    package enum ComponentWASTDirective {
         /// A component definition
         case component(ComponentDirective)
 
@@ -38,17 +38,17 @@
     }
 
     /// A component representation in "(component ...)" form in WAST.
-    public struct ComponentDirective {
+    package struct ComponentDirective {
         /// The source of the component
-        public let source: ComponentSource
+        package let source: ComponentSource
         /// The name of the component specified in $id form
-        public let id: String?
+        package let id: String?
         /// The location of the component in the source
-        public let location: Location
+        package let location: Location
     }
 
     /// The source of a component in WAST.
-    public enum ComponentSource {
+    package enum ComponentSource {
         /// A parsed Component WAT
         case text(ComponentWatParser.ComponentDef)
         /// A text form of Component WAT (quoted strings)
@@ -58,7 +58,7 @@
     }
 
     /// Component-level execution in WAST.
-    public enum ComponentWASTExecute {
+    package enum ComponentWASTExecute {
         /// Invoke a component function
         case invoke(ComponentWASTInvoke)
         /// Get a component export value
@@ -68,24 +68,24 @@
     }
 
     /// A component function invocation in WAST.
-    public struct ComponentWASTInvoke {
+    package struct ComponentWASTInvoke {
         /// Optional component name (if not specified, use current component)
-        public let component: String?
+        package let component: String?
         /// The function name to invoke
-        public let name: String
+        package let name: String
         /// Arguments to pass to the function (reuses ComponentValue from ComponentModel)
-        public let args: [ComponentValue]
+        package let args: [ComponentValue]
     }
 
     // MARK: - ComponentWASTParser
 
     /// A parser for Component WAST format.
     /// Similar to WASTParser but for Component Model scripts.
-    public struct ComponentWASTParser {
+    package struct ComponentWASTParser {
         var parser: Parser
         let features: WasmFeatureSet
 
-        public init(_ input: String, features: WasmFeatureSet) {
+        package init(_ input: String, features: WasmFeatureSet) {
             self.parser = Parser(input)
             self.features = features
         }
@@ -96,7 +96,7 @@
         private var savedParserBeforeDirective: Parser?
 
         /// Parse the next directive in the Component WAST script.
-        public mutating func nextDirective() throws(WatParserError) -> ComponentWASTDirective? {
+        package mutating func nextDirective() throws(WatParserError) -> ComponentWASTDirective? {
             guard (try parser.peek(.leftParen)) != nil else { return nil }
             savedParserBeforeDirective = parser  // Save state before consuming opening paren
             try parser.consume()
@@ -127,7 +127,7 @@
         /// Skip the current directive after an error.
         /// Call this after catching an error from `nextDirective()`.
         /// This restores to before the directive and skips the entire paren block.
-        public mutating func skipCurrentDirective() {
+        package mutating func skipCurrentDirective() {
             // Restore to the saved position (before the directive's opening paren)
             if let saved = savedParserBeforeDirective {
                 parser = saved

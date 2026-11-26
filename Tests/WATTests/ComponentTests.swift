@@ -19,64 +19,72 @@
             .deletingLastPathComponent()  // Root
             .appendingPathComponent("Vendor")
 
-        static func componentWastFiles(include: [String] = [], exclude: [String] = [], excludePaths: [String] = []) -> [URL] {
+        static func componentWastFiles() -> [URL] {
             let componentModelTestPath = vendorPath.appendingPathComponent("component-model/test")
 
             guard FileManager.default.fileExists(atPath: componentModelTestPath.path) else {
                 return []
             }
 
-            let searchPaths = [
-                componentModelTestPath.appendingPathComponent("wasm-tools"),
-                componentModelTestPath.appendingPathComponent("wasmtime"),
-                componentModelTestPath.appendingPathComponent("values"),
-            ]
+            let fixturesPath = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+                .appendingPathComponent("ComponentModelFixtures")
+            let searchPaths =
+                [fixturesPath]
+                + ["wasm-tools", "wasmtime", "values", "names", "resources", "async"].map {
+                    componentModelTestPath.appendingPathComponent($0)
+                }
 
-            let result: [URL] = searchPaths.flatMap {
+            return searchPaths.flatMap {
                 (try? FileManager.default.contentsOfDirectory(
                     at: $0,
                     includingPropertiesForKeys: nil
                 )) ?? []
-            }.compactMap { filePath in
-                guard filePath.pathExtension == "wast" else {
-                    return nil
-                }
-                for excludePath in excludePaths {
-                    if filePath.path.hasSuffix(excludePath) {
-                        return nil
-                    }
-                }
-                if !include.isEmpty {
-                    guard include.contains(filePath.lastPathComponent) else { return nil }
-                } else {
-                    guard !exclude.contains(filePath.lastPathComponent) else { return nil }
-                }
-                return filePath
-            }
-
-            return result
+            }.filter { $0.pathExtension == "wast" }
         }
+
+        static let knownIssues: [String: Set<Int>] = [
+            // The loader fills each index space in a fixed section order. It rejects these
+            // wasm-tools encodings, which interleave aliases, `canon lower` and type exports.
+            "wasmtime/adapter.wast": [97],
+            "wasmtime/fused.wast": [472, 508],
+            "wasmtime/strings.wast": [4, 40, 76],
+            // The text parser does not support `refines` on variant cases.
+            "wasm-tools/definedtypes.wast": [3],
+            // The text parser does not support `async` function types, `stream` and `future`
+            // types, or async canon built-ins.
+            "async/trap-on-reenter.wast": [4],
+            // The text parser does not support shorthand forms: inline `import` and `export` on
+            // components, core modules and instances, ids on exports, implicit outer aliases,
+            // `(core func (alias ...))`, and export projections other than a single `(func $i "name")`.
+            "async/deadlock.wast": [4],
+            "async/drop-waitable-set.wast": [5],
+            "wasm-tools/alias.wast": [68, 162, 174, 203, 224],
+            "wasm-tools/export-introduces-alias.wast": [3],
+            "wasm-tools/func.wast": [60],
+            "wasm-tools/instantiate.wast": [80, 98, 373, 542],
+            "wasm-tools/module-link.wast": [3, 12],
+            "wasm-tools/naming.wast": [105],
+            "wasm-tools/resources.wast": [291, 396, 439, 465, 567, 577, 591, 609, 625, 657, 721, 1022, 1080],
+            "wasm-tools/tags.wast": [17],
+            "wasm-tools/type-export-restrictions.wast": [107, 231, 244, 260, 319, 418, 468],
+            "wasm-tools/virtualize.wast": [3],
+            "wasmtime/instance.wast": [18, 104, 130, 191, 216, 224],
+            "wasmtime/modules.wast": [3, 34, 67, 108, 201, 292, 298, 315, 368, 416],
+            "wasmtime/nested.wast": [24, 36, 128, 149, 175, 213, 219, 264, 322, 374],
+            "wasmtime/resources.wast": [961],
+            "wasmtime/tags.wast": [3],
+        ]
+
+        static let features: WasmFeatureSet = WasmFeatureSet.all
 
         // MARK: - Encoding Tests
 
-        @Test(
-            arguments: componentWastFiles(
-                include: [
-                    "empty.wast",
-                    "simple.wast",
-                    "types.wast",
-                    "link.wast",
-                    "inline-exports.wast",
-                    "nested-modules.wast",
-                    "fused.wast",
-                    "strings.wast",
-                    "adapter.wast",
-                ],
-                excludePaths: []
-            )
-        )
+        @Test(arguments: componentWastFiles())
         func componentModelSpectest(wastFile: URL) throws {
             let wastContent = try String(contentsOf: wastFile, encoding: .utf8)
+            let knownIssueLines =
+                Self.knownIssues[wastFile.deletingLastPathComponent().lastPathComponent + "/" + wastFile.lastPathComponent] ?? []
+            var reachedKnownIssueLines: Set<Int> = []
 
             // Try to run wast2json for encoding validation (may fail for files with component assert_return)
             var moduleCommands: [WAST2JSONCommand] = []
@@ -95,7 +103,7 @@
 
             // Parse WAST file and collect component directives by line number
             var componentsByLine: [Int: ComponentWatParser.ComponentDef] = [:]
-            var wast = try parseComponentWAST(wastContent, features: .default)
+            var wast = try parseComponentWAST(wastContent, features: Self.features)
 
             // For execution: track current component instance
             let engine = Engine()
@@ -146,14 +154,20 @@
                         }
 
                     case .assertTrap(let execute, let expectedMessage):
+                        let isKnownIssue = knownIssueLines.contains(line)
+                        if isKnownIssue { reachedKnownIssueLines.insert(line) }
                         do {
-                            try executeAssertTrap(
-                                execute: execute,
-                                expectedMessage: expectedMessage,
-                                instance: currentInstance,
-                                linker: linker,
-                                location: location
-                            )
+                            try withKnownIssue {
+                                try executeAssertTrap(
+                                    execute: execute,
+                                    expectedMessage: expectedMessage,
+                                    instance: currentInstance,
+                                    linker: linker,
+                                    location: location
+                                )
+                            } when: {
+                                isKnownIssue
+                            }
                             executedAssertTraps += 1
                         } catch let error {
                             // Skip assert_trap that requires unsupported features
@@ -163,7 +177,6 @@
 
                     case .assertInvalid, .assertMalformed, .register, .invoke:
                         // TODO: Not implemented yet
-                        // TODO: .assertInvalid, .assertMalformed, .register, .invoke commands not implemented yet
                         continue
                     }
                 } catch {
@@ -183,48 +196,161 @@
             // Validate binary encoding against wasm-tools reference
             for command in moduleCommands {
                 guard let filename = command.filename else { continue }
+                let isKnownIssue = knownIssueLines.contains(command.line)
+                if isKnownIssue { reachedKnownIssueLines.insert(command.line) }
 
-                guard let component = componentsByLine[command.line] else {
-                    Issue.record("\(wastFile.lastPathComponent):\(command.line): Component not found at line")
-                    continue
-                }
-
-                var encoder = ComponentEncoder()
-                let actualBytes: [UInt8]
-                do {
-                    actualBytes = try encoder.encode(component, options: .init(nameSection: true))
-                } catch {
-                    Issue.record("\(wastFile.lastPathComponent):\(command.line): Encode failed: \(error)")
-                    continue
-                }
-
-                // Get expected bytes from memory (extracted by wast2json)
-                guard let expectedBytes = wasmFiles[filename] else {
-                    Issue.record("\(wastFile.lastPathComponent):\(command.line): Expected file not found: \(filename)")
-                    continue
-                }
-
-                if actualBytes != expectedBytes {
-                    print("\(wastFile.lastPathComponent):\(command.line) - Size: expected \(expectedBytes.count), actual \(actualBytes.count)")
-
-                    if actualBytes.count <= 200 && expectedBytes.count <= 200 {
-                        print("  Expected bytes: \(expectedBytes.map { String(format: "%02x", $0) }.joined(separator: " "))")
-                        print("  Actual bytes:   \(actualBytes.map { String(format: "%02x", $0) }.joined(separator: " "))")
+                withKnownIssue {
+                    guard let component = componentsByLine[command.line] else {
+                        Issue.record("\(wastFile.lastPathComponent):\(command.line): Component not found at line")
+                        return
                     }
-                }
 
-                #expect(
-                    actualBytes.count == expectedBytes.count,
-                    "Size mismatch for \(wastFile.lastPathComponent):\(command.line): expected \(expectedBytes.count), actual \(actualBytes.count)"
-                )
-                #expect(
-                    actualBytes == expectedBytes,
-                    "Byte mismatch for \(wastFile.lastPathComponent):\(command.line)"
-                )
+                    var encoder = ComponentEncoder()
+                    let actualBytes: [UInt8]
+                    do {
+                        actualBytes = try encoder.encode(component, options: .init(nameSection: true))
+                    } catch {
+                        Issue.record("\(wastFile.lastPathComponent):\(command.line): Encode failed: \(error)")
+                        return
+                    }
+
+                    // Get expected bytes from memory (extracted by wast2json)
+                    guard let expectedBytes = wasmFiles[filename] else {
+                        Issue.record("\(wastFile.lastPathComponent):\(command.line): Expected file not found: \(filename)")
+                        return
+                    }
+
+                    if actualBytes != expectedBytes {
+                        print("\(wastFile.lastPathComponent):\(command.line) - Size: expected \(expectedBytes.count), actual \(actualBytes.count)")
+
+                        if actualBytes.count <= 200 && expectedBytes.count <= 200 {
+                            print("  Expected bytes: \(expectedBytes.map { String(format: "%02x", $0) }.joined(separator: " "))")
+                            print("  Actual bytes:   \(actualBytes.map { String(format: "%02x", $0) }.joined(separator: " "))")
+                        }
+                    }
+
+                    #expect(
+                        actualBytes.count == expectedBytes.count,
+                        "Size mismatch for \(wastFile.lastPathComponent):\(command.line): expected \(expectedBytes.count), actual \(actualBytes.count)"
+                    )
+                    #expect(
+                        actualBytes == expectedBytes,
+                        "Byte mismatch for \(wastFile.lastPathComponent):\(command.line)"
+                    )
+                } when: {
+                    isKnownIssue
+                }
+            }
+
+            for line in knownIssueLines.subtracting(reachedKnownIssueLines).sorted() {
+                Issue.record("\(wastFile.lastPathComponent):\(line): known issue line was not reached")
             }
         }
 
+        @Test
+        func parsesRegisterDirective() throws {
+            var wast = try parseComponentWAST(#"(component $c) (register "name" $c)"#)
+            _ = try #require(try wast.nextDirective())
+            let (directive, _) = try #require(try wast.nextDirective())
+            guard case .register(let name, let componentId) = directive else {
+                Issue.record("Expected register directive, got \(directive)")
+                return
+            }
+            #expect(name == "name")
+            #expect(componentId == "$c")
+        }
+
+        @Test
+        func parsesRegisterDirectiveWithoutComponentId() throws {
+            var wast = try parseComponentWAST(#"(component) (register "name")"#)
+            _ = try #require(try wast.nextDirective())
+            let (directive, _) = try #require(try wast.nextDirective())
+            guard case .register(let name, let componentId) = directive else {
+                Issue.record("Expected register directive, got \(directive)")
+                return
+            }
+            #expect(name == "name")
+            #expect(componentId == nil)
+        }
+
+        @Test(arguments: ["type", "instance"])
+        func coreSortExportAliasIsRejected(coreSort: String) throws {
+            let error = #expect(throws: WatParserError.self) {
+                try wat2wasm(#"(component (import "i" (instance $i)) (alias export $i "t" (core \#(coreSort) $t)))"#)
+            }
+            #expect(error?.message == "A component instance cannot export a core \(coreSort)")
+        }
+
+        @Test(arguments: ["type", "module", "instance"])
+        func unsupportedCoreExportAliasSortIsRejected(coreSort: String) throws {
+            let error = #expect(throws: WatParserError.self) {
+                try wat2wasm(
+                    #"(component (core module $m) (core instance $ci (instantiate $m)) (alias core export $ci "x" (core \#(coreSort) $y)))"#
+                )
+            }
+            #expect(error?.message == "Unsupported core sort '\(coreSort)' for core export alias")
+        }
+
+        @Test(arguments: [
+            (#"(alias export $i "x" (bogus $x))"#, "Unexpected component declaration sort 'bogus'"),
+            (#"(alias export $i "x" (core bogus $x))"#, "Unexpected core declaration sort 'bogus'"),
+            (#"(instance (export "x" (bogus $x)))"#, "Unexpected component declaration sort 'bogus'"),
+            (#"(instance (export "x" (core bogus $x)))"#, "Unexpected core declaration sort 'bogus'"),
+            (#"(instance (instantiate $c (with "x" (bogus $x))))"#, "Unexpected component declaration sort 'bogus'"),
+            (#"(instance (instantiate $c (with "x" (core bogus $x))))"#, "Unexpected core declaration sort 'bogus'"),
+            (#"(alias core export $ci "x" (core bogus $y))"#, "Unexpected core declaration sort 'bogus'"),
+            ("(core type (module (alias outer 0 0 (bogus $x))))", "Unexpected core declaration sort 'bogus'"),
+        ])
+        func unknownSortKeywordIsRejected(field: String, message: String) throws {
+            let error = #expect(throws: WatParserError.self) {
+                try wat2wasm(#"(component (import "i" (instance $i)) (component $c) \#(field))"#)
+            }
+            #expect(error?.message == message)
+        }
+
+        @Test
+        func unresolvedCoreImportTypeIsRejected() throws {
+            let error = #expect(throws: WatParserError.self) {
+                try wat2wasm(#"(component (core type (module (import "m" "n" (func (type $missing))))))"#)
+            }
+            #expect(error?.message == "Unknown core type '$missing'")
+        }
+
+        @Test
+        func nestedValueTypesWithinLimitAreAccepted() throws {
+            _ = try wat2wasm("(component (type \(nestedValueType(depth: 11))))")
+        }
+
+        @Test
+        func tooDeeplyNestedValueTypeIsRejected() throws {
+            let error = #expect(throws: WatParserError.self) {
+                try wat2wasm("(component (type \(nestedValueType(depth: 12))))")
+            }
+            #expect(error?.message == "nesting too deep")
+        }
+
+        @Test
+        func nestedInstanceTypesWithinLimitAreAccepted() throws {
+            _ = try wat2wasm("(component (type \(nestedInstanceType(depth: 10))))")
+        }
+
+        @Test
+        func tooDeeplyNestedInstanceTypeIsRejected() throws {
+            let error = #expect(throws: WatParserError.self) {
+                try wat2wasm("(component (type \(nestedInstanceType(depth: 11))))")
+            }
+            #expect(error?.message == "nesting too deep")
+        }
+
         // MARK: - Test Helpers
+
+        private func nestedValueType(depth: Int) -> String {
+            String(repeating: "(list ", count: depth) + "u8" + String(repeating: ")", count: depth)
+        }
+
+        private func nestedInstanceType(depth: Int) -> String {
+            String(repeating: "(instance (type ", count: depth) + "(func)" + String(repeating: "))", count: depth)
+        }
 
         /// Instantiate a component from a ComponentDirective.
         private func instantiateComponent(
