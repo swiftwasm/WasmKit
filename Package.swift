@@ -148,6 +148,7 @@ let package = Package(
                 "WAT",
                 "WASTRunner",
             ],
+            exclude: ["ComponentModelFixtures"],
             swiftSettings: swiftSettings
         ),
 

@@ -29,6 +29,10 @@ package struct Encoder {
         output.append(contentsOf: contentEncoder.output)
     }
 
+    mutating func append<T: RawRepresentable<UInt8>>(_ value: T) {
+        output.append(value.rawValue)
+    }
+
     mutating func section<E: Error>(
         id: UInt8,
         placement: CustomSectionDecl.SectionKind,

@@ -219,34 +219,25 @@
         /// Parse a core sort discriminator.
         mutating func parseCoreSort() throws(WasmParserError) -> CoreDefSort {
             let byte = try stream.consumeAny()
-            switch byte {
-            case 0x00: return .func
-            case 0x01: return .table
-            case 0x02: return .memory
-            case 0x03: return .global
-            case 0x04: return .tag
-            case 0x10: return .type
-            case 0x11: return .module
-            case 0x12: return .instance
-            default:
+            guard let sort = CoreDefSort(rawValue: byte) else {
                 throw makeUnexpectedByteError(byte, for: "core sort")
             }
+            return sort
         }
 
         /// Parse a component sort discriminator.
         mutating func parseSort() throws(WasmParserError) -> ComponentDefSort {
             let byte = try stream.consumeAny()
-            switch byte {
-            case 0x00:
-                let coreSort = try parseCoreSort()
-                return .core(coreSort)
-            case 0x01: return .func
-            case 0x02: return .value
-            case 0x03: return .type
-            case 0x04: return .component
-            case 0x05: return .instance
-            default:
+            guard let sort = ComponentSortOpcode(rawValue: byte) else {
                 throw makeUnexpectedByteError(byte, for: "component sort")
+            }
+            switch sort {
+            case .core: return .core(try parseCoreSort())
+            case .function: return .func
+            case .value: return .value
+            case .type: return .type
+            case .component: return .component
+            case .instance: return .instance
             }
         }
 
@@ -292,7 +283,10 @@
             // or multi-byte with high bit set [0x80, 0xFF].
             if byte >= 0x64 && byte <= 0x7F {
                 let opcode = try stream.consumeAny()
-                return try .primitive(parsePrimValTypeFromOpcode(opcode))
+                guard let primitive = ComponentPrimValType(rawValue: opcode) else {
+                    throw makeError(.malformedValueType(opcode))
+                }
+                return .primitive(primitive)
             } else {
                 let idx: UInt32 = try parseUnsigned()
                 return .index(ComponentTypeIndex(rawValue: Int(idx)))
@@ -302,7 +296,7 @@
         /// Parse an optional value type.
         mutating func parseOptionalValType() throws(WasmParserError) -> ComponentValType? {
             let present = try stream.consumeAny()
-            if present == 0x00 {
+            if present == OptionalMarker.absent.rawValue {
                 return nil
             } else {
                 return try parseValType()
@@ -324,8 +318,8 @@
             let opcode = try stream.consumeAny()
 
             // Primitive types (0x73...0x7f and 0x64 are not in CompositeValTypeOpcode)
-            if PrimitiveValTypeOpcode(rawValue: opcode) != nil {
-                return try .primitive(parsePrimValTypeFromOpcode(opcode))
+            if let primitive = ComponentPrimValType(rawValue: opcode) {
+                return .primitive(primitive)
             }
 
             guard let compositeType = CompositeValTypeOpcode(rawValue: opcode) else {
@@ -345,7 +339,7 @@
                     let name = try p.stream.parseName()
                     let valType = try p.parseOptionalValType()
                     let terminator = try p.stream.consumeAny()
-                    guard terminator == 0x00 else {
+                    guard terminator == OptionalMarker.absent.rawValue else {
                         throw p.makeUnexpectedByteError(terminator, for: "variant case terminator")
                     }
                     return ComponentCaseField(name: name, type: valType)
@@ -398,58 +392,35 @@
             }
         }
 
-        /// Parse a primitive value type from an already-consumed opcode.
-        func parsePrimValTypeFromOpcode(_ opcode: UInt8) throws(WasmParserError) -> ComponentPrimValType {
-            guard let type = PrimitiveValTypeOpcode(rawValue: opcode) else {
-                throw makeError(.malformedValueType(opcode))
-            }
-
-            switch type {
-            case .bool: return .bool
-            case .s8: return .s8
-            case .u8: return .u8
-            case .s16: return .s16
-            case .u16: return .u16
-            case .s32: return .s32
-            case .u32: return .u32
-            case .s64: return .s64
-            case .u64: return .u64
-            case .float32: return .float32
-            case .float64: return .float64
-            case .char: return .char
-            case .string: return .string
-            case .errorContext: return .errorContext
-            }
-        }
-
         /// Parse an extern descriptor.
         mutating func parseExternDesc() throws(WasmParserError) -> ComponentExternDesc {
             let byte = try stream.consumeAny()
-            switch byte {
-            case 0x00:
+            guard let kind = ExternDescKind(rawValue: byte) else {
+                throw makeUnexpectedByteError(byte, for: "extern descriptor")
+            }
+            switch kind {
+            case .coreModule:
                 let moduleMarker = try stream.consumeAny()
-                guard moduleMarker == 0x11 else {
+                guard moduleMarker == CoreDefSort.module.rawValue else {
                     throw makeUnexpectedByteError(moduleMarker, for: "core module extern descriptor")
                 }
                 let idx: UInt32 = try parseUnsigned()
                 return .coreModule(typeIndex: idx)
-            case 0x01:
+            case .function:
                 let idx: UInt32 = try parseUnsigned()
                 return .function(typeIndex: idx)
-            case 0x02:
+            case .value:
                 let bound = try parseValueBound()
                 return .value(bound)
-            case 0x03:
+            case .type:
                 let bound = try parseTypeBound()
                 return .type(bound)
-            case 0x04:
+            case .component:
                 let idx: UInt32 = try parseUnsigned()
                 return .component(typeIndex: idx)
-            case 0x05:
+            case .instance:
                 let idx: UInt32 = try parseUnsigned()
                 return .instance(typeIndex: idx)
-            default:
-                throw makeUnexpectedByteError(byte, for: "extern descriptor")
             }
         }
 
@@ -471,14 +442,15 @@
         /// Parse a type bound.
         mutating func parseTypeBound() throws(WasmParserError) -> ComponentTypeBound {
             let byte = try stream.consumeAny()
-            switch byte {
-            case 0x00:
+            guard let bound = TypeBoundOpcode(rawValue: byte) else {
+                throw makeUnexpectedByteError(byte, for: "type bound")
+            }
+            switch bound {
+            case .eq:
                 let idx: UInt32 = try parseUnsigned()
                 return .eq(typeIndex: idx)
-            case 0x01:
+            case .subResource:
                 return .subResource
-            default:
-                throw makeUnexpectedByteError(byte, for: "type bound")
             }
         }
 
@@ -529,20 +501,23 @@
         mutating func parseCoreInstanceSection() throws(WasmParserError) -> [CoreInstanceDefinition] {
             try parseVector { p throws(WasmParserError) -> CoreInstanceDefinition in
                 let kind = try p.stream.consumeAny()
-                switch kind {
-                case 0x00:
+                guard let form = InstanceForm(rawValue: kind) else {
+                    throw p.makeUnexpectedByteError(kind, for: "core instance")
+                }
+                switch form {
+                case .instantiate:
                     let moduleIdx: UInt32 = try p.parseUnsigned()
                     let args = try p.parseVector { q throws(WasmParserError) -> CoreInstantiateArg in
                         let name = try q.stream.parseName()
                         let marker = try q.stream.consumeAny()
-                        guard marker == 0x12 else {
+                        guard marker == CoreDefSort.instance.rawValue else {
                             throw q.makeUnexpectedByteError(marker, for: "core instantiate argument")
                         }
                         let instanceIdx: UInt32 = try q.parseUnsigned()
                         return CoreInstantiateArg(name: name, instanceIndex: instanceIdx)
                     }
                     return .instantiate(moduleIndex: moduleIdx, args: args)
-                case 0x01:
+                case .inlineExports:
                     let exports = try p.parseVector { q throws(WasmParserError) -> CoreInlineExport in
                         let name = try q.stream.parseName()
                         let sort = try q.parseCoreSort()
@@ -550,8 +525,6 @@
                         return CoreInlineExport(name: name, sort: sort, index: idx)
                     }
                     return .exports(exports)
-                default:
-                    throw p.makeUnexpectedByteError(kind, for: "core instance")
                 }
             }
         }
@@ -560,8 +533,11 @@
         mutating func parseInstanceSection() throws(WasmParserError) -> [ComponentInstanceDefinition] {
             try parseVector { p throws(WasmParserError) -> ComponentInstanceDefinition in
                 let kind = try p.stream.consumeAny()
-                switch kind {
-                case 0x00:
+                guard let form = InstanceForm(rawValue: kind) else {
+                    throw p.makeUnexpectedByteError(kind, for: "component instance")
+                }
+                switch form {
+                case .instantiate:
                     let componentIdx: UInt32 = try p.parseUnsigned()
                     let args = try p.parseVector { q throws(WasmParserError) -> ComponentInstantiateArg in
                         let name = try q.stream.parseName()
@@ -569,43 +545,20 @@
                         return ComponentInstantiateArg(name: name, sort: sort, index: idx)
                     }
                     return .instantiate(componentIndex: componentIdx, args: args)
-                case 0x01:
+                case .inlineExports:
                     let exports = try p.parseVector { q throws(WasmParserError) -> ComponentInlineExport in
                         let name = try q.parseImportExportName()
                         let (sort, idx) = try q.parseSortIdx()
                         return ComponentInlineExport(name: name, sort: sort, index: idx)
                     }
                     return .exports(exports)
-                default:
-                    throw p.makeUnexpectedByteError(kind, for: "component instance")
                 }
             }
         }
 
         /// Parse alias section (section 6).
         mutating func parseAliasSection() throws(WasmParserError) -> [ComponentAlias] {
-            try parseVector { p throws(WasmParserError) -> ComponentAlias in
-                let sort = try p.parseSort()
-                let targetKind = try p.stream.consumeAny()
-                let target: ComponentAliasTarget
-                switch targetKind {
-                case 0x00:
-                    let instanceIdx: UInt32 = try p.parseUnsigned()
-                    let name = try p.stream.parseName()
-                    target = .export(instanceIndex: instanceIdx, name: name)
-                case 0x01:
-                    let instanceIdx: UInt32 = try p.parseUnsigned()
-                    let name = try p.stream.parseName()
-                    target = .coreExport(instanceIndex: instanceIdx, name: name)
-                case 0x02:
-                    let count: UInt32 = try p.parseUnsigned()
-                    let idx: UInt32 = try p.parseUnsigned()
-                    target = .outer(count: count, index: idx)
-                default:
-                    throw p.makeUnexpectedByteError(targetKind, for: "alias target")
-                }
-                return ComponentAlias(sort: sort, target: target)
-            }
+            try parseVector { p throws(WasmParserError) -> ComponentAlias in try p.parseSingleAlias() }
         }
 
         /// Parse type section (section 7).
@@ -626,27 +579,27 @@
             }
 
             let opcode = try stream.consumeAny()
-            switch opcode {
-            case 0x40:  // functype
+            switch DefinedTypeOpcode(rawValue: opcode) {
+            case .funcSync?:
                 return try parseFuncTypeBody(isAsync: false)
 
-            case 0x43 where features.contains(.componentModelAsync):  // func async
+            case .funcAsync? where features.contains(.componentModelAsync):
                 return try parseFuncTypeBody(isAsync: true)
 
-            case 0x41:  // componenttype
+            case .componentType?:
                 let decls = try parseVector { p throws(WasmParserError) -> ComponentOrInstanceDecl in
                     try p.parseComponentOrInstanceDecl(isComponent: true)
                 }
                 return .component(ComponentTypeDecl(declarations: decls))
 
-            case 0x42:  // instancetype
+            case .instanceType?:
                 let decls = try parseVector { p throws(WasmParserError) -> InstanceDecl in try p.parseInstanceDeclOnly() }
                 return .instance(InstanceTypeDecl(declarations: decls))
 
-            case 0x3f:  // resourcetype
+            case .resourceSync?:
                 _ = try stream.consumeAny()  // 0x7f rep type marker
                 let hasDtor = try stream.consumeAny()
-                let dtor: UInt32? = hasDtor == 0x01 ? try parseUnsigned() : nil
+                let dtor: UInt32? = hasDtor == OptionalMarker.present.rawValue ? try parseUnsigned() : nil
                 return .resource(destructor: dtor)
 
             default:
@@ -671,24 +624,26 @@
         /// and the `task.return` async canon op. Non-zero named-result counts are rejected.
         mutating func parseResultList() throws(WasmParserError) -> ComponentDefValType? {
             let resultKind = try stream.consumeAny()
-            if resultKind == 0x00 {
+            guard let marker = ResultMarker(rawValue: resultKind) else {
+                throw makeUnexpectedByteError(resultKind, for: "component function results")
+            }
+            switch marker {
+            case .hasResult:
                 return try .inlined(parseValType())
-            } else if resultKind == 0x01 {
+            case .namedResults:
                 let count: UInt32 = try parseUnsigned()
                 if count != 0 {
                     throw makeError(.init("named results must be empty, got count \(count)"))
                 }
                 return nil
-            } else {
-                throw makeUnexpectedByteError(resultKind, for: "component function results")
             }
         }
 
         /// Parse component or instance declaration.
         mutating func parseComponentOrInstanceDecl(isComponent: Bool) throws(WasmParserError) -> ComponentOrInstanceDecl {
             let kind = try stream.consumeAny()
-            switch kind {
-            case 0x03 where isComponent:
+            switch TypeDeclTag(rawValue: kind) {
+            case .import? where isComponent:
                 let name = try parseImportExportName()
                 let externDesc = try parseExternDesc()
                 return .importDecl(ComponentImportDecl(name: name, externDesc: externDesc))
@@ -706,21 +661,17 @@
 
         /// Parse instance declaration from kind byte.
         mutating func parseInstanceDecl(fromKind kind: UInt8) throws(WasmParserError) -> InstanceDecl {
-            switch kind {
-            case 0x00:
-                // core type
+            switch TypeDeclTag(rawValue: kind) {
+            case .coreType?:
                 let coreType = try parseCoreTypeDef()
                 return .coreType(coreType)
-            case 0x01:
-                // type
+            case .type?:
                 let typeDef = try parseTypeDef()
                 return .type(typeDef)
-            case 0x02:
-                // alias
+            case .alias?:
                 let alias = try parseSingleAlias()
                 return .alias(alias)
-            case 0x04:
-                // export decl
+            case .export?:
                 let name = try parseImportExportName()
                 let externDesc = try parseExternDesc()
                 return .exportDecl(ComponentExportDecl(name: name, externDesc: externDesc))
@@ -729,26 +680,26 @@
             }
         }
 
-        /// Parse a single alias (not in a vector).
         mutating func parseSingleAlias() throws(WasmParserError) -> ComponentAlias {
             let sort = try parseSort()
             let targetKind = try stream.consumeAny()
+            guard let targetOpcode = AliasTargetOpcode(rawValue: targetKind) else {
+                throw makeUnexpectedByteError(targetKind, for: "alias target")
+            }
             let target: ComponentAliasTarget
-            switch targetKind {
-            case 0x00:
+            switch targetOpcode {
+            case .export:
                 let instanceIdx: UInt32 = try parseUnsigned()
                 let name = try stream.parseName()
                 target = .export(instanceIndex: instanceIdx, name: name)
-            case 0x01:
+            case .coreExport:
                 let instanceIdx: UInt32 = try parseUnsigned()
                 let name = try stream.parseName()
                 target = .coreExport(instanceIndex: instanceIdx, name: name)
-            case 0x02:
+            case .outer:
                 let count: UInt32 = try parseUnsigned()
                 let idx: UInt32 = try parseUnsigned()
                 target = .outer(count: count, index: idx)
-            default:
-                throw makeUnexpectedByteError(targetKind, for: "alias target")
             }
             return ComponentAlias(sort: sort, target: target)
         }
@@ -756,12 +707,12 @@
         /// Parse a core type definition.
         mutating func parseCoreTypeDef() throws(WasmParserError) -> CoreTypeDef {
             let byte = try stream.peek() ?? 0
-            if byte == 0x50 {
+            if byte == DefinedTypeOpcode.coreModule.rawValue {
                 _ = try stream.consumeAny()
                 // Module type
                 let decls = try parseVector { p throws(WasmParserError) -> CoreModuleDecl in try p.parseCoreModuleDecl() }
                 return .module(CoreModuleType(declarations: decls))
-            } else if byte == 0x60 {
+            } else if byte == DefinedTypeOpcode.coreFunc.rawValue {
                 // Function type
                 _ = try stream.consumeAny()
                 let params = try parseVector { p throws(WasmParserError) -> ValueType in try p.parseCoreValueType() }
@@ -881,10 +832,10 @@
         mutating func parseCanonSection() throws(WasmParserError) -> [CanonicalDefinition] {
             try parseVector { p throws(WasmParserError) -> CanonicalDefinition in
                 let kind = try p.stream.consumeAny()
-                switch kind {
-                case 0x00:
+                switch CanonOpcode(rawValue: kind) {
+                case .lift?:
                     let sortMarker = try p.stream.consumeAny()
-                    guard sortMarker == 0x00 else {
+                    guard sortMarker == CoreDefSort.func.rawValue else {
                         throw p.makeUnexpectedByteError(sortMarker, for: "canon core function sort")
                     }
                     let funcIdx: UInt32 = try p.parseUnsigned()
@@ -892,36 +843,32 @@
                     let typeIdx: UInt32 = try p.parseUnsigned()
                     return .lift(coreFuncIndex: funcIdx, options: opts, typeIndex: typeIdx)
 
-                case 0x01:
+                case .lower?:
                     let sortMarker = try p.stream.consumeAny()
-                    guard sortMarker == 0x00 else {
+                    guard sortMarker == CoreDefSort.func.rawValue else {
                         throw p.makeUnexpectedByteError(sortMarker, for: "canon core function sort")
                     }
                     let funcIdx: UInt32 = try p.parseUnsigned()
                     let opts = try p.parseCanonicalOptions()
                     return .lower(funcIndex: funcIdx, options: opts)
 
-                case 0x02:
+                case .resourceNew?:
                     let typeIdx: UInt32 = try p.parseUnsigned()
                     return .resourceNew(typeIndex: typeIdx)
 
-                case 0x03:
+                case .resourceDrop?:
                     let typeIdx: UInt32 = try p.parseUnsigned()
                     return .resourceDrop(typeIndex: typeIdx)
 
-                case 0x04:
+                case .resourceRep?:
                     let typeIdx: UInt32 = try p.parseUnsigned()
                     return .resourceRep(typeIndex: typeIdx)
 
-                case let opcodeByte
-                where p.features.contains(.componentModelAsync)
-                    && CanonOpcode(rawValue: opcodeByte)?.isSupportedAsyncBuiltin == true:
-                    let opcode = CanonOpcode(rawValue: opcodeByte)!
+                case let opcode? where p.features.contains(.componentModelAsync) && opcode.isSupportedAsyncBuiltin:
                     let immediates = try p.parseAsyncCanonicalImmediates(for: opcode)
                     return .asyncBuiltin(AsyncCanonicalBuiltin(opcode: opcode, immediates: immediates))
 
                 default:
-                    // Skip other canon builtins for now
                     throw p.makeUnexpectedByteError(kind, for: "canon definition")
                 }
             }
@@ -1007,18 +954,14 @@
             try parseVector { p throws(WasmParserError) -> ComponentExportDef in
                 let name = try p.parseImportExportName()
                 let (sort, idx) = try p.parseSortIdx()
-                // Parse optional extern desc
-                // The presence flag is always consumed:
-                // 0x00 = no extern desc present
-                // 0x01 = extern desc present (followed by the extern desc)
                 let marker = try p.stream.consumeAny()
-                let externDesc: ComponentExternDesc?
-                if marker == 0x00 {
-                    externDesc = nil
-                } else if marker == 0x01 {
-                    externDesc = try p.parseExternDesc()
-                } else {
+                guard let ascription = OptionalMarker(rawValue: marker) else {
                     throw p.makeUnexpectedByteError(marker, for: "export type ascription")
+                }
+                let externDesc: ComponentExternDesc?
+                switch ascription {
+                case .absent: externDesc = nil
+                case .present: externDesc = try p.parseExternDesc()
                 }
                 return ComponentExportDef(name: name, sort: sort, index: idx, externDesc: externDesc)
             }

@@ -55,15 +55,16 @@ package struct CoreModuleIndex: Hashable {
     package let rawValue: UInt32
 }
 
-package enum CoreDefSort: String {
-    case `func`
-    case table
-    case memory
-    case global
-    case tag
-    case type
-    case module
-    case instance
+/// The raw value is the `core:sort` byte of the binary format.
+package enum CoreDefSort: UInt8 {
+    case `func` = 0x00
+    case table = 0x01
+    case memory = 0x02
+    case global = 0x03
+    case tag = 0x04
+    case type = 0x10
+    case module = 0x11
+    case instance = 0x12
 }
 
 package enum ComponentDefSort {
@@ -77,21 +78,21 @@ package enum ComponentDefSort {
 
 /// Primitive value types that can be encoded inline in valtypes.
 /// Corresponds to `primvaltype` in the Component Model binary spec.
-package enum ComponentPrimValType: Hashable {
-    case bool
-    case s8
-    case s16
-    case s32
-    case s64
-    case u8
-    case u16
-    case u32
-    case u64
-    case float32
-    case float64
-    case char
-    case string
-    case errorContext
+package enum ComponentPrimValType: UInt8, Hashable {
+    case bool = 0x7f
+    case s8 = 0x7e
+    case s16 = 0x7c
+    case s32 = 0x7a
+    case s64 = 0x78
+    case u8 = 0x7d
+    case u16 = 0x7b
+    case u32 = 0x79
+    case u64 = 0x77
+    case float32 = 0x76
+    case float64 = 0x75
+    case char = 0x74
+    case string = 0x73
+    case errorContext = 0x64
 }
 
 /// A value type reference: either a type index or an inline primitive.
@@ -151,6 +152,22 @@ package enum ComponentDefValType: Hashable {
         }
 
         return true
+    }
+
+    package var index: ComponentTypeIndex? {
+        guard case .inlined(.index(let idx)) = self else { return nil }
+
+        return idx
+    }
+
+    /// Returns `index`, or the result of `create` when this type has none. `??` would rethrow as
+    /// `any Error` and lose the typed throw.
+    package func getOrCreateIndex<E: Error>(create: () throws(E) -> ComponentTypeIndex) throws(E) -> ComponentTypeIndex {
+        return if let index {
+            index
+        } else {
+            try create()
+        }
     }
 }
 

@@ -343,19 +343,19 @@
         ) throws {
             switch typeRepr {
             // Primitives
-            case .bool: encoder.output.append(PrimitiveValTypeOpcode.bool.rawValue)
-            case .s8: encoder.output.append(PrimitiveValTypeOpcode.s8.rawValue)
-            case .u8: encoder.output.append(PrimitiveValTypeOpcode.u8.rawValue)
-            case .s16: encoder.output.append(PrimitiveValTypeOpcode.s16.rawValue)
-            case .u16: encoder.output.append(PrimitiveValTypeOpcode.u16.rawValue)
-            case .s32: encoder.output.append(PrimitiveValTypeOpcode.s32.rawValue)
-            case .u32: encoder.output.append(PrimitiveValTypeOpcode.u32.rawValue)
-            case .s64: encoder.output.append(PrimitiveValTypeOpcode.s64.rawValue)
-            case .u64: encoder.output.append(PrimitiveValTypeOpcode.u64.rawValue)
-            case .float32: encoder.output.append(PrimitiveValTypeOpcode.float32.rawValue)
-            case .float64: encoder.output.append(PrimitiveValTypeOpcode.float64.rawValue)
-            case .char: encoder.output.append(PrimitiveValTypeOpcode.char.rawValue)
-            case .string: encoder.output.append(PrimitiveValTypeOpcode.string.rawValue)
+            case .bool: encoder.output.append(ComponentPrimValType.bool.rawValue)
+            case .s8: encoder.output.append(ComponentPrimValType.s8.rawValue)
+            case .u8: encoder.output.append(ComponentPrimValType.u8.rawValue)
+            case .s16: encoder.output.append(ComponentPrimValType.s16.rawValue)
+            case .u16: encoder.output.append(ComponentPrimValType.u16.rawValue)
+            case .s32: encoder.output.append(ComponentPrimValType.s32.rawValue)
+            case .u32: encoder.output.append(ComponentPrimValType.u32.rawValue)
+            case .s64: encoder.output.append(ComponentPrimValType.s64.rawValue)
+            case .u64: encoder.output.append(ComponentPrimValType.u64.rawValue)
+            case .float32: encoder.output.append(ComponentPrimValType.float32.rawValue)
+            case .float64: encoder.output.append(ComponentPrimValType.float64.rawValue)
+            case .char: encoder.output.append(ComponentPrimValType.char.rawValue)
+            case .string: encoder.output.append(ComponentPrimValType.string.rawValue)
 
             // Named type reference
             case .name(let id):
@@ -363,8 +363,8 @@
                     encoder.writeUnsignedLEB128(idx)
                 } else {
                     switch id.text {
-                    case "f32": encoder.output.append(PrimitiveValTypeOpcode.float32.rawValue)
-                    case "f64": encoder.output.append(PrimitiveValTypeOpcode.float64.rawValue)
+                    case "f32": encoder.output.append(ComponentPrimValType.float32.rawValue)
+                    case "f64": encoder.output.append(ComponentPrimValType.float64.rawValue)
                     default:
                         throw Error.unsupportedFeature("unknown type reference: \(id.text)")
                     }
