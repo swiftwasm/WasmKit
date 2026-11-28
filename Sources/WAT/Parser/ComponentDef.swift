@@ -662,6 +662,22 @@
                 case resourceNew(Parser.IndexOrId)  // Type reference
                 case resourceDrop(Parser.IndexOrId)  // Type reference
                 case resourceRep(Parser.IndexOrId)  // Type reference
+                case asyncBuiltin(opcode: CanonOpcode, immediate: AsyncImmediate)
+            }
+
+            /// The immediates of an async canon built-in, in the shapes of `AsyncCanonicalImmediates`.
+            /// Type and table references stay unresolved until encoding.
+            enum AsyncImmediate {
+                case none
+                case type(Parser.IndexOrId)
+                case typeWithOptions(Parser.IndexOrId, options: [Option])
+                case typeWithAsyncFlag(Parser.IndexOrId, async: Bool)
+                case asyncFlag(Bool)
+                case cancellableFlag(Bool)
+                case cancellableWithMemory(Bool, memoryIndex: UInt32)
+                case resultListWithOptions(ComponentDefValType?, options: [Option])
+                case context(CanonicalContextValueType, slot: UInt32)
+                case typeWithTable(type: Parser.IndexOrId, table: Parser.IndexOrId)
             }
 
             let kind: Kind

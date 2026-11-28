@@ -91,6 +91,7 @@
                 case .resourceNew: return "canon resource.new"
                 case .resourceDrop: return "canon resource.drop"
                 case .resourceRep: return "canon resource.rep"
+                case .asyncBuiltin(let opcode, _): return "canon \(opcode)"
                 }
             case .componentStart:
                 return "start"
