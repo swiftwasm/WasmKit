@@ -50,9 +50,6 @@
             "wasmtime/strings.wast": [4, 40, 76],
             // The text parser does not support `refines` on variant cases.
             "wasm-tools/definedtypes.wast": [3],
-            // The text parser does not support `async` function types, `stream` and `future`
-            // types, or async canon built-ins.
-            "async/trap-on-reenter.wast": [4],
             // The text parser does not support shorthand forms: inline `import` and `export` on
             // components, core modules and instances, ids on exports, implicit outer aliases,
             // `(core func (alias ...))`, and export projections other than a single `(func $i "name")`.
@@ -75,7 +72,7 @@
             "wasmtime/tags.wast": [3],
         ]
 
-        static let features: WasmFeatureSet = WasmFeatureSet.all
+        static let features: WasmFeatureSet = WasmFeatureSet.all.union(.componentModelAsync)
 
         // MARK: - Encoding Tests
 
@@ -318,26 +315,26 @@
 
         @Test
         func nestedValueTypesWithinLimitAreAccepted() throws {
-            _ = try wat2wasm("(component (type \(nestedValueType(depth: 11))))")
+            _ = try wat2wasm("(component (type \(nestedValueType(depth: 10))))")
         }
 
         @Test
         func tooDeeplyNestedValueTypeIsRejected() throws {
             let error = #expect(throws: WatParserError.self) {
-                try wat2wasm("(component (type \(nestedValueType(depth: 12))))")
+                try wat2wasm("(component (type \(nestedValueType(depth: 11))))")
             }
             #expect(error?.message == "nesting too deep")
         }
 
         @Test
         func nestedInstanceTypesWithinLimitAreAccepted() throws {
-            _ = try wat2wasm("(component (type \(nestedInstanceType(depth: 10))))")
+            _ = try wat2wasm("(component (type \(nestedInstanceType(depth: 9))))")
         }
 
         @Test
         func tooDeeplyNestedInstanceTypeIsRejected() throws {
             let error = #expect(throws: WatParserError.self) {
-                try wat2wasm("(component (type \(nestedInstanceType(depth: 11))))")
+                try wat2wasm("(component (type \(nestedInstanceType(depth: 10))))")
             }
             #expect(error?.message == "nesting too deep")
         }

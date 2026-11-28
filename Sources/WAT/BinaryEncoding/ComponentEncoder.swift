@@ -424,8 +424,15 @@
                 try encodeValueType(param.type, encoder: &encoder, typeIndexMapping: typeIndexMapping)
             }
 
-            // Result
-            if let result = funcType.result {
+            try encodeResultList(funcType.result, encoder: &encoder, typeIndexMapping: typeIndexMapping)
+        }
+
+        private static func encodeResultList(
+            _ result: ComponentDefValType?,
+            encoder: inout Encoder,
+            typeIndexMapping: [Int: Int]
+        ) throws(WatParserError) {
+            if let result {
                 encoder.append(ResultMarker.hasResult)
                 try encodeValueType(result, encoder: &encoder, typeIndexMapping: typeIndexMapping)
             } else {
@@ -466,12 +473,7 @@
                 encoder.writeUnsignedLEB128(UInt32(cases.count))
                 for caseField in cases {
                     encoder.encode(caseField.name)
-                    if let caseType = caseField.type {
-                        encoder.append(OptionalMarker.present)
-                        try encodeInlinedValueType(caseType, encoder: &encoder, typeIndexMapping: typeIndexMapping)
-                    } else {
-                        encoder.append(OptionalMarker.absent)
-                    }
+                    try encodeOptionalValueType(caseField.type, encoder: &encoder, typeIndexMapping: typeIndexMapping)
                     encoder.append(OptionalMarker.absent)  // refines: none
                 }
             case .tuple(let types):
@@ -497,18 +499,8 @@
                 try encodeInlinedValueType(innerType, encoder: &encoder, typeIndexMapping: typeIndexMapping)
             case .result(let okType, let errType):
                 encoder.append(CompositeValTypeOpcode.result)
-                if let okType {
-                    encoder.append(OptionalMarker.present)
-                    try encodeInlinedValueType(okType, encoder: &encoder, typeIndexMapping: typeIndexMapping)
-                } else {
-                    encoder.append(OptionalMarker.absent)
-                }
-                if let errType {
-                    encoder.append(OptionalMarker.present)
-                    try encodeInlinedValueType(errType, encoder: &encoder, typeIndexMapping: typeIndexMapping)
-                } else {
-                    encoder.append(OptionalMarker.absent)
-                }
+                try encodeOptionalValueType(okType, encoder: &encoder, typeIndexMapping: typeIndexMapping)
+                try encodeOptionalValueType(errType, encoder: &encoder, typeIndexMapping: typeIndexMapping)
             case .resource(let destructor):
                 encoder.append(DefinedTypeOpcode.resourceSync)
                 encoder.encode(ValueType.i32)
@@ -518,8 +510,26 @@
                 } else {
                     encoder.append(OptionalMarker.absent)
                 }
-            case .stream, .future:
-                throw WatParserError("Component value type not yet supported: \(valueType)", location: nil)
+            case .stream(let element, let end):
+                guard end == nil else {
+                    throw WatParserError("binary `stream` type cannot encode a WIT `end` type", location: nil)
+                }
+                encoder.append(CompositeValTypeOpcode.stream)
+                try encodeOptionalValueType(element, encoder: &encoder, typeIndexMapping: typeIndexMapping)
+            case .future(let element):
+                encoder.append(CompositeValTypeOpcode.future)
+                try encodeOptionalValueType(element, encoder: &encoder, typeIndexMapping: typeIndexMapping)
+            }
+        }
+
+        private static func encodeOptionalValueType(
+            _ valType: ComponentValType?, encoder: inout Encoder, typeIndexMapping: [Int: Int]
+        ) throws(WatParserError) {
+            if let valType {
+                encoder.append(OptionalMarker.present)
+                try encodeInlinedValueType(valType, encoder: &encoder, typeIndexMapping: typeIndexMapping)
+            } else {
+                encoder.append(OptionalMarker.absent)
             }
         }
 
@@ -797,27 +807,23 @@
 
             case .resourceNew(let typeRef):
                 encoder.append(CanonOpcode.resourceNew)
-                let typeIndex = try component.resolveTypeIndex(use: typeRef)
-                guard let mappedIndex = typeIndexMapping[typeIndex] else {
-                    throw WatParserError("Unmapped type index \(typeIndex) in canon resource.new", location: nil)
-                }
-                encoder.writeUnsignedLEB128(UInt32(mappedIndex))
+                try encodeMappedTypeIndex(
+                    typeRef, in: "canon resource.new", encoder: &encoder, component: component, typeIndexMapping: typeIndexMapping)
 
             case .resourceDrop(let typeRef):
                 encoder.append(CanonOpcode.resourceDrop)
-                let typeIndex = try component.resolveTypeIndex(use: typeRef)
-                guard let mappedIndex = typeIndexMapping[typeIndex] else {
-                    throw WatParserError("Unmapped type index \(typeIndex) in canon resource.drop", location: nil)
-                }
-                encoder.writeUnsignedLEB128(UInt32(mappedIndex))
+                try encodeMappedTypeIndex(
+                    typeRef, in: "canon resource.drop", encoder: &encoder, component: component, typeIndexMapping: typeIndexMapping)
 
             case .resourceRep(let typeRef):
                 encoder.append(CanonOpcode.resourceRep)
-                let typeIndex = try component.resolveTypeIndex(use: typeRef)
-                guard let mappedIndex = typeIndexMapping[typeIndex] else {
-                    throw WatParserError("Unmapped type index \(typeIndex) in canon resource.rep", location: nil)
-                }
-                encoder.writeUnsignedLEB128(UInt32(mappedIndex))
+                try encodeMappedTypeIndex(
+                    typeRef, in: "canon resource.rep", encoder: &encoder, component: component, typeIndexMapping: typeIndexMapping)
+
+            case .asyncBuiltin(let opcode, let immediate):
+                encoder.append(opcode)
+                try encodeAsyncImmediate(
+                    immediate, encoder: &encoder, component: component, typeIndexMapping: typeIndexMapping)
             }
         }
 
@@ -874,6 +880,75 @@
                     }
                 }
             }
+        }
+
+        /// Encodes the immediates of an async canon built-in, the inverse of
+        /// `ComponentParser.parseAsyncCanonicalImmediates`.
+        private static func encodeAsyncImmediate(
+            _ immediate: ComponentWatParser.CanonDef.AsyncImmediate,
+            encoder: inout Encoder,
+            component: ComponentWatParser.ComponentDef,
+            typeIndexMapping: [Int: Int]
+        ) throws(WatParserError) {
+            switch immediate {
+            case .none:
+                break
+
+            case .type(let typeRef):
+                try encodeMappedTypeIndex(
+                    typeRef, in: "async canon op", encoder: &encoder, component: component, typeIndexMapping: typeIndexMapping)
+
+            case .typeWithOptions(let typeRef, let options):
+                try encodeMappedTypeIndex(
+                    typeRef, in: "async canon op", encoder: &encoder, component: component, typeIndexMapping: typeIndexMapping)
+                try encodeCanonOptions(options, encoder: &encoder, component: component)
+
+            case .typeWithAsyncFlag(let typeRef, let isAsync):
+                try encodeMappedTypeIndex(
+                    typeRef, in: "async canon op", encoder: &encoder, component: component, typeIndexMapping: typeIndexMapping)
+                encoder.encodeFlag(isAsync)
+
+            case .asyncFlag(let isAsync):
+                encoder.encodeFlag(isAsync)
+
+            case .cancellableFlag(let cancellable):
+                encoder.encodeFlag(cancellable)
+
+            case .cancellableWithMemory(let cancellable, let memoryIndex):
+                encoder.encodeFlag(cancellable)
+                encoder.writeUnsignedLEB128(memoryIndex)
+
+            case .resultListWithOptions(let result, let options):
+                try encodeResultList(result, encoder: &encoder, typeIndexMapping: typeIndexMapping)
+                try encodeCanonOptions(options, encoder: &encoder, component: component)
+
+            case .context(let valueType, let slot):
+                switch valueType {
+                case .i32: encoder.encode(ValueType.i32)
+                case .i64: encoder.encode(ValueType.i64)
+                }
+                encoder.writeUnsignedLEB128(slot)
+
+            case .typeWithTable(let typeRef, let tableRef):
+                let coreTypeIndex = try component.coreTypesMap.resolveIndex(use: typeRef)
+                encoder.writeUnsignedLEB128(UInt32(coreTypeIndex))
+                let tableIndex = try component.coreTablesMap.resolveIndex(use: tableRef)
+                encoder.writeUnsignedLEB128(UInt32(tableIndex))
+            }
+        }
+
+        private static func encodeMappedTypeIndex(
+            _ typeRef: Parser.IndexOrId,
+            in context: String,
+            encoder: inout Encoder,
+            component: ComponentWatParser.ComponentDef,
+            typeIndexMapping: [Int: Int]
+        ) throws(WatParserError) {
+            let typeIndex = try component.resolveTypeIndex(use: typeRef)
+            guard let mappedIndex = typeIndexMapping[typeIndex] else {
+                throw WatParserError("Unmapped type index \(typeIndex) in \(context)", location: nil)
+            }
+            encoder.writeUnsignedLEB128(UInt32(mappedIndex))
         }
 
         private static func encodeStart(
@@ -1233,6 +1308,10 @@
             case .component: append(ComponentSortOpcode.component)
             case .instance: append(ComponentSortOpcode.instance)
             }
+        }
+
+        fileprivate mutating func encodeFlag(_ flag: Bool) {
+            output.append(flag ? 0x01 : 0x00)
         }
 
         /// Encode a sort name map subsection (subsection id 1) for the component name section.

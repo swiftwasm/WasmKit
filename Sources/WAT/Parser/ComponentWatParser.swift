@@ -77,8 +77,9 @@
         }
 
         private static let maxComponentNestingDepth = 100
-        /// A debug build with AddressSanitizer uses up to 33 KB of stack per level, and a Swift task thread has 512 KB.
-        private static let maxTypeNestingDepth = 10
+        /// A debug build with AddressSanitizer uses up to 36 KB of stack per level plus about 40 KB below the first
+        /// level, and a Swift task thread has 512 KB. At this limit, three more levels would still fit.
+        private static let maxTypeNestingDepth = 9
 
         /// Enters one level of type nesting. The caller decrements `typeNestingDepth` when it leaves the level.
         private mutating func enterTypeNesting(_ parser: inout Parser) throws(WatParserError) {
@@ -335,9 +336,13 @@
             case "func":
                 // Handle function imports with inline type or type reference
                 let funcId = try parser.takeId()
+                let isAsync = try takeAsyncKeyword(&parser)
 
                 // Check for (type $ref) shorthand first
                 if try parser.takeParenBlockStart("type") {
+                    guard !isAsync else {
+                        throw WatParserError("async cannot be combined with a type reference", location: parser.lexer.location())
+                    }
                     let typeRef = try parser.expectIndexOrId()
                     try parser.expect(.rightParen)  // Close (type ...)
                     try parser.expect(.rightParen)  // Close (func ...)
@@ -377,7 +382,7 @@
                 // Create function type
                 // Always create a fresh type for each import's inline function type.
                 // wasm-tools does not deduplicate inline types created by import desugaring.
-                let funcType = ComponentFuncType(params: params, result: resultType)
+                let funcType = ComponentFuncType(params: params, result: resultType, isAsync: isAsync)
                 let funcTypeDef = ComponentTypeDef(id: nil, kind: .function(funcType))
 
                 let funcTypeIndex = try currentComponent.typeIndexSpace.addDefinition(funcTypeDef)
@@ -581,6 +586,7 @@
                 switch annotKeyword {
                 case "func":
                     // Parse inline function type annotation
+                    let isAsync = try takeAsyncKeyword(&parser)
                     var params: [ComponentFuncType.Param] = []
                     var resultType: ComponentDefValType?
                     while try parser.takeParenBlockStart("param") {
@@ -596,7 +602,7 @@
                     try parser.expect(.rightParen)
                     // Extract composite value types (own, borrow, etc.) from the
                     // annotation function type into separate type definitions
-                    let rawFuncType = ComponentFuncType(params: params, result: resultType)
+                    let rawFuncType = ComponentFuncType(params: params, result: resultType, isAsync: isAsync)
                     let funcType = try extractAnnotationFuncTypeComposites(rawFuncType)
                     let typeDef = ComponentTypeDef(id: nil, kind: .function(funcType))
                     let typeIndex = try currentComponent.typeIndexSpace.addDefinition(typeDef)
@@ -680,7 +686,7 @@
         }
 
         /// Parses the rest of a canon definition that produces a core function, after its operation
-        /// keyword (`lower`, `resource.new`, `resource.drop` or `resource.rep`),
+        /// keyword (`lower`, `resource.new`, `resource.drop`, `resource.rep` or an async built-in),
         /// then registers the core function and appends the canon definition.
         private mutating func parseCoreFuncCanon(
             _ parser: inout Parser,
@@ -706,7 +712,10 @@
             case "resource.rep":
                 kind = .resourceRep(try parser.expectIndexOrId())
             default:
-                throw WatParserError("Unknown canon operation '\(operation)'", location: parser.lexer.location())
+                guard features.contains(.componentModelAsync), let opcode = asyncCanonOpcode(forToken: operation) else {
+                    throw WatParserError("Unknown canon operation '\(operation)'", location: parser.lexer.location())
+                }
+                kind = .asyncBuiltin(opcode: opcode, immediate: try parseAsyncCanonImmediate(opcode, &parser, location: location))
             }
 
             let coreFuncId: Name?
@@ -771,6 +780,7 @@
             try parser.expect(.leftParen)
             try parser.expectKeyword("func")
             let funcId = try parser.takeId()
+            let isAsync = try takeAsyncKeyword(&parser)
             var parameters = [ComponentFuncType.Param]()
             var resultType: ComponentDefValType?
             var existingTypeRef: Int?
@@ -782,6 +792,9 @@
                 case "result":
                     resultType = try parseComponentValueType(&parser)
                 case "type":
+                    guard !isAsync else {
+                        throw WatParserError("async cannot be combined with a type reference", location: parser.lexer.location())
+                    }
                     let typeRef = try parser.expectIndexOrId()
                     existingTypeRef = try currentComponent.resolveTypeIndex(use: typeRef)
                 default:
@@ -794,7 +807,7 @@
             }
             try parser.expect(.rightParen)
 
-            let typeIndex = try functionTypeIndex(existing: existingTypeRef, ComponentFuncType(params: parameters, result: resultType))
+            let typeIndex = try functionTypeIndex(existing: existingTypeRef, ComponentFuncType(params: parameters, result: resultType, isAsync: isAsync))
             try emitCanonLift(lift, typeIndex: typeIndex)
             _ = try currentComponent.componentFunctions.add(
                 ComponentFuncDef(id: funcId, paramNames: parameters.map(\.name), type: ComponentTypeIndex(rawValue: typeIndex))
@@ -1078,13 +1091,14 @@
 
                 switch typeKeyword {
                 case "func":
+                    let isAsync = try takeAsyncKeyword(&parser)
                     let params = try parseFuncParams(&parser)
                     var resultType: ComponentDefValType?
                     if try parser.takeParenBlockStart("result") {
                         resultType = try parseComponentValueType(&parser)
                         try parser.expect(.rightParen)
                     }
-                    kind = .function(ComponentFuncType(params: params, result: resultType))
+                    kind = .function(ComponentFuncType(params: params, result: resultType, isAsync: isAsync))
                     try parser.expect(.rightParen)
 
                 case "instance":
@@ -1098,7 +1112,7 @@
                     try parser.expect(.rightParen)
 
                 case "record", "variant", "flags", "enum", "list", "tuple", "option", "result",
-                    "own", "borrow":
+                    "own", "borrow", "stream", "future":
                     let valueType = try parseCompositeValueTypeBody(
                         keyword: typeKeyword, &parser,
                         recurse: { (p: inout ComponentWatParser, parser: inout Parser) throws(WatParserError) -> ComponentDefValType in
@@ -1955,6 +1969,27 @@
                 try parser.expect(.rightParen)
                 return .borrow(ResourceTypeIndex(rawValue: Int(resourceTypeIndex.rawValue)))
 
+            case "stream", "future":
+                guard features.contains(.componentModelAsync) else {
+                    throw WatParserError(
+                        "Unsupported type definition keyword \(keyword)",
+                        location: parser.lexer.location()
+                    )
+                }
+                let elementLocation = parser.lexer.location()
+                var element: ComponentValType? = nil
+                if try !parser.take(.rightParen) {
+                    element = try toInlined(&self, recurse(&self, &parser))
+                    try parser.expect(.rightParen)
+                }
+                if keyword == "stream", case .primitive(.char)? = element {
+                    throw WatParserError(
+                        "(stream char) is not a valid stream element type",
+                        location: elementLocation
+                    )
+                }
+                return keyword == "stream" ? .stream(element: element, end: nil) : .future(element)
+
             default:
                 throw WatParserError(
                     "Unexpected composite component type keyword `\(keyword)`",
@@ -2106,6 +2141,7 @@
 
                 case "func":
                     // Parse inline function type: (func (param ...) (result ...))
+                    let isAsync = try takeAsyncKeyword(&parser)
                     let params = try parseLocalFuncParams(&parser, context: &localCtx)
                     var resultType: ComponentDefValType?
                     if try parser.takeParenBlockStart("result") {
@@ -2115,12 +2151,12 @@
                     try parser.expect(.rightParen)
                     // Extract composite value types into separate type definitions
                     let funcType = localCtx.extractFuncTypeComposites(
-                        ComponentFuncType(params: params, result: resultType))
+                        ComponentFuncType(params: params, result: resultType, isAsync: isAsync))
                     return .function(funcType)
 
                 // Handle composite value types via shared parser
                 case "list", "tuple", "option", "result", "record", "variant",
-                    "flags", "enum", "own", "borrow":
+                    "flags", "enum", "own", "borrow", "stream", "future":
                     let valueType = try parseCompositeValueTypeBody(
                         keyword: keyword, &parser,
                         recurse: { (p: inout ComponentWatParser, parser: inout Parser) throws(WatParserError) -> ComponentDefValType in
@@ -2382,10 +2418,14 @@
 
             case "func":
                 let funcId = try parser.takeId()
+                let isAsync = try takeAsyncKeyword(&parser)
                 // Parse optional type reference or inline function type
                 var typeIndex: UInt32? = nil
                 if try parser.takeParenBlockStart("type") {
                     // (type INDEX) - explicit type reference
+                    guard !isAsync else {
+                        throw WatParserError("async cannot be combined with a type reference", location: parser.lexer.location())
+                    }
                     let typeRef = try parser.expectIndexOrId()
                     typeIndex = try resolveTypeRefInLocalContext(typeRef, localCtx: &localCtx)
                     try parser.expect(.rightParen)
@@ -2400,7 +2440,7 @@
                     // Extract composite value types (own, borrow, tuple, etc.) into
                     // separate type definitions before the function type
                     let funcType = localCtx.extractFuncTypeComposites(
-                        ComponentFuncType(params: params, result: resultType))
+                        ComponentFuncType(params: params, result: resultType, isAsync: isAsync))
                     let funcTypeDef = ComponentTypeDef(id: nil, kind: .function(funcType))
                     let idx = localCtx.addInlineType(funcTypeDef)
                     typeIndex = idx
@@ -2408,7 +2448,7 @@
                 // If no explicit type reference and no inline type, create empty function type
                 // This handles cases like (export "f" (func)) which need an anonymous (func) type
                 if typeIndex == nil {
-                    let emptyFuncType = ComponentFuncType(params: [], result: nil)
+                    let emptyFuncType = ComponentFuncType(params: [], result: nil, isAsync: isAsync)
                     let funcTypeDef = ComponentTypeDef(id: nil, kind: .function(emptyFuncType))
                     let idx = localCtx.addInlineType(funcTypeDef)
                     typeIndex = idx
@@ -2543,6 +2583,7 @@
             var importDef: (location: Location, importModule: String, importName: String)?
             var canonLift: CanonLift?
             var existingTypeRef: Int?  // When (type $ref) is used instead of inline params/result
+            var asyncLocation: Location?
 
             /// Component functions are not tracked as separate entities in the final binary, i.e. there's no dedicated
             /// component functions section in the binary format. They're always encoded as a part of following
@@ -2550,6 +2591,16 @@
             /// What looks like a function definition in component WAT `(func ...)` always desugars into one or
             /// more definitions in those sections.
             while true {
+                if try takeAsyncKeyword(&parser) {
+                    guard asyncLocation == nil, parameters.isEmpty, resultType == nil, canonLift == nil else {
+                        throw WatParserError(
+                            "async must appear once, before the function's params, result and canon lift",
+                            location: parser.lexer.location()
+                        )
+                    }
+                    asyncLocation = parser.lexer.location()
+                    continue
+                }
                 guard try parser.take(.leftParen) else { break }
                 let keyword = try parser.expectKeyword()
                 switch keyword {
@@ -2590,6 +2641,9 @@
 
                 case "alias":
                     // (alias export $inst "name"): func defined entirely by alias
+                    if let asyncLocation {
+                        throw WatParserError("async cannot be combined with an alias", location: asyncLocation)
+                    }
                     let aliasKeyword = try parser.expectKeyword()
                     guard aliasKeyword == "export" else {
                         throw WatParserError(
@@ -2631,10 +2685,14 @@
                 try parser.expect(.rightParen)
             }
 
+            if let asyncLocation, existingTypeRef != nil {
+                throw WatParserError("async cannot be combined with a type reference", location: asyncLocation)
+            }
+
             // Order: type -> core func alias -> option aliases -> canon -> export
             let typeIndex = try functionTypeIndex(
                 existing: existingTypeRef,
-                ComponentFuncType(params: parameters, result: resultType)
+                ComponentFuncType(params: parameters, result: resultType, isAsync: asyncLocation != nil)
             )
             if let canonLift {
                 try emitCanonLift(canonLift, typeIndex: typeIndex)
@@ -2817,14 +2875,7 @@
             for (i, option) in options.enumerated() {
                 switch option {
                 case .memory(let memRef):
-                    switch memRef {
-                    case .direct(let ref):
-                        let memIndex = try currentComponent.coreMemoriesMap.resolveIndex(use: ref)
-                        result[i] = .memoryIndex(UInt32(memIndex))
-                    case .export(let instance, let exportName):
-                        let memIndex = try emitCoreExportAlias(sort: .memory, coreInstanceIndex: instance, exportName: exportName)
-                        result[i] = .memoryIndex(UInt32(memIndex))
-                    }
+                    result[i] = .memoryIndex(try resolveCoreMemoryRef(memRef))
 
                 case .realloc(let funcRef), .postReturn(let funcRef), .callback(let funcRef):
                     if case .export(let instance, let exportName) = funcRef {
@@ -2845,9 +2896,132 @@
             return result
         }
 
-        /// Parses a canon option list of parenthesized options and bare string encodings.
-        /// Stops before a trailing `(<stopKeyword> …)` block (`(core func …)` for `lower`,
-        /// `(func …)` for `lift`), or before the enclosing `)` when `stopKeyword` is `nil`.
+        private mutating func resolveCoreMemoryRef(_ memRef: MemoryRef) throws(WatParserError) -> UInt32 {
+            switch memRef {
+            case .direct(let ref):
+                return UInt32(try currentComponent.coreMemoriesMap.resolveIndex(use: ref))
+            case .export(let instance, let exportName):
+                return UInt32(try emitCoreExportAlias(sort: .memory, coreInstanceIndex: instance, exportName: exportName))
+            }
+        }
+
+        private func asyncCanonOpcode(forToken token: String) -> CanonOpcode? {
+            switch token {
+            case "task.return": return .taskReturn
+            case "task.cancel": return .taskCancel
+            case "subtask.cancel": return .subtaskCancel
+            case "subtask.drop": return .subtaskDrop
+            case "context.get": return .contextGetI32
+            case "context.set": return .contextSetI32
+            case "thread.yield": return .threadYield
+            case "thread.suspend": return .threadSuspend
+            case "thread.index": return .threadIndex
+            case "thread.new-indirect": return .threadNewIndirect
+            case "stream.new": return .streamNew
+            case "stream.read": return .streamRead
+            case "stream.write": return .streamWrite
+            case "stream.cancel-read": return .streamCancelRead
+            case "stream.cancel-write": return .streamCancelWrite
+            case "stream.drop-readable": return .streamDropReadable
+            case "stream.drop-writable": return .streamDropWritable
+            case "future.new": return .futureNew
+            case "future.read": return .futureRead
+            case "future.write": return .futureWrite
+            case "future.cancel-read": return .futureCancelRead
+            case "future.cancel-write": return .futureCancelWrite
+            case "future.drop-readable": return .futureDropReadable
+            case "future.drop-writable": return .futureDropWritable
+            case "waitable-set.new": return .waitableSetNew
+            case "waitable-set.wait": return .waitableSetWait
+            case "waitable-set.poll": return .waitableSetPoll
+            case "waitable-set.drop": return .waitableSetDrop
+            case "waitable.join": return .waitableJoin
+            case "backpressure.inc": return .backpressureInc
+            case "backpressure.dec": return .backpressureDec
+            default: return nil
+            }
+        }
+
+        /// Parses the immediates after an async canon built-in's keyword. The aliases that
+        /// memory references desugar to must precede the canon definition.
+        private mutating func parseAsyncCanonImmediate(
+            _ opcode: CanonOpcode, _ parser: inout Parser, location: Location
+        ) throws(WatParserError) -> CanonDef.AsyncImmediate {
+            switch opcode {
+            case .taskCancel, .subtaskDrop, .threadIndex, .waitableSetNew, .waitableSetDrop, .waitableJoin,
+                .backpressureInc, .backpressureDec:
+                return .none
+
+            case .streamNew, .streamDropReadable, .streamDropWritable,
+                .futureNew, .futureDropReadable, .futureDropWritable:
+                return .type(try parser.expectIndexOrId())
+
+            case .streamRead, .streamWrite, .futureRead, .futureWrite:
+                let typeRef = try parser.expectIndexOrId()
+                let rawOptions = try parseCanonOptionList(&parser, stopBefore: "core")
+                let options = try desugarCanonOptions(rawOptions, location: location)
+                return .typeWithOptions(typeRef, options: options)
+
+            case .streamCancelRead, .streamCancelWrite, .futureCancelRead, .futureCancelWrite:
+                let typeRef = try parser.expectIndexOrId()
+                return .typeWithAsyncFlag(typeRef, async: try takeAsyncKeyword(&parser))
+
+            case .subtaskCancel:
+                return .asyncFlag(try takeAsyncKeyword(&parser))
+
+            case .threadYield, .threadSuspend:
+                return .cancellableFlag(try parser.takeKeyword("cancellable"))
+
+            case .waitableSetWait, .waitableSetPoll:
+                let cancellable = try parser.takeKeyword("cancellable")
+                try parser.expectParenBlockStart("memory")
+                let memRef = try parseCoreMemoryRef(&parser)
+                try parser.expect(.rightParen)
+                let memoryIndex = try resolveCoreMemoryRef(memRef)
+                return .cancellableWithMemory(cancellable, memoryIndex: memoryIndex)
+
+            case .taskReturn:
+                var result: ComponentDefValType?
+                if try parser.takeParenBlockStart("result") {
+                    result = try parseComponentValueType(&parser)
+                    try parser.expect(.rightParen)
+                }
+                let rawOptions = try parseCanonOptionList(&parser, stopBefore: "core")
+                let options = try desugarCanonOptions(rawOptions, location: location)
+                return .resultListWithOptions(result, options: options)
+
+            case .contextGetI32, .contextSetI32:
+                let valueTypeToken = try parser.expect(.keyword)
+                let valueTypeKeyword = valueTypeToken.text(from: parser.lexer)
+                let valueType: CanonicalContextValueType
+                switch valueTypeKeyword {
+                case "i32": valueType = .i32
+                case "i64": valueType = .i64
+                default:
+                    throw WatParserError(
+                        "context.get/set value type must be i32 or i64, got '\(valueTypeKeyword)'",
+                        location: valueTypeToken.location(in: parser.lexer))
+                }
+                let slot = try parser.expectUnsignedInt(UInt32.self)
+                return .context(valueType, slot: slot)
+
+            case .threadNewIndirect:
+                let typeRef = try parser.expectIndexOrId()
+                try parser.expectParenBlockStart("table")
+                let tableRef = try parser.expectIndexOrId()
+                try parser.expect(.rightParen)
+                return .typeWithTable(type: typeRef, table: tableRef)
+
+            default:
+                // Unreachable: callers gate on `asyncCanonOpcode(forToken:) != nil`.
+                throw WatParserError("unsupported async canon operation '\(opcode)'", location: location)
+            }
+        }
+
+        /// Parses a canon option list of parenthesized options, bare string encodings and,
+        /// with `componentModelAsync`, the bare `async` option. Stops before a trailing
+        /// `(<stopKeyword> ...)` block (`(core func ...)` for `lower` and the async built-ins,
+        /// `(func ...)` for `lift`), or before the enclosing `)` when `stopKeyword` is `nil`.
         private mutating func parseCanonOptionList(
             _ parser: inout Parser, stopBefore stopKeyword: String?
         ) throws(WatParserError) -> [CanonDef.Option] {
@@ -2861,6 +3035,10 @@
                 if try parser.take(.leftParen) {
                     options.append(try parseCanonOpt(&parser))
                     try parser.expect(.rightParen)
+                    continue
+                }
+                if try takeAsyncKeyword(&parser) {
+                    options.append(.async)
                     continue
                 }
                 if let encoding = try parseBareStringEncoding(&parser) {
@@ -2933,6 +3111,11 @@
                     location: parser.lexer.location()
                 )
             }
+        }
+
+        private func takeAsyncKeyword(_ parser: inout Parser) throws(WatParserError) -> Bool {
+            guard features.contains(.componentModelAsync) else { return false }
+            return try parser.takeKeyword("async")
         }
 
         /// Parses `$ref` or `$instance "name"`, building the result with `direct` or `export`.
